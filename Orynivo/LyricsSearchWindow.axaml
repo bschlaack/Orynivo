@@ -1,6 +1,7 @@
 <Window x:Class="Orynivo.LyricsSearchWindow"
         xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:local="using:Orynivo"
         Title="{DynamicResource L_LyricsSearchTitle}"
         Icon="avares://Orynivo/Assets/Orynivo.ico"
         Width="700"
@@ -73,7 +74,7 @@
                      ItemContainerTheme="{StaticResource AppSearchResultItemTheme}"
                      SelectionChanged="ResultsListBox_OnSelectionChanged">
                 <ListBox.ItemTemplate>
-                    <DataTemplate>
+                    <DataTemplate x:DataType="local:LyricsSearchResultViewModel">
                         <StackPanel>
                                 <TextBlock Text="{Binding TrackName}"
                                            Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ListBoxItem}}"

@@ -62,6 +62,13 @@ public sealed class AppSettings
     /// <summary>Gets or sets a value indicating whether DSD sources are transported as bit-perfect DoP frames.</summary>
     public bool DsdOverPcmEnabled { get; set; }
     /// <summary>Gets or sets a value indicating whether PCM playback receives an additional +6 dB output boost.</summary>
+    /// <summary>
+    /// Gets or sets the maximum PCM output sample rate in hertz. Zero leaves the choice to
+    /// the device and lets the player use the highest rate it can fill. A lower value caps
+    /// the exclusive-mode output, which is useful when a driver advertises a rate it cannot
+    /// reproduce cleanly.
+    /// </summary>
+    public int MaxOutputSampleRateHz { get; set; }
     public bool PcmOutputBoostEnabled { get; set; }
     /// <summary>Gets or sets the fade duration used when advancing non-gapless queues, in seconds.</summary>
     public double NonGaplessCrossfadeSeconds { get; set; }

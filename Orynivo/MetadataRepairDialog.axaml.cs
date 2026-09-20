@@ -9,8 +9,6 @@ namespace Orynivo;
 /// <summary>Reviews MusicBrainz release candidates for one physical album folder.</summary>
 public partial class MetadataRepairDialog : Window
 {
-    private sealed record PreviewRow(int TrackNumber, string CurrentValues, string ProposedValues);
-
     private readonly MetadataFolderCandidate _candidate;
     private List<MetadataReleaseMatch> _matches = [];
     private CancellationTokenSource? _searchCts;
@@ -30,13 +28,11 @@ public partial class MetadataRepairDialog : Window
         _candidate = candidate;
         InitializeComponent();
         Title = LocalizationManager.Current.MetadataReviewTitle;
-        DataContext = new
-        {
-            FolderPath = candidate.FolderPath,
-            FoundReleasesLabel = LocalizationManager.Current.MetadataFoundReleases,
-            CancelLabel = LocalizationManager.Current.Cancel,
-            ApplyLabel = LocalizationManager.Current.MetadataApplyCorrection
-        };
+        DataContext = new MetadataRepairHeaderViewModel(
+            candidate.FolderPath,
+            LocalizationManager.Current.MetadataFoundReleases,
+            LocalizationManager.Current.Cancel,
+            LocalizationManager.Current.MetadataApplyCorrection);
         CurrentTracksDataGrid.ItemsSource = LibraryMetadataRepairService.OrderTracks(candidate.Tracks);
         AlbumQueryLabel.Text = LocalizationManager.Current.MetadataAlbumQuery;
         ArtistQueryLabel.Text = LocalizationManager.Current.MetadataArtistQuery;
@@ -148,7 +144,7 @@ public partial class MetadataRepairDialog : Window
         var localTracks = LibraryMetadataRepairService.OrderTracks(_candidate.Tracks);
         ApplyButton.IsEnabled = localTracks.Count == match.Tracks.Count;
         PreviewDataGrid.ItemsSource = localTracks.Zip(match.Tracks, (local, proposed) =>
-            new PreviewRow(
+            new MetadataRepairPreviewRow(
                 proposed.Position,
                 FormatTrackValues(local.Title, local.Artist),
                 FormatTrackValues(proposed.Title, proposed.Artist)))
@@ -176,3 +172,31 @@ public partial class MetadataRepairDialog : Window
             .Select(group => group.Key)
             .FirstOrDefault() ?? string.Empty;
 }
+
+/// <summary>
+/// Header values of the metadata review dialog. It lives outside the window so XAML can
+/// name it in an <c>x:DataType</c> directive; compiled bindings cannot be used with the
+/// anonymous type this dialog used before.
+/// </summary>
+/// <param name="FolderPath">Physical folder under review.</param>
+/// <param name="FoundReleasesLabel">Localized heading above the release list.</param>
+/// <param name="CancelLabel">Localized cancel button label.</param>
+/// <param name="ApplyLabel">Localized apply button label.</param>
+internal sealed record MetadataRepairHeaderViewModel(
+    string FolderPath,
+    string FoundReleasesLabel,
+    string CancelLabel,
+    string ApplyLabel);
+
+/// <summary>
+/// One current-versus-proposed row of the metadata correction preview. It lives outside
+/// the window so XAML can name it in an <c>x:DataType</c> directive, which compiled
+/// bindings require (a nested private type cannot be referenced from XAML).
+/// </summary>
+/// <param name="TrackNumber">Proposed track number.</param>
+/// <param name="CurrentValues">Current title and artist.</param>
+/// <param name="ProposedValues">Proposed title and artist.</param>
+internal sealed record MetadataRepairPreviewRow(
+    int TrackNumber,
+    string CurrentValues,
+    string ProposedValues);

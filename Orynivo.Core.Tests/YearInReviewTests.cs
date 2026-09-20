@@ -51,10 +51,20 @@ public sealed class YearInReviewTests
             InsertHistory(databasePath, null, "Old", "Old Artist", "Rock", 10_000, LocalTime(2023, 6, 1, 9));
             InsertHistory(databasePath, null, "New", "New Artist", "Jazz", 120, LocalTime(2024, 6, 1, 9));
 
+            // Both rows are written through a separate connection, so prove first that the
+            // AudioDatabase connection sees them. Without this precondition an invisible
+            // insert looks exactly like a year-filter bug, which is what made an earlier
+            // failure of this test hard to attribute.
+            Assert.Equal(2, database.GetRecentHistory().Count);
+
             var summary = database.GetYearInReview(2024);
 
             Assert.NotNull(summary);
-            Assert.Equal(120d, summary.TotalListeningSeconds);
+            Assert.True(
+                summary.TotalListeningSeconds == 120d,
+                $"Expected 120 s for 2024, got {summary.TotalListeningSeconds} s "
+                + $"(active profile '{AudioDatabase.ActiveProfileId}', "
+                + $"{database.GetRecentHistory().Count} history rows visible).");
             Assert.Equal("Jazz", summary.TopGenres[0].Genre);
             Assert.Equal("New", summary.TopAlbums[0].Title);
             Assert.Equal("New Artist", summary.TopArtists[0].Name);
@@ -111,8 +121,14 @@ public sealed class YearInReviewTests
         var root = Path.Combine(Path.GetTempPath(), $"orynivo-year-review-{Guid.NewGuid():N}");
         Directory.CreateDirectory(root);
         var databasePath = Path.Combine(root, "library.db");
+        // The year summary filters by AudioDatabase.ActiveProfileId, which is
+        // process-wide AsyncLocal state. Pin it for the test and restore whatever the
+        // surrounding context had, so a leaked profile from another test can never turn
+        // this into a silent "zero listening time" result.
+        var previousProfile = AudioDatabase.ActiveProfileId;
         try
         {
+            AudioDatabase.SetActiveProfile("standard");
             using var database = new AudioDatabase(databasePath);
             var path = Path.Combine(root, "track.flac");
             database.Upsert(new TrackRecord
@@ -132,6 +148,7 @@ public sealed class YearInReviewTests
         }
         finally
         {
+            AudioDatabase.SetActiveProfile(previousProfile);
             CoreTestDatabase.ClearPool(databasePath);
             Directory.Delete(root, recursive: true);
         }

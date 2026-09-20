@@ -14,13 +14,8 @@ namespace Orynivo;
 /// <summary>Dialog for manually searching and selecting album cover artwork.</summary>
 public partial class CoverSearchWindow : Window
 {
-    private sealed record CoverResultViewModel(CoverSearchResult Result, Bitmap Image)
-    {
-        public string Title => Result.Title;
-        public string? Artist => Result.Artist;
-    }
 
-    private readonly ObservableCollection<CoverResultViewModel> _results = [];
+    private readonly ObservableCollection<CoverSearchResultViewModel> _results = [];
     private readonly DispatcherTimer _busyTimer;
     private readonly string[] _busyFrames = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
     private int _busyFrameIndex;
@@ -126,7 +121,7 @@ public partial class CoverSearchWindow : Window
                             bitmap.Dispose();
                             return;
                         }
-                        _results.Add(new CoverResultViewModel(result, bitmap));
+                        _results.Add(new CoverSearchResultViewModel(result, bitmap));
                         CoverSearchDiagnostics.Record("preview", elapsed.ElapsedMilliseconds, decodeMs, result.ImageData.Length);
                     });
                 });
@@ -159,7 +154,7 @@ public partial class CoverSearchWindow : Window
 
     private async void UseSelectedCoverButton_OnClick(object? sender, RoutedEventArgs e)
     {
-        if (_closed || _selecting || ResultsListBox.SelectedItem is not CoverResultViewModel selected)
+        if (_closed || _selecting || ResultsListBox.SelectedItem is not CoverSearchResultViewModel selected)
             return;
 
         _selecting = true;
@@ -211,4 +206,15 @@ public partial class CoverSearchWindow : Window
         using var stream = new MemoryStream(data);
         return Bitmap.DecodeToWidth(stream, 250);
     }
+}
+
+/// <summary>
+/// Presentation wrapper for one CoverSearchWindow result. It lives outside the window so XAML
+/// can name it in an <c>x:DataType</c> directive, which compiled bindings require
+/// (a nested private type cannot be referenced from XAML).
+/// </summary>
+internal sealed record CoverSearchResultViewModel(CoverSearchResult Result, Bitmap Image)
+{
+    public string Title => Result.Title;
+    public string? Artist => Result.Artist;
 }

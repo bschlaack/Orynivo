@@ -201,7 +201,7 @@ public partial class MainWindow
                 Math.Max(1, (int)Math.Round(source.Width * scale)),
                 Math.Max(1, (int)Math.Round(source.Height * scale)));
             using var resized = scale < 1d
-                ? source.Resize(info, SKFilterQuality.Medium)
+                ? source.Resize(info, new SKSamplingOptions(SKFilterMode.Linear, SKMipmapMode.Linear))
                 : source.Copy();
             using var encoded = resized?.Encode(SKEncodedImageFormat.Jpeg, 85);
             var data = encoded?.ToArray();

@@ -83,7 +83,7 @@ public partial class YearInReviewDialog : Window
                 new PixelSize((int)Math.Ceiling(size.Width), (int)Math.Ceiling(size.Height)),
                 new Vector(96, 96));
             bitmap.Render(ContentHost);
-            bitmap.Save(filePath);
+            bitmap.Save(filePath, PngBitmapEncoderOptions.Default);
             StatusTextBlock.Text = string.Format(
                 CultureInfo.CurrentCulture,
                 LocalizationManager.Current.YearInReviewImageSaved,

@@ -52,10 +52,10 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw "Tag '$tag' is not contained in origin/main." }
           git checkout --detach $tag
 
-      - name: Set up .NET 8
+      - name: Set up .NET 10
         uses: actions/setup-dotnet@v6
         with:
-          dotnet-version: 8.0.x
+          dotnet-version: 10.0.x
 
       - name: Restore dependencies
         run: dotnet restore Orynivo/Orynivo.csproj --runtime win-x64

@@ -70,7 +70,7 @@
                  Background="{DynamicResource AppInputBrush}"
                  Foreground="{DynamicResource AppPrimaryTextBrush}"
                  BorderBrush="{DynamicResource AppInputBorderBrush}"
-                 Watermark="{DynamicResource L_ReferenceTrackSearchWatermark}"
+                 PlaceholderText="{DynamicResource L_ReferenceTrackSearchWatermark}"
                  Margin="0,0,0,10"
                  TextChanged="SearchTextBox_OnTextChanged"/>
 

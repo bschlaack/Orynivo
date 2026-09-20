@@ -214,7 +214,8 @@ public partial class MainWindow : Window
                     _settings.SelectedDriverName,
                     _settings.EqualizerEnabled,
                     _settings.EqualizerProfile,
-                    _playbackCts.Token);
+                    _playbackCts.Token,
+                    _settings.MaxOutputSampleRateHz);
         }
         else if (_settings.OutputBackend == OutputBackend.AirPlay)
         {
@@ -273,7 +274,8 @@ public partial class MainWindow : Window
                 _settings.SelectedWasapiDeviceId,
                 _settings.EqualizerEnabled,
                 _settings.EqualizerProfile,
-                _playbackCts.Token);
+                _playbackCts.Token,
+                _settings.MaxOutputSampleRateHz);
         }
         else
         {
@@ -749,7 +751,8 @@ public partial class MainWindow : Window
                 driverName,
                 _settings.EqualizerEnabled,
                 _settings.EqualizerProfile,
-                _playbackCts?.Token ?? CancellationToken.None);
+                _playbackCts?.Token ?? CancellationToken.None,
+                _settings.MaxOutputSampleRateHz);
         }
     }
 

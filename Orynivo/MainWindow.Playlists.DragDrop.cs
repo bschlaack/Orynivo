@@ -77,6 +77,7 @@ public partial class MainWindow : Window
         {
             _queueDragOrigin = e.GetPosition(control);
             _queueDragPending = true;
+            _queueDragPress = e;
         }
         else
         {
@@ -86,7 +87,7 @@ public partial class MainWindow : Window
 
     private async void QueueDragSource_OnPointerMoved(object? sender, PointerEventArgs e)
     {
-        if (!_queueDragPending || sender is not Control control)
+        if (!_queueDragPending || _queueDragPress is not { } press || sender is not Control control)
             return;
         if (!e.GetCurrentPoint(control).Properties.IsLeftButtonPressed)
         {
@@ -105,7 +106,8 @@ public partial class MainWindow : Window
         e.Handled = true;
         var data = new DataTransfer();
         data.Add(DataTransferItem.Create(QueueDragFormat, JsonSerializer.Serialize(paths)));
-        try { await DragDrop.DoDragDropAsync(e, data, DragDropEffects.Copy); }
+        // Avalonia 12 requires the originating press event, not the move event.
+        try { await DragDrop.DoDragDropAsync(press, data, DragDropEffects.Copy); }
         catch { /* A failed drag must never disrupt normal list interaction. */ }
         e.Handled = true;
     }

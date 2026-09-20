@@ -4,6 +4,89 @@ All notable changes to Orynivo are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased]
+
+### Added
+- Added a **Maximum output sample rate** option under Playback. It caps the PCM output
+  rate for exclusive WASAPI and ASIO/cwASIO (Automatic keeps the previous behaviour of
+  using the highest rate the device offers). It is useful when a driver advertises a rate
+  it cannot reproduce cleanly - a Sound BlasterX AE-5 in Direct Mode reports 384 kHz that
+  way. A cap only reorders the candidates, so playback still falls back to an above-cap
+  rate when the device supports nothing at or below it.
+
+
+- Extracted `ContentRow` and `LogicalAlbumPart` from `MainWindow.xaml.cs` into
+  top-level types with complete English XML documentation (69 members gained a
+  summary). Every remaining `{ReflectionBinding}` in the views is now a
+  compile-time-checked `{Binding}` with `x:DataType="local:ContentRow"`, so no
+  reflection binding is left in the XAML.
+
+- Adopted Avalonia 12 compiled bindings for the whole desktop UI and removed
+  `AvaloniaUseCompiledBindingsByDefault=false`. Every template and item-binding
+  scope now carries an explicit `x:DataType`, which turned 232 previously unchecked
+  bindings into compile-time-checked ones. Ten view models moved out of their
+  window or view into top-level types because XAML cannot name a nested type
+  (`RadioStationViewModel`, `PodcastViewModel`, `PodcastEpisodeViewModel`,
+  `LyricLineViewModel`, `DailyHistoryRow`, `MetadataProblemRow`,
+  `MetadataRepairHeaderViewModel`, `MetadataRepairPreviewRow`, `TrackInfoEntry`,
+  and the three search-window result view models); the metadata review dialog now
+  uses a named header record instead of an anonymous type. The scopes that bind the
+  still-nested `ContentRow` keep explicit `{ReflectionBinding}` until that type is
+  extracted.
+
+- Hardened the profile-scoped test isolation. `AudioDatabase.ActiveProfileId` is
+  process-wide `AsyncLocal` state, so every test that changes it now saves and
+  restores the previous value; a leaked profile made profile-scoped queries
+  (playback history, year-in-review summary, cross-device positions) silently
+  return nothing, which looked like a query bug. `YearInReviewTests` additionally
+  pins the profile, proves that history rows written through a separate SQLite
+  connection are visible through the `AudioDatabase` connection before the year
+  query runs, and reports the active profile and visible row count on failure.
+  This addresses the intermittent failure of
+  `GetYearInReview_ExcludesOtherYears` that could not be reproduced on demand.
+
+- Migrated the desktop from Avalonia 11.3 to **Avalonia 12.1.2** and SkiaSharp
+  2.88.9 to **3.119.4** (`Avalonia.Skia` 12.1.2 depends on that line).
+  `Avalonia.Controls.DataGrid` moved with the other packages - the earlier "no
+  release beyond 11.3.13" note was wrong, DataGrid ships 12.1.2 again. The
+  unused Debug-only `Avalonia.Diagnostics` reference was dropped (it has no 12.x
+  release and the app never called `AttachDevTools`); its official successor is
+  `AvaloniaUI.DiagnosticsSupport`. SkiaSharp 3 moved the text and sampling APIs
+  off `SKPaint` onto `SKFont`/`SKSamplingOptions`, and the Avalonia 12
+  deprecations that fail the `--warnaserror` build were fixed:
+  `TextBox.Watermark` became `PlaceholderText` (8 sites), `Window.SystemDecorations`
+  became `WindowDecorations`, `IClipboard.SetTextAsync` became
+  `SetDataAsync(DataTransfer)`, and `DragDrop.DoDragDropAsync` now needs the
+  originating press event. Bindings deliberately stay on the reflection mode
+  (`AvaloniaUseCompiledBindingsByDefault=false`) until each view is converted to
+  compiled bindings with an explicit `x:DataType`; that conversion is recorded
+  in `DEPENDENCY-MIGRATION.md`.
+
+- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
+  held back by Dependabot. It records the current pins, the trigger that unblocks
+  each upgrade, the migration steps, and the checks required before merging, and
+  is referenced from `AGENTS.md` next to the Dependabot rules.
+
+- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
+  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
+  support on 10 November 2026, the same day as the currently used .NET 8, so
+  moving to it would be a dead end. The record now carries the support-window
+  table, the .NET 10 migration steps, and the note that
+  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
+  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
+  instead of waiting for an upstream release.
+
+- Migrated the complete solution to **.NET 10 LTS**. All six projects now target
+  `net10.0` (`net10.0-windows10.0.19041.0` for the Windows desktop and its tests),
+  `global.json` pins SDK `10.0.100` with `rollForward: latestFeature`, every
+  workflow pins `dotnet-version: 10.0.x`, and `Microsoft.Data.Sqlite`,
+  `Microsoft.AspNetCore.TestHost`, and `Microsoft.NET.Test.Sdk` moved to the
+  matching 10.0.12/10.0.12/18.10.1 lines. `net8.0` and .NET 9 both reach end of
+  support on 10 November 2026, so this replaces a line that was about to stop
+  receiving fixes. `Orynivo/Orynivo.csproj` also copies the Lucene `NOTICE.txt`
+  from the `4.8.0-beta00018` directory it actually references; the path still
+  named `beta00017`, so the license file was silently skipped.
+
 ## [0.44.0] - 2026-09-20
 
 ### Added
@@ -18,18 +101,24 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   `LastFmClient.SetTrackLovedAsync`. The call is best effort, never blocks
   playback, and is skipped for items without an artist and title. The existing
   "now playing" notification now also skips untagged items instead of sending a
-  request Last.fm would reject.- The Infinite Mix profile editor now offers 
+  request Last.fm would reject.
+
+- The Infinite Mix profile editor now offers
   **Focus**, **Workout**, and
   **Wind down** presets next to the mood selector. They pre-fill the mood,
   discovery level, history period, and weighting through the pure, tested
   `InfiniteMixPresets` mapping, which preserves the server selection, genre
   filters, feedback, and exclusions, and never modifies the profile it is based
-  on.- The smart-playlist editor can now replace the similarity reference track.
+  on.
+
+- The smart-playlist editor can now replace the similarity reference track.
   **Choose reference track** opens a small search dialog over the local library
   and every configured Orynivo Server and applies the selection together with the
   minimum similarity score; the readable label and **Remove reference** stay.
   Criteria building keeps using the pure `SmartPlaylistCriteriaEditing` helper,
-  which gained a picked-reference override.- Added five MCP and AI Chat tools.
+  which gained a picked-reference override.
+
+- Added five MCP and AI Chat tools.
   Read-only: `get_year_in_review` returns the
   listening statistics for one calendar year (listened hours, active days, the
   monthly breakdown, and the leading genres, albums, and artists), and
@@ -67,6 +156,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   sets the cache size limit in megabytes. Eviction removes the least recently used
   downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
   the most recently used episode is always kept.
+
 - Added an optional automatic server-side library backup schedule. The
   `Orynivo:BackupSchedule` configuration section (disabled by default) writes a
   versioned library ZIP at most once per `IntervalDays` into its target folder and
@@ -75,6 +165,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   archive so no extra state is stored, holds no credentials, and never includes
   audio files. Automatic archive naming moved into the shared
   `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
+
 - Added an optional WebDAV upload target for completed library backups.
   `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
   sub-folder, and user name, while the password lives only in the encrypted
@@ -100,30 +191,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
   positions are stored, and no credential-bearing URL is ever persisted.
 
-- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
-  held back by Dependabot. It records the current pins, the trigger that unblocks
-  each upgrade, the migration steps, and the checks required before merging, and
-  is referenced from `AGENTS.md` next to the Dependabot rules.
-
-- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
-  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
-  support on 10 November 2026, the same day as the currently used .NET 8, so
-  moving to it would be a dead end. The record now carries the support-window
-  table, the .NET 10 migration steps, and the note that
-  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
-  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
-  instead of waiting for an upstream release.
-
-- Fixed the failing Dependabot GitHub Actions update. `dotnet-desktop.yml` still
-  pinned `actions/checkout@v6`, `actions/setup-dotnet@v5`, and
-  `actions/upload-artifact@v6` while every other workflow used `@v7`/`@v6`/`@v7`,
-  which made Dependabot abort with `Error processing actions/setup-dotnet
-  (RuntimeError)` / `No files changed!`. All 18 action references now use one
-  version per action, and the new `scripts/verify-github-actions-pins.ps1` (wired
-  into `scripts/verify-all.ps1` and the CI verify job) fails the build when a
-  workflow reintroduces a mixed major.
-
 ### Fixed
+- Fixed DSD-to-PCM playback over exclusive WASAPI, which played nothing but very loud
+  crackling on a Sound BlasterX AE-5. The WASAPI format chooser handed the raw DSD rate
+  to its ordering (`Math.Max(source, hint)`), so a DSD source preferred the highest rate
+  the driver reported. On a Sound BlasterX AE-5 that is 384 kHz, a fractional division of
+  the DSD rate (5644800/384000 = 14.7 for DSD128), and that driver reports its
+  exclusive-format set inconsistently between queries, so the same build can pick 192 kHz
+  in one run and 384 kHz in the next. It now prefers an exact division of
+  the DSD rate that does not exceed the conversion hint, matching what the ASIO path
+  already did, and the WASAPI probe reports the same 176400 Hz hint as the FFmpeg player.
+  On that device the conversion now runs at 88200 Hz (5644800/64 for DSD128). The probe
+  order is extracted into the pure `WasapiAudioPlayer.OrderCandidateSampleRates` and
+  covered by seven tests.
+
 
 - Similarity smart playlists now resolve on an Orynivo Server instead of
   returning an empty list. `/api/playlists/{id}/resolve` and
@@ -143,6 +224,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   process-wide `SqliteConnection.ClearAllPools()`. `ArtistAttributionTests` no
   longer deletes a shared database between tests, so no test can observe another
   test's rows while xUnit runs classes in parallel.
+- Fixed the failing Dependabot GitHub Actions update. `dotnet-desktop.yml` still
+  pinned `actions/checkout@v6`, `actions/setup-dotnet@v5`, and
+  `actions/upload-artifact@v6` while every other workflow used `@v7`/`@v6`/`@v7`,
+  which made Dependabot abort with `Error processing actions/setup-dotnet
+  (RuntimeError)` / `No files changed!`. All 18 action references now use one
+  version per action, and the new `scripts/verify-github-actions-pins.ps1` (wired
+  into `scripts/verify-all.ps1` and the CI verify job) fails the build when a
+  workflow reintroduces a mixed major.
 
 ## [0.43.1] - 2026-09-18
 
@@ -180,62 +269,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   the cache size limit in megabytes. Eviction removes the least recently used
   downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
   the most recently used episode is always kept.
-- Added an optional automatic server-side library backup schedule. The
-  `Orynivo:BackupSchedule` configuration section (disabled by default) writes a
-  versioned library ZIP at most once per `IntervalDays` into its target folder and
-  removes archives beyond `RetentionCount`. It reuses the shared
-  `Orynivo.Library.BackupRetention` decisions, derives its last run from the newest
-  archive so no extra state is stored, holds no credentials, and never includes
-  audio files. Automatic archive naming moved into the shared
-  `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
-- Added an optional WebDAV upload target for completed library backups.
-  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
-  sub-folder, and user name, while the password lives only in the encrypted
-  credential store and stays out of `settings.json`. Only plain `http`/`https`
-  URLs without embedded credentials are accepted, the upload is best effort and
-  never removes the local archive, and credentials never reach a URL, a log, or
-  an error message. The scheduled and **Back up now** paths share the upload,
-  and Settings gained the corresponding fields under the backup schedule.
-
-- Added a **Reduce motion** option under Appearance that disables the optional
-  Genre Cloud, Dashboard cover-stage, and karaoke animations. The decision lives
-  in the pure `Orynivo.Controls.MotionPreferences` helper. The album and artist
-  artwork grids can now be opened with Enter or Space in addition to a
-  double-click, and the transport controls (previous, play/pause, next, volume,
-  artist info, lyrics, favorite, shuffle, equalizer, and output) expose
-  accessible names.
-
-- Added cross-device resume for remote Orynivo Server tracks. The server stores the
-  last playback position per profile and track (`profile_track_position`) through
-  the new authenticated `GET`/`PUT /api/tracks/{id}/position` endpoints; the client
-  publishes its audible position at most every 20 seconds and offers a **Resume**
-  transport action when another device left off meaningfully later. The decision
-  lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
-  positions are stored, and no credential-bearing URL is ever persisted.
-
-- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
-  held back by Dependabot. It records the current pins, the trigger that unblocks
-  each upgrade, the migration steps, and the checks required before merging, and
-  is referenced from `AGENTS.md` next to the Dependabot rules.
-
-- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
-  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
-  support on 10 November 2026, the same day as the currently used .NET 8, so
-  moving to it would be a dead end. The record now carries the support-window
-  table, the .NET 10 migration steps, and the note that
-  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
-  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
-  instead of waiting for an upstream release.
-
-- Fixed the failing Dependabot GitHub Actions update. `dotnet-desktop.yml` still
-  pinned `actions/checkout@v6`, `actions/setup-dotnet@v5`, and
-  `actions/upload-artifact@v6` while every other workflow used `@v7`/`@v6`/`@v7`,
-  which made Dependabot abort with `Error processing actions/setup-dotnet
-  (RuntimeError)` / `No files changed!`. All 18 action references now use one
-  version per action, and the new `scripts/verify-github-actions-pins.ps1` (wired
-  into `scripts/verify-all.ps1` and the CI verify job) fails the build when a
-  workflow reintroduces a mixed major.
-
 ### Fixed
 
 - Fixed a .NET 8 build break in `GenreCloudService` and
@@ -360,62 +393,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   the cache size limit in megabytes. Eviction removes the least recently used
   downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
   the most recently used episode is always kept.
-- Added an optional automatic server-side library backup schedule. The
-  `Orynivo:BackupSchedule` configuration section (disabled by default) writes a
-  versioned library ZIP at most once per `IntervalDays` into its target folder and
-  removes archives beyond `RetentionCount`. It reuses the shared
-  `Orynivo.Library.BackupRetention` decisions, derives its last run from the newest
-  archive so no extra state is stored, holds no credentials, and never includes
-  audio files. Automatic archive naming moved into the shared
-  `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
-- Added an optional WebDAV upload target for completed library backups.
-  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
-  sub-folder, and user name, while the password lives only in the encrypted
-  credential store and stays out of `settings.json`. Only plain `http`/`https`
-  URLs without embedded credentials are accepted, the upload is best effort and
-  never removes the local archive, and credentials never reach a URL, a log, or
-  an error message. The scheduled and **Back up now** paths share the upload,
-  and Settings gained the corresponding fields under the backup schedule.
-
-- Added a **Reduce motion** option under Appearance that disables the optional
-  Genre Cloud, Dashboard cover-stage, and karaoke animations. The decision lives
-  in the pure `Orynivo.Controls.MotionPreferences` helper. The album and artist
-  artwork grids can now be opened with Enter or Space in addition to a
-  double-click, and the transport controls (previous, play/pause, next, volume,
-  artist info, lyrics, favorite, shuffle, equalizer, and output) expose
-  accessible names.
-
-- Added cross-device resume for remote Orynivo Server tracks. The server stores the
-  last playback position per profile and track (`profile_track_position`) through
-  the new authenticated `GET`/`PUT /api/tracks/{id}/position` endpoints; the client
-  publishes its audible position at most every 20 seconds and offers a **Resume**
-  transport action when another device left off meaningfully later. The decision
-  lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
-  positions are stored, and no credential-bearing URL is ever persisted.
-
-- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
-  held back by Dependabot. It records the current pins, the trigger that unblocks
-  each upgrade, the migration steps, and the checks required before merging, and
-  is referenced from `AGENTS.md` next to the Dependabot rules.
-
-- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
-  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
-  support on 10 November 2026, the same day as the currently used .NET 8, so
-  moving to it would be a dead end. The record now carries the support-window
-  table, the .NET 10 migration steps, and the note that
-  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
-  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
-  instead of waiting for an upstream release.
-
-- Fixed the failing Dependabot GitHub Actions update. `dotnet-desktop.yml` still
-  pinned `actions/checkout@v6`, `actions/setup-dotnet@v5`, and
-  `actions/upload-artifact@v6` while every other workflow used `@v7`/`@v6`/`@v7`,
-  which made Dependabot abort with `Error processing actions/setup-dotnet
-  (RuntimeError)` / `No files changed!`. All 18 action references now use one
-  version per action, and the new `scripts/verify-github-actions-pins.ps1` (wired
-  into `scripts/verify-all.ps1` and the CI verify job) fails the build when a
-  workflow reintroduces a mixed major.
-
 ### Fixed
 
 - Editing a similarity smart playlist no longer drops its reference track. The
@@ -586,62 +563,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   the cache size limit in megabytes. Eviction removes the least recently used
   downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
   the most recently used episode is always kept.
-- Added an optional automatic server-side library backup schedule. The
-  `Orynivo:BackupSchedule` configuration section (disabled by default) writes a
-  versioned library ZIP at most once per `IntervalDays` into its target folder and
-  removes archives beyond `RetentionCount`. It reuses the shared
-  `Orynivo.Library.BackupRetention` decisions, derives its last run from the newest
-  archive so no extra state is stored, holds no credentials, and never includes
-  audio files. Automatic archive naming moved into the shared
-  `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
-- Added an optional WebDAV upload target for completed library backups.
-  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
-  sub-folder, and user name, while the password lives only in the encrypted
-  credential store and stays out of `settings.json`. Only plain `http`/`https`
-  URLs without embedded credentials are accepted, the upload is best effort and
-  never removes the local archive, and credentials never reach a URL, a log, or
-  an error message. The scheduled and **Back up now** paths share the upload,
-  and Settings gained the corresponding fields under the backup schedule.
-
-- Added a **Reduce motion** option under Appearance that disables the optional
-  Genre Cloud, Dashboard cover-stage, and karaoke animations. The decision lives
-  in the pure `Orynivo.Controls.MotionPreferences` helper. The album and artist
-  artwork grids can now be opened with Enter or Space in addition to a
-  double-click, and the transport controls (previous, play/pause, next, volume,
-  artist info, lyrics, favorite, shuffle, equalizer, and output) expose
-  accessible names.
-
-- Added cross-device resume for remote Orynivo Server tracks. The server stores the
-  last playback position per profile and track (`profile_track_position`) through
-  the new authenticated `GET`/`PUT /api/tracks/{id}/position` endpoints; the client
-  publishes its audible position at most every 20 seconds and offers a **Resume**
-  transport action when another device left off meaningfully later. The decision
-  lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
-  positions are stored, and no credential-bearing URL is ever persisted.
-
-- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
-  held back by Dependabot. It records the current pins, the trigger that unblocks
-  each upgrade, the migration steps, and the checks required before merging, and
-  is referenced from `AGENTS.md` next to the Dependabot rules.
-
-- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
-  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
-  support on 10 November 2026, the same day as the currently used .NET 8, so
-  moving to it would be a dead end. The record now carries the support-window
-  table, the .NET 10 migration steps, and the note that
-  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
-  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
-  instead of waiting for an upstream release.
-
-- Fixed the failing Dependabot GitHub Actions update. `dotnet-desktop.yml` still
-  pinned `actions/checkout@v6`, `actions/setup-dotnet@v5`, and
-  `actions/upload-artifact@v6` while every other workflow used `@v7`/`@v6`/`@v7`,
-  which made Dependabot abort with `Error processing actions/setup-dotnet
-  (RuntimeError)` / `No files changed!`. All 18 action references now use one
-  version per action, and the new `scripts/verify-github-actions-pins.ps1` (wired
-  into `scripts/verify-all.ps1` and the CI verify job) fails the build when a
-  workflow reintroduces a mixed major.
-
 ### Fixed
 
 - The genre-cloud recommendation tie-break is now deterministic. It previously
@@ -685,62 +606,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   the cache size limit in megabytes. Eviction removes the least recently used
   downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
   the most recently used episode is always kept.
-- Added an optional automatic server-side library backup schedule. The
-  `Orynivo:BackupSchedule` configuration section (disabled by default) writes a
-  versioned library ZIP at most once per `IntervalDays` into its target folder and
-  removes archives beyond `RetentionCount`. It reuses the shared
-  `Orynivo.Library.BackupRetention` decisions, derives its last run from the newest
-  archive so no extra state is stored, holds no credentials, and never includes
-  audio files. Automatic archive naming moved into the shared
-  `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
-- Added an optional WebDAV upload target for completed library backups.
-  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
-  sub-folder, and user name, while the password lives only in the encrypted
-  credential store and stays out of `settings.json`. Only plain `http`/`https`
-  URLs without embedded credentials are accepted, the upload is best effort and
-  never removes the local archive, and credentials never reach a URL, a log, or
-  an error message. The scheduled and **Back up now** paths share the upload,
-  and Settings gained the corresponding fields under the backup schedule.
-
-- Added a **Reduce motion** option under Appearance that disables the optional
-  Genre Cloud, Dashboard cover-stage, and karaoke animations. The decision lives
-  in the pure `Orynivo.Controls.MotionPreferences` helper. The album and artist
-  artwork grids can now be opened with Enter or Space in addition to a
-  double-click, and the transport controls (previous, play/pause, next, volume,
-  artist info, lyrics, favorite, shuffle, equalizer, and output) expose
-  accessible names.
-
-- Added cross-device resume for remote Orynivo Server tracks. The server stores the
-  last playback position per profile and track (`profile_track_position`) through
-  the new authenticated `GET`/`PUT /api/tracks/{id}/position` endpoints; the client
-  publishes its audible position at most every 20 seconds and offers a **Resume**
-  transport action when another device left off meaningfully later. The decision
-  lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
-  positions are stored, and no credential-bearing URL is ever persisted.
-
-- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
-  held back by Dependabot. It records the current pins, the trigger that unblocks
-  each upgrade, the migration steps, and the checks required before merging, and
-  is referenced from `AGENTS.md` next to the Dependabot rules.
-
-- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
-  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
-  support on 10 November 2026, the same day as the currently used .NET 8, so
-  moving to it would be a dead end. The record now carries the support-window
-  table, the .NET 10 migration steps, and the note that
-  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
-  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
-  instead of waiting for an upstream release.
-
-- Fixed the failing Dependabot GitHub Actions update. `dotnet-desktop.yml` still
-  pinned `actions/checkout@v6`, `actions/setup-dotnet@v5`, and
-  `actions/upload-artifact@v6` while every other workflow used `@v7`/`@v6`/`@v7`,
-  which made Dependabot abort with `Error processing actions/setup-dotnet
-  (RuntimeError)` / `No files changed!`. All 18 action references now use one
-  version per action, and the new `scripts/verify-github-actions-pins.ps1` (wired
-  into `scripts/verify-all.ps1` and the CI verify job) fails the build when a
-  workflow reintroduces a mixed major.
-
 ### Fixed
 
 - Assigning local or remote album artwork now preserves the Dashboard's
@@ -790,62 +655,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   the cache size limit in megabytes. Eviction removes the least recently used
   downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
   the most recently used episode is always kept.
-- Added an optional automatic server-side library backup schedule. The
-  `Orynivo:BackupSchedule` configuration section (disabled by default) writes a
-  versioned library ZIP at most once per `IntervalDays` into its target folder and
-  removes archives beyond `RetentionCount`. It reuses the shared
-  `Orynivo.Library.BackupRetention` decisions, derives its last run from the newest
-  archive so no extra state is stored, holds no credentials, and never includes
-  audio files. Automatic archive naming moved into the shared
-  `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
-- Added an optional WebDAV upload target for completed library backups.
-  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
-  sub-folder, and user name, while the password lives only in the encrypted
-  credential store and stays out of `settings.json`. Only plain `http`/`https`
-  URLs without embedded credentials are accepted, the upload is best effort and
-  never removes the local archive, and credentials never reach a URL, a log, or
-  an error message. The scheduled and **Back up now** paths share the upload,
-  and Settings gained the corresponding fields under the backup schedule.
-
-- Added a **Reduce motion** option under Appearance that disables the optional
-  Genre Cloud, Dashboard cover-stage, and karaoke animations. The decision lives
-  in the pure `Orynivo.Controls.MotionPreferences` helper. The album and artist
-  artwork grids can now be opened with Enter or Space in addition to a
-  double-click, and the transport controls (previous, play/pause, next, volume,
-  artist info, lyrics, favorite, shuffle, equalizer, and output) expose
-  accessible names.
-
-- Added cross-device resume for remote Orynivo Server tracks. The server stores the
-  last playback position per profile and track (`profile_track_position`) through
-  the new authenticated `GET`/`PUT /api/tracks/{id}/position` endpoints; the client
-  publishes its audible position at most every 20 seconds and offers a **Resume**
-  transport action when another device left off meaningfully later. The decision
-  lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
-  positions are stored, and no credential-bearing URL is ever persisted.
-
-- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
-  held back by Dependabot. It records the current pins, the trigger that unblocks
-  each upgrade, the migration steps, and the checks required before merging, and
-  is referenced from `AGENTS.md` next to the Dependabot rules.
-
-- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
-  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
-  support on 10 November 2026, the same day as the currently used .NET 8, so
-  moving to it would be a dead end. The record now carries the support-window
-  table, the .NET 10 migration steps, and the note that
-  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
-  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
-  instead of waiting for an upstream release.
-
-- Fixed the failing Dependabot GitHub Actions update. `dotnet-desktop.yml` still
-  pinned `actions/checkout@v6`, `actions/setup-dotnet@v5`, and
-  `actions/upload-artifact@v6` while every other workflow used `@v7`/`@v6`/`@v7`,
-  which made Dependabot abort with `Error processing actions/setup-dotnet
-  (RuntimeError)` / `No files changed!`. All 18 action references now use one
-  version per action, and the new `scripts/verify-github-actions-pins.ps1` (wired
-  into `scripts/verify-all.ps1` and the CI verify job) fails the build when a
-  workflow reintroduces a mixed major.
-
 ### Fixed
 
 - Unified all six desktop languages as complete built-in resources (853 keys
@@ -888,62 +697,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   the cache size limit in megabytes. Eviction removes the least recently used
   downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
   the most recently used episode is always kept.
-- Added an optional automatic server-side library backup schedule. The
-  `Orynivo:BackupSchedule` configuration section (disabled by default) writes a
-  versioned library ZIP at most once per `IntervalDays` into its target folder and
-  removes archives beyond `RetentionCount`. It reuses the shared
-  `Orynivo.Library.BackupRetention` decisions, derives its last run from the newest
-  archive so no extra state is stored, holds no credentials, and never includes
-  audio files. Automatic archive naming moved into the shared
-  `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
-- Added an optional WebDAV upload target for completed library backups.
-  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
-  sub-folder, and user name, while the password lives only in the encrypted
-  credential store and stays out of `settings.json`. Only plain `http`/`https`
-  URLs without embedded credentials are accepted, the upload is best effort and
-  never removes the local archive, and credentials never reach a URL, a log, or
-  an error message. The scheduled and **Back up now** paths share the upload,
-  and Settings gained the corresponding fields under the backup schedule.
-
-- Added a **Reduce motion** option under Appearance that disables the optional
-  Genre Cloud, Dashboard cover-stage, and karaoke animations. The decision lives
-  in the pure `Orynivo.Controls.MotionPreferences` helper. The album and artist
-  artwork grids can now be opened with Enter or Space in addition to a
-  double-click, and the transport controls (previous, play/pause, next, volume,
-  artist info, lyrics, favorite, shuffle, equalizer, and output) expose
-  accessible names.
-
-- Added cross-device resume for remote Orynivo Server tracks. The server stores the
-  last playback position per profile and track (`profile_track_position`) through
-  the new authenticated `GET`/`PUT /api/tracks/{id}/position` endpoints; the client
-  publishes its audible position at most every 20 seconds and offers a **Resume**
-  transport action when another device left off meaningfully later. The decision
-  lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
-  positions are stored, and no credential-bearing URL is ever persisted.
-
-- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
-  held back by Dependabot. It records the current pins, the trigger that unblocks
-  each upgrade, the migration steps, and the checks required before merging, and
-  is referenced from `AGENTS.md` next to the Dependabot rules.
-
-- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
-  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
-  support on 10 November 2026, the same day as the currently used .NET 8, so
-  moving to it would be a dead end. The record now carries the support-window
-  table, the .NET 10 migration steps, and the note that
-  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
-  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
-  instead of waiting for an upstream release.
-
-- Fixed the failing Dependabot GitHub Actions update. `dotnet-desktop.yml` still
-  pinned `actions/checkout@v6`, `actions/setup-dotnet@v5`, and
-  `actions/upload-artifact@v6` while every other workflow used `@v7`/`@v6`/`@v7`,
-  which made Dependabot abort with `Error processing actions/setup-dotnet
-  (RuntimeError)` / `No files changed!`. All 18 action references now use one
-  version per action, and the new `scripts/verify-github-actions-pins.ps1` (wired
-  into `scripts/verify-all.ps1` and the CI verify job) fails the build when a
-  workflow reintroduces a mixed major.
-
 ### Fixed
 
 - Fixed a runtime language-switch issue where the dynamically created local
@@ -995,62 +748,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   the cache size limit in megabytes. Eviction removes the least recently used
   downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
   the most recently used episode is always kept.
-- Added an optional automatic server-side library backup schedule. The
-  `Orynivo:BackupSchedule` configuration section (disabled by default) writes a
-  versioned library ZIP at most once per `IntervalDays` into its target folder and
-  removes archives beyond `RetentionCount`. It reuses the shared
-  `Orynivo.Library.BackupRetention` decisions, derives its last run from the newest
-  archive so no extra state is stored, holds no credentials, and never includes
-  audio files. Automatic archive naming moved into the shared
-  `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
-- Added an optional WebDAV upload target for completed library backups.
-  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
-  sub-folder, and user name, while the password lives only in the encrypted
-  credential store and stays out of `settings.json`. Only plain `http`/`https`
-  URLs without embedded credentials are accepted, the upload is best effort and
-  never removes the local archive, and credentials never reach a URL, a log, or
-  an error message. The scheduled and **Back up now** paths share the upload,
-  and Settings gained the corresponding fields under the backup schedule.
-
-- Added a **Reduce motion** option under Appearance that disables the optional
-  Genre Cloud, Dashboard cover-stage, and karaoke animations. The decision lives
-  in the pure `Orynivo.Controls.MotionPreferences` helper. The album and artist
-  artwork grids can now be opened with Enter or Space in addition to a
-  double-click, and the transport controls (previous, play/pause, next, volume,
-  artist info, lyrics, favorite, shuffle, equalizer, and output) expose
-  accessible names.
-
-- Added cross-device resume for remote Orynivo Server tracks. The server stores the
-  last playback position per profile and track (`profile_track_position`) through
-  the new authenticated `GET`/`PUT /api/tracks/{id}/position` endpoints; the client
-  publishes its audible position at most every 20 seconds and offers a **Resume**
-  transport action when another device left off meaningfully later. The decision
-  lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
-  positions are stored, and no credential-bearing URL is ever persisted.
-
-- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
-  held back by Dependabot. It records the current pins, the trigger that unblocks
-  each upgrade, the migration steps, and the checks required before merging, and
-  is referenced from `AGENTS.md` next to the Dependabot rules.
-
-- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
-  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
-  support on 10 November 2026, the same day as the currently used .NET 8, so
-  moving to it would be a dead end. The record now carries the support-window
-  table, the .NET 10 migration steps, and the note that
-  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
-  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
-  instead of waiting for an upstream release.
-
-- Fixed the failing Dependabot GitHub Actions update. `dotnet-desktop.yml` still
-  pinned `actions/checkout@v6`, `actions/setup-dotnet@v5`, and
-  `actions/upload-artifact@v6` while every other workflow used `@v7`/`@v6`/`@v7`,
-  which made Dependabot abort with `Error processing actions/setup-dotnet
-  (RuntimeError)` / `No files changed!`. All 18 action references now use one
-  version per action, and the new `scripts/verify-github-actions-pins.ps1` (wired
-  into `scripts/verify-all.ps1` and the CI verify job) fails the build when a
-  workflow reintroduces a mixed major.
-
 ### Fixed
 
 - The **Up Next** table now offers the same selectable track columns as
@@ -1090,62 +787,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   the cache size limit in megabytes. Eviction removes the least recently used
   downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
   the most recently used episode is always kept.
-- Added an optional automatic server-side library backup schedule. The
-  `Orynivo:BackupSchedule` configuration section (disabled by default) writes a
-  versioned library ZIP at most once per `IntervalDays` into its target folder and
-  removes archives beyond `RetentionCount`. It reuses the shared
-  `Orynivo.Library.BackupRetention` decisions, derives its last run from the newest
-  archive so no extra state is stored, holds no credentials, and never includes
-  audio files. Automatic archive naming moved into the shared
-  `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
-- Added an optional WebDAV upload target for completed library backups.
-  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
-  sub-folder, and user name, while the password lives only in the encrypted
-  credential store and stays out of `settings.json`. Only plain `http`/`https`
-  URLs without embedded credentials are accepted, the upload is best effort and
-  never removes the local archive, and credentials never reach a URL, a log, or
-  an error message. The scheduled and **Back up now** paths share the upload,
-  and Settings gained the corresponding fields under the backup schedule.
-
-- Added a **Reduce motion** option under Appearance that disables the optional
-  Genre Cloud, Dashboard cover-stage, and karaoke animations. The decision lives
-  in the pure `Orynivo.Controls.MotionPreferences` helper. The album and artist
-  artwork grids can now be opened with Enter or Space in addition to a
-  double-click, and the transport controls (previous, play/pause, next, volume,
-  artist info, lyrics, favorite, shuffle, equalizer, and output) expose
-  accessible names.
-
-- Added cross-device resume for remote Orynivo Server tracks. The server stores the
-  last playback position per profile and track (`profile_track_position`) through
-  the new authenticated `GET`/`PUT /api/tracks/{id}/position` endpoints; the client
-  publishes its audible position at most every 20 seconds and offers a **Resume**
-  transport action when another device left off meaningfully later. The decision
-  lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
-  positions are stored, and no credential-bearing URL is ever persisted.
-
-- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
-  held back by Dependabot. It records the current pins, the trigger that unblocks
-  each upgrade, the migration steps, and the checks required before merging, and
-  is referenced from `AGENTS.md` next to the Dependabot rules.
-
-- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
-  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
-  support on 10 November 2026, the same day as the currently used .NET 8, so
-  moving to it would be a dead end. The record now carries the support-window
-  table, the .NET 10 migration steps, and the note that
-  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
-  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
-  instead of waiting for an upstream release.
-
-- Fixed the failing Dependabot GitHub Actions update. `dotnet-desktop.yml` still
-  pinned `actions/checkout@v6`, `actions/setup-dotnet@v5`, and
-  `actions/upload-artifact@v6` while every other workflow used `@v7`/`@v6`/`@v7`,
-  which made Dependabot abort with `Error processing actions/setup-dotnet
-  (RuntimeError)` / `No files changed!`. All 18 action references now use one
-  version per action, and the new `scripts/verify-github-actions-pins.ps1` (wired
-  into `scripts/verify-all.ps1` and the CI verify job) fails the build when a
-  workflow reintroduces a mixed major.
-
 ### Fixed
 
 - Similar-title and mood-mix actions now navigate directly to **Up Next**
@@ -1176,62 +817,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   the cache size limit in megabytes. Eviction removes the least recently used
   downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
   the most recently used episode is always kept.
-- Added an optional automatic server-side library backup schedule. The
-  `Orynivo:BackupSchedule` configuration section (disabled by default) writes a
-  versioned library ZIP at most once per `IntervalDays` into its target folder and
-  removes archives beyond `RetentionCount`. It reuses the shared
-  `Orynivo.Library.BackupRetention` decisions, derives its last run from the newest
-  archive so no extra state is stored, holds no credentials, and never includes
-  audio files. Automatic archive naming moved into the shared
-  `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
-- Added an optional WebDAV upload target for completed library backups.
-  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
-  sub-folder, and user name, while the password lives only in the encrypted
-  credential store and stays out of `settings.json`. Only plain `http`/`https`
-  URLs without embedded credentials are accepted, the upload is best effort and
-  never removes the local archive, and credentials never reach a URL, a log, or
-  an error message. The scheduled and **Back up now** paths share the upload,
-  and Settings gained the corresponding fields under the backup schedule.
-
-- Added a **Reduce motion** option under Appearance that disables the optional
-  Genre Cloud, Dashboard cover-stage, and karaoke animations. The decision lives
-  in the pure `Orynivo.Controls.MotionPreferences` helper. The album and artist
-  artwork grids can now be opened with Enter or Space in addition to a
-  double-click, and the transport controls (previous, play/pause, next, volume,
-  artist info, lyrics, favorite, shuffle, equalizer, and output) expose
-  accessible names.
-
-- Added cross-device resume for remote Orynivo Server tracks. The server stores the
-  last playback position per profile and track (`profile_track_position`) through
-  the new authenticated `GET`/`PUT /api/tracks/{id}/position` endpoints; the client
-  publishes its audible position at most every 20 seconds and offers a **Resume**
-  transport action when another device left off meaningfully later. The decision
-  lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
-  positions are stored, and no credential-bearing URL is ever persisted.
-
-- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
-  held back by Dependabot. It records the current pins, the trigger that unblocks
-  each upgrade, the migration steps, and the checks required before merging, and
-  is referenced from `AGENTS.md` next to the Dependabot rules.
-
-- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
-  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
-  support on 10 November 2026, the same day as the currently used .NET 8, so
-  moving to it would be a dead end. The record now carries the support-window
-  table, the .NET 10 migration steps, and the note that
-  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
-  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
-  instead of waiting for an upstream release.
-
-- Fixed the failing Dependabot GitHub Actions update. `dotnet-desktop.yml` still
-  pinned `actions/checkout@v6`, `actions/setup-dotnet@v5`, and
-  `actions/upload-artifact@v6` while every other workflow used `@v7`/`@v6`/`@v7`,
-  which made Dependabot abort with `Error processing actions/setup-dotnet
-  (RuntimeError)` / `No files changed!`. All 18 action references now use one
-  version per action, and the new `scripts/verify-github-actions-pins.ps1` (wired
-  into `scripts/verify-all.ps1` and the CI verify job) fails the build when a
-  workflow reintroduces a mixed major.
-
 ### Fixed
 
 - Similar-title and mood-mix ranking now runs on a background thread, keeping
@@ -1270,62 +855,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   the cache size limit in megabytes. Eviction removes the least recently used
   downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
   the most recently used episode is always kept.
-- Added an optional automatic server-side library backup schedule. The
-  `Orynivo:BackupSchedule` configuration section (disabled by default) writes a
-  versioned library ZIP at most once per `IntervalDays` into its target folder and
-  removes archives beyond `RetentionCount`. It reuses the shared
-  `Orynivo.Library.BackupRetention` decisions, derives its last run from the newest
-  archive so no extra state is stored, holds no credentials, and never includes
-  audio files. Automatic archive naming moved into the shared
-  `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
-- Added an optional WebDAV upload target for completed library backups.
-  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
-  sub-folder, and user name, while the password lives only in the encrypted
-  credential store and stays out of `settings.json`. Only plain `http`/`https`
-  URLs without embedded credentials are accepted, the upload is best effort and
-  never removes the local archive, and credentials never reach a URL, a log, or
-  an error message. The scheduled and **Back up now** paths share the upload,
-  and Settings gained the corresponding fields under the backup schedule.
-
-- Added a **Reduce motion** option under Appearance that disables the optional
-  Genre Cloud, Dashboard cover-stage, and karaoke animations. The decision lives
-  in the pure `Orynivo.Controls.MotionPreferences` helper. The album and artist
-  artwork grids can now be opened with Enter or Space in addition to a
-  double-click, and the transport controls (previous, play/pause, next, volume,
-  artist info, lyrics, favorite, shuffle, equalizer, and output) expose
-  accessible names.
-
-- Added cross-device resume for remote Orynivo Server tracks. The server stores the
-  last playback position per profile and track (`profile_track_position`) through
-  the new authenticated `GET`/`PUT /api/tracks/{id}/position` endpoints; the client
-  publishes its audible position at most every 20 seconds and offers a **Resume**
-  transport action when another device left off meaningfully later. The decision
-  lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
-  positions are stored, and no credential-bearing URL is ever persisted.
-
-- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
-  held back by Dependabot. It records the current pins, the trigger that unblocks
-  each upgrade, the migration steps, and the checks required before merging, and
-  is referenced from `AGENTS.md` next to the Dependabot rules.
-
-- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
-  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
-  support on 10 November 2026, the same day as the currently used .NET 8, so
-  moving to it would be a dead end. The record now carries the support-window
-  table, the .NET 10 migration steps, and the note that
-  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
-  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
-  instead of waiting for an upstream release.
-
-- Fixed the failing Dependabot GitHub Actions update. `dotnet-desktop.yml` still
-  pinned `actions/checkout@v6`, `actions/setup-dotnet@v5`, and
-  `actions/upload-artifact@v6` while every other workflow used `@v7`/`@v6`/`@v7`,
-  which made Dependabot abort with `Error processing actions/setup-dotnet
-  (RuntimeError)` / `No files changed!`. All 18 action references now use one
-  version per action, and the new `scripts/verify-github-actions-pins.ps1` (wired
-  into `scripts/verify-all.ps1` and the CI verify job) fails the build when a
-  workflow reintroduces a mixed major.
-
 ### Fixed
 
 - Fixed startup failure on existing databases whose `play_history` table did
@@ -1393,62 +922,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   the cache size limit in megabytes. Eviction removes the least recently used
   downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
   the most recently used episode is always kept.
-- Added an optional automatic server-side library backup schedule. The
-  `Orynivo:BackupSchedule` configuration section (disabled by default) writes a
-  versioned library ZIP at most once per `IntervalDays` into its target folder and
-  removes archives beyond `RetentionCount`. It reuses the shared
-  `Orynivo.Library.BackupRetention` decisions, derives its last run from the newest
-  archive so no extra state is stored, holds no credentials, and never includes
-  audio files. Automatic archive naming moved into the shared
-  `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
-- Added an optional WebDAV upload target for completed library backups.
-  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
-  sub-folder, and user name, while the password lives only in the encrypted
-  credential store and stays out of `settings.json`. Only plain `http`/`https`
-  URLs without embedded credentials are accepted, the upload is best effort and
-  never removes the local archive, and credentials never reach a URL, a log, or
-  an error message. The scheduled and **Back up now** paths share the upload,
-  and Settings gained the corresponding fields under the backup schedule.
-
-- Added a **Reduce motion** option under Appearance that disables the optional
-  Genre Cloud, Dashboard cover-stage, and karaoke animations. The decision lives
-  in the pure `Orynivo.Controls.MotionPreferences` helper. The album and artist
-  artwork grids can now be opened with Enter or Space in addition to a
-  double-click, and the transport controls (previous, play/pause, next, volume,
-  artist info, lyrics, favorite, shuffle, equalizer, and output) expose
-  accessible names.
-
-- Added cross-device resume for remote Orynivo Server tracks. The server stores the
-  last playback position per profile and track (`profile_track_position`) through
-  the new authenticated `GET`/`PUT /api/tracks/{id}/position` endpoints; the client
-  publishes its audible position at most every 20 seconds and offers a **Resume**
-  transport action when another device left off meaningfully later. The decision
-  lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
-  positions are stored, and no credential-bearing URL is ever persisted.
-
-- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
-  held back by Dependabot. It records the current pins, the trigger that unblocks
-  each upgrade, the migration steps, and the checks required before merging, and
-  is referenced from `AGENTS.md` next to the Dependabot rules.
-
-- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
-  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
-  support on 10 November 2026, the same day as the currently used .NET 8, so
-  moving to it would be a dead end. The record now carries the support-window
-  table, the .NET 10 migration steps, and the note that
-  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
-  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
-  instead of waiting for an upstream release.
-
-- Fixed the failing Dependabot GitHub Actions update. `dotnet-desktop.yml` still
-  pinned `actions/checkout@v6`, `actions/setup-dotnet@v5`, and
-  `actions/upload-artifact@v6` while every other workflow used `@v7`/`@v6`/`@v7`,
-  which made Dependabot abort with `Error processing actions/setup-dotnet
-  (RuntimeError)` / `No files changed!`. All 18 action references now use one
-  version per action, and the new `scripts/verify-github-actions-pins.ps1` (wired
-  into `scripts/verify-all.ps1` and the CI verify job) fails the build when a
-  workflow reintroduces a mixed major.
-
 ### Fixed
 
 - Dashboard album artwork now refreshes immediately after a cover search or
@@ -1484,62 +957,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   the cache size limit in megabytes. Eviction removes the least recently used
   downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
   the most recently used episode is always kept.
-- Added an optional automatic server-side library backup schedule. The
-  `Orynivo:BackupSchedule` configuration section (disabled by default) writes a
-  versioned library ZIP at most once per `IntervalDays` into its target folder and
-  removes archives beyond `RetentionCount`. It reuses the shared
-  `Orynivo.Library.BackupRetention` decisions, derives its last run from the newest
-  archive so no extra state is stored, holds no credentials, and never includes
-  audio files. Automatic archive naming moved into the shared
-  `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
-- Added an optional WebDAV upload target for completed library backups.
-  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
-  sub-folder, and user name, while the password lives only in the encrypted
-  credential store and stays out of `settings.json`. Only plain `http`/`https`
-  URLs without embedded credentials are accepted, the upload is best effort and
-  never removes the local archive, and credentials never reach a URL, a log, or
-  an error message. The scheduled and **Back up now** paths share the upload,
-  and Settings gained the corresponding fields under the backup schedule.
-
-- Added a **Reduce motion** option under Appearance that disables the optional
-  Genre Cloud, Dashboard cover-stage, and karaoke animations. The decision lives
-  in the pure `Orynivo.Controls.MotionPreferences` helper. The album and artist
-  artwork grids can now be opened with Enter or Space in addition to a
-  double-click, and the transport controls (previous, play/pause, next, volume,
-  artist info, lyrics, favorite, shuffle, equalizer, and output) expose
-  accessible names.
-
-- Added cross-device resume for remote Orynivo Server tracks. The server stores the
-  last playback position per profile and track (`profile_track_position`) through
-  the new authenticated `GET`/`PUT /api/tracks/{id}/position` endpoints; the client
-  publishes its audible position at most every 20 seconds and offers a **Resume**
-  transport action when another device left off meaningfully later. The decision
-  lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
-  positions are stored, and no credential-bearing URL is ever persisted.
-
-- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
-  held back by Dependabot. It records the current pins, the trigger that unblocks
-  each upgrade, the migration steps, and the checks required before merging, and
-  is referenced from `AGENTS.md` next to the Dependabot rules.
-
-- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
-  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
-  support on 10 November 2026, the same day as the currently used .NET 8, so
-  moving to it would be a dead end. The record now carries the support-window
-  table, the .NET 10 migration steps, and the note that
-  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
-  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
-  instead of waiting for an upstream release.
-
-- Fixed the failing Dependabot GitHub Actions update. `dotnet-desktop.yml` still
-  pinned `actions/checkout@v6`, `actions/setup-dotnet@v5`, and
-  `actions/upload-artifact@v6` while every other workflow used `@v7`/`@v6`/`@v7`,
-  which made Dependabot abort with `Error processing actions/setup-dotnet
-  (RuntimeError)` / `No files changed!`. All 18 action references now use one
-  version per action, and the new `scripts/verify-github-actions-pins.ps1` (wired
-  into `scripts/verify-all.ps1` and the CI verify job) fails the build when a
-  workflow reintroduces a mixed major.
-
 ### Fixed
 
 - Opening metadata review uses a fast index-only analysis instead of opening
@@ -1575,62 +992,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   the cache size limit in megabytes. Eviction removes the least recently used
   downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
   the most recently used episode is always kept.
-- Added an optional automatic server-side library backup schedule. The
-  `Orynivo:BackupSchedule` configuration section (disabled by default) writes a
-  versioned library ZIP at most once per `IntervalDays` into its target folder and
-  removes archives beyond `RetentionCount`. It reuses the shared
-  `Orynivo.Library.BackupRetention` decisions, derives its last run from the newest
-  archive so no extra state is stored, holds no credentials, and never includes
-  audio files. Automatic archive naming moved into the shared
-  `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
-- Added an optional WebDAV upload target for completed library backups.
-  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
-  sub-folder, and user name, while the password lives only in the encrypted
-  credential store and stays out of `settings.json`. Only plain `http`/`https`
-  URLs without embedded credentials are accepted, the upload is best effort and
-  never removes the local archive, and credentials never reach a URL, a log, or
-  an error message. The scheduled and **Back up now** paths share the upload,
-  and Settings gained the corresponding fields under the backup schedule.
-
-- Added a **Reduce motion** option under Appearance that disables the optional
-  Genre Cloud, Dashboard cover-stage, and karaoke animations. The decision lives
-  in the pure `Orynivo.Controls.MotionPreferences` helper. The album and artist
-  artwork grids can now be opened with Enter or Space in addition to a
-  double-click, and the transport controls (previous, play/pause, next, volume,
-  artist info, lyrics, favorite, shuffle, equalizer, and output) expose
-  accessible names.
-
-- Added cross-device resume for remote Orynivo Server tracks. The server stores the
-  last playback position per profile and track (`profile_track_position`) through
-  the new authenticated `GET`/`PUT /api/tracks/{id}/position` endpoints; the client
-  publishes its audible position at most every 20 seconds and offers a **Resume**
-  transport action when another device left off meaningfully later. The decision
-  lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
-  positions are stored, and no credential-bearing URL is ever persisted.
-
-- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
-  held back by Dependabot. It records the current pins, the trigger that unblocks
-  each upgrade, the migration steps, and the checks required before merging, and
-  is referenced from `AGENTS.md` next to the Dependabot rules.
-
-- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
-  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
-  support on 10 November 2026, the same day as the currently used .NET 8, so
-  moving to it would be a dead end. The record now carries the support-window
-  table, the .NET 10 migration steps, and the note that
-  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
-  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
-  instead of waiting for an upstream release.
-
-- Fixed the failing Dependabot GitHub Actions update. `dotnet-desktop.yml` still
-  pinned `actions/checkout@v6`, `actions/setup-dotnet@v5`, and
-  `actions/upload-artifact@v6` while every other workflow used `@v7`/`@v6`/`@v7`,
-  which made Dependabot abort with `Error processing actions/setup-dotnet
-  (RuntimeError)` / `No files changed!`. All 18 action references now use one
-  version per action, and the new `scripts/verify-github-actions-pins.ps1` (wired
-  into `scripts/verify-all.ps1` and the CI verify job) fails the build when a
-  workflow reintroduces a mixed major.
-
 ### Fixed
 
 - Fixed smart playlists missing server tracks (including favorites) because the
@@ -1691,62 +1052,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   the cache size limit in megabytes. Eviction removes the least recently used
   downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
   the most recently used episode is always kept.
-- Added an optional automatic server-side library backup schedule. The
-  `Orynivo:BackupSchedule` configuration section (disabled by default) writes a
-  versioned library ZIP at most once per `IntervalDays` into its target folder and
-  removes archives beyond `RetentionCount`. It reuses the shared
-  `Orynivo.Library.BackupRetention` decisions, derives its last run from the newest
-  archive so no extra state is stored, holds no credentials, and never includes
-  audio files. Automatic archive naming moved into the shared
-  `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
-- Added an optional WebDAV upload target for completed library backups.
-  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
-  sub-folder, and user name, while the password lives only in the encrypted
-  credential store and stays out of `settings.json`. Only plain `http`/`https`
-  URLs without embedded credentials are accepted, the upload is best effort and
-  never removes the local archive, and credentials never reach a URL, a log, or
-  an error message. The scheduled and **Back up now** paths share the upload,
-  and Settings gained the corresponding fields under the backup schedule.
-
-- Added a **Reduce motion** option under Appearance that disables the optional
-  Genre Cloud, Dashboard cover-stage, and karaoke animations. The decision lives
-  in the pure `Orynivo.Controls.MotionPreferences` helper. The album and artist
-  artwork grids can now be opened with Enter or Space in addition to a
-  double-click, and the transport controls (previous, play/pause, next, volume,
-  artist info, lyrics, favorite, shuffle, equalizer, and output) expose
-  accessible names.
-
-- Added cross-device resume for remote Orynivo Server tracks. The server stores the
-  last playback position per profile and track (`profile_track_position`) through
-  the new authenticated `GET`/`PUT /api/tracks/{id}/position` endpoints; the client
-  publishes its audible position at most every 20 seconds and offers a **Resume**
-  transport action when another device left off meaningfully later. The decision
-  lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
-  positions are stored, and no credential-bearing URL is ever persisted.
-
-- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
-  held back by Dependabot. It records the current pins, the trigger that unblocks
-  each upgrade, the migration steps, and the checks required before merging, and
-  is referenced from `AGENTS.md` next to the Dependabot rules.
-
-- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
-  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
-  support on 10 November 2026, the same day as the currently used .NET 8, so
-  moving to it would be a dead end. The record now carries the support-window
-  table, the .NET 10 migration steps, and the note that
-  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
-  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
-  instead of waiting for an upstream release.
-
-- Fixed the failing Dependabot GitHub Actions update. `dotnet-desktop.yml` still
-  pinned `actions/checkout@v6`, `actions/setup-dotnet@v5`, and
-  `actions/upload-artifact@v6` while every other workflow used `@v7`/`@v6`/`@v7`,
-  which made Dependabot abort with `Error processing actions/setup-dotnet
-  (RuntimeError)` / `No files changed!`. All 18 action references now use one
-  version per action, and the new `scripts/verify-github-actions-pins.ps1` (wired
-  into `scripts/verify-all.ps1` and the CI verify job) fails the build when a
-  workflow reintroduces a mixed major.
-
 ### Fixed
 
 - Allowed authenticated artwork blob URLs in the remote's content security policy,
@@ -1863,62 +1168,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   the cache size limit in megabytes. Eviction removes the least recently used
   downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
   the most recently used episode is always kept.
-- Added an optional automatic server-side library backup schedule. The
-  `Orynivo:BackupSchedule` configuration section (disabled by default) writes a
-  versioned library ZIP at most once per `IntervalDays` into its target folder and
-  removes archives beyond `RetentionCount`. It reuses the shared
-  `Orynivo.Library.BackupRetention` decisions, derives its last run from the newest
-  archive so no extra state is stored, holds no credentials, and never includes
-  audio files. Automatic archive naming moved into the shared
-  `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
-- Added an optional WebDAV upload target for completed library backups.
-  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
-  sub-folder, and user name, while the password lives only in the encrypted
-  credential store and stays out of `settings.json`. Only plain `http`/`https`
-  URLs without embedded credentials are accepted, the upload is best effort and
-  never removes the local archive, and credentials never reach a URL, a log, or
-  an error message. The scheduled and **Back up now** paths share the upload,
-  and Settings gained the corresponding fields under the backup schedule.
-
-- Added a **Reduce motion** option under Appearance that disables the optional
-  Genre Cloud, Dashboard cover-stage, and karaoke animations. The decision lives
-  in the pure `Orynivo.Controls.MotionPreferences` helper. The album and artist
-  artwork grids can now be opened with Enter or Space in addition to a
-  double-click, and the transport controls (previous, play/pause, next, volume,
-  artist info, lyrics, favorite, shuffle, equalizer, and output) expose
-  accessible names.
-
-- Added cross-device resume for remote Orynivo Server tracks. The server stores the
-  last playback position per profile and track (`profile_track_position`) through
-  the new authenticated `GET`/`PUT /api/tracks/{id}/position` endpoints; the client
-  publishes its audible position at most every 20 seconds and offers a **Resume**
-  transport action when another device left off meaningfully later. The decision
-  lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
-  positions are stored, and no credential-bearing URL is ever persisted.
-
-- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
-  held back by Dependabot. It records the current pins, the trigger that unblocks
-  each upgrade, the migration steps, and the checks required before merging, and
-  is referenced from `AGENTS.md` next to the Dependabot rules.
-
-- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
-  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
-  support on 10 November 2026, the same day as the currently used .NET 8, so
-  moving to it would be a dead end. The record now carries the support-window
-  table, the .NET 10 migration steps, and the note that
-  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
-  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
-  instead of waiting for an upstream release.
-
-- Fixed the failing Dependabot GitHub Actions update. `dotnet-desktop.yml` still
-  pinned `actions/checkout@v6`, `actions/setup-dotnet@v5`, and
-  `actions/upload-artifact@v6` while every other workflow used `@v7`/`@v6`/`@v7`,
-  which made Dependabot abort with `Error processing actions/setup-dotnet
-  (RuntimeError)` / `No files changed!`. All 18 action references now use one
-  version per action, and the new `scripts/verify-github-actions-pins.ps1` (wired
-  into `scripts/verify-all.ps1` and the CI verify job) fails the build when a
-  workflow reintroduces a mixed major.
-
 ### Fixed
 
 - Fixed a Library Doctor database-column typo that closed Orynivo when metadata
@@ -1976,62 +1225,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   the cache size limit in megabytes. Eviction removes the least recently used
   downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
   the most recently used episode is always kept.
-- Added an optional automatic server-side library backup schedule. The
-  `Orynivo:BackupSchedule` configuration section (disabled by default) writes a
-  versioned library ZIP at most once per `IntervalDays` into its target folder and
-  removes archives beyond `RetentionCount`. It reuses the shared
-  `Orynivo.Library.BackupRetention` decisions, derives its last run from the newest
-  archive so no extra state is stored, holds no credentials, and never includes
-  audio files. Automatic archive naming moved into the shared
-  `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
-- Added an optional WebDAV upload target for completed library backups.
-  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
-  sub-folder, and user name, while the password lives only in the encrypted
-  credential store and stays out of `settings.json`. Only plain `http`/`https`
-  URLs without embedded credentials are accepted, the upload is best effort and
-  never removes the local archive, and credentials never reach a URL, a log, or
-  an error message. The scheduled and **Back up now** paths share the upload,
-  and Settings gained the corresponding fields under the backup schedule.
-
-- Added a **Reduce motion** option under Appearance that disables the optional
-  Genre Cloud, Dashboard cover-stage, and karaoke animations. The decision lives
-  in the pure `Orynivo.Controls.MotionPreferences` helper. The album and artist
-  artwork grids can now be opened with Enter or Space in addition to a
-  double-click, and the transport controls (previous, play/pause, next, volume,
-  artist info, lyrics, favorite, shuffle, equalizer, and output) expose
-  accessible names.
-
-- Added cross-device resume for remote Orynivo Server tracks. The server stores the
-  last playback position per profile and track (`profile_track_position`) through
-  the new authenticated `GET`/`PUT /api/tracks/{id}/position` endpoints; the client
-  publishes its audible position at most every 20 seconds and offers a **Resume**
-  transport action when another device left off meaningfully later. The decision
-  lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
-  positions are stored, and no credential-bearing URL is ever persisted.
-
-- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
-  held back by Dependabot. It records the current pins, the trigger that unblocks
-  each upgrade, the migration steps, and the checks required before merging, and
-  is referenced from `AGENTS.md` next to the Dependabot rules.
-
-- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
-  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
-  support on 10 November 2026, the same day as the currently used .NET 8, so
-  moving to it would be a dead end. The record now carries the support-window
-  table, the .NET 10 migration steps, and the note that
-  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
-  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
-  instead of waiting for an upstream release.
-
-- Fixed the failing Dependabot GitHub Actions update. `dotnet-desktop.yml` still
-  pinned `actions/checkout@v6`, `actions/setup-dotnet@v5`, and
-  `actions/upload-artifact@v6` while every other workflow used `@v7`/`@v6`/`@v7`,
-  which made Dependabot abort with `Error processing actions/setup-dotnet
-  (RuntimeError)` / `No files changed!`. All 18 action references now use one
-  version per action, and the new `scripts/verify-github-actions-pins.ps1` (wired
-  into `scripts/verify-all.ps1` and the CI verify job) fails the build when a
-  workflow reintroduces a mixed major.
-
 ### Fixed
 
 - Fixed combined artist-and-title library searches so terms can match across
@@ -2073,62 +1266,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   the cache size limit in megabytes. Eviction removes the least recently used
   downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
   the most recently used episode is always kept.
-- Added an optional automatic server-side library backup schedule. The
-  `Orynivo:BackupSchedule` configuration section (disabled by default) writes a
-  versioned library ZIP at most once per `IntervalDays` into its target folder and
-  removes archives beyond `RetentionCount`. It reuses the shared
-  `Orynivo.Library.BackupRetention` decisions, derives its last run from the newest
-  archive so no extra state is stored, holds no credentials, and never includes
-  audio files. Automatic archive naming moved into the shared
-  `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
-- Added an optional WebDAV upload target for completed library backups.
-  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
-  sub-folder, and user name, while the password lives only in the encrypted
-  credential store and stays out of `settings.json`. Only plain `http`/`https`
-  URLs without embedded credentials are accepted, the upload is best effort and
-  never removes the local archive, and credentials never reach a URL, a log, or
-  an error message. The scheduled and **Back up now** paths share the upload,
-  and Settings gained the corresponding fields under the backup schedule.
-
-- Added a **Reduce motion** option under Appearance that disables the optional
-  Genre Cloud, Dashboard cover-stage, and karaoke animations. The decision lives
-  in the pure `Orynivo.Controls.MotionPreferences` helper. The album and artist
-  artwork grids can now be opened with Enter or Space in addition to a
-  double-click, and the transport controls (previous, play/pause, next, volume,
-  artist info, lyrics, favorite, shuffle, equalizer, and output) expose
-  accessible names.
-
-- Added cross-device resume for remote Orynivo Server tracks. The server stores the
-  last playback position per profile and track (`profile_track_position`) through
-  the new authenticated `GET`/`PUT /api/tracks/{id}/position` endpoints; the client
-  publishes its audible position at most every 20 seconds and offers a **Resume**
-  transport action when another device left off meaningfully later. The decision
-  lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
-  positions are stored, and no credential-bearing URL is ever persisted.
-
-- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
-  held back by Dependabot. It records the current pins, the trigger that unblocks
-  each upgrade, the migration steps, and the checks required before merging, and
-  is referenced from `AGENTS.md` next to the Dependabot rules.
-
-- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
-  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
-  support on 10 November 2026, the same day as the currently used .NET 8, so
-  moving to it would be a dead end. The record now carries the support-window
-  table, the .NET 10 migration steps, and the note that
-  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
-  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
-  instead of waiting for an upstream release.
-
-- Fixed the failing Dependabot GitHub Actions update. `dotnet-desktop.yml` still
-  pinned `actions/checkout@v6`, `actions/setup-dotnet@v5`, and
-  `actions/upload-artifact@v6` while every other workflow used `@v7`/`@v6`/`@v7`,
-  which made Dependabot abort with `Error processing actions/setup-dotnet
-  (RuntimeError)` / `No files changed!`. All 18 action references now use one
-  version per action, and the new `scripts/verify-github-actions-pins.ps1` (wired
-  into `scripts/verify-all.ps1` and the CI verify job) fails the build when a
-  workflow reintroduces a mixed major.
-
 ### Fixed
 
 ## [0.37.0] - 2026-08-27
@@ -2173,62 +1310,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   the cache size limit in megabytes. Eviction removes the least recently used
   downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
   the most recently used episode is always kept.
-- Added an optional automatic server-side library backup schedule. The
-  `Orynivo:BackupSchedule` configuration section (disabled by default) writes a
-  versioned library ZIP at most once per `IntervalDays` into its target folder and
-  removes archives beyond `RetentionCount`. It reuses the shared
-  `Orynivo.Library.BackupRetention` decisions, derives its last run from the newest
-  archive so no extra state is stored, holds no credentials, and never includes
-  audio files. Automatic archive naming moved into the shared
-  `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
-- Added an optional WebDAV upload target for completed library backups.
-  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
-  sub-folder, and user name, while the password lives only in the encrypted
-  credential store and stays out of `settings.json`. Only plain `http`/`https`
-  URLs without embedded credentials are accepted, the upload is best effort and
-  never removes the local archive, and credentials never reach a URL, a log, or
-  an error message. The scheduled and **Back up now** paths share the upload,
-  and Settings gained the corresponding fields under the backup schedule.
-
-- Added a **Reduce motion** option under Appearance that disables the optional
-  Genre Cloud, Dashboard cover-stage, and karaoke animations. The decision lives
-  in the pure `Orynivo.Controls.MotionPreferences` helper. The album and artist
-  artwork grids can now be opened with Enter or Space in addition to a
-  double-click, and the transport controls (previous, play/pause, next, volume,
-  artist info, lyrics, favorite, shuffle, equalizer, and output) expose
-  accessible names.
-
-- Added cross-device resume for remote Orynivo Server tracks. The server stores the
-  last playback position per profile and track (`profile_track_position`) through
-  the new authenticated `GET`/`PUT /api/tracks/{id}/position` endpoints; the client
-  publishes its audible position at most every 20 seconds and offers a **Resume**
-  transport action when another device left off meaningfully later. The decision
-  lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
-  positions are stored, and no credential-bearing URL is ever persisted.
-
-- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
-  held back by Dependabot. It records the current pins, the trigger that unblocks
-  each upgrade, the migration steps, and the checks required before merging, and
-  is referenced from `AGENTS.md` next to the Dependabot rules.
-
-- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
-  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
-  support on 10 November 2026, the same day as the currently used .NET 8, so
-  moving to it would be a dead end. The record now carries the support-window
-  table, the .NET 10 migration steps, and the note that
-  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
-  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
-  instead of waiting for an upstream release.
-
-- Fixed the failing Dependabot GitHub Actions update. `dotnet-desktop.yml` still
-  pinned `actions/checkout@v6`, `actions/setup-dotnet@v5`, and
-  `actions/upload-artifact@v6` while every other workflow used `@v7`/`@v6`/`@v7`,
-  which made Dependabot abort with `Error processing actions/setup-dotnet
-  (RuntimeError)` / `No files changed!`. All 18 action references now use one
-  version per action, and the new `scripts/verify-github-actions-pins.ps1` (wired
-  into `scripts/verify-all.ps1` and the CI verify job) fails the build when a
-  workflow reintroduces a mixed major.
-
 ### Fixed
 
 - AirPlay 2 receiver controls now drive Orynivo's transport instead of only
@@ -2348,62 +1429,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   the cache size limit in megabytes. Eviction removes the least recently used
   downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
   the most recently used episode is always kept.
-- Added an optional automatic server-side library backup schedule. The
-  `Orynivo:BackupSchedule` configuration section (disabled by default) writes a
-  versioned library ZIP at most once per `IntervalDays` into its target folder and
-  removes archives beyond `RetentionCount`. It reuses the shared
-  `Orynivo.Library.BackupRetention` decisions, derives its last run from the newest
-  archive so no extra state is stored, holds no credentials, and never includes
-  audio files. Automatic archive naming moved into the shared
-  `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
-- Added an optional WebDAV upload target for completed library backups.
-  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
-  sub-folder, and user name, while the password lives only in the encrypted
-  credential store and stays out of `settings.json`. Only plain `http`/`https`
-  URLs without embedded credentials are accepted, the upload is best effort and
-  never removes the local archive, and credentials never reach a URL, a log, or
-  an error message. The scheduled and **Back up now** paths share the upload,
-  and Settings gained the corresponding fields under the backup schedule.
-
-- Added a **Reduce motion** option under Appearance that disables the optional
-  Genre Cloud, Dashboard cover-stage, and karaoke animations. The decision lives
-  in the pure `Orynivo.Controls.MotionPreferences` helper. The album and artist
-  artwork grids can now be opened with Enter or Space in addition to a
-  double-click, and the transport controls (previous, play/pause, next, volume,
-  artist info, lyrics, favorite, shuffle, equalizer, and output) expose
-  accessible names.
-
-- Added cross-device resume for remote Orynivo Server tracks. The server stores the
-  last playback position per profile and track (`profile_track_position`) through
-  the new authenticated `GET`/`PUT /api/tracks/{id}/position` endpoints; the client
-  publishes its audible position at most every 20 seconds and offers a **Resume**
-  transport action when another device left off meaningfully later. The decision
-  lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
-  positions are stored, and no credential-bearing URL is ever persisted.
-
-- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
-  held back by Dependabot. It records the current pins, the trigger that unblocks
-  each upgrade, the migration steps, and the checks required before merging, and
-  is referenced from `AGENTS.md` next to the Dependabot rules.
-
-- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
-  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
-  support on 10 November 2026, the same day as the currently used .NET 8, so
-  moving to it would be a dead end. The record now carries the support-window
-  table, the .NET 10 migration steps, and the note that
-  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
-  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
-  instead of waiting for an upstream release.
-
-- Fixed the failing Dependabot GitHub Actions update. `dotnet-desktop.yml` still
-  pinned `actions/checkout@v6`, `actions/setup-dotnet@v5`, and
-  `actions/upload-artifact@v6` while every other workflow used `@v7`/`@v6`/`@v7`,
-  which made Dependabot abort with `Error processing actions/setup-dotnet
-  (RuntimeError)` / `No files changed!`. All 18 action references now use one
-  version per action, and the new `scripts/verify-github-actions-pins.ps1` (wired
-  into `scripts/verify-all.ps1` and the CI verify job) fails the build when a
-  workflow reintroduces a mixed major.
-
 ### Fixed
 
 - Artist and album artwork changes now invalidate the unified library view
@@ -2468,62 +1493,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   the cache size limit in megabytes. Eviction removes the least recently used
   downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
   the most recently used episode is always kept.
-- Added an optional automatic server-side library backup schedule. The
-  `Orynivo:BackupSchedule` configuration section (disabled by default) writes a
-  versioned library ZIP at most once per `IntervalDays` into its target folder and
-  removes archives beyond `RetentionCount`. It reuses the shared
-  `Orynivo.Library.BackupRetention` decisions, derives its last run from the newest
-  archive so no extra state is stored, holds no credentials, and never includes
-  audio files. Automatic archive naming moved into the shared
-  `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
-- Added an optional WebDAV upload target for completed library backups.
-  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
-  sub-folder, and user name, while the password lives only in the encrypted
-  credential store and stays out of `settings.json`. Only plain `http`/`https`
-  URLs without embedded credentials are accepted, the upload is best effort and
-  never removes the local archive, and credentials never reach a URL, a log, or
-  an error message. The scheduled and **Back up now** paths share the upload,
-  and Settings gained the corresponding fields under the backup schedule.
-
-- Added a **Reduce motion** option under Appearance that disables the optional
-  Genre Cloud, Dashboard cover-stage, and karaoke animations. The decision lives
-  in the pure `Orynivo.Controls.MotionPreferences` helper. The album and artist
-  artwork grids can now be opened with Enter or Space in addition to a
-  double-click, and the transport controls (previous, play/pause, next, volume,
-  artist info, lyrics, favorite, shuffle, equalizer, and output) expose
-  accessible names.
-
-- Added cross-device resume for remote Orynivo Server tracks. The server stores the
-  last playback position per profile and track (`profile_track_position`) through
-  the new authenticated `GET`/`PUT /api/tracks/{id}/position` endpoints; the client
-  publishes its audible position at most every 20 seconds and offers a **Resume**
-  transport action when another device left off meaningfully later. The decision
-  lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
-  positions are stored, and no credential-bearing URL is ever persisted.
-
-- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
-  held back by Dependabot. It records the current pins, the trigger that unblocks
-  each upgrade, the migration steps, and the checks required before merging, and
-  is referenced from `AGENTS.md` next to the Dependabot rules.
-
-- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
-  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
-  support on 10 November 2026, the same day as the currently used .NET 8, so
-  moving to it would be a dead end. The record now carries the support-window
-  table, the .NET 10 migration steps, and the note that
-  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
-  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
-  instead of waiting for an upstream release.
-
-- Fixed the failing Dependabot GitHub Actions update. `dotnet-desktop.yml` still
-  pinned `actions/checkout@v6`, `actions/setup-dotnet@v5`, and
-  `actions/upload-artifact@v6` while every other workflow used `@v7`/`@v6`/`@v7`,
-  which made Dependabot abort with `Error processing actions/setup-dotnet
-  (RuntimeError)` / `No files changed!`. All 18 action references now use one
-  version per action, and the new `scripts/verify-github-actions-pins.ps1` (wired
-  into `scripts/verify-all.ps1` and the CI verify job) fails the build when a
-  workflow reintroduces a mixed major.
-
 ### Fixed
 
 - Restarting Orynivo now restores every selectable sidebar content view rather
@@ -2559,62 +1528,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   the cache size limit in megabytes. Eviction removes the least recently used
   downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
   the most recently used episode is always kept.
-- Added an optional automatic server-side library backup schedule. The
-  `Orynivo:BackupSchedule` configuration section (disabled by default) writes a
-  versioned library ZIP at most once per `IntervalDays` into its target folder and
-  removes archives beyond `RetentionCount`. It reuses the shared
-  `Orynivo.Library.BackupRetention` decisions, derives its last run from the newest
-  archive so no extra state is stored, holds no credentials, and never includes
-  audio files. Automatic archive naming moved into the shared
-  `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
-- Added an optional WebDAV upload target for completed library backups.
-  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
-  sub-folder, and user name, while the password lives only in the encrypted
-  credential store and stays out of `settings.json`. Only plain `http`/`https`
-  URLs without embedded credentials are accepted, the upload is best effort and
-  never removes the local archive, and credentials never reach a URL, a log, or
-  an error message. The scheduled and **Back up now** paths share the upload,
-  and Settings gained the corresponding fields under the backup schedule.
-
-- Added a **Reduce motion** option under Appearance that disables the optional
-  Genre Cloud, Dashboard cover-stage, and karaoke animations. The decision lives
-  in the pure `Orynivo.Controls.MotionPreferences` helper. The album and artist
-  artwork grids can now be opened with Enter or Space in addition to a
-  double-click, and the transport controls (previous, play/pause, next, volume,
-  artist info, lyrics, favorite, shuffle, equalizer, and output) expose
-  accessible names.
-
-- Added cross-device resume for remote Orynivo Server tracks. The server stores the
-  last playback position per profile and track (`profile_track_position`) through
-  the new authenticated `GET`/`PUT /api/tracks/{id}/position` endpoints; the client
-  publishes its audible position at most every 20 seconds and offers a **Resume**
-  transport action when another device left off meaningfully later. The decision
-  lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
-  positions are stored, and no credential-bearing URL is ever persisted.
-
-- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
-  held back by Dependabot. It records the current pins, the trigger that unblocks
-  each upgrade, the migration steps, and the checks required before merging, and
-  is referenced from `AGENTS.md` next to the Dependabot rules.
-
-- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
-  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
-  support on 10 November 2026, the same day as the currently used .NET 8, so
-  moving to it would be a dead end. The record now carries the support-window
-  table, the .NET 10 migration steps, and the note that
-  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
-  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
-  instead of waiting for an upstream release.
-
-- Fixed the failing Dependabot GitHub Actions update. `dotnet-desktop.yml` still
-  pinned `actions/checkout@v6`, `actions/setup-dotnet@v5`, and
-  `actions/upload-artifact@v6` while every other workflow used `@v7`/`@v6`/`@v7`,
-  which made Dependabot abort with `Error processing actions/setup-dotnet
-  (RuntimeError)` / `No files changed!`. All 18 action references now use one
-  version per action, and the new `scripts/verify-github-actions-pins.ps1` (wired
-  into `scripts/verify-all.ps1` and the CI verify job) fails the build when a
-  workflow reintroduces a mixed major.
-
 ### Fixed
 
 - Infinite Mix no longer stalls after exhausting its first two 20-track
@@ -2661,62 +1574,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   the cache size limit in megabytes. Eviction removes the least recently used
   downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
   the most recently used episode is always kept.
-- Added an optional automatic server-side library backup schedule. The
-  `Orynivo:BackupSchedule` configuration section (disabled by default) writes a
-  versioned library ZIP at most once per `IntervalDays` into its target folder and
-  removes archives beyond `RetentionCount`. It reuses the shared
-  `Orynivo.Library.BackupRetention` decisions, derives its last run from the newest
-  archive so no extra state is stored, holds no credentials, and never includes
-  audio files. Automatic archive naming moved into the shared
-  `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
-- Added an optional WebDAV upload target for completed library backups.
-  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
-  sub-folder, and user name, while the password lives only in the encrypted
-  credential store and stays out of `settings.json`. Only plain `http`/`https`
-  URLs without embedded credentials are accepted, the upload is best effort and
-  never removes the local archive, and credentials never reach a URL, a log, or
-  an error message. The scheduled and **Back up now** paths share the upload,
-  and Settings gained the corresponding fields under the backup schedule.
-
-- Added a **Reduce motion** option under Appearance that disables the optional
-  Genre Cloud, Dashboard cover-stage, and karaoke animations. The decision lives
-  in the pure `Orynivo.Controls.MotionPreferences` helper. The album and artist
-  artwork grids can now be opened with Enter or Space in addition to a
-  double-click, and the transport controls (previous, play/pause, next, volume,
-  artist info, lyrics, favorite, shuffle, equalizer, and output) expose
-  accessible names.
-
-- Added cross-device resume for remote Orynivo Server tracks. The server stores the
-  last playback position per profile and track (`profile_track_position`) through
-  the new authenticated `GET`/`PUT /api/tracks/{id}/position` endpoints; the client
-  publishes its audible position at most every 20 seconds and offers a **Resume**
-  transport action when another device left off meaningfully later. The decision
-  lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
-  positions are stored, and no credential-bearing URL is ever persisted.
-
-- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
-  held back by Dependabot. It records the current pins, the trigger that unblocks
-  each upgrade, the migration steps, and the checks required before merging, and
-  is referenced from `AGENTS.md` next to the Dependabot rules.
-
-- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
-  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
-  support on 10 November 2026, the same day as the currently used .NET 8, so
-  moving to it would be a dead end. The record now carries the support-window
-  table, the .NET 10 migration steps, and the note that
-  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
-  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
-  instead of waiting for an upstream release.
-
-- Fixed the failing Dependabot GitHub Actions update. `dotnet-desktop.yml` still
-  pinned `actions/checkout@v6`, `actions/setup-dotnet@v5`, and
-  `actions/upload-artifact@v6` while every other workflow used `@v7`/`@v6`/`@v7`,
-  which made Dependabot abort with `Error processing actions/setup-dotnet
-  (RuntimeError)` / `No files changed!`. All 18 action references now use one
-  version per action, and the new `scripts/verify-github-actions-pins.ps1` (wired
-  into `scripts/verify-all.ps1` and the CI verify job) fails the build when a
-  workflow reintroduces a mixed major.
-
 ### Fixed
 
 - Orynivo Server ReplayGain maintenance now runs FFmpeg with one worker thread,
@@ -2760,62 +1617,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   the cache size limit in megabytes. Eviction removes the least recently used
   downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
   the most recently used episode is always kept.
-- Added an optional automatic server-side library backup schedule. The
-  `Orynivo:BackupSchedule` configuration section (disabled by default) writes a
-  versioned library ZIP at most once per `IntervalDays` into its target folder and
-  removes archives beyond `RetentionCount`. It reuses the shared
-  `Orynivo.Library.BackupRetention` decisions, derives its last run from the newest
-  archive so no extra state is stored, holds no credentials, and never includes
-  audio files. Automatic archive naming moved into the shared
-  `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
-- Added an optional WebDAV upload target for completed library backups.
-  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
-  sub-folder, and user name, while the password lives only in the encrypted
-  credential store and stays out of `settings.json`. Only plain `http`/`https`
-  URLs without embedded credentials are accepted, the upload is best effort and
-  never removes the local archive, and credentials never reach a URL, a log, or
-  an error message. The scheduled and **Back up now** paths share the upload,
-  and Settings gained the corresponding fields under the backup schedule.
-
-- Added a **Reduce motion** option under Appearance that disables the optional
-  Genre Cloud, Dashboard cover-stage, and karaoke animations. The decision lives
-  in the pure `Orynivo.Controls.MotionPreferences` helper. The album and artist
-  artwork grids can now be opened with Enter or Space in addition to a
-  double-click, and the transport controls (previous, play/pause, next, volume,
-  artist info, lyrics, favorite, shuffle, equalizer, and output) expose
-  accessible names.
-
-- Added cross-device resume for remote Orynivo Server tracks. The server stores the
-  last playback position per profile and track (`profile_track_position`) through
-  the new authenticated `GET`/`PUT /api/tracks/{id}/position` endpoints; the client
-  publishes its audible position at most every 20 seconds and offers a **Resume**
-  transport action when another device left off meaningfully later. The decision
-  lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
-  positions are stored, and no credential-bearing URL is ever persisted.
-
-- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
-  held back by Dependabot. It records the current pins, the trigger that unblocks
-  each upgrade, the migration steps, and the checks required before merging, and
-  is referenced from `AGENTS.md` next to the Dependabot rules.
-
-- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
-  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
-  support on 10 November 2026, the same day as the currently used .NET 8, so
-  moving to it would be a dead end. The record now carries the support-window
-  table, the .NET 10 migration steps, and the note that
-  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
-  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
-  instead of waiting for an upstream release.
-
-- Fixed the failing Dependabot GitHub Actions update. `dotnet-desktop.yml` still
-  pinned `actions/checkout@v6`, `actions/setup-dotnet@v5`, and
-  `actions/upload-artifact@v6` while every other workflow used `@v7`/`@v6`/`@v7`,
-  which made Dependabot abort with `Error processing actions/setup-dotnet
-  (RuntimeError)` / `No files changed!`. All 18 action references now use one
-  version per action, and the new `scripts/verify-github-actions-pins.ps1` (wired
-  into `scripts/verify-all.ps1` and the CI verify job) fails the build when a
-  workflow reintroduces a mixed major.
-
 ### Fixed
 
 - Fixed server scans with multiple library roots occasionally appearing stuck
@@ -2871,62 +1672,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   the cache size limit in megabytes. Eviction removes the least recently used
   downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
   the most recently used episode is always kept.
-- Added an optional automatic server-side library backup schedule. The
-  `Orynivo:BackupSchedule` configuration section (disabled by default) writes a
-  versioned library ZIP at most once per `IntervalDays` into its target folder and
-  removes archives beyond `RetentionCount`. It reuses the shared
-  `Orynivo.Library.BackupRetention` decisions, derives its last run from the newest
-  archive so no extra state is stored, holds no credentials, and never includes
-  audio files. Automatic archive naming moved into the shared
-  `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
-- Added an optional WebDAV upload target for completed library backups.
-  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
-  sub-folder, and user name, while the password lives only in the encrypted
-  credential store and stays out of `settings.json`. Only plain `http`/`https`
-  URLs without embedded credentials are accepted, the upload is best effort and
-  never removes the local archive, and credentials never reach a URL, a log, or
-  an error message. The scheduled and **Back up now** paths share the upload,
-  and Settings gained the corresponding fields under the backup schedule.
-
-- Added a **Reduce motion** option under Appearance that disables the optional
-  Genre Cloud, Dashboard cover-stage, and karaoke animations. The decision lives
-  in the pure `Orynivo.Controls.MotionPreferences` helper. The album and artist
-  artwork grids can now be opened with Enter or Space in addition to a
-  double-click, and the transport controls (previous, play/pause, next, volume,
-  artist info, lyrics, favorite, shuffle, equalizer, and output) expose
-  accessible names.
-
-- Added cross-device resume for remote Orynivo Server tracks. The server stores the
-  last playback position per profile and track (`profile_track_position`) through
-  the new authenticated `GET`/`PUT /api/tracks/{id}/position` endpoints; the client
-  publishes its audible position at most every 20 seconds and offers a **Resume**
-  transport action when another device left off meaningfully later. The decision
-  lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
-  positions are stored, and no credential-bearing URL is ever persisted.
-
-- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
-  held back by Dependabot. It records the current pins, the trigger that unblocks
-  each upgrade, the migration steps, and the checks required before merging, and
-  is referenced from `AGENTS.md` next to the Dependabot rules.
-
-- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
-  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
-  support on 10 November 2026, the same day as the currently used .NET 8, so
-  moving to it would be a dead end. The record now carries the support-window
-  table, the .NET 10 migration steps, and the note that
-  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
-  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
-  instead of waiting for an upstream release.
-
-- Fixed the failing Dependabot GitHub Actions update. `dotnet-desktop.yml` still
-  pinned `actions/checkout@v6`, `actions/setup-dotnet@v5`, and
-  `actions/upload-artifact@v6` while every other workflow used `@v7`/`@v6`/`@v7`,
-  which made Dependabot abort with `Error processing actions/setup-dotnet
-  (RuntimeError)` / `No files changed!`. All 18 action references now use one
-  version per action, and the new `scripts/verify-github-actions-pins.ps1` (wired
-  into `scripts/verify-all.ps1` and the CI verify job) fails the build when a
-  workflow reintroduces a mixed major.
-
 ### Fixed
 
 - Fixed the embedded Settings view at constrained window heights: long
@@ -2985,62 +1730,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   the cache size limit in megabytes. Eviction removes the least recently used
   downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
   the most recently used episode is always kept.
-- Added an optional automatic server-side library backup schedule. The
-  `Orynivo:BackupSchedule` configuration section (disabled by default) writes a
-  versioned library ZIP at most once per `IntervalDays` into its target folder and
-  removes archives beyond `RetentionCount`. It reuses the shared
-  `Orynivo.Library.BackupRetention` decisions, derives its last run from the newest
-  archive so no extra state is stored, holds no credentials, and never includes
-  audio files. Automatic archive naming moved into the shared
-  `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
-- Added an optional WebDAV upload target for completed library backups.
-  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
-  sub-folder, and user name, while the password lives only in the encrypted
-  credential store and stays out of `settings.json`. Only plain `http`/`https`
-  URLs without embedded credentials are accepted, the upload is best effort and
-  never removes the local archive, and credentials never reach a URL, a log, or
-  an error message. The scheduled and **Back up now** paths share the upload,
-  and Settings gained the corresponding fields under the backup schedule.
-
-- Added a **Reduce motion** option under Appearance that disables the optional
-  Genre Cloud, Dashboard cover-stage, and karaoke animations. The decision lives
-  in the pure `Orynivo.Controls.MotionPreferences` helper. The album and artist
-  artwork grids can now be opened with Enter or Space in addition to a
-  double-click, and the transport controls (previous, play/pause, next, volume,
-  artist info, lyrics, favorite, shuffle, equalizer, and output) expose
-  accessible names.
-
-- Added cross-device resume for remote Orynivo Server tracks. The server stores the
-  last playback position per profile and track (`profile_track_position`) through
-  the new authenticated `GET`/`PUT /api/tracks/{id}/position` endpoints; the client
-  publishes its audible position at most every 20 seconds and offers a **Resume**
-  transport action when another device left off meaningfully later. The decision
-  lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
-  positions are stored, and no credential-bearing URL is ever persisted.
-
-- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
-  held back by Dependabot. It records the current pins, the trigger that unblocks
-  each upgrade, the migration steps, and the checks required before merging, and
-  is referenced from `AGENTS.md` next to the Dependabot rules.
-
-- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
-  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
-  support on 10 November 2026, the same day as the currently used .NET 8, so
-  moving to it would be a dead end. The record now carries the support-window
-  table, the .NET 10 migration steps, and the note that
-  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
-  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
-  instead of waiting for an upstream release.
-
-- Fixed the failing Dependabot GitHub Actions update. `dotnet-desktop.yml` still
-  pinned `actions/checkout@v6`, `actions/setup-dotnet@v5`, and
-  `actions/upload-artifact@v6` while every other workflow used `@v7`/`@v6`/`@v7`,
-  which made Dependabot abort with `Error processing actions/setup-dotnet
-  (RuntimeError)` / `No files changed!`. All 18 action references now use one
-  version per action, and the new `scripts/verify-github-actions-pins.ps1` (wired
-  into `scripts/verify-all.ps1` and the CI verify job) fails the build when a
-  workflow reintroduces a mixed major.
-
 ### Fixed
 
 - Distinguished a completed MusicBrainz lookup with no community votes from a
@@ -3081,62 +1770,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   the cache size limit in megabytes. Eviction removes the least recently used
   downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
   the most recently used episode is always kept.
-- Added an optional automatic server-side library backup schedule. The
-  `Orynivo:BackupSchedule` configuration section (disabled by default) writes a
-  versioned library ZIP at most once per `IntervalDays` into its target folder and
-  removes archives beyond `RetentionCount`. It reuses the shared
-  `Orynivo.Library.BackupRetention` decisions, derives its last run from the newest
-  archive so no extra state is stored, holds no credentials, and never includes
-  audio files. Automatic archive naming moved into the shared
-  `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
-- Added an optional WebDAV upload target for completed library backups.
-  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
-  sub-folder, and user name, while the password lives only in the encrypted
-  credential store and stays out of `settings.json`. Only plain `http`/`https`
-  URLs without embedded credentials are accepted, the upload is best effort and
-  never removes the local archive, and credentials never reach a URL, a log, or
-  an error message. The scheduled and **Back up now** paths share the upload,
-  and Settings gained the corresponding fields under the backup schedule.
-
-- Added a **Reduce motion** option under Appearance that disables the optional
-  Genre Cloud, Dashboard cover-stage, and karaoke animations. The decision lives
-  in the pure `Orynivo.Controls.MotionPreferences` helper. The album and artist
-  artwork grids can now be opened with Enter or Space in addition to a
-  double-click, and the transport controls (previous, play/pause, next, volume,
-  artist info, lyrics, favorite, shuffle, equalizer, and output) expose
-  accessible names.
-
-- Added cross-device resume for remote Orynivo Server tracks. The server stores the
-  last playback position per profile and track (`profile_track_position`) through
-  the new authenticated `GET`/`PUT /api/tracks/{id}/position` endpoints; the client
-  publishes its audible position at most every 20 seconds and offers a **Resume**
-  transport action when another device left off meaningfully later. The decision
-  lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
-  positions are stored, and no credential-bearing URL is ever persisted.
-
-- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
-  held back by Dependabot. It records the current pins, the trigger that unblocks
-  each upgrade, the migration steps, and the checks required before merging, and
-  is referenced from `AGENTS.md` next to the Dependabot rules.
-
-- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
-  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
-  support on 10 November 2026, the same day as the currently used .NET 8, so
-  moving to it would be a dead end. The record now carries the support-window
-  table, the .NET 10 migration steps, and the note that
-  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
-  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
-  instead of waiting for an upstream release.
-
-- Fixed the failing Dependabot GitHub Actions update. `dotnet-desktop.yml` still
-  pinned `actions/checkout@v6`, `actions/setup-dotnet@v5`, and
-  `actions/upload-artifact@v6` while every other workflow used `@v7`/`@v6`/`@v7`,
-  which made Dependabot abort with `Error processing actions/setup-dotnet
-  (RuntimeError)` / `No files changed!`. All 18 action references now use one
-  version per action, and the new `scripts/verify-github-actions-pins.ps1` (wired
-  into `scripts/verify-all.ps1` and the CI verify job) fails the build when a
-  workflow reintroduces a mixed major.
-
 ### Fixed
 
 - Removed the Fluent DataGrid header's permanent empty sort-icon reservation,
@@ -3176,62 +1809,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   the cache size limit in megabytes. Eviction removes the least recently used
   downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
   the most recently used episode is always kept.
-- Added an optional automatic server-side library backup schedule. The
-  `Orynivo:BackupSchedule` configuration section (disabled by default) writes a
-  versioned library ZIP at most once per `IntervalDays` into its target folder and
-  removes archives beyond `RetentionCount`. It reuses the shared
-  `Orynivo.Library.BackupRetention` decisions, derives its last run from the newest
-  archive so no extra state is stored, holds no credentials, and never includes
-  audio files. Automatic archive naming moved into the shared
-  `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
-- Added an optional WebDAV upload target for completed library backups.
-  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
-  sub-folder, and user name, while the password lives only in the encrypted
-  credential store and stays out of `settings.json`. Only plain `http`/`https`
-  URLs without embedded credentials are accepted, the upload is best effort and
-  never removes the local archive, and credentials never reach a URL, a log, or
-  an error message. The scheduled and **Back up now** paths share the upload,
-  and Settings gained the corresponding fields under the backup schedule.
-
-- Added a **Reduce motion** option under Appearance that disables the optional
-  Genre Cloud, Dashboard cover-stage, and karaoke animations. The decision lives
-  in the pure `Orynivo.Controls.MotionPreferences` helper. The album and artist
-  artwork grids can now be opened with Enter or Space in addition to a
-  double-click, and the transport controls (previous, play/pause, next, volume,
-  artist info, lyrics, favorite, shuffle, equalizer, and output) expose
-  accessible names.
-
-- Added cross-device resume for remote Orynivo Server tracks. The server stores the
-  last playback position per profile and track (`profile_track_position`) through
-  the new authenticated `GET`/`PUT /api/tracks/{id}/position` endpoints; the client
-  publishes its audible position at most every 20 seconds and offers a **Resume**
-  transport action when another device left off meaningfully later. The decision
-  lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
-  positions are stored, and no credential-bearing URL is ever persisted.
-
-- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
-  held back by Dependabot. It records the current pins, the trigger that unblocks
-  each upgrade, the migration steps, and the checks required before merging, and
-  is referenced from `AGENTS.md` next to the Dependabot rules.
-
-- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
-  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
-  support on 10 November 2026, the same day as the currently used .NET 8, so
-  moving to it would be a dead end. The record now carries the support-window
-  table, the .NET 10 migration steps, and the note that
-  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
-  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
-  instead of waiting for an upstream release.
-
-- Fixed the failing Dependabot GitHub Actions update. `dotnet-desktop.yml` still
-  pinned `actions/checkout@v6`, `actions/setup-dotnet@v5`, and
-  `actions/upload-artifact@v6` while every other workflow used `@v7`/`@v6`/`@v7`,
-  which made Dependabot abort with `Error processing actions/setup-dotnet
-  (RuntimeError)` / `No files changed!`. All 18 action references now use one
-  version per action, and the new `scripts/verify-github-actions-pins.ps1` (wired
-  into `scripts/verify-all.ps1` and the CI verify job) fails the build when a
-  workflow reintroduces a mixed major.
-
 ### Fixed
 
 - Fixed unified artist details clearing their already rendered albums when the
@@ -3265,62 +1842,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   the cache size limit in megabytes. Eviction removes the least recently used
   downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
   the most recently used episode is always kept.
-- Added an optional automatic server-side library backup schedule. The
-  `Orynivo:BackupSchedule` configuration section (disabled by default) writes a
-  versioned library ZIP at most once per `IntervalDays` into its target folder and
-  removes archives beyond `RetentionCount`. It reuses the shared
-  `Orynivo.Library.BackupRetention` decisions, derives its last run from the newest
-  archive so no extra state is stored, holds no credentials, and never includes
-  audio files. Automatic archive naming moved into the shared
-  `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
-- Added an optional WebDAV upload target for completed library backups.
-  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
-  sub-folder, and user name, while the password lives only in the encrypted
-  credential store and stays out of `settings.json`. Only plain `http`/`https`
-  URLs without embedded credentials are accepted, the upload is best effort and
-  never removes the local archive, and credentials never reach a URL, a log, or
-  an error message. The scheduled and **Back up now** paths share the upload,
-  and Settings gained the corresponding fields under the backup schedule.
-
-- Added a **Reduce motion** option under Appearance that disables the optional
-  Genre Cloud, Dashboard cover-stage, and karaoke animations. The decision lives
-  in the pure `Orynivo.Controls.MotionPreferences` helper. The album and artist
-  artwork grids can now be opened with Enter or Space in addition to a
-  double-click, and the transport controls (previous, play/pause, next, volume,
-  artist info, lyrics, favorite, shuffle, equalizer, and output) expose
-  accessible names.
-
-- Added cross-device resume for remote Orynivo Server tracks. The server stores the
-  last playback position per profile and track (`profile_track_position`) through
-  the new authenticated `GET`/`PUT /api/tracks/{id}/position` endpoints; the client
-  publishes its audible position at most every 20 seconds and offers a **Resume**
-  transport action when another device left off meaningfully later. The decision
-  lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
-  positions are stored, and no credential-bearing URL is ever persisted.
-
-- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
-  held back by Dependabot. It records the current pins, the trigger that unblocks
-  each upgrade, the migration steps, and the checks required before merging, and
-  is referenced from `AGENTS.md` next to the Dependabot rules.
-
-- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
-  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
-  support on 10 November 2026, the same day as the currently used .NET 8, so
-  moving to it would be a dead end. The record now carries the support-window
-  table, the .NET 10 migration steps, and the note that
-  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
-  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
-  instead of waiting for an upstream release.
-
-- Fixed the failing Dependabot GitHub Actions update. `dotnet-desktop.yml` still
-  pinned `actions/checkout@v6`, `actions/setup-dotnet@v5`, and
-  `actions/upload-artifact@v6` while every other workflow used `@v7`/`@v6`/`@v7`,
-  which made Dependabot abort with `Error processing actions/setup-dotnet
-  (RuntimeError)` / `No files changed!`. All 18 action references now use one
-  version per action, and the new `scripts/verify-github-actions-pins.ps1` (wired
-  into `scripts/verify-all.ps1` and the CI verify job) fails the build when a
-  workflow reintroduces a mixed major.
-
 ### Fixed
 
 - Reworked the unified artist detail hero to match the album-detail layout:
@@ -3392,62 +1913,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   the cache size limit in megabytes. Eviction removes the least recently used
   downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
   the most recently used episode is always kept.
-- Added an optional automatic server-side library backup schedule. The
-  `Orynivo:BackupSchedule` configuration section (disabled by default) writes a
-  versioned library ZIP at most once per `IntervalDays` into its target folder and
-  removes archives beyond `RetentionCount`. It reuses the shared
-  `Orynivo.Library.BackupRetention` decisions, derives its last run from the newest
-  archive so no extra state is stored, holds no credentials, and never includes
-  audio files. Automatic archive naming moved into the shared
-  `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
-- Added an optional WebDAV upload target for completed library backups.
-  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
-  sub-folder, and user name, while the password lives only in the encrypted
-  credential store and stays out of `settings.json`. Only plain `http`/`https`
-  URLs without embedded credentials are accepted, the upload is best effort and
-  never removes the local archive, and credentials never reach a URL, a log, or
-  an error message. The scheduled and **Back up now** paths share the upload,
-  and Settings gained the corresponding fields under the backup schedule.
-
-- Added a **Reduce motion** option under Appearance that disables the optional
-  Genre Cloud, Dashboard cover-stage, and karaoke animations. The decision lives
-  in the pure `Orynivo.Controls.MotionPreferences` helper. The album and artist
-  artwork grids can now be opened with Enter or Space in addition to a
-  double-click, and the transport controls (previous, play/pause, next, volume,
-  artist info, lyrics, favorite, shuffle, equalizer, and output) expose
-  accessible names.
-
-- Added cross-device resume for remote Orynivo Server tracks. The server stores the
-  last playback position per profile and track (`profile_track_position`) through
-  the new authenticated `GET`/`PUT /api/tracks/{id}/position` endpoints; the client
-  publishes its audible position at most every 20 seconds and offers a **Resume**
-  transport action when another device left off meaningfully later. The decision
-  lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
-  positions are stored, and no credential-bearing URL is ever persisted.
-
-- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
-  held back by Dependabot. It records the current pins, the trigger that unblocks
-  each upgrade, the migration steps, and the checks required before merging, and
-  is referenced from `AGENTS.md` next to the Dependabot rules.
-
-- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
-  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
-  support on 10 November 2026, the same day as the currently used .NET 8, so
-  moving to it would be a dead end. The record now carries the support-window
-  table, the .NET 10 migration steps, and the note that
-  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
-  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
-  instead of waiting for an upstream release.
-
-- Fixed the failing Dependabot GitHub Actions update. `dotnet-desktop.yml` still
-  pinned `actions/checkout@v6`, `actions/setup-dotnet@v5`, and
-  `actions/upload-artifact@v6` while every other workflow used `@v7`/`@v6`/`@v7`,
-  which made Dependabot abort with `Error processing actions/setup-dotnet
-  (RuntimeError)` / `No files changed!`. All 18 action references now use one
-  version per action, and the new `scripts/verify-github-actions-pins.ps1` (wired
-  into `scripts/verify-all.ps1` and the CI verify job) fails the build when a
-  workflow reintroduces a mixed major.
-
 ### Fixed
 
 - Fixed Windows identifying Orynivo as an unknown application in the system
@@ -3483,62 +1948,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   the cache size limit in megabytes. Eviction removes the least recently used
   downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
   the most recently used episode is always kept.
-- Added an optional automatic server-side library backup schedule. The
-  `Orynivo:BackupSchedule` configuration section (disabled by default) writes a
-  versioned library ZIP at most once per `IntervalDays` into its target folder and
-  removes archives beyond `RetentionCount`. It reuses the shared
-  `Orynivo.Library.BackupRetention` decisions, derives its last run from the newest
-  archive so no extra state is stored, holds no credentials, and never includes
-  audio files. Automatic archive naming moved into the shared
-  `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
-- Added an optional WebDAV upload target for completed library backups.
-  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
-  sub-folder, and user name, while the password lives only in the encrypted
-  credential store and stays out of `settings.json`. Only plain `http`/`https`
-  URLs without embedded credentials are accepted, the upload is best effort and
-  never removes the local archive, and credentials never reach a URL, a log, or
-  an error message. The scheduled and **Back up now** paths share the upload,
-  and Settings gained the corresponding fields under the backup schedule.
-
-- Added a **Reduce motion** option under Appearance that disables the optional
-  Genre Cloud, Dashboard cover-stage, and karaoke animations. The decision lives
-  in the pure `Orynivo.Controls.MotionPreferences` helper. The album and artist
-  artwork grids can now be opened with Enter or Space in addition to a
-  double-click, and the transport controls (previous, play/pause, next, volume,
-  artist info, lyrics, favorite, shuffle, equalizer, and output) expose
-  accessible names.
-
-- Added cross-device resume for remote Orynivo Server tracks. The server stores the
-  last playback position per profile and track (`profile_track_position`) through
-  the new authenticated `GET`/`PUT /api/tracks/{id}/position` endpoints; the client
-  publishes its audible position at most every 20 seconds and offers a **Resume**
-  transport action when another device left off meaningfully later. The decision
-  lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
-  positions are stored, and no credential-bearing URL is ever persisted.
-
-- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
-  held back by Dependabot. It records the current pins, the trigger that unblocks
-  each upgrade, the migration steps, and the checks required before merging, and
-  is referenced from `AGENTS.md` next to the Dependabot rules.
-
-- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
-  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
-  support on 10 November 2026, the same day as the currently used .NET 8, so
-  moving to it would be a dead end. The record now carries the support-window
-  table, the .NET 10 migration steps, and the note that
-  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
-  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
-  instead of waiting for an upstream release.
-
-- Fixed the failing Dependabot GitHub Actions update. `dotnet-desktop.yml` still
-  pinned `actions/checkout@v6`, `actions/setup-dotnet@v5`, and
-  `actions/upload-artifact@v6` while every other workflow used `@v7`/`@v6`/`@v7`,
-  which made Dependabot abort with `Error processing actions/setup-dotnet
-  (RuntimeError)` / `No files changed!`. All 18 action references now use one
-  version per action, and the new `scripts/verify-github-actions-pins.ps1` (wired
-  into `scripts/verify-all.ps1` and the CI verify job) fails the build when a
-  workflow reintroduces a mixed major.
-
 ### Fixed
 
 - Fixed server-library backup downloads failing on Windows because the completed
@@ -3585,62 +1994,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   the cache size limit in megabytes. Eviction removes the least recently used
   downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
   the most recently used episode is always kept.
-- Added an optional automatic server-side library backup schedule. The
-  `Orynivo:BackupSchedule` configuration section (disabled by default) writes a
-  versioned library ZIP at most once per `IntervalDays` into its target folder and
-  removes archives beyond `RetentionCount`. It reuses the shared
-  `Orynivo.Library.BackupRetention` decisions, derives its last run from the newest
-  archive so no extra state is stored, holds no credentials, and never includes
-  audio files. Automatic archive naming moved into the shared
-  `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
-- Added an optional WebDAV upload target for completed library backups.
-  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
-  sub-folder, and user name, while the password lives only in the encrypted
-  credential store and stays out of `settings.json`. Only plain `http`/`https`
-  URLs without embedded credentials are accepted, the upload is best effort and
-  never removes the local archive, and credentials never reach a URL, a log, or
-  an error message. The scheduled and **Back up now** paths share the upload,
-  and Settings gained the corresponding fields under the backup schedule.
-
-- Added a **Reduce motion** option under Appearance that disables the optional
-  Genre Cloud, Dashboard cover-stage, and karaoke animations. The decision lives
-  in the pure `Orynivo.Controls.MotionPreferences` helper. The album and artist
-  artwork grids can now be opened with Enter or Space in addition to a
-  double-click, and the transport controls (previous, play/pause, next, volume,
-  artist info, lyrics, favorite, shuffle, equalizer, and output) expose
-  accessible names.
-
-- Added cross-device resume for remote Orynivo Server tracks. The server stores the
-  last playback position per profile and track (`profile_track_position`) through
-  the new authenticated `GET`/`PUT /api/tracks/{id}/position` endpoints; the client
-  publishes its audible position at most every 20 seconds and offers a **Resume**
-  transport action when another device left off meaningfully later. The decision
-  lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
-  positions are stored, and no credential-bearing URL is ever persisted.
-
-- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
-  held back by Dependabot. It records the current pins, the trigger that unblocks
-  each upgrade, the migration steps, and the checks required before merging, and
-  is referenced from `AGENTS.md` next to the Dependabot rules.
-
-- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
-  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
-  support on 10 November 2026, the same day as the currently used .NET 8, so
-  moving to it would be a dead end. The record now carries the support-window
-  table, the .NET 10 migration steps, and the note that
-  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
-  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
-  instead of waiting for an upstream release.
-
-- Fixed the failing Dependabot GitHub Actions update. `dotnet-desktop.yml` still
-  pinned `actions/checkout@v6`, `actions/setup-dotnet@v5`, and
-  `actions/upload-artifact@v6` while every other workflow used `@v7`/`@v6`/`@v7`,
-  which made Dependabot abort with `Error processing actions/setup-dotnet
-  (RuntimeError)` / `No files changed!`. All 18 action references now use one
-  version per action, and the new `scripts/verify-github-actions-pins.ps1` (wired
-  into `scripts/verify-all.ps1` and the CI verify job) fails the build when a
-  workflow reintroduces a mixed major.
-
 ### Fixed
 
 - Preserved an album's downloaded artwork and favorite flag when a full
@@ -3672,62 +2025,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   the cache size limit in megabytes. Eviction removes the least recently used
   downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
   the most recently used episode is always kept.
-- Added an optional automatic server-side library backup schedule. The
-  `Orynivo:BackupSchedule` configuration section (disabled by default) writes a
-  versioned library ZIP at most once per `IntervalDays` into its target folder and
-  removes archives beyond `RetentionCount`. It reuses the shared
-  `Orynivo.Library.BackupRetention` decisions, derives its last run from the newest
-  archive so no extra state is stored, holds no credentials, and never includes
-  audio files. Automatic archive naming moved into the shared
-  `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
-- Added an optional WebDAV upload target for completed library backups.
-  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
-  sub-folder, and user name, while the password lives only in the encrypted
-  credential store and stays out of `settings.json`. Only plain `http`/`https`
-  URLs without embedded credentials are accepted, the upload is best effort and
-  never removes the local archive, and credentials never reach a URL, a log, or
-  an error message. The scheduled and **Back up now** paths share the upload,
-  and Settings gained the corresponding fields under the backup schedule.
-
-- Added a **Reduce motion** option under Appearance that disables the optional
-  Genre Cloud, Dashboard cover-stage, and karaoke animations. The decision lives
-  in the pure `Orynivo.Controls.MotionPreferences` helper. The album and artist
-  artwork grids can now be opened with Enter or Space in addition to a
-  double-click, and the transport controls (previous, play/pause, next, volume,
-  artist info, lyrics, favorite, shuffle, equalizer, and output) expose
-  accessible names.
-
-- Added cross-device resume for remote Orynivo Server tracks. The server stores the
-  last playback position per profile and track (`profile_track_position`) through
-  the new authenticated `GET`/`PUT /api/tracks/{id}/position` endpoints; the client
-  publishes its audible position at most every 20 seconds and offers a **Resume**
-  transport action when another device left off meaningfully later. The decision
-  lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
-  positions are stored, and no credential-bearing URL is ever persisted.
-
-- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
-  held back by Dependabot. It records the current pins, the trigger that unblocks
-  each upgrade, the migration steps, and the checks required before merging, and
-  is referenced from `AGENTS.md` next to the Dependabot rules.
-
-- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
-  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
-  support on 10 November 2026, the same day as the currently used .NET 8, so
-  moving to it would be a dead end. The record now carries the support-window
-  table, the .NET 10 migration steps, and the note that
-  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
-  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
-  instead of waiting for an upstream release.
-
-- Fixed the failing Dependabot GitHub Actions update. `dotnet-desktop.yml` still
-  pinned `actions/checkout@v6`, `actions/setup-dotnet@v5`, and
-  `actions/upload-artifact@v6` while every other workflow used `@v7`/`@v6`/`@v7`,
-  which made Dependabot abort with `Error processing actions/setup-dotnet
-  (RuntimeError)` / `No files changed!`. All 18 action references now use one
-  version per action, and the new `scripts/verify-github-actions-pins.ps1` (wired
-  into `scripts/verify-all.ps1` and the CI verify job) fails the build when a
-  workflow reintroduces a mixed major.
-
 ### Fixed
 
 - Added the complete album title as a tooltip on shared artwork cards so
@@ -3772,62 +2069,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   the cache size limit in megabytes. Eviction removes the least recently used
   downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
   the most recently used episode is always kept.
-- Added an optional automatic server-side library backup schedule. The
-  `Orynivo:BackupSchedule` configuration section (disabled by default) writes a
-  versioned library ZIP at most once per `IntervalDays` into its target folder and
-  removes archives beyond `RetentionCount`. It reuses the shared
-  `Orynivo.Library.BackupRetention` decisions, derives its last run from the newest
-  archive so no extra state is stored, holds no credentials, and never includes
-  audio files. Automatic archive naming moved into the shared
-  `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
-- Added an optional WebDAV upload target for completed library backups.
-  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
-  sub-folder, and user name, while the password lives only in the encrypted
-  credential store and stays out of `settings.json`. Only plain `http`/`https`
-  URLs without embedded credentials are accepted, the upload is best effort and
-  never removes the local archive, and credentials never reach a URL, a log, or
-  an error message. The scheduled and **Back up now** paths share the upload,
-  and Settings gained the corresponding fields under the backup schedule.
-
-- Added a **Reduce motion** option under Appearance that disables the optional
-  Genre Cloud, Dashboard cover-stage, and karaoke animations. The decision lives
-  in the pure `Orynivo.Controls.MotionPreferences` helper. The album and artist
-  artwork grids can now be opened with Enter or Space in addition to a
-  double-click, and the transport controls (previous, play/pause, next, volume,
-  artist info, lyrics, favorite, shuffle, equalizer, and output) expose
-  accessible names.
-
-- Added cross-device resume for remote Orynivo Server tracks. The server stores the
-  last playback position per profile and track (`profile_track_position`) through
-  the new authenticated `GET`/`PUT /api/tracks/{id}/position` endpoints; the client
-  publishes its audible position at most every 20 seconds and offers a **Resume**
-  transport action when another device left off meaningfully later. The decision
-  lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
-  positions are stored, and no credential-bearing URL is ever persisted.
-
-- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
-  held back by Dependabot. It records the current pins, the trigger that unblocks
-  each upgrade, the migration steps, and the checks required before merging, and
-  is referenced from `AGENTS.md` next to the Dependabot rules.
-
-- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
-  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
-  support on 10 November 2026, the same day as the currently used .NET 8, so
-  moving to it would be a dead end. The record now carries the support-window
-  table, the .NET 10 migration steps, and the note that
-  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
-  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
-  instead of waiting for an upstream release.
-
-- Fixed the failing Dependabot GitHub Actions update. `dotnet-desktop.yml` still
-  pinned `actions/checkout@v6`, `actions/setup-dotnet@v5`, and
-  `actions/upload-artifact@v6` while every other workflow used `@v7`/`@v6`/`@v7`,
-  which made Dependabot abort with `Error processing actions/setup-dotnet
-  (RuntimeError)` / `No files changed!`. All 18 action references now use one
-  version per action, and the new `scripts/verify-github-actions-pins.ps1` (wired
-  into `scripts/verify-all.ps1` and the CI verify job) fails the build when a
-  workflow reintroduces a mixed major.
-
 ### Fixed
 
 - Prevented concurrent platform release jobs from creating duplicate GitHub
@@ -3892,62 +2133,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   the cache size limit in megabytes. Eviction removes the least recently used
   downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
   the most recently used episode is always kept.
-- Added an optional automatic server-side library backup schedule. The
-  `Orynivo:BackupSchedule` configuration section (disabled by default) writes a
-  versioned library ZIP at most once per `IntervalDays` into its target folder and
-  removes archives beyond `RetentionCount`. It reuses the shared
-  `Orynivo.Library.BackupRetention` decisions, derives its last run from the newest
-  archive so no extra state is stored, holds no credentials, and never includes
-  audio files. Automatic archive naming moved into the shared
-  `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
-- Added an optional WebDAV upload target for completed library backups.
-  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
-  sub-folder, and user name, while the password lives only in the encrypted
-  credential store and stays out of `settings.json`. Only plain `http`/`https`
-  URLs without embedded credentials are accepted, the upload is best effort and
-  never removes the local archive, and credentials never reach a URL, a log, or
-  an error message. The scheduled and **Back up now** paths share the upload,
-  and Settings gained the corresponding fields under the backup schedule.
-
-- Added a **Reduce motion** option under Appearance that disables the optional
-  Genre Cloud, Dashboard cover-stage, and karaoke animations. The decision lives
-  in the pure `Orynivo.Controls.MotionPreferences` helper. The album and artist
-  artwork grids can now be opened with Enter or Space in addition to a
-  double-click, and the transport controls (previous, play/pause, next, volume,
-  artist info, lyrics, favorite, shuffle, equalizer, and output) expose
-  accessible names.
-
-- Added cross-device resume for remote Orynivo Server tracks. The server stores the
-  last playback position per profile and track (`profile_track_position`) through
-  the new authenticated `GET`/`PUT /api/tracks/{id}/position` endpoints; the client
-  publishes its audible position at most every 20 seconds and offers a **Resume**
-  transport action when another device left off meaningfully later. The decision
-  lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
-  positions are stored, and no credential-bearing URL is ever persisted.
-
-- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
-  held back by Dependabot. It records the current pins, the trigger that unblocks
-  each upgrade, the migration steps, and the checks required before merging, and
-  is referenced from `AGENTS.md` next to the Dependabot rules.
-
-- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
-  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
-  support on 10 November 2026, the same day as the currently used .NET 8, so
-  moving to it would be a dead end. The record now carries the support-window
-  table, the .NET 10 migration steps, and the note that
-  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
-  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
-  instead of waiting for an upstream release.
-
-- Fixed the failing Dependabot GitHub Actions update. `dotnet-desktop.yml` still
-  pinned `actions/checkout@v6`, `actions/setup-dotnet@v5`, and
-  `actions/upload-artifact@v6` while every other workflow used `@v7`/`@v6`/`@v7`,
-  which made Dependabot abort with `Error processing actions/setup-dotnet
-  (RuntimeError)` / `No files changed!`. All 18 action references now use one
-  version per action, and the new `scripts/verify-github-actions-pins.ps1` (wired
-  into `scripts/verify-all.ps1` and the CI verify job) fails the build when a
-  workflow reintroduces a mixed major.
-
 ### Fixed
 
 - Enlarged the Infinite Mix profile dialog, made it resizable, and reserved a
@@ -4014,62 +2199,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   the cache size limit in megabytes. Eviction removes the least recently used
   downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
   the most recently used episode is always kept.
-- Added an optional automatic server-side library backup schedule. The
-  `Orynivo:BackupSchedule` configuration section (disabled by default) writes a
-  versioned library ZIP at most once per `IntervalDays` into its target folder and
-  removes archives beyond `RetentionCount`. It reuses the shared
-  `Orynivo.Library.BackupRetention` decisions, derives its last run from the newest
-  archive so no extra state is stored, holds no credentials, and never includes
-  audio files. Automatic archive naming moved into the shared
-  `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
-- Added an optional WebDAV upload target for completed library backups.
-  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
-  sub-folder, and user name, while the password lives only in the encrypted
-  credential store and stays out of `settings.json`. Only plain `http`/`https`
-  URLs without embedded credentials are accepted, the upload is best effort and
-  never removes the local archive, and credentials never reach a URL, a log, or
-  an error message. The scheduled and **Back up now** paths share the upload,
-  and Settings gained the corresponding fields under the backup schedule.
-
-- Added a **Reduce motion** option under Appearance that disables the optional
-  Genre Cloud, Dashboard cover-stage, and karaoke animations. The decision lives
-  in the pure `Orynivo.Controls.MotionPreferences` helper. The album and artist
-  artwork grids can now be opened with Enter or Space in addition to a
-  double-click, and the transport controls (previous, play/pause, next, volume,
-  artist info, lyrics, favorite, shuffle, equalizer, and output) expose
-  accessible names.
-
-- Added cross-device resume for remote Orynivo Server tracks. The server stores the
-  last playback position per profile and track (`profile_track_position`) through
-  the new authenticated `GET`/`PUT /api/tracks/{id}/position` endpoints; the client
-  publishes its audible position at most every 20 seconds and offers a **Resume**
-  transport action when another device left off meaningfully later. The decision
-  lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
-  positions are stored, and no credential-bearing URL is ever persisted.
-
-- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
-  held back by Dependabot. It records the current pins, the trigger that unblocks
-  each upgrade, the migration steps, and the checks required before merging, and
-  is referenced from `AGENTS.md` next to the Dependabot rules.
-
-- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
-  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
-  support on 10 November 2026, the same day as the currently used .NET 8, so
-  moving to it would be a dead end. The record now carries the support-window
-  table, the .NET 10 migration steps, and the note that
-  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
-  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
-  instead of waiting for an upstream release.
-
-- Fixed the failing Dependabot GitHub Actions update. `dotnet-desktop.yml` still
-  pinned `actions/checkout@v6`, `actions/setup-dotnet@v5`, and
-  `actions/upload-artifact@v6` while every other workflow used `@v7`/`@v6`/`@v7`,
-  which made Dependabot abort with `Error processing actions/setup-dotnet
-  (RuntimeError)` / `No files changed!`. All 18 action references now use one
-  version per action, and the new `scripts/verify-github-actions-pins.ps1` (wired
-  into `scripts/verify-all.ps1` and the CI verify job) fails the build when a
-  workflow reintroduces a mixed major.
-
 ### Fixed
 
 - Fixed Genre Cloud drill-downs reverting to all root genres when a connected
@@ -4136,62 +2265,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   the cache size limit in megabytes. Eviction removes the least recently used
   downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
   the most recently used episode is always kept.
-- Added an optional automatic server-side library backup schedule. The
-  `Orynivo:BackupSchedule` configuration section (disabled by default) writes a
-  versioned library ZIP at most once per `IntervalDays` into its target folder and
-  removes archives beyond `RetentionCount`. It reuses the shared
-  `Orynivo.Library.BackupRetention` decisions, derives its last run from the newest
-  archive so no extra state is stored, holds no credentials, and never includes
-  audio files. Automatic archive naming moved into the shared
-  `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
-- Added an optional WebDAV upload target for completed library backups.
-  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
-  sub-folder, and user name, while the password lives only in the encrypted
-  credential store and stays out of `settings.json`. Only plain `http`/`https`
-  URLs without embedded credentials are accepted, the upload is best effort and
-  never removes the local archive, and credentials never reach a URL, a log, or
-  an error message. The scheduled and **Back up now** paths share the upload,
-  and Settings gained the corresponding fields under the backup schedule.
-
-- Added a **Reduce motion** option under Appearance that disables the optional
-  Genre Cloud, Dashboard cover-stage, and karaoke animations. The decision lives
-  in the pure `Orynivo.Controls.MotionPreferences` helper. The album and artist
-  artwork grids can now be opened with Enter or Space in addition to a
-  double-click, and the transport controls (previous, play/pause, next, volume,
-  artist info, lyrics, favorite, shuffle, equalizer, and output) expose
-  accessible names.
-
-- Added cross-device resume for remote Orynivo Server tracks. The server stores the
-  last playback position per profile and track (`profile_track_position`) through
-  the new authenticated `GET`/`PUT /api/tracks/{id}/position` endpoints; the client
-  publishes its audible position at most every 20 seconds and offers a **Resume**
-  transport action when another device left off meaningfully later. The decision
-  lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
-  positions are stored, and no credential-bearing URL is ever persisted.
-
-- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
-  held back by Dependabot. It records the current pins, the trigger that unblocks
-  each upgrade, the migration steps, and the checks required before merging, and
-  is referenced from `AGENTS.md` next to the Dependabot rules.
-
-- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
-  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
-  support on 10 November 2026, the same day as the currently used .NET 8, so
-  moving to it would be a dead end. The record now carries the support-window
-  table, the .NET 10 migration steps, and the note that
-  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
-  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
-  instead of waiting for an upstream release.
-
-- Fixed the failing Dependabot GitHub Actions update. `dotnet-desktop.yml` still
-  pinned `actions/checkout@v6`, `actions/setup-dotnet@v5`, and
-  `actions/upload-artifact@v6` while every other workflow used `@v7`/`@v6`/`@v7`,
-  which made Dependabot abort with `Error processing actions/setup-dotnet
-  (RuntimeError)` / `No files changed!`. All 18 action references now use one
-  version per action, and the new `scripts/verify-github-actions-pins.ps1` (wired
-  into `scripts/verify-all.ps1` and the CI verify job) fails the build when a
-  workflow reintroduces a mixed major.
-
 ### Fixed
 
 - Fixed SEO image dimensions stretching the product screenshots and brand
@@ -4242,62 +2315,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   the cache size limit in megabytes. Eviction removes the least recently used
   downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
   the most recently used episode is always kept.
-- Added an optional automatic server-side library backup schedule. The
-  `Orynivo:BackupSchedule` configuration section (disabled by default) writes a
-  versioned library ZIP at most once per `IntervalDays` into its target folder and
-  removes archives beyond `RetentionCount`. It reuses the shared
-  `Orynivo.Library.BackupRetention` decisions, derives its last run from the newest
-  archive so no extra state is stored, holds no credentials, and never includes
-  audio files. Automatic archive naming moved into the shared
-  `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
-- Added an optional WebDAV upload target for completed library backups.
-  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
-  sub-folder, and user name, while the password lives only in the encrypted
-  credential store and stays out of `settings.json`. Only plain `http`/`https`
-  URLs without embedded credentials are accepted, the upload is best effort and
-  never removes the local archive, and credentials never reach a URL, a log, or
-  an error message. The scheduled and **Back up now** paths share the upload,
-  and Settings gained the corresponding fields under the backup schedule.
-
-- Added a **Reduce motion** option under Appearance that disables the optional
-  Genre Cloud, Dashboard cover-stage, and karaoke animations. The decision lives
-  in the pure `Orynivo.Controls.MotionPreferences` helper. The album and artist
-  artwork grids can now be opened with Enter or Space in addition to a
-  double-click, and the transport controls (previous, play/pause, next, volume,
-  artist info, lyrics, favorite, shuffle, equalizer, and output) expose
-  accessible names.
-
-- Added cross-device resume for remote Orynivo Server tracks. The server stores the
-  last playback position per profile and track (`profile_track_position`) through
-  the new authenticated `GET`/`PUT /api/tracks/{id}/position` endpoints; the client
-  publishes its audible position at most every 20 seconds and offers a **Resume**
-  transport action when another device left off meaningfully later. The decision
-  lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
-  positions are stored, and no credential-bearing URL is ever persisted.
-
-- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
-  held back by Dependabot. It records the current pins, the trigger that unblocks
-  each upgrade, the migration steps, and the checks required before merging, and
-  is referenced from `AGENTS.md` next to the Dependabot rules.
-
-- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
-  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
-  support on 10 November 2026, the same day as the currently used .NET 8, so
-  moving to it would be a dead end. The record now carries the support-window
-  table, the .NET 10 migration steps, and the note that
-  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
-  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
-  instead of waiting for an upstream release.
-
-- Fixed the failing Dependabot GitHub Actions update. `dotnet-desktop.yml` still
-  pinned `actions/checkout@v6`, `actions/setup-dotnet@v5`, and
-  `actions/upload-artifact@v6` while every other workflow used `@v7`/`@v6`/`@v7`,
-  which made Dependabot abort with `Error processing actions/setup-dotnet
-  (RuntimeError)` / `No files changed!`. All 18 action references now use one
-  version per action, and the new `scripts/verify-github-actions-pins.ps1` (wired
-  into `scripts/verify-all.ps1` and the CI verify job) fails the build when a
-  workflow reintroduces a mixed major.
-
 ### Fixed
 
 - Masked the Last.fm API key in Settings so it is no longer displayed as
@@ -4360,62 +2377,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   the cache size limit in megabytes. Eviction removes the least recently used
   downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
   the most recently used episode is always kept.
-- Added an optional automatic server-side library backup schedule. The
-  `Orynivo:BackupSchedule` configuration section (disabled by default) writes a
-  versioned library ZIP at most once per `IntervalDays` into its target folder and
-  removes archives beyond `RetentionCount`. It reuses the shared
-  `Orynivo.Library.BackupRetention` decisions, derives its last run from the newest
-  archive so no extra state is stored, holds no credentials, and never includes
-  audio files. Automatic archive naming moved into the shared
-  `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
-- Added an optional WebDAV upload target for completed library backups.
-  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
-  sub-folder, and user name, while the password lives only in the encrypted
-  credential store and stays out of `settings.json`. Only plain `http`/`https`
-  URLs without embedded credentials are accepted, the upload is best effort and
-  never removes the local archive, and credentials never reach a URL, a log, or
-  an error message. The scheduled and **Back up now** paths share the upload,
-  and Settings gained the corresponding fields under the backup schedule.
-
-- Added a **Reduce motion** option under Appearance that disables the optional
-  Genre Cloud, Dashboard cover-stage, and karaoke animations. The decision lives
-  in the pure `Orynivo.Controls.MotionPreferences` helper. The album and artist
-  artwork grids can now be opened with Enter or Space in addition to a
-  double-click, and the transport controls (previous, play/pause, next, volume,
-  artist info, lyrics, favorite, shuffle, equalizer, and output) expose
-  accessible names.
-
-- Added cross-device resume for remote Orynivo Server tracks. The server stores the
-  last playback position per profile and track (`profile_track_position`) through
-  the new authenticated `GET`/`PUT /api/tracks/{id}/position` endpoints; the client
-  publishes its audible position at most every 20 seconds and offers a **Resume**
-  transport action when another device left off meaningfully later. The decision
-  lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
-  positions are stored, and no credential-bearing URL is ever persisted.
-
-- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
-  held back by Dependabot. It records the current pins, the trigger that unblocks
-  each upgrade, the migration steps, and the checks required before merging, and
-  is referenced from `AGENTS.md` next to the Dependabot rules.
-
-- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
-  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
-  support on 10 November 2026, the same day as the currently used .NET 8, so
-  moving to it would be a dead end. The record now carries the support-window
-  table, the .NET 10 migration steps, and the note that
-  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
-  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
-  instead of waiting for an upstream release.
-
-- Fixed the failing Dependabot GitHub Actions update. `dotnet-desktop.yml` still
-  pinned `actions/checkout@v6`, `actions/setup-dotnet@v5`, and
-  `actions/upload-artifact@v6` while every other workflow used `@v7`/`@v6`/`@v7`,
-  which made Dependabot abort with `Error processing actions/setup-dotnet
-  (RuntimeError)` / `No files changed!`. All 18 action references now use one
-  version per action, and the new `scripts/verify-github-actions-pins.ps1` (wired
-  into `scripts/verify-all.ps1` and the CI verify job) fails the build when a
-  workflow reintroduces a mixed major.
-
 ### Fixed
 
 - Fixed Linux desktop updates being unavailable or attempting to treat the
@@ -4480,62 +2441,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   the cache size limit in megabytes. Eviction removes the least recently used
   downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
   the most recently used episode is always kept.
-- Added an optional automatic server-side library backup schedule. The
-  `Orynivo:BackupSchedule` configuration section (disabled by default) writes a
-  versioned library ZIP at most once per `IntervalDays` into its target folder and
-  removes archives beyond `RetentionCount`. It reuses the shared
-  `Orynivo.Library.BackupRetention` decisions, derives its last run from the newest
-  archive so no extra state is stored, holds no credentials, and never includes
-  audio files. Automatic archive naming moved into the shared
-  `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
-- Added an optional WebDAV upload target for completed library backups.
-  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
-  sub-folder, and user name, while the password lives only in the encrypted
-  credential store and stays out of `settings.json`. Only plain `http`/`https`
-  URLs without embedded credentials are accepted, the upload is best effort and
-  never removes the local archive, and credentials never reach a URL, a log, or
-  an error message. The scheduled and **Back up now** paths share the upload,
-  and Settings gained the corresponding fields under the backup schedule.
-
-- Added a **Reduce motion** option under Appearance that disables the optional
-  Genre Cloud, Dashboard cover-stage, and karaoke animations. The decision lives
-  in the pure `Orynivo.Controls.MotionPreferences` helper. The album and artist
-  artwork grids can now be opened with Enter or Space in addition to a
-  double-click, and the transport controls (previous, play/pause, next, volume,
-  artist info, lyrics, favorite, shuffle, equalizer, and output) expose
-  accessible names.
-
-- Added cross-device resume for remote Orynivo Server tracks. The server stores the
-  last playback position per profile and track (`profile_track_position`) through
-  the new authenticated `GET`/`PUT /api/tracks/{id}/position` endpoints; the client
-  publishes its audible position at most every 20 seconds and offers a **Resume**
-  transport action when another device left off meaningfully later. The decision
-  lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
-  positions are stored, and no credential-bearing URL is ever persisted.
-
-- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
-  held back by Dependabot. It records the current pins, the trigger that unblocks
-  each upgrade, the migration steps, and the checks required before merging, and
-  is referenced from `AGENTS.md` next to the Dependabot rules.
-
-- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
-  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
-  support on 10 November 2026, the same day as the currently used .NET 8, so
-  moving to it would be a dead end. The record now carries the support-window
-  table, the .NET 10 migration steps, and the note that
-  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
-  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
-  instead of waiting for an upstream release.
-
-- Fixed the failing Dependabot GitHub Actions update. `dotnet-desktop.yml` still
-  pinned `actions/checkout@v6`, `actions/setup-dotnet@v5`, and
-  `actions/upload-artifact@v6` while every other workflow used `@v7`/`@v6`/`@v7`,
-  which made Dependabot abort with `Error processing actions/setup-dotnet
-  (RuntimeError)` / `No files changed!`. All 18 action references now use one
-  version per action, and the new `scripts/verify-github-actions-pins.ps1` (wired
-  into `scripts/verify-all.ps1` and the CI verify job) fails the build when a
-  workflow reintroduces a mixed major.
-
 ### Fixed
 
 - Linux server release builds now normalize and validate packaged maintainer
@@ -4565,62 +2470,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   the cache size limit in megabytes. Eviction removes the least recently used
   downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
   the most recently used episode is always kept.
-- Added an optional automatic server-side library backup schedule. The
-  `Orynivo:BackupSchedule` configuration section (disabled by default) writes a
-  versioned library ZIP at most once per `IntervalDays` into its target folder and
-  removes archives beyond `RetentionCount`. It reuses the shared
-  `Orynivo.Library.BackupRetention` decisions, derives its last run from the newest
-  archive so no extra state is stored, holds no credentials, and never includes
-  audio files. Automatic archive naming moved into the shared
-  `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
-- Added an optional WebDAV upload target for completed library backups.
-  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
-  sub-folder, and user name, while the password lives only in the encrypted
-  credential store and stays out of `settings.json`. Only plain `http`/`https`
-  URLs without embedded credentials are accepted, the upload is best effort and
-  never removes the local archive, and credentials never reach a URL, a log, or
-  an error message. The scheduled and **Back up now** paths share the upload,
-  and Settings gained the corresponding fields under the backup schedule.
-
-- Added a **Reduce motion** option under Appearance that disables the optional
-  Genre Cloud, Dashboard cover-stage, and karaoke animations. The decision lives
-  in the pure `Orynivo.Controls.MotionPreferences` helper. The album and artist
-  artwork grids can now be opened with Enter or Space in addition to a
-  double-click, and the transport controls (previous, play/pause, next, volume,
-  artist info, lyrics, favorite, shuffle, equalizer, and output) expose
-  accessible names.
-
-- Added cross-device resume for remote Orynivo Server tracks. The server stores the
-  last playback position per profile and track (`profile_track_position`) through
-  the new authenticated `GET`/`PUT /api/tracks/{id}/position` endpoints; the client
-  publishes its audible position at most every 20 seconds and offers a **Resume**
-  transport action when another device left off meaningfully later. The decision
-  lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
-  positions are stored, and no credential-bearing URL is ever persisted.
-
-- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
-  held back by Dependabot. It records the current pins, the trigger that unblocks
-  each upgrade, the migration steps, and the checks required before merging, and
-  is referenced from `AGENTS.md` next to the Dependabot rules.
-
-- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
-  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
-  support on 10 November 2026, the same day as the currently used .NET 8, so
-  moving to it would be a dead end. The record now carries the support-window
-  table, the .NET 10 migration steps, and the note that
-  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
-  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
-  instead of waiting for an upstream release.
-
-- Fixed the failing Dependabot GitHub Actions update. `dotnet-desktop.yml` still
-  pinned `actions/checkout@v6`, `actions/setup-dotnet@v5`, and
-  `actions/upload-artifact@v6` while every other workflow used `@v7`/`@v6`/`@v7`,
-  which made Dependabot abort with `Error processing actions/setup-dotnet
-  (RuntimeError)` / `No files changed!`. All 18 action references now use one
-  version per action, and the new `scripts/verify-github-actions-pins.ps1` (wired
-  into `scripts/verify-all.ps1` and the CI verify job) fails the build when a
-  workflow reintroduces a mixed major.
-
 ### Fixed
 
 - Managed DEB server updates now retain the administrator's existing
@@ -4672,62 +2521,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   the cache size limit in megabytes. Eviction removes the least recently used
   downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
   the most recently used episode is always kept.
-- Added an optional automatic server-side library backup schedule. The
-  `Orynivo:BackupSchedule` configuration section (disabled by default) writes a
-  versioned library ZIP at most once per `IntervalDays` into its target folder and
-  removes archives beyond `RetentionCount`. It reuses the shared
-  `Orynivo.Library.BackupRetention` decisions, derives its last run from the newest
-  archive so no extra state is stored, holds no credentials, and never includes
-  audio files. Automatic archive naming moved into the shared
-  `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
-- Added an optional WebDAV upload target for completed library backups.
-  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
-  sub-folder, and user name, while the password lives only in the encrypted
-  credential store and stays out of `settings.json`. Only plain `http`/`https`
-  URLs without embedded credentials are accepted, the upload is best effort and
-  never removes the local archive, and credentials never reach a URL, a log, or
-  an error message. The scheduled and **Back up now** paths share the upload,
-  and Settings gained the corresponding fields under the backup schedule.
-
-- Added a **Reduce motion** option under Appearance that disables the optional
-  Genre Cloud, Dashboard cover-stage, and karaoke animations. The decision lives
-  in the pure `Orynivo.Controls.MotionPreferences` helper. The album and artist
-  artwork grids can now be opened with Enter or Space in addition to a
-  double-click, and the transport controls (previous, play/pause, next, volume,
-  artist info, lyrics, favorite, shuffle, equalizer, and output) expose
-  accessible names.
-
-- Added cross-device resume for remote Orynivo Server tracks. The server stores the
-  last playback position per profile and track (`profile_track_position`) through
-  the new authenticated `GET`/`PUT /api/tracks/{id}/position` endpoints; the client
-  publishes its audible position at most every 20 seconds and offers a **Resume**
-  transport action when another device left off meaningfully later. The decision
-  lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
-  positions are stored, and no credential-bearing URL is ever persisted.
-
-- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
-  held back by Dependabot. It records the current pins, the trigger that unblocks
-  each upgrade, the migration steps, and the checks required before merging, and
-  is referenced from `AGENTS.md` next to the Dependabot rules.
-
-- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
-  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
-  support on 10 November 2026, the same day as the currently used .NET 8, so
-  moving to it would be a dead end. The record now carries the support-window
-  table, the .NET 10 migration steps, and the note that
-  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
-  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
-  instead of waiting for an upstream release.
-
-- Fixed the failing Dependabot GitHub Actions update. `dotnet-desktop.yml` still
-  pinned `actions/checkout@v6`, `actions/setup-dotnet@v5`, and
-  `actions/upload-artifact@v6` while every other workflow used `@v7`/`@v6`/`@v7`,
-  which made Dependabot abort with `Error processing actions/setup-dotnet
-  (RuntimeError)` / `No files changed!`. All 18 action references now use one
-  version per action, and the new `scripts/verify-github-actions-pins.ps1` (wired
-  into `scripts/verify-all.ps1` and the CI verify job) fails the build when a
-  workflow reintroduces a mixed major.
-
 ### Fixed
 
 - Opening a local or Orynivo Server album from a unified artist view once again
@@ -4758,62 +2551,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   the cache size limit in megabytes. Eviction removes the least recently used
   downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
   the most recently used episode is always kept.
-- Added an optional automatic server-side library backup schedule. The
-  `Orynivo:BackupSchedule` configuration section (disabled by default) writes a
-  versioned library ZIP at most once per `IntervalDays` into its target folder and
-  removes archives beyond `RetentionCount`. It reuses the shared
-  `Orynivo.Library.BackupRetention` decisions, derives its last run from the newest
-  archive so no extra state is stored, holds no credentials, and never includes
-  audio files. Automatic archive naming moved into the shared
-  `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
-- Added an optional WebDAV upload target for completed library backups.
-  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
-  sub-folder, and user name, while the password lives only in the encrypted
-  credential store and stays out of `settings.json`. Only plain `http`/`https`
-  URLs without embedded credentials are accepted, the upload is best effort and
-  never removes the local archive, and credentials never reach a URL, a log, or
-  an error message. The scheduled and **Back up now** paths share the upload,
-  and Settings gained the corresponding fields under the backup schedule.
-
-- Added a **Reduce motion** option under Appearance that disables the optional
-  Genre Cloud, Dashboard cover-stage, and karaoke animations. The decision lives
-  in the pure `Orynivo.Controls.MotionPreferences` helper. The album and artist
-  artwork grids can now be opened with Enter or Space in addition to a
-  double-click, and the transport controls (previous, play/pause, next, volume,
-  artist info, lyrics, favorite, shuffle, equalizer, and output) expose
-  accessible names.
-
-- Added cross-device resume for remote Orynivo Server tracks. The server stores the
-  last playback position per profile and track (`profile_track_position`) through
-  the new authenticated `GET`/`PUT /api/tracks/{id}/position` endpoints; the client
-  publishes its audible position at most every 20 seconds and offers a **Resume**
-  transport action when another device left off meaningfully later. The decision
-  lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
-  positions are stored, and no credential-bearing URL is ever persisted.
-
-- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
-  held back by Dependabot. It records the current pins, the trigger that unblocks
-  each upgrade, the migration steps, and the checks required before merging, and
-  is referenced from `AGENTS.md` next to the Dependabot rules.
-
-- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
-  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
-  support on 10 November 2026, the same day as the currently used .NET 8, so
-  moving to it would be a dead end. The record now carries the support-window
-  table, the .NET 10 migration steps, and the note that
-  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
-  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
-  instead of waiting for an upstream release.
-
-- Fixed the failing Dependabot GitHub Actions update. `dotnet-desktop.yml` still
-  pinned `actions/checkout@v6`, `actions/setup-dotnet@v5`, and
-  `actions/upload-artifact@v6` while every other workflow used `@v7`/`@v6`/`@v7`,
-  which made Dependabot abort with `Error processing actions/setup-dotnet
-  (RuntimeError)` / `No files changed!`. All 18 action references now use one
-  version per action, and the new `scripts/verify-github-actions-pins.ps1` (wired
-  into `scripts/verify-all.ps1` and the CI verify job) fails the build when a
-  workflow reintroduces a mixed major.
-
 ### Fixed
 
 - macOS now finds FFmpeg and FFprobe installed in common Homebrew, MacPorts,
@@ -4863,62 +2600,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   the cache size limit in megabytes. Eviction removes the least recently used
   downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
   the most recently used episode is always kept.
-- Added an optional automatic server-side library backup schedule. The
-  `Orynivo:BackupSchedule` configuration section (disabled by default) writes a
-  versioned library ZIP at most once per `IntervalDays` into its target folder and
-  removes archives beyond `RetentionCount`. It reuses the shared
-  `Orynivo.Library.BackupRetention` decisions, derives its last run from the newest
-  archive so no extra state is stored, holds no credentials, and never includes
-  audio files. Automatic archive naming moved into the shared
-  `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
-- Added an optional WebDAV upload target for completed library backups.
-  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
-  sub-folder, and user name, while the password lives only in the encrypted
-  credential store and stays out of `settings.json`. Only plain `http`/`https`
-  URLs without embedded credentials are accepted, the upload is best effort and
-  never removes the local archive, and credentials never reach a URL, a log, or
-  an error message. The scheduled and **Back up now** paths share the upload,
-  and Settings gained the corresponding fields under the backup schedule.
-
-- Added a **Reduce motion** option under Appearance that disables the optional
-  Genre Cloud, Dashboard cover-stage, and karaoke animations. The decision lives
-  in the pure `Orynivo.Controls.MotionPreferences` helper. The album and artist
-  artwork grids can now be opened with Enter or Space in addition to a
-  double-click, and the transport controls (previous, play/pause, next, volume,
-  artist info, lyrics, favorite, shuffle, equalizer, and output) expose
-  accessible names.
-
-- Added cross-device resume for remote Orynivo Server tracks. The server stores the
-  last playback position per profile and track (`profile_track_position`) through
-  the new authenticated `GET`/`PUT /api/tracks/{id}/position` endpoints; the client
-  publishes its audible position at most every 20 seconds and offers a **Resume**
-  transport action when another device left off meaningfully later. The decision
-  lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
-  positions are stored, and no credential-bearing URL is ever persisted.
-
-- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
-  held back by Dependabot. It records the current pins, the trigger that unblocks
-  each upgrade, the migration steps, and the checks required before merging, and
-  is referenced from `AGENTS.md` next to the Dependabot rules.
-
-- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
-  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
-  support on 10 November 2026, the same day as the currently used .NET 8, so
-  moving to it would be a dead end. The record now carries the support-window
-  table, the .NET 10 migration steps, and the note that
-  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
-  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
-  instead of waiting for an upstream release.
-
-- Fixed the failing Dependabot GitHub Actions update. `dotnet-desktop.yml` still
-  pinned `actions/checkout@v6`, `actions/setup-dotnet@v5`, and
-  `actions/upload-artifact@v6` while every other workflow used `@v7`/`@v6`/`@v7`,
-  which made Dependabot abort with `Error processing actions/setup-dotnet
-  (RuntimeError)` / `No files changed!`. All 18 action references now use one
-  version per action, and the new `scripts/verify-github-actions-pins.ps1` (wired
-  into `scripts/verify-all.ps1` and the CI verify job) fails the build when a
-  workflow reintroduces a mixed major.
-
 ### Fixed
 
 - Hidden the Steinberg ASIO and cwASIO subsystem badges on macOS and Linux,
@@ -4967,62 +2648,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   the cache size limit in megabytes. Eviction removes the least recently used
   downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
   the most recently used episode is always kept.
-- Added an optional automatic server-side library backup schedule. The
-  `Orynivo:BackupSchedule` configuration section (disabled by default) writes a
-  versioned library ZIP at most once per `IntervalDays` into its target folder and
-  removes archives beyond `RetentionCount`. It reuses the shared
-  `Orynivo.Library.BackupRetention` decisions, derives its last run from the newest
-  archive so no extra state is stored, holds no credentials, and never includes
-  audio files. Automatic archive naming moved into the shared
-  `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
-- Added an optional WebDAV upload target for completed library backups.
-  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
-  sub-folder, and user name, while the password lives only in the encrypted
-  credential store and stays out of `settings.json`. Only plain `http`/`https`
-  URLs without embedded credentials are accepted, the upload is best effort and
-  never removes the local archive, and credentials never reach a URL, a log, or
-  an error message. The scheduled and **Back up now** paths share the upload,
-  and Settings gained the corresponding fields under the backup schedule.
-
-- Added a **Reduce motion** option under Appearance that disables the optional
-  Genre Cloud, Dashboard cover-stage, and karaoke animations. The decision lives
-  in the pure `Orynivo.Controls.MotionPreferences` helper. The album and artist
-  artwork grids can now be opened with Enter or Space in addition to a
-  double-click, and the transport controls (previous, play/pause, next, volume,
-  artist info, lyrics, favorite, shuffle, equalizer, and output) expose
-  accessible names.
-
-- Added cross-device resume for remote Orynivo Server tracks. The server stores the
-  last playback position per profile and track (`profile_track_position`) through
-  the new authenticated `GET`/`PUT /api/tracks/{id}/position` endpoints; the client
-  publishes its audible position at most every 20 seconds and offers a **Resume**
-  transport action when another device left off meaningfully later. The decision
-  lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
-  positions are stored, and no credential-bearing URL is ever persisted.
-
-- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
-  held back by Dependabot. It records the current pins, the trigger that unblocks
-  each upgrade, the migration steps, and the checks required before merging, and
-  is referenced from `AGENTS.md` next to the Dependabot rules.
-
-- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
-  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
-  support on 10 November 2026, the same day as the currently used .NET 8, so
-  moving to it would be a dead end. The record now carries the support-window
-  table, the .NET 10 migration steps, and the note that
-  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
-  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
-  instead of waiting for an upstream release.
-
-- Fixed the failing Dependabot GitHub Actions update. `dotnet-desktop.yml` still
-  pinned `actions/checkout@v6`, `actions/setup-dotnet@v5`, and
-  `actions/upload-artifact@v6` while every other workflow used `@v7`/`@v6`/`@v7`,
-  which made Dependabot abort with `Error processing actions/setup-dotnet
-  (RuntimeError)` / `No files changed!`. All 18 action references now use one
-  version per action, and the new `scripts/verify-github-actions-pins.ps1` (wired
-  into `scripts/verify-all.ps1` and the CI verify job) fails the build when a
-  workflow reintroduces a mixed major.
-
 ### Fixed
 
 - Fixed the Arch Linux player package layout so `.PKGINFO` is stored at the
@@ -5104,62 +2729,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   the cache size limit in megabytes. Eviction removes the least recently used
   downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
   the most recently used episode is always kept.
-- Added an optional automatic server-side library backup schedule. The
-  `Orynivo:BackupSchedule` configuration section (disabled by default) writes a
-  versioned library ZIP at most once per `IntervalDays` into its target folder and
-  removes archives beyond `RetentionCount`. It reuses the shared
-  `Orynivo.Library.BackupRetention` decisions, derives its last run from the newest
-  archive so no extra state is stored, holds no credentials, and never includes
-  audio files. Automatic archive naming moved into the shared
-  `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
-- Added an optional WebDAV upload target for completed library backups.
-  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
-  sub-folder, and user name, while the password lives only in the encrypted
-  credential store and stays out of `settings.json`. Only plain `http`/`https`
-  URLs without embedded credentials are accepted, the upload is best effort and
-  never removes the local archive, and credentials never reach a URL, a log, or
-  an error message. The scheduled and **Back up now** paths share the upload,
-  and Settings gained the corresponding fields under the backup schedule.
-
-- Added a **Reduce motion** option under Appearance that disables the optional
-  Genre Cloud, Dashboard cover-stage, and karaoke animations. The decision lives
-  in the pure `Orynivo.Controls.MotionPreferences` helper. The album and artist
-  artwork grids can now be opened with Enter or Space in addition to a
-  double-click, and the transport controls (previous, play/pause, next, volume,
-  artist info, lyrics, favorite, shuffle, equalizer, and output) expose
-  accessible names.
-
-- Added cross-device resume for remote Orynivo Server tracks. The server stores the
-  last playback position per profile and track (`profile_track_position`) through
-  the new authenticated `GET`/`PUT /api/tracks/{id}/position` endpoints; the client
-  publishes its audible position at most every 20 seconds and offers a **Resume**
-  transport action when another device left off meaningfully later. The decision
-  lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
-  positions are stored, and no credential-bearing URL is ever persisted.
-
-- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
-  held back by Dependabot. It records the current pins, the trigger that unblocks
-  each upgrade, the migration steps, and the checks required before merging, and
-  is referenced from `AGENTS.md` next to the Dependabot rules.
-
-- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
-  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
-  support on 10 November 2026, the same day as the currently used .NET 8, so
-  moving to it would be a dead end. The record now carries the support-window
-  table, the .NET 10 migration steps, and the note that
-  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
-  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
-  instead of waiting for an upstream release.
-
-- Fixed the failing Dependabot GitHub Actions update. `dotnet-desktop.yml` still
-  pinned `actions/checkout@v6`, `actions/setup-dotnet@v5`, and
-  `actions/upload-artifact@v6` while every other workflow used `@v7`/`@v6`/`@v7`,
-  which made Dependabot abort with `Error processing actions/setup-dotnet
-  (RuntimeError)` / `No files changed!`. All 18 action references now use one
-  version per action, and the new `scripts/verify-github-actions-pins.ps1` (wired
-  into `scripts/verify-all.ps1` and the CI verify job) fails the build when a
-  workflow reintroduces a mixed major.
-
 ### Fixed
 
 - Linux now detects the extensionless `ffmpeg` and `ffprobe` executables for
@@ -5215,62 +2784,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   the cache size limit in megabytes. Eviction removes the least recently used
   downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
   the most recently used episode is always kept.
-- Added an optional automatic server-side library backup schedule. The
-  `Orynivo:BackupSchedule` configuration section (disabled by default) writes a
-  versioned library ZIP at most once per `IntervalDays` into its target folder and
-  removes archives beyond `RetentionCount`. It reuses the shared
-  `Orynivo.Library.BackupRetention` decisions, derives its last run from the newest
-  archive so no extra state is stored, holds no credentials, and never includes
-  audio files. Automatic archive naming moved into the shared
-  `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
-- Added an optional WebDAV upload target for completed library backups.
-  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
-  sub-folder, and user name, while the password lives only in the encrypted
-  credential store and stays out of `settings.json`. Only plain `http`/`https`
-  URLs without embedded credentials are accepted, the upload is best effort and
-  never removes the local archive, and credentials never reach a URL, a log, or
-  an error message. The scheduled and **Back up now** paths share the upload,
-  and Settings gained the corresponding fields under the backup schedule.
-
-- Added a **Reduce motion** option under Appearance that disables the optional
-  Genre Cloud, Dashboard cover-stage, and karaoke animations. The decision lives
-  in the pure `Orynivo.Controls.MotionPreferences` helper. The album and artist
-  artwork grids can now be opened with Enter or Space in addition to a
-  double-click, and the transport controls (previous, play/pause, next, volume,
-  artist info, lyrics, favorite, shuffle, equalizer, and output) expose
-  accessible names.
-
-- Added cross-device resume for remote Orynivo Server tracks. The server stores the
-  last playback position per profile and track (`profile_track_position`) through
-  the new authenticated `GET`/`PUT /api/tracks/{id}/position` endpoints; the client
-  publishes its audible position at most every 20 seconds and offers a **Resume**
-  transport action when another device left off meaningfully later. The decision
-  lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
-  positions are stored, and no credential-bearing URL is ever persisted.
-
-- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
-  held back by Dependabot. It records the current pins, the trigger that unblocks
-  each upgrade, the migration steps, and the checks required before merging, and
-  is referenced from `AGENTS.md` next to the Dependabot rules.
-
-- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
-  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
-  support on 10 November 2026, the same day as the currently used .NET 8, so
-  moving to it would be a dead end. The record now carries the support-window
-  table, the .NET 10 migration steps, and the note that
-  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
-  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
-  instead of waiting for an upstream release.
-
-- Fixed the failing Dependabot GitHub Actions update. `dotnet-desktop.yml` still
-  pinned `actions/checkout@v6`, `actions/setup-dotnet@v5`, and
-  `actions/upload-artifact@v6` while every other workflow used `@v7`/`@v6`/`@v7`,
-  which made Dependabot abort with `Error processing actions/setup-dotnet
-  (RuntimeError)` / `No files changed!`. All 18 action references now use one
-  version per action, and the new `scripts/verify-github-actions-pins.ps1` (wired
-  into `scripts/verify-all.ps1` and the CI verify job) fails the build when a
-  workflow reintroduces a mixed major.
-
 ### Fixed
 
 - Improved the startup update dialog's primary action contrast, spacing, and
@@ -5306,62 +2819,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   the cache size limit in megabytes. Eviction removes the least recently used
   downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
   the most recently used episode is always kept.
-- Added an optional automatic server-side library backup schedule. The
-  `Orynivo:BackupSchedule` configuration section (disabled by default) writes a
-  versioned library ZIP at most once per `IntervalDays` into its target folder and
-  removes archives beyond `RetentionCount`. It reuses the shared
-  `Orynivo.Library.BackupRetention` decisions, derives its last run from the newest
-  archive so no extra state is stored, holds no credentials, and never includes
-  audio files. Automatic archive naming moved into the shared
-  `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
-- Added an optional WebDAV upload target for completed library backups.
-  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
-  sub-folder, and user name, while the password lives only in the encrypted
-  credential store and stays out of `settings.json`. Only plain `http`/`https`
-  URLs without embedded credentials are accepted, the upload is best effort and
-  never removes the local archive, and credentials never reach a URL, a log, or
-  an error message. The scheduled and **Back up now** paths share the upload,
-  and Settings gained the corresponding fields under the backup schedule.
-
-- Added a **Reduce motion** option under Appearance that disables the optional
-  Genre Cloud, Dashboard cover-stage, and karaoke animations. The decision lives
-  in the pure `Orynivo.Controls.MotionPreferences` helper. The album and artist
-  artwork grids can now be opened with Enter or Space in addition to a
-  double-click, and the transport controls (previous, play/pause, next, volume,
-  artist info, lyrics, favorite, shuffle, equalizer, and output) expose
-  accessible names.
-
-- Added cross-device resume for remote Orynivo Server tracks. The server stores the
-  last playback position per profile and track (`profile_track_position`) through
-  the new authenticated `GET`/`PUT /api/tracks/{id}/position` endpoints; the client
-  publishes its audible position at most every 20 seconds and offers a **Resume**
-  transport action when another device left off meaningfully later. The decision
-  lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
-  positions are stored, and no credential-bearing URL is ever persisted.
-
-- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
-  held back by Dependabot. It records the current pins, the trigger that unblocks
-  each upgrade, the migration steps, and the checks required before merging, and
-  is referenced from `AGENTS.md` next to the Dependabot rules.
-
-- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
-  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
-  support on 10 November 2026, the same day as the currently used .NET 8, so
-  moving to it would be a dead end. The record now carries the support-window
-  table, the .NET 10 migration steps, and the note that
-  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
-  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
-  instead of waiting for an upstream release.
-
-- Fixed the failing Dependabot GitHub Actions update. `dotnet-desktop.yml` still
-  pinned `actions/checkout@v6`, `actions/setup-dotnet@v5`, and
-  `actions/upload-artifact@v6` while every other workflow used `@v7`/`@v6`/`@v7`,
-  which made Dependabot abort with `Error processing actions/setup-dotnet
-  (RuntimeError)` / `No files changed!`. All 18 action references now use one
-  version per action, and the new `scripts/verify-github-actions-pins.ps1` (wired
-  into `scripts/verify-all.ps1` and the CI verify job) fails the build when a
-  workflow reintroduces a mixed major.
-
 ### Fixed
 
 - Corrected Dashboard library totals to include tracks and albums from all
@@ -5403,62 +2860,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   the cache size limit in megabytes. Eviction removes the least recently used
   downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
   the most recently used episode is always kept.
-- Added an optional automatic server-side library backup schedule. The
-  `Orynivo:BackupSchedule` configuration section (disabled by default) writes a
-  versioned library ZIP at most once per `IntervalDays` into its target folder and
-  removes archives beyond `RetentionCount`. It reuses the shared
-  `Orynivo.Library.BackupRetention` decisions, derives its last run from the newest
-  archive so no extra state is stored, holds no credentials, and never includes
-  audio files. Automatic archive naming moved into the shared
-  `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
-- Added an optional WebDAV upload target for completed library backups.
-  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
-  sub-folder, and user name, while the password lives only in the encrypted
-  credential store and stays out of `settings.json`. Only plain `http`/`https`
-  URLs without embedded credentials are accepted, the upload is best effort and
-  never removes the local archive, and credentials never reach a URL, a log, or
-  an error message. The scheduled and **Back up now** paths share the upload,
-  and Settings gained the corresponding fields under the backup schedule.
-
-- Added a **Reduce motion** option under Appearance that disables the optional
-  Genre Cloud, Dashboard cover-stage, and karaoke animations. The decision lives
-  in the pure `Orynivo.Controls.MotionPreferences` helper. The album and artist
-  artwork grids can now be opened with Enter or Space in addition to a
-  double-click, and the transport controls (previous, play/pause, next, volume,
-  artist info, lyrics, favorite, shuffle, equalizer, and output) expose
-  accessible names.
-
-- Added cross-device resume for remote Orynivo Server tracks. The server stores the
-  last playback position per profile and track (`profile_track_position`) through
-  the new authenticated `GET`/`PUT /api/tracks/{id}/position` endpoints; the client
-  publishes its audible position at most every 20 seconds and offers a **Resume**
-  transport action when another device left off meaningfully later. The decision
-  lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
-  positions are stored, and no credential-bearing URL is ever persisted.
-
-- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
-  held back by Dependabot. It records the current pins, the trigger that unblocks
-  each upgrade, the migration steps, and the checks required before merging, and
-  is referenced from `AGENTS.md` next to the Dependabot rules.
-
-- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
-  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
-  support on 10 November 2026, the same day as the currently used .NET 8, so
-  moving to it would be a dead end. The record now carries the support-window
-  table, the .NET 10 migration steps, and the note that
-  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
-  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
-  instead of waiting for an upstream release.
-
-- Fixed the failing Dependabot GitHub Actions update. `dotnet-desktop.yml` still
-  pinned `actions/checkout@v6`, `actions/setup-dotnet@v5`, and
-  `actions/upload-artifact@v6` while every other workflow used `@v7`/`@v6`/`@v7`,
-  which made Dependabot abort with `Error processing actions/setup-dotnet
-  (RuntimeError)` / `No files changed!`. All 18 action references now use one
-  version per action, and the new `scripts/verify-github-actions-pins.ps1` (wired
-  into `scripts/verify-all.ps1` and the CI verify job) fails the build when a
-  workflow reintroduces a mixed major.
-
 ### Fixed
 
 - Placed Settings on/off switches immediately before their labels and aligned
@@ -5496,62 +2897,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   the cache size limit in megabytes. Eviction removes the least recently used
   downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
   the most recently used episode is always kept.
-- Added an optional automatic server-side library backup schedule. The
-  `Orynivo:BackupSchedule` configuration section (disabled by default) writes a
-  versioned library ZIP at most once per `IntervalDays` into its target folder and
-  removes archives beyond `RetentionCount`. It reuses the shared
-  `Orynivo.Library.BackupRetention` decisions, derives its last run from the newest
-  archive so no extra state is stored, holds no credentials, and never includes
-  audio files. Automatic archive naming moved into the shared
-  `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
-- Added an optional WebDAV upload target for completed library backups.
-  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
-  sub-folder, and user name, while the password lives only in the encrypted
-  credential store and stays out of `settings.json`. Only plain `http`/`https`
-  URLs without embedded credentials are accepted, the upload is best effort and
-  never removes the local archive, and credentials never reach a URL, a log, or
-  an error message. The scheduled and **Back up now** paths share the upload,
-  and Settings gained the corresponding fields under the backup schedule.
-
-- Added a **Reduce motion** option under Appearance that disables the optional
-  Genre Cloud, Dashboard cover-stage, and karaoke animations. The decision lives
-  in the pure `Orynivo.Controls.MotionPreferences` helper. The album and artist
-  artwork grids can now be opened with Enter or Space in addition to a
-  double-click, and the transport controls (previous, play/pause, next, volume,
-  artist info, lyrics, favorite, shuffle, equalizer, and output) expose
-  accessible names.
-
-- Added cross-device resume for remote Orynivo Server tracks. The server stores the
-  last playback position per profile and track (`profile_track_position`) through
-  the new authenticated `GET`/`PUT /api/tracks/{id}/position` endpoints; the client
-  publishes its audible position at most every 20 seconds and offers a **Resume**
-  transport action when another device left off meaningfully later. The decision
-  lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
-  positions are stored, and no credential-bearing URL is ever persisted.
-
-- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
-  held back by Dependabot. It records the current pins, the trigger that unblocks
-  each upgrade, the migration steps, and the checks required before merging, and
-  is referenced from `AGENTS.md` next to the Dependabot rules.
-
-- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
-  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
-  support on 10 November 2026, the same day as the currently used .NET 8, so
-  moving to it would be a dead end. The record now carries the support-window
-  table, the .NET 10 migration steps, and the note that
-  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
-  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
-  instead of waiting for an upstream release.
-
-- Fixed the failing Dependabot GitHub Actions update. `dotnet-desktop.yml` still
-  pinned `actions/checkout@v6`, `actions/setup-dotnet@v5`, and
-  `actions/upload-artifact@v6` while every other workflow used `@v7`/`@v6`/`@v7`,
-  which made Dependabot abort with `Error processing actions/setup-dotnet
-  (RuntimeError)` / `No files changed!`. All 18 action references now use one
-  version per action, and the new `scripts/verify-github-actions-pins.ps1` (wired
-  into `scripts/verify-all.ps1` and the CI verify job) fails the build when a
-  workflow reintroduces a mixed major.
-
 ### Fixed
 
 - Removed the standalone cyan scan-activity dot from the sidebar while retaining
@@ -5587,62 +2932,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   the cache size limit in megabytes. Eviction removes the least recently used
   downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
   the most recently used episode is always kept.
-- Added an optional automatic server-side library backup schedule. The
-  `Orynivo:BackupSchedule` configuration section (disabled by default) writes a
-  versioned library ZIP at most once per `IntervalDays` into its target folder and
-  removes archives beyond `RetentionCount`. It reuses the shared
-  `Orynivo.Library.BackupRetention` decisions, derives its last run from the newest
-  archive so no extra state is stored, holds no credentials, and never includes
-  audio files. Automatic archive naming moved into the shared
-  `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
-- Added an optional WebDAV upload target for completed library backups.
-  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
-  sub-folder, and user name, while the password lives only in the encrypted
-  credential store and stays out of `settings.json`. Only plain `http`/`https`
-  URLs without embedded credentials are accepted, the upload is best effort and
-  never removes the local archive, and credentials never reach a URL, a log, or
-  an error message. The scheduled and **Back up now** paths share the upload,
-  and Settings gained the corresponding fields under the backup schedule.
-
-- Added a **Reduce motion** option under Appearance that disables the optional
-  Genre Cloud, Dashboard cover-stage, and karaoke animations. The decision lives
-  in the pure `Orynivo.Controls.MotionPreferences` helper. The album and artist
-  artwork grids can now be opened with Enter or Space in addition to a
-  double-click, and the transport controls (previous, play/pause, next, volume,
-  artist info, lyrics, favorite, shuffle, equalizer, and output) expose
-  accessible names.
-
-- Added cross-device resume for remote Orynivo Server tracks. The server stores the
-  last playback position per profile and track (`profile_track_position`) through
-  the new authenticated `GET`/`PUT /api/tracks/{id}/position` endpoints; the client
-  publishes its audible position at most every 20 seconds and offers a **Resume**
-  transport action when another device left off meaningfully later. The decision
-  lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
-  positions are stored, and no credential-bearing URL is ever persisted.
-
-- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
-  held back by Dependabot. It records the current pins, the trigger that unblocks
-  each upgrade, the migration steps, and the checks required before merging, and
-  is referenced from `AGENTS.md` next to the Dependabot rules.
-
-- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
-  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
-  support on 10 November 2026, the same day as the currently used .NET 8, so
-  moving to it would be a dead end. The record now carries the support-window
-  table, the .NET 10 migration steps, and the note that
-  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
-  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
-  instead of waiting for an upstream release.
-
-- Fixed the failing Dependabot GitHub Actions update. `dotnet-desktop.yml` still
-  pinned `actions/checkout@v6`, `actions/setup-dotnet@v5`, and
-  `actions/upload-artifact@v6` while every other workflow used `@v7`/`@v6`/`@v7`,
-  which made Dependabot abort with `Error processing actions/setup-dotnet
-  (RuntimeError)` / `No files changed!`. All 18 action references now use one
-  version per action, and the new `scripts/verify-github-actions-pins.ps1` (wired
-  into `scripts/verify-all.ps1` and the CI verify job) fails the build when a
-  workflow reintroduces a mixed major.
-
 ### Fixed
 
 - Allowed signed server-update bundles up to the endpoint's verified one-GiB
@@ -5684,62 +2973,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   the cache size limit in megabytes. Eviction removes the least recently used
   downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
   the most recently used episode is always kept.
-- Added an optional automatic server-side library backup schedule. The
-  `Orynivo:BackupSchedule` configuration section (disabled by default) writes a
-  versioned library ZIP at most once per `IntervalDays` into its target folder and
-  removes archives beyond `RetentionCount`. It reuses the shared
-  `Orynivo.Library.BackupRetention` decisions, derives its last run from the newest
-  archive so no extra state is stored, holds no credentials, and never includes
-  audio files. Automatic archive naming moved into the shared
-  `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
-- Added an optional WebDAV upload target for completed library backups.
-  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
-  sub-folder, and user name, while the password lives only in the encrypted
-  credential store and stays out of `settings.json`. Only plain `http`/`https`
-  URLs without embedded credentials are accepted, the upload is best effort and
-  never removes the local archive, and credentials never reach a URL, a log, or
-  an error message. The scheduled and **Back up now** paths share the upload,
-  and Settings gained the corresponding fields under the backup schedule.
-
-- Added a **Reduce motion** option under Appearance that disables the optional
-  Genre Cloud, Dashboard cover-stage, and karaoke animations. The decision lives
-  in the pure `Orynivo.Controls.MotionPreferences` helper. The album and artist
-  artwork grids can now be opened with Enter or Space in addition to a
-  double-click, and the transport controls (previous, play/pause, next, volume,
-  artist info, lyrics, favorite, shuffle, equalizer, and output) expose
-  accessible names.
-
-- Added cross-device resume for remote Orynivo Server tracks. The server stores the
-  last playback position per profile and track (`profile_track_position`) through
-  the new authenticated `GET`/`PUT /api/tracks/{id}/position` endpoints; the client
-  publishes its audible position at most every 20 seconds and offers a **Resume**
-  transport action when another device left off meaningfully later. The decision
-  lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
-  positions are stored, and no credential-bearing URL is ever persisted.
-
-- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
-  held back by Dependabot. It records the current pins, the trigger that unblocks
-  each upgrade, the migration steps, and the checks required before merging, and
-  is referenced from `AGENTS.md` next to the Dependabot rules.
-
-- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
-  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
-  support on 10 November 2026, the same day as the currently used .NET 8, so
-  moving to it would be a dead end. The record now carries the support-window
-  table, the .NET 10 migration steps, and the note that
-  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
-  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
-  instead of waiting for an upstream release.
-
-- Fixed the failing Dependabot GitHub Actions update. `dotnet-desktop.yml` still
-  pinned `actions/checkout@v6`, `actions/setup-dotnet@v5`, and
-  `actions/upload-artifact@v6` while every other workflow used `@v7`/`@v6`/`@v7`,
-  which made Dependabot abort with `Error processing actions/setup-dotnet
-  (RuntimeError)` / `No files changed!`. All 18 action references now use one
-  version per action, and the new `scripts/verify-github-actions-pins.ps1` (wired
-  into `scripts/verify-all.ps1` and the CI verify job) fails the build when a
-  workflow reintroduces a mixed major.
-
 ### Fixed
 
 - Prevented publication of incomplete signed update manifests by waiting for
@@ -5776,62 +3009,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   the cache size limit in megabytes. Eviction removes the least recently used
   downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
   the most recently used episode is always kept.
-- Added an optional automatic server-side library backup schedule. The
-  `Orynivo:BackupSchedule` configuration section (disabled by default) writes a
-  versioned library ZIP at most once per `IntervalDays` into its target folder and
-  removes archives beyond `RetentionCount`. It reuses the shared
-  `Orynivo.Library.BackupRetention` decisions, derives its last run from the newest
-  archive so no extra state is stored, holds no credentials, and never includes
-  audio files. Automatic archive naming moved into the shared
-  `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
-- Added an optional WebDAV upload target for completed library backups.
-  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
-  sub-folder, and user name, while the password lives only in the encrypted
-  credential store and stays out of `settings.json`. Only plain `http`/`https`
-  URLs without embedded credentials are accepted, the upload is best effort and
-  never removes the local archive, and credentials never reach a URL, a log, or
-  an error message. The scheduled and **Back up now** paths share the upload,
-  and Settings gained the corresponding fields under the backup schedule.
-
-- Added a **Reduce motion** option under Appearance that disables the optional
-  Genre Cloud, Dashboard cover-stage, and karaoke animations. The decision lives
-  in the pure `Orynivo.Controls.MotionPreferences` helper. The album and artist
-  artwork grids can now be opened with Enter or Space in addition to a
-  double-click, and the transport controls (previous, play/pause, next, volume,
-  artist info, lyrics, favorite, shuffle, equalizer, and output) expose
-  accessible names.
-
-- Added cross-device resume for remote Orynivo Server tracks. The server stores the
-  last playback position per profile and track (`profile_track_position`) through
-  the new authenticated `GET`/`PUT /api/tracks/{id}/position` endpoints; the client
-  publishes its audible position at most every 20 seconds and offers a **Resume**
-  transport action when another device left off meaningfully later. The decision
-  lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
-  positions are stored, and no credential-bearing URL is ever persisted.
-
-- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
-  held back by Dependabot. It records the current pins, the trigger that unblocks
-  each upgrade, the migration steps, and the checks required before merging, and
-  is referenced from `AGENTS.md` next to the Dependabot rules.
-
-- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
-  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
-  support on 10 November 2026, the same day as the currently used .NET 8, so
-  moving to it would be a dead end. The record now carries the support-window
-  table, the .NET 10 migration steps, and the note that
-  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
-  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
-  instead of waiting for an upstream release.
-
-- Fixed the failing Dependabot GitHub Actions update. `dotnet-desktop.yml` still
-  pinned `actions/checkout@v6`, `actions/setup-dotnet@v5`, and
-  `actions/upload-artifact@v6` while every other workflow used `@v7`/`@v6`/`@v7`,
-  which made Dependabot abort with `Error processing actions/setup-dotnet
-  (RuntimeError)` / `No files changed!`. All 18 action references now use one
-  version per action, and the new `scripts/verify-github-actions-pins.ps1` (wired
-  into `scripts/verify-all.ps1` and the CI verify job) fails the build when a
-  workflow reintroduces a mixed major.
-
 ### Fixed
 
 - Enlarged the About window, placed its proportionally filled logo in a compact
@@ -5963,62 +3140,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   the cache size limit in megabytes. Eviction removes the least recently used
   downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
   the most recently used episode is always kept.
-- Added an optional automatic server-side library backup schedule. The
-  `Orynivo:BackupSchedule` configuration section (disabled by default) writes a
-  versioned library ZIP at most once per `IntervalDays` into its target folder and
-  removes archives beyond `RetentionCount`. It reuses the shared
-  `Orynivo.Library.BackupRetention` decisions, derives its last run from the newest
-  archive so no extra state is stored, holds no credentials, and never includes
-  audio files. Automatic archive naming moved into the shared
-  `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
-- Added an optional WebDAV upload target for completed library backups.
-  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
-  sub-folder, and user name, while the password lives only in the encrypted
-  credential store and stays out of `settings.json`. Only plain `http`/`https`
-  URLs without embedded credentials are accepted, the upload is best effort and
-  never removes the local archive, and credentials never reach a URL, a log, or
-  an error message. The scheduled and **Back up now** paths share the upload,
-  and Settings gained the corresponding fields under the backup schedule.
-
-- Added a **Reduce motion** option under Appearance that disables the optional
-  Genre Cloud, Dashboard cover-stage, and karaoke animations. The decision lives
-  in the pure `Orynivo.Controls.MotionPreferences` helper. The album and artist
-  artwork grids can now be opened with Enter or Space in addition to a
-  double-click, and the transport controls (previous, play/pause, next, volume,
-  artist info, lyrics, favorite, shuffle, equalizer, and output) expose
-  accessible names.
-
-- Added cross-device resume for remote Orynivo Server tracks. The server stores the
-  last playback position per profile and track (`profile_track_position`) through
-  the new authenticated `GET`/`PUT /api/tracks/{id}/position` endpoints; the client
-  publishes its audible position at most every 20 seconds and offers a **Resume**
-  transport action when another device left off meaningfully later. The decision
-  lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
-  positions are stored, and no credential-bearing URL is ever persisted.
-
-- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
-  held back by Dependabot. It records the current pins, the trigger that unblocks
-  each upgrade, the migration steps, and the checks required before merging, and
-  is referenced from `AGENTS.md` next to the Dependabot rules.
-
-- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
-  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
-  support on 10 November 2026, the same day as the currently used .NET 8, so
-  moving to it would be a dead end. The record now carries the support-window
-  table, the .NET 10 migration steps, and the note that
-  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
-  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
-  instead of waiting for an upstream release.
-
-- Fixed the failing Dependabot GitHub Actions update. `dotnet-desktop.yml` still
-  pinned `actions/checkout@v6`, `actions/setup-dotnet@v5`, and
-  `actions/upload-artifact@v6` while every other workflow used `@v7`/`@v6`/`@v7`,
-  which made Dependabot abort with `Error processing actions/setup-dotnet
-  (RuntimeError)` / `No files changed!`. All 18 action references now use one
-  version per action, and the new `scripts/verify-github-actions-pins.ps1` (wired
-  into `scripts/verify-all.ps1` and the CI verify job) fails the build when a
-  workflow reintroduces a mixed major.
-
 ### Fixed
 
 - Fixed the listening chart's Y-axis rendering: the filled path now includes an
@@ -6139,62 +3260,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   the cache size limit in megabytes. Eviction removes the least recently used
   downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
   the most recently used episode is always kept.
-- Added an optional automatic server-side library backup schedule. The
-  `Orynivo:BackupSchedule` configuration section (disabled by default) writes a
-  versioned library ZIP at most once per `IntervalDays` into its target folder and
-  removes archives beyond `RetentionCount`. It reuses the shared
-  `Orynivo.Library.BackupRetention` decisions, derives its last run from the newest
-  archive so no extra state is stored, holds no credentials, and never includes
-  audio files. Automatic archive naming moved into the shared
-  `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
-- Added an optional WebDAV upload target for completed library backups.
-  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
-  sub-folder, and user name, while the password lives only in the encrypted
-  credential store and stays out of `settings.json`. Only plain `http`/`https`
-  URLs without embedded credentials are accepted, the upload is best effort and
-  never removes the local archive, and credentials never reach a URL, a log, or
-  an error message. The scheduled and **Back up now** paths share the upload,
-  and Settings gained the corresponding fields under the backup schedule.
-
-- Added a **Reduce motion** option under Appearance that disables the optional
-  Genre Cloud, Dashboard cover-stage, and karaoke animations. The decision lives
-  in the pure `Orynivo.Controls.MotionPreferences` helper. The album and artist
-  artwork grids can now be opened with Enter or Space in addition to a
-  double-click, and the transport controls (previous, play/pause, next, volume,
-  artist info, lyrics, favorite, shuffle, equalizer, and output) expose
-  accessible names.
-
-- Added cross-device resume for remote Orynivo Server tracks. The server stores the
-  last playback position per profile and track (`profile_track_position`) through
-  the new authenticated `GET`/`PUT /api/tracks/{id}/position` endpoints; the client
-  publishes its audible position at most every 20 seconds and offers a **Resume**
-  transport action when another device left off meaningfully later. The decision
-  lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
-  positions are stored, and no credential-bearing URL is ever persisted.
-
-- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
-  held back by Dependabot. It records the current pins, the trigger that unblocks
-  each upgrade, the migration steps, and the checks required before merging, and
-  is referenced from `AGENTS.md` next to the Dependabot rules.
-
-- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
-  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
-  support on 10 November 2026, the same day as the currently used .NET 8, so
-  moving to it would be a dead end. The record now carries the support-window
-  table, the .NET 10 migration steps, and the note that
-  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
-  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
-  instead of waiting for an upstream release.
-
-- Fixed the failing Dependabot GitHub Actions update. `dotnet-desktop.yml` still
-  pinned `actions/checkout@v6`, `actions/setup-dotnet@v5`, and
-  `actions/upload-artifact@v6` while every other workflow used `@v7`/`@v6`/`@v7`,
-  which made Dependabot abort with `Error processing actions/setup-dotnet
-  (RuntimeError)` / `No files changed!`. All 18 action references now use one
-  version per action, and the new `scripts/verify-github-actions-pins.ps1` (wired
-  into `scripts/verify-all.ps1` and the CI verify job) fails the build when a
-  workflow reintroduces a mixed major.
-
 ### Fixed
 
 - Fixed dragging albums onto the "Up Next" sidebar item restarting the current
@@ -6246,62 +3311,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   the cache size limit in megabytes. Eviction removes the least recently used
   downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
   the most recently used episode is always kept.
-- Added an optional automatic server-side library backup schedule. The
-  `Orynivo:BackupSchedule` configuration section (disabled by default) writes a
-  versioned library ZIP at most once per `IntervalDays` into its target folder and
-  removes archives beyond `RetentionCount`. It reuses the shared
-  `Orynivo.Library.BackupRetention` decisions, derives its last run from the newest
-  archive so no extra state is stored, holds no credentials, and never includes
-  audio files. Automatic archive naming moved into the shared
-  `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
-- Added an optional WebDAV upload target for completed library backups.
-  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
-  sub-folder, and user name, while the password lives only in the encrypted
-  credential store and stays out of `settings.json`. Only plain `http`/`https`
-  URLs without embedded credentials are accepted, the upload is best effort and
-  never removes the local archive, and credentials never reach a URL, a log, or
-  an error message. The scheduled and **Back up now** paths share the upload,
-  and Settings gained the corresponding fields under the backup schedule.
-
-- Added a **Reduce motion** option under Appearance that disables the optional
-  Genre Cloud, Dashboard cover-stage, and karaoke animations. The decision lives
-  in the pure `Orynivo.Controls.MotionPreferences` helper. The album and artist
-  artwork grids can now be opened with Enter or Space in addition to a
-  double-click, and the transport controls (previous, play/pause, next, volume,
-  artist info, lyrics, favorite, shuffle, equalizer, and output) expose
-  accessible names.
-
-- Added cross-device resume for remote Orynivo Server tracks. The server stores the
-  last playback position per profile and track (`profile_track_position`) through
-  the new authenticated `GET`/`PUT /api/tracks/{id}/position` endpoints; the client
-  publishes its audible position at most every 20 seconds and offers a **Resume**
-  transport action when another device left off meaningfully later. The decision
-  lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
-  positions are stored, and no credential-bearing URL is ever persisted.
-
-- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
-  held back by Dependabot. It records the current pins, the trigger that unblocks
-  each upgrade, the migration steps, and the checks required before merging, and
-  is referenced from `AGENTS.md` next to the Dependabot rules.
-
-- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
-  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
-  support on 10 November 2026, the same day as the currently used .NET 8, so
-  moving to it would be a dead end. The record now carries the support-window
-  table, the .NET 10 migration steps, and the note that
-  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
-  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
-  instead of waiting for an upstream release.
-
-- Fixed the failing Dependabot GitHub Actions update. `dotnet-desktop.yml` still
-  pinned `actions/checkout@v6`, `actions/setup-dotnet@v5`, and
-  `actions/upload-artifact@v6` while every other workflow used `@v7`/`@v6`/`@v7`,
-  which made Dependabot abort with `Error processing actions/setup-dotnet
-  (RuntimeError)` / `No files changed!`. All 18 action references now use one
-  version per action, and the new `scripts/verify-github-actions-pins.ps1` (wired
-  into `scripts/verify-all.ps1` and the CI verify job) fails the build when a
-  workflow reintroduces a mixed major.
-
 ### Fixed
 
 - Reduced local and Orynivo Server artist rename work by updating only the
@@ -6343,62 +3352,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   the cache size limit in megabytes. Eviction removes the least recently used
   downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
   the most recently used episode is always kept.
-- Added an optional automatic server-side library backup schedule. The
-  `Orynivo:BackupSchedule` configuration section (disabled by default) writes a
-  versioned library ZIP at most once per `IntervalDays` into its target folder and
-  removes archives beyond `RetentionCount`. It reuses the shared
-  `Orynivo.Library.BackupRetention` decisions, derives its last run from the newest
-  archive so no extra state is stored, holds no credentials, and never includes
-  audio files. Automatic archive naming moved into the shared
-  `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
-- Added an optional WebDAV upload target for completed library backups.
-  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
-  sub-folder, and user name, while the password lives only in the encrypted
-  credential store and stays out of `settings.json`. Only plain `http`/`https`
-  URLs without embedded credentials are accepted, the upload is best effort and
-  never removes the local archive, and credentials never reach a URL, a log, or
-  an error message. The scheduled and **Back up now** paths share the upload,
-  and Settings gained the corresponding fields under the backup schedule.
-
-- Added a **Reduce motion** option under Appearance that disables the optional
-  Genre Cloud, Dashboard cover-stage, and karaoke animations. The decision lives
-  in the pure `Orynivo.Controls.MotionPreferences` helper. The album and artist
-  artwork grids can now be opened with Enter or Space in addition to a
-  double-click, and the transport controls (previous, play/pause, next, volume,
-  artist info, lyrics, favorite, shuffle, equalizer, and output) expose
-  accessible names.
-
-- Added cross-device resume for remote Orynivo Server tracks. The server stores the
-  last playback position per profile and track (`profile_track_position`) through
-  the new authenticated `GET`/`PUT /api/tracks/{id}/position` endpoints; the client
-  publishes its audible position at most every 20 seconds and offers a **Resume**
-  transport action when another device left off meaningfully later. The decision
-  lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
-  positions are stored, and no credential-bearing URL is ever persisted.
-
-- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
-  held back by Dependabot. It records the current pins, the trigger that unblocks
-  each upgrade, the migration steps, and the checks required before merging, and
-  is referenced from `AGENTS.md` next to the Dependabot rules.
-
-- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
-  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
-  support on 10 November 2026, the same day as the currently used .NET 8, so
-  moving to it would be a dead end. The record now carries the support-window
-  table, the .NET 10 migration steps, and the note that
-  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
-  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
-  instead of waiting for an upstream release.
-
-- Fixed the failing Dependabot GitHub Actions update. `dotnet-desktop.yml` still
-  pinned `actions/checkout@v6`, `actions/setup-dotnet@v5`, and
-  `actions/upload-artifact@v6` while every other workflow used `@v7`/`@v6`/`@v7`,
-  which made Dependabot abort with `Error processing actions/setup-dotnet
-  (RuntimeError)` / `No files changed!`. All 18 action references now use one
-  version per action, and the new `scripts/verify-github-actions-pins.ps1` (wired
-  into `scripts/verify-all.ps1` and the CI verify job) fails the build when a
-  workflow reintroduces a mixed major.
-
 ### Fixed
 
 - Fixed remote Orynivo Server artist information from the shared Artists view so
@@ -6441,62 +3394,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   the cache size limit in megabytes. Eviction removes the least recently used
   downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
   the most recently used episode is always kept.
-- Added an optional automatic server-side library backup schedule. The
-  `Orynivo:BackupSchedule` configuration section (disabled by default) writes a
-  versioned library ZIP at most once per `IntervalDays` into its target folder and
-  removes archives beyond `RetentionCount`. It reuses the shared
-  `Orynivo.Library.BackupRetention` decisions, derives its last run from the newest
-  archive so no extra state is stored, holds no credentials, and never includes
-  audio files. Automatic archive naming moved into the shared
-  `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
-- Added an optional WebDAV upload target for completed library backups.
-  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
-  sub-folder, and user name, while the password lives only in the encrypted
-  credential store and stays out of `settings.json`. Only plain `http`/`https`
-  URLs without embedded credentials are accepted, the upload is best effort and
-  never removes the local archive, and credentials never reach a URL, a log, or
-  an error message. The scheduled and **Back up now** paths share the upload,
-  and Settings gained the corresponding fields under the backup schedule.
-
-- Added a **Reduce motion** option under Appearance that disables the optional
-  Genre Cloud, Dashboard cover-stage, and karaoke animations. The decision lives
-  in the pure `Orynivo.Controls.MotionPreferences` helper. The album and artist
-  artwork grids can now be opened with Enter or Space in addition to a
-  double-click, and the transport controls (previous, play/pause, next, volume,
-  artist info, lyrics, favorite, shuffle, equalizer, and output) expose
-  accessible names.
-
-- Added cross-device resume for remote Orynivo Server tracks. The server stores the
-  last playback position per profile and track (`profile_track_position`) through
-  the new authenticated `GET`/`PUT /api/tracks/{id}/position` endpoints; the client
-  publishes its audible position at most every 20 seconds and offers a **Resume**
-  transport action when another device left off meaningfully later. The decision
-  lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
-  positions are stored, and no credential-bearing URL is ever persisted.
-
-- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
-  held back by Dependabot. It records the current pins, the trigger that unblocks
-  each upgrade, the migration steps, and the checks required before merging, and
-  is referenced from `AGENTS.md` next to the Dependabot rules.
-
-- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
-  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
-  support on 10 November 2026, the same day as the currently used .NET 8, so
-  moving to it would be a dead end. The record now carries the support-window
-  table, the .NET 10 migration steps, and the note that
-  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
-  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
-  instead of waiting for an upstream release.
-
-- Fixed the failing Dependabot GitHub Actions update. `dotnet-desktop.yml` still
-  pinned `actions/checkout@v6`, `actions/setup-dotnet@v5`, and
-  `actions/upload-artifact@v6` while every other workflow used `@v7`/`@v6`/`@v7`,
-  which made Dependabot abort with `Error processing actions/setup-dotnet
-  (RuntimeError)` / `No files changed!`. All 18 action references now use one
-  version per action, and the new `scripts/verify-github-actions-pins.ps1` (wired
-  into `scripts/verify-all.ps1` and the CI verify job) fails the build when a
-  workflow reintroduces a mixed major.
-
 ### Fixed
 
 - Reduced the Artist artwork-card height after adding the source badge so the
@@ -6572,62 +3469,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   the cache size limit in megabytes. Eviction removes the least recently used
   downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
   the most recently used episode is always kept.
-- Added an optional automatic server-side library backup schedule. The
-  `Orynivo:BackupSchedule` configuration section (disabled by default) writes a
-  versioned library ZIP at most once per `IntervalDays` into its target folder and
-  removes archives beyond `RetentionCount`. It reuses the shared
-  `Orynivo.Library.BackupRetention` decisions, derives its last run from the newest
-  archive so no extra state is stored, holds no credentials, and never includes
-  audio files. Automatic archive naming moved into the shared
-  `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
-- Added an optional WebDAV upload target for completed library backups.
-  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
-  sub-folder, and user name, while the password lives only in the encrypted
-  credential store and stays out of `settings.json`. Only plain `http`/`https`
-  URLs without embedded credentials are accepted, the upload is best effort and
-  never removes the local archive, and credentials never reach a URL, a log, or
-  an error message. The scheduled and **Back up now** paths share the upload,
-  and Settings gained the corresponding fields under the backup schedule.
-
-- Added a **Reduce motion** option under Appearance that disables the optional
-  Genre Cloud, Dashboard cover-stage, and karaoke animations. The decision lives
-  in the pure `Orynivo.Controls.MotionPreferences` helper. The album and artist
-  artwork grids can now be opened with Enter or Space in addition to a
-  double-click, and the transport controls (previous, play/pause, next, volume,
-  artist info, lyrics, favorite, shuffle, equalizer, and output) expose
-  accessible names.
-
-- Added cross-device resume for remote Orynivo Server tracks. The server stores the
-  last playback position per profile and track (`profile_track_position`) through
-  the new authenticated `GET`/`PUT /api/tracks/{id}/position` endpoints; the client
-  publishes its audible position at most every 20 seconds and offers a **Resume**
-  transport action when another device left off meaningfully later. The decision
-  lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
-  positions are stored, and no credential-bearing URL is ever persisted.
-
-- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
-  held back by Dependabot. It records the current pins, the trigger that unblocks
-  each upgrade, the migration steps, and the checks required before merging, and
-  is referenced from `AGENTS.md` next to the Dependabot rules.
-
-- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
-  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
-  support on 10 November 2026, the same day as the currently used .NET 8, so
-  moving to it would be a dead end. The record now carries the support-window
-  table, the .NET 10 migration steps, and the note that
-  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
-  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
-  instead of waiting for an upstream release.
-
-- Fixed the failing Dependabot GitHub Actions update. `dotnet-desktop.yml` still
-  pinned `actions/checkout@v6`, `actions/setup-dotnet@v5`, and
-  `actions/upload-artifact@v6` while every other workflow used `@v7`/`@v6`/`@v7`,
-  which made Dependabot abort with `Error processing actions/setup-dotnet
-  (RuntimeError)` / `No files changed!`. All 18 action references now use one
-  version per action, and the new `scripts/verify-github-actions-pins.ps1` (wired
-  into `scripts/verify-all.ps1` and the CI verify job) fails the build when a
-  workflow reintroduces a mixed major.
-
 ### Fixed
 
 - The content loading skeleton now fully covers the content area (it spans the
@@ -6747,62 +3588,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   the cache size limit in megabytes. Eviction removes the least recently used
   downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
   the most recently used episode is always kept.
-- Added an optional automatic server-side library backup schedule. The
-  `Orynivo:BackupSchedule` configuration section (disabled by default) writes a
-  versioned library ZIP at most once per `IntervalDays` into its target folder and
-  removes archives beyond `RetentionCount`. It reuses the shared
-  `Orynivo.Library.BackupRetention` decisions, derives its last run from the newest
-  archive so no extra state is stored, holds no credentials, and never includes
-  audio files. Automatic archive naming moved into the shared
-  `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
-- Added an optional WebDAV upload target for completed library backups.
-  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
-  sub-folder, and user name, while the password lives only in the encrypted
-  credential store and stays out of `settings.json`. Only plain `http`/`https`
-  URLs without embedded credentials are accepted, the upload is best effort and
-  never removes the local archive, and credentials never reach a URL, a log, or
-  an error message. The scheduled and **Back up now** paths share the upload,
-  and Settings gained the corresponding fields under the backup schedule.
-
-- Added a **Reduce motion** option under Appearance that disables the optional
-  Genre Cloud, Dashboard cover-stage, and karaoke animations. The decision lives
-  in the pure `Orynivo.Controls.MotionPreferences` helper. The album and artist
-  artwork grids can now be opened with Enter or Space in addition to a
-  double-click, and the transport controls (previous, play/pause, next, volume,
-  artist info, lyrics, favorite, shuffle, equalizer, and output) expose
-  accessible names.
-
-- Added cross-device resume for remote Orynivo Server tracks. The server stores the
-  last playback position per profile and track (`profile_track_position`) through
-  the new authenticated `GET`/`PUT /api/tracks/{id}/position` endpoints; the client
-  publishes its audible position at most every 20 seconds and offers a **Resume**
-  transport action when another device left off meaningfully later. The decision
-  lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
-  positions are stored, and no credential-bearing URL is ever persisted.
-
-- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
-  held back by Dependabot. It records the current pins, the trigger that unblocks
-  each upgrade, the migration steps, and the checks required before merging, and
-  is referenced from `AGENTS.md` next to the Dependabot rules.
-
-- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
-  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
-  support on 10 November 2026, the same day as the currently used .NET 8, so
-  moving to it would be a dead end. The record now carries the support-window
-  table, the .NET 10 migration steps, and the note that
-  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
-  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
-  instead of waiting for an upstream release.
-
-- Fixed the failing Dependabot GitHub Actions update. `dotnet-desktop.yml` still
-  pinned `actions/checkout@v6`, `actions/setup-dotnet@v5`, and
-  `actions/upload-artifact@v6` while every other workflow used `@v7`/`@v6`/`@v7`,
-  which made Dependabot abort with `Error processing actions/setup-dotnet
-  (RuntimeError)` / `No files changed!`. All 18 action references now use one
-  version per action, and the new `scripts/verify-github-actions-pins.ps1` (wired
-  into `scripts/verify-all.ps1` and the CI verify job) fails the build when a
-  workflow reintroduces a mixed major.
-
 ### Fixed
 
 - Fixed manual MusicBrainz cover search failing on stylized album titles with
@@ -6965,62 +3750,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   the cache size limit in megabytes. Eviction removes the least recently used
   downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
   the most recently used episode is always kept.
-- Added an optional automatic server-side library backup schedule. The
-  `Orynivo:BackupSchedule` configuration section (disabled by default) writes a
-  versioned library ZIP at most once per `IntervalDays` into its target folder and
-  removes archives beyond `RetentionCount`. It reuses the shared
-  `Orynivo.Library.BackupRetention` decisions, derives its last run from the newest
-  archive so no extra state is stored, holds no credentials, and never includes
-  audio files. Automatic archive naming moved into the shared
-  `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
-- Added an optional WebDAV upload target for completed library backups.
-  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
-  sub-folder, and user name, while the password lives only in the encrypted
-  credential store and stays out of `settings.json`. Only plain `http`/`https`
-  URLs without embedded credentials are accepted, the upload is best effort and
-  never removes the local archive, and credentials never reach a URL, a log, or
-  an error message. The scheduled and **Back up now** paths share the upload,
-  and Settings gained the corresponding fields under the backup schedule.
-
-- Added a **Reduce motion** option under Appearance that disables the optional
-  Genre Cloud, Dashboard cover-stage, and karaoke animations. The decision lives
-  in the pure `Orynivo.Controls.MotionPreferences` helper. The album and artist
-  artwork grids can now be opened with Enter or Space in addition to a
-  double-click, and the transport controls (previous, play/pause, next, volume,
-  artist info, lyrics, favorite, shuffle, equalizer, and output) expose
-  accessible names.
-
-- Added cross-device resume for remote Orynivo Server tracks. The server stores the
-  last playback position per profile and track (`profile_track_position`) through
-  the new authenticated `GET`/`PUT /api/tracks/{id}/position` endpoints; the client
-  publishes its audible position at most every 20 seconds and offers a **Resume**
-  transport action when another device left off meaningfully later. The decision
-  lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
-  positions are stored, and no credential-bearing URL is ever persisted.
-
-- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
-  held back by Dependabot. It records the current pins, the trigger that unblocks
-  each upgrade, the migration steps, and the checks required before merging, and
-  is referenced from `AGENTS.md` next to the Dependabot rules.
-
-- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
-  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
-  support on 10 November 2026, the same day as the currently used .NET 8, so
-  moving to it would be a dead end. The record now carries the support-window
-  table, the .NET 10 migration steps, and the note that
-  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
-  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
-  instead of waiting for an upstream release.
-
-- Fixed the failing Dependabot GitHub Actions update. `dotnet-desktop.yml` still
-  pinned `actions/checkout@v6`, `actions/setup-dotnet@v5`, and
-  `actions/upload-artifact@v6` while every other workflow used `@v7`/`@v6`/`@v7`,
-  which made Dependabot abort with `Error processing actions/setup-dotnet
-  (RuntimeError)` / `No files changed!`. All 18 action references now use one
-  version per action, and the new `scripts/verify-github-actions-pins.ps1` (wired
-  into `scripts/verify-all.ps1` and the CI verify job) fails the build when a
-  workflow reintroduces a mixed major.
-
 ### Fixed
 
 - Fixed waveform transport seeking so pointer release is captured reliably, the
@@ -7144,62 +3873,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   the cache size limit in megabytes. Eviction removes the least recently used
   downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
   the most recently used episode is always kept.
-- Added an optional automatic server-side library backup schedule. The
-  `Orynivo:BackupSchedule` configuration section (disabled by default) writes a
-  versioned library ZIP at most once per `IntervalDays` into its target folder and
-  removes archives beyond `RetentionCount`. It reuses the shared
-  `Orynivo.Library.BackupRetention` decisions, derives its last run from the newest
-  archive so no extra state is stored, holds no credentials, and never includes
-  audio files. Automatic archive naming moved into the shared
-  `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
-- Added an optional WebDAV upload target for completed library backups.
-  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
-  sub-folder, and user name, while the password lives only in the encrypted
-  credential store and stays out of `settings.json`. Only plain `http`/`https`
-  URLs without embedded credentials are accepted, the upload is best effort and
-  never removes the local archive, and credentials never reach a URL, a log, or
-  an error message. The scheduled and **Back up now** paths share the upload,
-  and Settings gained the corresponding fields under the backup schedule.
-
-- Added a **Reduce motion** option under Appearance that disables the optional
-  Genre Cloud, Dashboard cover-stage, and karaoke animations. The decision lives
-  in the pure `Orynivo.Controls.MotionPreferences` helper. The album and artist
-  artwork grids can now be opened with Enter or Space in addition to a
-  double-click, and the transport controls (previous, play/pause, next, volume,
-  artist info, lyrics, favorite, shuffle, equalizer, and output) expose
-  accessible names.
-
-- Added cross-device resume for remote Orynivo Server tracks. The server stores the
-  last playback position per profile and track (`profile_track_position`) through
-  the new authenticated `GET`/`PUT /api/tracks/{id}/position` endpoints; the client
-  publishes its audible position at most every 20 seconds and offers a **Resume**
-  transport action when another device left off meaningfully later. The decision
-  lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
-  positions are stored, and no credential-bearing URL is ever persisted.
-
-- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
-  held back by Dependabot. It records the current pins, the trigger that unblocks
-  each upgrade, the migration steps, and the checks required before merging, and
-  is referenced from `AGENTS.md` next to the Dependabot rules.
-
-- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
-  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
-  support on 10 November 2026, the same day as the currently used .NET 8, so
-  moving to it would be a dead end. The record now carries the support-window
-  table, the .NET 10 migration steps, and the note that
-  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
-  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
-  instead of waiting for an upstream release.
-
-- Fixed the failing Dependabot GitHub Actions update. `dotnet-desktop.yml` still
-  pinned `actions/checkout@v6`, `actions/setup-dotnet@v5`, and
-  `actions/upload-artifact@v6` while every other workflow used `@v7`/`@v6`/`@v7`,
-  which made Dependabot abort with `Error processing actions/setup-dotnet
-  (RuntimeError)` / `No files changed!`. All 18 action references now use one
-  version per action, and the new `scripts/verify-github-actions-pins.ps1` (wired
-  into `scripts/verify-all.ps1` and the CI verify job) fails the build when a
-  workflow reintroduces a mixed major.
-
 ### Fixed
 
 - Fixed checkbox borders appearing near-black on the dark background: the app
@@ -7246,62 +3919,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   the cache size limit in megabytes. Eviction removes the least recently used
   downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
   the most recently used episode is always kept.
-- Added an optional automatic server-side library backup schedule. The
-  `Orynivo:BackupSchedule` configuration section (disabled by default) writes a
-  versioned library ZIP at most once per `IntervalDays` into its target folder and
-  removes archives beyond `RetentionCount`. It reuses the shared
-  `Orynivo.Library.BackupRetention` decisions, derives its last run from the newest
-  archive so no extra state is stored, holds no credentials, and never includes
-  audio files. Automatic archive naming moved into the shared
-  `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
-- Added an optional WebDAV upload target for completed library backups.
-  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
-  sub-folder, and user name, while the password lives only in the encrypted
-  credential store and stays out of `settings.json`. Only plain `http`/`https`
-  URLs without embedded credentials are accepted, the upload is best effort and
-  never removes the local archive, and credentials never reach a URL, a log, or
-  an error message. The scheduled and **Back up now** paths share the upload,
-  and Settings gained the corresponding fields under the backup schedule.
-
-- Added a **Reduce motion** option under Appearance that disables the optional
-  Genre Cloud, Dashboard cover-stage, and karaoke animations. The decision lives
-  in the pure `Orynivo.Controls.MotionPreferences` helper. The album and artist
-  artwork grids can now be opened with Enter or Space in addition to a
-  double-click, and the transport controls (previous, play/pause, next, volume,
-  artist info, lyrics, favorite, shuffle, equalizer, and output) expose
-  accessible names.
-
-- Added cross-device resume for remote Orynivo Server tracks. The server stores the
-  last playback position per profile and track (`profile_track_position`) through
-  the new authenticated `GET`/`PUT /api/tracks/{id}/position` endpoints; the client
-  publishes its audible position at most every 20 seconds and offers a **Resume**
-  transport action when another device left off meaningfully later. The decision
-  lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
-  positions are stored, and no credential-bearing URL is ever persisted.
-
-- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
-  held back by Dependabot. It records the current pins, the trigger that unblocks
-  each upgrade, the migration steps, and the checks required before merging, and
-  is referenced from `AGENTS.md` next to the Dependabot rules.
-
-- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
-  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
-  support on 10 November 2026, the same day as the currently used .NET 8, so
-  moving to it would be a dead end. The record now carries the support-window
-  table, the .NET 10 migration steps, and the note that
-  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
-  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
-  instead of waiting for an upstream release.
-
-- Fixed the failing Dependabot GitHub Actions update. `dotnet-desktop.yml` still
-  pinned `actions/checkout@v6`, `actions/setup-dotnet@v5`, and
-  `actions/upload-artifact@v6` while every other workflow used `@v7`/`@v6`/`@v7`,
-  which made Dependabot abort with `Error processing actions/setup-dotnet
-  (RuntimeError)` / `No files changed!`. All 18 action references now use one
-  version per action, and the new `scripts/verify-github-actions-pins.ps1` (wired
-  into `scripts/verify-all.ps1` and the CI verify job) fails the build when a
-  workflow reintroduces a mixed major.
-
 ### Fixed
 
 - Library watcher rescans now honour cancellation while waiting between locked
@@ -7384,62 +4001,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   the cache size limit in megabytes. Eviction removes the least recently used
   downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
   the most recently used episode is always kept.
-- Added an optional automatic server-side library backup schedule. The
-  `Orynivo:BackupSchedule` configuration section (disabled by default) writes a
-  versioned library ZIP at most once per `IntervalDays` into its target folder and
-  removes archives beyond `RetentionCount`. It reuses the shared
-  `Orynivo.Library.BackupRetention` decisions, derives its last run from the newest
-  archive so no extra state is stored, holds no credentials, and never includes
-  audio files. Automatic archive naming moved into the shared
-  `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
-- Added an optional WebDAV upload target for completed library backups.
-  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
-  sub-folder, and user name, while the password lives only in the encrypted
-  credential store and stays out of `settings.json`. Only plain `http`/`https`
-  URLs without embedded credentials are accepted, the upload is best effort and
-  never removes the local archive, and credentials never reach a URL, a log, or
-  an error message. The scheduled and **Back up now** paths share the upload,
-  and Settings gained the corresponding fields under the backup schedule.
-
-- Added a **Reduce motion** option under Appearance that disables the optional
-  Genre Cloud, Dashboard cover-stage, and karaoke animations. The decision lives
-  in the pure `Orynivo.Controls.MotionPreferences` helper. The album and artist
-  artwork grids can now be opened with Enter or Space in addition to a
-  double-click, and the transport controls (previous, play/pause, next, volume,
-  artist info, lyrics, favorite, shuffle, equalizer, and output) expose
-  accessible names.
-
-- Added cross-device resume for remote Orynivo Server tracks. The server stores the
-  last playback position per profile and track (`profile_track_position`) through
-  the new authenticated `GET`/`PUT /api/tracks/{id}/position` endpoints; the client
-  publishes its audible position at most every 20 seconds and offers a **Resume**
-  transport action when another device left off meaningfully later. The decision
-  lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
-  positions are stored, and no credential-bearing URL is ever persisted.
-
-- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
-  held back by Dependabot. It records the current pins, the trigger that unblocks
-  each upgrade, the migration steps, and the checks required before merging, and
-  is referenced from `AGENTS.md` next to the Dependabot rules.
-
-- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
-  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
-  support on 10 November 2026, the same day as the currently used .NET 8, so
-  moving to it would be a dead end. The record now carries the support-window
-  table, the .NET 10 migration steps, and the note that
-  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
-  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
-  instead of waiting for an upstream release.
-
-- Fixed the failing Dependabot GitHub Actions update. `dotnet-desktop.yml` still
-  pinned `actions/checkout@v6`, `actions/setup-dotnet@v5`, and
-  `actions/upload-artifact@v6` while every other workflow used `@v7`/`@v6`/`@v7`,
-  which made Dependabot abort with `Error processing actions/setup-dotnet
-  (RuntimeError)` / `No files changed!`. All 18 action references now use one
-  version per action, and the new `scripts/verify-github-actions-pins.ps1` (wired
-  into `scripts/verify-all.ps1` and the CI verify job) fails the build when a
-  workflow reintroduces a mixed major.
-
 ### Fixed
 
 - The Dashboard genre statistics (Top genres and the per-day calendar genres) now
@@ -7483,62 +4044,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   the cache size limit in megabytes. Eviction removes the least recently used
   downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
   the most recently used episode is always kept.
-- Added an optional automatic server-side library backup schedule. The
-  `Orynivo:BackupSchedule` configuration section (disabled by default) writes a
-  versioned library ZIP at most once per `IntervalDays` into its target folder and
-  removes archives beyond `RetentionCount`. It reuses the shared
-  `Orynivo.Library.BackupRetention` decisions, derives its last run from the newest
-  archive so no extra state is stored, holds no credentials, and never includes
-  audio files. Automatic archive naming moved into the shared
-  `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
-- Added an optional WebDAV upload target for completed library backups.
-  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
-  sub-folder, and user name, while the password lives only in the encrypted
-  credential store and stays out of `settings.json`. Only plain `http`/`https`
-  URLs without embedded credentials are accepted, the upload is best effort and
-  never removes the local archive, and credentials never reach a URL, a log, or
-  an error message. The scheduled and **Back up now** paths share the upload,
-  and Settings gained the corresponding fields under the backup schedule.
-
-- Added a **Reduce motion** option under Appearance that disables the optional
-  Genre Cloud, Dashboard cover-stage, and karaoke animations. The decision lives
-  in the pure `Orynivo.Controls.MotionPreferences` helper. The album and artist
-  artwork grids can now be opened with Enter or Space in addition to a
-  double-click, and the transport controls (previous, play/pause, next, volume,
-  artist info, lyrics, favorite, shuffle, equalizer, and output) expose
-  accessible names.
-
-- Added cross-device resume for remote Orynivo Server tracks. The server stores the
-  last playback position per profile and track (`profile_track_position`) through
-  the new authenticated `GET`/`PUT /api/tracks/{id}/position` endpoints; the client
-  publishes its audible position at most every 20 seconds and offers a **Resume**
-  transport action when another device left off meaningfully later. The decision
-  lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
-  positions are stored, and no credential-bearing URL is ever persisted.
-
-- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
-  held back by Dependabot. It records the current pins, the trigger that unblocks
-  each upgrade, the migration steps, and the checks required before merging, and
-  is referenced from `AGENTS.md` next to the Dependabot rules.
-
-- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
-  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
-  support on 10 November 2026, the same day as the currently used .NET 8, so
-  moving to it would be a dead end. The record now carries the support-window
-  table, the .NET 10 migration steps, and the note that
-  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
-  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
-  instead of waiting for an upstream release.
-
-- Fixed the failing Dependabot GitHub Actions update. `dotnet-desktop.yml` still
-  pinned `actions/checkout@v6`, `actions/setup-dotnet@v5`, and
-  `actions/upload-artifact@v6` while every other workflow used `@v7`/`@v6`/`@v7`,
-  which made Dependabot abort with `Error processing actions/setup-dotnet
-  (RuntimeError)` / `No files changed!`. All 18 action references now use one
-  version per action, and the new `scripts/verify-github-actions-pins.ps1` (wired
-  into `scripts/verify-all.ps1` and the CI verify job) fails the build when a
-  workflow reintroduces a mixed major.
-
 ### Fixed
 
 - The Linux Orynivo Server now reads and writes its editable configuration at
@@ -7573,62 +4078,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   the cache size limit in megabytes. Eviction removes the least recently used
   downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
   the most recently used episode is always kept.
-- Added an optional automatic server-side library backup schedule. The
-  `Orynivo:BackupSchedule` configuration section (disabled by default) writes a
-  versioned library ZIP at most once per `IntervalDays` into its target folder and
-  removes archives beyond `RetentionCount`. It reuses the shared
-  `Orynivo.Library.BackupRetention` decisions, derives its last run from the newest
-  archive so no extra state is stored, holds no credentials, and never includes
-  audio files. Automatic archive naming moved into the shared
-  `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
-- Added an optional WebDAV upload target for completed library backups.
-  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
-  sub-folder, and user name, while the password lives only in the encrypted
-  credential store and stays out of `settings.json`. Only plain `http`/`https`
-  URLs without embedded credentials are accepted, the upload is best effort and
-  never removes the local archive, and credentials never reach a URL, a log, or
-  an error message. The scheduled and **Back up now** paths share the upload,
-  and Settings gained the corresponding fields under the backup schedule.
-
-- Added a **Reduce motion** option under Appearance that disables the optional
-  Genre Cloud, Dashboard cover-stage, and karaoke animations. The decision lives
-  in the pure `Orynivo.Controls.MotionPreferences` helper. The album and artist
-  artwork grids can now be opened with Enter or Space in addition to a
-  double-click, and the transport controls (previous, play/pause, next, volume,
-  artist info, lyrics, favorite, shuffle, equalizer, and output) expose
-  accessible names.
-
-- Added cross-device resume for remote Orynivo Server tracks. The server stores the
-  last playback position per profile and track (`profile_track_position`) through
-  the new authenticated `GET`/`PUT /api/tracks/{id}/position` endpoints; the client
-  publishes its audible position at most every 20 seconds and offers a **Resume**
-  transport action when another device left off meaningfully later. The decision
-  lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
-  positions are stored, and no credential-bearing URL is ever persisted.
-
-- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
-  held back by Dependabot. It records the current pins, the trigger that unblocks
-  each upgrade, the migration steps, and the checks required before merging, and
-  is referenced from `AGENTS.md` next to the Dependabot rules.
-
-- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
-  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
-  support on 10 November 2026, the same day as the currently used .NET 8, so
-  moving to it would be a dead end. The record now carries the support-window
-  table, the .NET 10 migration steps, and the note that
-  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
-  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
-  instead of waiting for an upstream release.
-
-- Fixed the failing Dependabot GitHub Actions update. `dotnet-desktop.yml` still
-  pinned `actions/checkout@v6`, `actions/setup-dotnet@v5`, and
-  `actions/upload-artifact@v6` while every other workflow used `@v7`/`@v6`/`@v7`,
-  which made Dependabot abort with `Error processing actions/setup-dotnet
-  (RuntimeError)` / `No files changed!`. All 18 action references now use one
-  version per action, and the new `scripts/verify-github-actions-pins.ps1` (wired
-  into `scripts/verify-all.ps1` and the CI verify job) fails the build when a
-  workflow reintroduces a mixed major.
-
 ### Fixed
 
 - The Linux Orynivo Server package no longer crashes on startup
@@ -7678,62 +4127,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   the cache size limit in megabytes. Eviction removes the least recently used
   downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
   the most recently used episode is always kept.
-- Added an optional automatic server-side library backup schedule. The
-  `Orynivo:BackupSchedule` configuration section (disabled by default) writes a
-  versioned library ZIP at most once per `IntervalDays` into its target folder and
-  removes archives beyond `RetentionCount`. It reuses the shared
-  `Orynivo.Library.BackupRetention` decisions, derives its last run from the newest
-  archive so no extra state is stored, holds no credentials, and never includes
-  audio files. Automatic archive naming moved into the shared
-  `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
-- Added an optional WebDAV upload target for completed library backups.
-  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
-  sub-folder, and user name, while the password lives only in the encrypted
-  credential store and stays out of `settings.json`. Only plain `http`/`https`
-  URLs without embedded credentials are accepted, the upload is best effort and
-  never removes the local archive, and credentials never reach a URL, a log, or
-  an error message. The scheduled and **Back up now** paths share the upload,
-  and Settings gained the corresponding fields under the backup schedule.
-
-- Added a **Reduce motion** option under Appearance that disables the optional
-  Genre Cloud, Dashboard cover-stage, and karaoke animations. The decision lives
-  in the pure `Orynivo.Controls.MotionPreferences` helper. The album and artist
-  artwork grids can now be opened with Enter or Space in addition to a
-  double-click, and the transport controls (previous, play/pause, next, volume,
-  artist info, lyrics, favorite, shuffle, equalizer, and output) expose
-  accessible names.
-
-- Added cross-device resume for remote Orynivo Server tracks. The server stores the
-  last playback position per profile and track (`profile_track_position`) through
-  the new authenticated `GET`/`PUT /api/tracks/{id}/position` endpoints; the client
-  publishes its audible position at most every 20 seconds and offers a **Resume**
-  transport action when another device left off meaningfully later. The decision
-  lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
-  positions are stored, and no credential-bearing URL is ever persisted.
-
-- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
-  held back by Dependabot. It records the current pins, the trigger that unblocks
-  each upgrade, the migration steps, and the checks required before merging, and
-  is referenced from `AGENTS.md` next to the Dependabot rules.
-
-- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
-  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
-  support on 10 November 2026, the same day as the currently used .NET 8, so
-  moving to it would be a dead end. The record now carries the support-window
-  table, the .NET 10 migration steps, and the note that
-  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
-  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
-  instead of waiting for an upstream release.
-
-- Fixed the failing Dependabot GitHub Actions update. `dotnet-desktop.yml` still
-  pinned `actions/checkout@v6`, `actions/setup-dotnet@v5`, and
-  `actions/upload-artifact@v6` while every other workflow used `@v7`/`@v6`/`@v7`,
-  which made Dependabot abort with `Error processing actions/setup-dotnet
-  (RuntimeError)` / `No files changed!`. All 18 action references now use one
-  version per action, and the new `scripts/verify-github-actions-pins.ps1` (wired
-  into `scripts/verify-all.ps1` and the CI verify job) fails the build when a
-  workflow reintroduces a mixed major.
-
 ### Fixed
 
 - Remote Orynivo Server folder view loading placeholder now uses the themed muted
@@ -7796,62 +4189,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   the cache size limit in megabytes. Eviction removes the least recently used
   downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
   the most recently used episode is always kept.
-- Added an optional automatic server-side library backup schedule. The
-  `Orynivo:BackupSchedule` configuration section (disabled by default) writes a
-  versioned library ZIP at most once per `IntervalDays` into its target folder and
-  removes archives beyond `RetentionCount`. It reuses the shared
-  `Orynivo.Library.BackupRetention` decisions, derives its last run from the newest
-  archive so no extra state is stored, holds no credentials, and never includes
-  audio files. Automatic archive naming moved into the shared
-  `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
-- Added an optional WebDAV upload target for completed library backups.
-  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
-  sub-folder, and user name, while the password lives only in the encrypted
-  credential store and stays out of `settings.json`. Only plain `http`/`https`
-  URLs without embedded credentials are accepted, the upload is best effort and
-  never removes the local archive, and credentials never reach a URL, a log, or
-  an error message. The scheduled and **Back up now** paths share the upload,
-  and Settings gained the corresponding fields under the backup schedule.
-
-- Added a **Reduce motion** option under Appearance that disables the optional
-  Genre Cloud, Dashboard cover-stage, and karaoke animations. The decision lives
-  in the pure `Orynivo.Controls.MotionPreferences` helper. The album and artist
-  artwork grids can now be opened with Enter or Space in addition to a
-  double-click, and the transport controls (previous, play/pause, next, volume,
-  artist info, lyrics, favorite, shuffle, equalizer, and output) expose
-  accessible names.
-
-- Added cross-device resume for remote Orynivo Server tracks. The server stores the
-  last playback position per profile and track (`profile_track_position`) through
-  the new authenticated `GET`/`PUT /api/tracks/{id}/position` endpoints; the client
-  publishes its audible position at most every 20 seconds and offers a **Resume**
-  transport action when another device left off meaningfully later. The decision
-  lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
-  positions are stored, and no credential-bearing URL is ever persisted.
-
-- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
-  held back by Dependabot. It records the current pins, the trigger that unblocks
-  each upgrade, the migration steps, and the checks required before merging, and
-  is referenced from `AGENTS.md` next to the Dependabot rules.
-
-- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
-  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
-  support on 10 November 2026, the same day as the currently used .NET 8, so
-  moving to it would be a dead end. The record now carries the support-window
-  table, the .NET 10 migration steps, and the note that
-  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
-  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
-  instead of waiting for an upstream release.
-
-- Fixed the failing Dependabot GitHub Actions update. `dotnet-desktop.yml` still
-  pinned `actions/checkout@v6`, `actions/setup-dotnet@v5`, and
-  `actions/upload-artifact@v6` while every other workflow used `@v7`/`@v6`/`@v7`,
-  which made Dependabot abort with `Error processing actions/setup-dotnet
-  (RuntimeError)` / `No files changed!`. All 18 action references now use one
-  version per action, and the new `scripts/verify-github-actions-pins.ps1` (wired
-  into `scripts/verify-all.ps1` and the CI verify job) fails the build when a
-  workflow reintroduces a mixed major.
-
 ### Fixed
 
 - Windows FFmpeg auto-download now resolves the current BtbN release asset via
@@ -7887,62 +4224,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   the cache size limit in megabytes. Eviction removes the least recently used
   downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
   the most recently used episode is always kept.
-- Added an optional automatic server-side library backup schedule. The
-  `Orynivo:BackupSchedule` configuration section (disabled by default) writes a
-  versioned library ZIP at most once per `IntervalDays` into its target folder and
-  removes archives beyond `RetentionCount`. It reuses the shared
-  `Orynivo.Library.BackupRetention` decisions, derives its last run from the newest
-  archive so no extra state is stored, holds no credentials, and never includes
-  audio files. Automatic archive naming moved into the shared
-  `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
-- Added an optional WebDAV upload target for completed library backups.
-  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
-  sub-folder, and user name, while the password lives only in the encrypted
-  credential store and stays out of `settings.json`. Only plain `http`/`https`
-  URLs without embedded credentials are accepted, the upload is best effort and
-  never removes the local archive, and credentials never reach a URL, a log, or
-  an error message. The scheduled and **Back up now** paths share the upload,
-  and Settings gained the corresponding fields under the backup schedule.
-
-- Added a **Reduce motion** option under Appearance that disables the optional
-  Genre Cloud, Dashboard cover-stage, and karaoke animations. The decision lives
-  in the pure `Orynivo.Controls.MotionPreferences` helper. The album and artist
-  artwork grids can now be opened with Enter or Space in addition to a
-  double-click, and the transport controls (previous, play/pause, next, volume,
-  artist info, lyrics, favorite, shuffle, equalizer, and output) expose
-  accessible names.
-
-- Added cross-device resume for remote Orynivo Server tracks. The server stores the
-  last playback position per profile and track (`profile_track_position`) through
-  the new authenticated `GET`/`PUT /api/tracks/{id}/position` endpoints; the client
-  publishes its audible position at most every 20 seconds and offers a **Resume**
-  transport action when another device left off meaningfully later. The decision
-  lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
-  positions are stored, and no credential-bearing URL is ever persisted.
-
-- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
-  held back by Dependabot. It records the current pins, the trigger that unblocks
-  each upgrade, the migration steps, and the checks required before merging, and
-  is referenced from `AGENTS.md` next to the Dependabot rules.
-
-- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
-  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
-  support on 10 November 2026, the same day as the currently used .NET 8, so
-  moving to it would be a dead end. The record now carries the support-window
-  table, the .NET 10 migration steps, and the note that
-  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
-  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
-  instead of waiting for an upstream release.
-
-- Fixed the failing Dependabot GitHub Actions update. `dotnet-desktop.yml` still
-  pinned `actions/checkout@v6`, `actions/setup-dotnet@v5`, and
-  `actions/upload-artifact@v6` while every other workflow used `@v7`/`@v6`/`@v7`,
-  which made Dependabot abort with `Error processing actions/setup-dotnet
-  (RuntimeError)` / `No files changed!`. All 18 action references now use one
-  version per action, and the new `scripts/verify-github-actions-pins.ps1` (wired
-  into `scripts/verify-all.ps1` and the CI verify job) fails the build when a
-  workflow reintroduces a mixed major.
-
 ### Fixed
 
 - FFmpeg and FFprobe child processes now always receive a valid working
@@ -7974,62 +4255,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   the cache size limit in megabytes. Eviction removes the least recently used
   downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
   the most recently used episode is always kept.
-- Added an optional automatic server-side library backup schedule. The
-  `Orynivo:BackupSchedule` configuration section (disabled by default) writes a
-  versioned library ZIP at most once per `IntervalDays` into its target folder and
-  removes archives beyond `RetentionCount`. It reuses the shared
-  `Orynivo.Library.BackupRetention` decisions, derives its last run from the newest
-  archive so no extra state is stored, holds no credentials, and never includes
-  audio files. Automatic archive naming moved into the shared
-  `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
-- Added an optional WebDAV upload target for completed library backups.
-  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
-  sub-folder, and user name, while the password lives only in the encrypted
-  credential store and stays out of `settings.json`. Only plain `http`/`https`
-  URLs without embedded credentials are accepted, the upload is best effort and
-  never removes the local archive, and credentials never reach a URL, a log, or
-  an error message. The scheduled and **Back up now** paths share the upload,
-  and Settings gained the corresponding fields under the backup schedule.
-
-- Added a **Reduce motion** option under Appearance that disables the optional
-  Genre Cloud, Dashboard cover-stage, and karaoke animations. The decision lives
-  in the pure `Orynivo.Controls.MotionPreferences` helper. The album and artist
-  artwork grids can now be opened with Enter or Space in addition to a
-  double-click, and the transport controls (previous, play/pause, next, volume,
-  artist info, lyrics, favorite, shuffle, equalizer, and output) expose
-  accessible names.
-
-- Added cross-device resume for remote Orynivo Server tracks. The server stores the
-  last playback position per profile and track (`profile_track_position`) through
-  the new authenticated `GET`/`PUT /api/tracks/{id}/position` endpoints; the client
-  publishes its audible position at most every 20 seconds and offers a **Resume**
-  transport action when another device left off meaningfully later. The decision
-  lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
-  positions are stored, and no credential-bearing URL is ever persisted.
-
-- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
-  held back by Dependabot. It records the current pins, the trigger that unblocks
-  each upgrade, the migration steps, and the checks required before merging, and
-  is referenced from `AGENTS.md` next to the Dependabot rules.
-
-- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
-  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
-  support on 10 November 2026, the same day as the currently used .NET 8, so
-  moving to it would be a dead end. The record now carries the support-window
-  table, the .NET 10 migration steps, and the note that
-  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
-  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
-  instead of waiting for an upstream release.
-
-- Fixed the failing Dependabot GitHub Actions update. `dotnet-desktop.yml` still
-  pinned `actions/checkout@v6`, `actions/setup-dotnet@v5`, and
-  `actions/upload-artifact@v6` while every other workflow used `@v7`/`@v6`/`@v7`,
-  which made Dependabot abort with `Error processing actions/setup-dotnet
-  (RuntimeError)` / `No files changed!`. All 18 action references now use one
-  version per action, and the new `scripts/verify-github-actions-pins.ps1` (wired
-  into `scripts/verify-all.ps1` and the CI verify job) fails the build when a
-  workflow reintroduces a mixed major.
-
 ### Fixed
 
 - Automatic FFmpeg download on Windows now stores downloaded binaries in
@@ -8175,62 +4400,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   the cache size limit in megabytes. Eviction removes the least recently used
   downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
   the most recently used episode is always kept.
-- Added an optional automatic server-side library backup schedule. The
-  `Orynivo:BackupSchedule` configuration section (disabled by default) writes a
-  versioned library ZIP at most once per `IntervalDays` into its target folder and
-  removes archives beyond `RetentionCount`. It reuses the shared
-  `Orynivo.Library.BackupRetention` decisions, derives its last run from the newest
-  archive so no extra state is stored, holds no credentials, and never includes
-  audio files. Automatic archive naming moved into the shared
-  `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
-- Added an optional WebDAV upload target for completed library backups.
-  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
-  sub-folder, and user name, while the password lives only in the encrypted
-  credential store and stays out of `settings.json`. Only plain `http`/`https`
-  URLs without embedded credentials are accepted, the upload is best effort and
-  never removes the local archive, and credentials never reach a URL, a log, or
-  an error message. The scheduled and **Back up now** paths share the upload,
-  and Settings gained the corresponding fields under the backup schedule.
-
-- Added a **Reduce motion** option under Appearance that disables the optional
-  Genre Cloud, Dashboard cover-stage, and karaoke animations. The decision lives
-  in the pure `Orynivo.Controls.MotionPreferences` helper. The album and artist
-  artwork grids can now be opened with Enter or Space in addition to a
-  double-click, and the transport controls (previous, play/pause, next, volume,
-  artist info, lyrics, favorite, shuffle, equalizer, and output) expose
-  accessible names.
-
-- Added cross-device resume for remote Orynivo Server tracks. The server stores the
-  last playback position per profile and track (`profile_track_position`) through
-  the new authenticated `GET`/`PUT /api/tracks/{id}/position` endpoints; the client
-  publishes its audible position at most every 20 seconds and offers a **Resume**
-  transport action when another device left off meaningfully later. The decision
-  lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
-  positions are stored, and no credential-bearing URL is ever persisted.
-
-- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
-  held back by Dependabot. It records the current pins, the trigger that unblocks
-  each upgrade, the migration steps, and the checks required before merging, and
-  is referenced from `AGENTS.md` next to the Dependabot rules.
-
-- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
-  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
-  support on 10 November 2026, the same day as the currently used .NET 8, so
-  moving to it would be a dead end. The record now carries the support-window
-  table, the .NET 10 migration steps, and the note that
-  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
-  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
-  instead of waiting for an upstream release.
-
-- Fixed the failing Dependabot GitHub Actions update. `dotnet-desktop.yml` still
-  pinned `actions/checkout@v6`, `actions/setup-dotnet@v5`, and
-  `actions/upload-artifact@v6` while every other workflow used `@v7`/`@v6`/`@v7`,
-  which made Dependabot abort with `Error processing actions/setup-dotnet
-  (RuntimeError)` / `No files changed!`. All 18 action references now use one
-  version per action, and the new `scripts/verify-github-actions-pins.ps1` (wired
-  into `scripts/verify-all.ps1` and the CI verify job) fails the build when a
-  workflow reintroduces a mixed major.
-
 ### Fixed
 
 - Remote Orynivo Server (and other HTTP-streamed) tracks now start much faster.
@@ -8395,62 +4564,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   the cache size limit in megabytes. Eviction removes the least recently used
   downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
   the most recently used episode is always kept.
-- Added an optional automatic server-side library backup schedule. The
-  `Orynivo:BackupSchedule` configuration section (disabled by default) writes a
-  versioned library ZIP at most once per `IntervalDays` into its target folder and
-  removes archives beyond `RetentionCount`. It reuses the shared
-  `Orynivo.Library.BackupRetention` decisions, derives its last run from the newest
-  archive so no extra state is stored, holds no credentials, and never includes
-  audio files. Automatic archive naming moved into the shared
-  `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
-- Added an optional WebDAV upload target for completed library backups.
-  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
-  sub-folder, and user name, while the password lives only in the encrypted
-  credential store and stays out of `settings.json`. Only plain `http`/`https`
-  URLs without embedded credentials are accepted, the upload is best effort and
-  never removes the local archive, and credentials never reach a URL, a log, or
-  an error message. The scheduled and **Back up now** paths share the upload,
-  and Settings gained the corresponding fields under the backup schedule.
-
-- Added a **Reduce motion** option under Appearance that disables the optional
-  Genre Cloud, Dashboard cover-stage, and karaoke animations. The decision lives
-  in the pure `Orynivo.Controls.MotionPreferences` helper. The album and artist
-  artwork grids can now be opened with Enter or Space in addition to a
-  double-click, and the transport controls (previous, play/pause, next, volume,
-  artist info, lyrics, favorite, shuffle, equalizer, and output) expose
-  accessible names.
-
-- Added cross-device resume for remote Orynivo Server tracks. The server stores the
-  last playback position per profile and track (`profile_track_position`) through
-  the new authenticated `GET`/`PUT /api/tracks/{id}/position` endpoints; the client
-  publishes its audible position at most every 20 seconds and offers a **Resume**
-  transport action when another device left off meaningfully later. The decision
-  lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
-  positions are stored, and no credential-bearing URL is ever persisted.
-
-- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
-  held back by Dependabot. It records the current pins, the trigger that unblocks
-  each upgrade, the migration steps, and the checks required before merging, and
-  is referenced from `AGENTS.md` next to the Dependabot rules.
-
-- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
-  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
-  support on 10 November 2026, the same day as the currently used .NET 8, so
-  moving to it would be a dead end. The record now carries the support-window
-  table, the .NET 10 migration steps, and the note that
-  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
-  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
-  instead of waiting for an upstream release.
-
-- Fixed the failing Dependabot GitHub Actions update. `dotnet-desktop.yml` still
-  pinned `actions/checkout@v6`, `actions/setup-dotnet@v5`, and
-  `actions/upload-artifact@v6` while every other workflow used `@v7`/`@v6`/`@v7`,
-  which made Dependabot abort with `Error processing actions/setup-dotnet
-  (RuntimeError)` / `No files changed!`. All 18 action references now use one
-  version per action, and the new `scripts/verify-github-actions-pins.ps1` (wired
-  into `scripts/verify-all.ps1` and the CI verify job) fails the build when a
-  workflow reintroduces a mixed major.
-
 ### Fixed
 
 - The Orynivo Server settings and remote directory browser dialogs now use
@@ -8557,62 +4670,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   the cache size limit in megabytes. Eviction removes the least recently used
   downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
   the most recently used episode is always kept.
-- Added an optional automatic server-side library backup schedule. The
-  `Orynivo:BackupSchedule` configuration section (disabled by default) writes a
-  versioned library ZIP at most once per `IntervalDays` into its target folder and
-  removes archives beyond `RetentionCount`. It reuses the shared
-  `Orynivo.Library.BackupRetention` decisions, derives its last run from the newest
-  archive so no extra state is stored, holds no credentials, and never includes
-  audio files. Automatic archive naming moved into the shared
-  `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
-- Added an optional WebDAV upload target for completed library backups.
-  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
-  sub-folder, and user name, while the password lives only in the encrypted
-  credential store and stays out of `settings.json`. Only plain `http`/`https`
-  URLs without embedded credentials are accepted, the upload is best effort and
-  never removes the local archive, and credentials never reach a URL, a log, or
-  an error message. The scheduled and **Back up now** paths share the upload,
-  and Settings gained the corresponding fields under the backup schedule.
-
-- Added a **Reduce motion** option under Appearance that disables the optional
-  Genre Cloud, Dashboard cover-stage, and karaoke animations. The decision lives
-  in the pure `Orynivo.Controls.MotionPreferences` helper. The album and artist
-  artwork grids can now be opened with Enter or Space in addition to a
-  double-click, and the transport controls (previous, play/pause, next, volume,
-  artist info, lyrics, favorite, shuffle, equalizer, and output) expose
-  accessible names.
-
-- Added cross-device resume for remote Orynivo Server tracks. The server stores the
-  last playback position per profile and track (`profile_track_position`) through
-  the new authenticated `GET`/`PUT /api/tracks/{id}/position` endpoints; the client
-  publishes its audible position at most every 20 seconds and offers a **Resume**
-  transport action when another device left off meaningfully later. The decision
-  lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
-  positions are stored, and no credential-bearing URL is ever persisted.
-
-- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
-  held back by Dependabot. It records the current pins, the trigger that unblocks
-  each upgrade, the migration steps, and the checks required before merging, and
-  is referenced from `AGENTS.md` next to the Dependabot rules.
-
-- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
-  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
-  support on 10 November 2026, the same day as the currently used .NET 8, so
-  moving to it would be a dead end. The record now carries the support-window
-  table, the .NET 10 migration steps, and the note that
-  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
-  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
-  instead of waiting for an upstream release.
-
-- Fixed the failing Dependabot GitHub Actions update. `dotnet-desktop.yml` still
-  pinned `actions/checkout@v6`, `actions/setup-dotnet@v5`, and
-  `actions/upload-artifact@v6` while every other workflow used `@v7`/`@v6`/`@v7`,
-  which made Dependabot abort with `Error processing actions/setup-dotnet
-  (RuntimeError)` / `No files changed!`. All 18 action references now use one
-  version per action, and the new `scripts/verify-github-actions-pins.ps1` (wired
-  into `scripts/verify-all.ps1` and the CI verify job) fails the build when a
-  workflow reintroduces a mixed major.
-
 ### Fixed
 
 - Fixed numbered circle labels on the equalizer frequency-response graph being
@@ -8674,62 +4731,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   the cache size limit in megabytes. Eviction removes the least recently used
   downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
   the most recently used episode is always kept.
-- Added an optional automatic server-side library backup schedule. The
-  `Orynivo:BackupSchedule` configuration section (disabled by default) writes a
-  versioned library ZIP at most once per `IntervalDays` into its target folder and
-  removes archives beyond `RetentionCount`. It reuses the shared
-  `Orynivo.Library.BackupRetention` decisions, derives its last run from the newest
-  archive so no extra state is stored, holds no credentials, and never includes
-  audio files. Automatic archive naming moved into the shared
-  `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
-- Added an optional WebDAV upload target for completed library backups.
-  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
-  sub-folder, and user name, while the password lives only in the encrypted
-  credential store and stays out of `settings.json`. Only plain `http`/`https`
-  URLs without embedded credentials are accepted, the upload is best effort and
-  never removes the local archive, and credentials never reach a URL, a log, or
-  an error message. The scheduled and **Back up now** paths share the upload,
-  and Settings gained the corresponding fields under the backup schedule.
-
-- Added a **Reduce motion** option under Appearance that disables the optional
-  Genre Cloud, Dashboard cover-stage, and karaoke animations. The decision lives
-  in the pure `Orynivo.Controls.MotionPreferences` helper. The album and artist
-  artwork grids can now be opened with Enter or Space in addition to a
-  double-click, and the transport controls (previous, play/pause, next, volume,
-  artist info, lyrics, favorite, shuffle, equalizer, and output) expose
-  accessible names.
-
-- Added cross-device resume for remote Orynivo Server tracks. The server stores the
-  last playback position per profile and track (`profile_track_position`) through
-  the new authenticated `GET`/`PUT /api/tracks/{id}/position` endpoints; the client
-  publishes its audible position at most every 20 seconds and offers a **Resume**
-  transport action when another device left off meaningfully later. The decision
-  lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
-  positions are stored, and no credential-bearing URL is ever persisted.
-
-- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
-  held back by Dependabot. It records the current pins, the trigger that unblocks
-  each upgrade, the migration steps, and the checks required before merging, and
-  is referenced from `AGENTS.md` next to the Dependabot rules.
-
-- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
-  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
-  support on 10 November 2026, the same day as the currently used .NET 8, so
-  moving to it would be a dead end. The record now carries the support-window
-  table, the .NET 10 migration steps, and the note that
-  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
-  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
-  instead of waiting for an upstream release.
-
-- Fixed the failing Dependabot GitHub Actions update. `dotnet-desktop.yml` still
-  pinned `actions/checkout@v6`, `actions/setup-dotnet@v5`, and
-  `actions/upload-artifact@v6` while every other workflow used `@v7`/`@v6`/`@v7`,
-  which made Dependabot abort with `Error processing actions/setup-dotnet
-  (RuntimeError)` / `No files changed!`. All 18 action references now use one
-  version per action, and the new `scripts/verify-github-actions-pins.ps1` (wired
-  into `scripts/verify-all.ps1` and the CI verify job) fails the build when a
-  workflow reintroduces a mixed major.
-
 ### Fixed
 
 - Switching the output profile via the transport quick-pick popup now resumes
@@ -8824,62 +4825,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   the cache size limit in megabytes. Eviction removes the least recently used
   downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
   the most recently used episode is always kept.
-- Added an optional automatic server-side library backup schedule. The
-  `Orynivo:BackupSchedule` configuration section (disabled by default) writes a
-  versioned library ZIP at most once per `IntervalDays` into its target folder and
-  removes archives beyond `RetentionCount`. It reuses the shared
-  `Orynivo.Library.BackupRetention` decisions, derives its last run from the newest
-  archive so no extra state is stored, holds no credentials, and never includes
-  audio files. Automatic archive naming moved into the shared
-  `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
-- Added an optional WebDAV upload target for completed library backups.
-  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
-  sub-folder, and user name, while the password lives only in the encrypted
-  credential store and stays out of `settings.json`. Only plain `http`/`https`
-  URLs without embedded credentials are accepted, the upload is best effort and
-  never removes the local archive, and credentials never reach a URL, a log, or
-  an error message. The scheduled and **Back up now** paths share the upload,
-  and Settings gained the corresponding fields under the backup schedule.
-
-- Added a **Reduce motion** option under Appearance that disables the optional
-  Genre Cloud, Dashboard cover-stage, and karaoke animations. The decision lives
-  in the pure `Orynivo.Controls.MotionPreferences` helper. The album and artist
-  artwork grids can now be opened with Enter or Space in addition to a
-  double-click, and the transport controls (previous, play/pause, next, volume,
-  artist info, lyrics, favorite, shuffle, equalizer, and output) expose
-  accessible names.
-
-- Added cross-device resume for remote Orynivo Server tracks. The server stores the
-  last playback position per profile and track (`profile_track_position`) through
-  the new authenticated `GET`/`PUT /api/tracks/{id}/position` endpoints; the client
-  publishes its audible position at most every 20 seconds and offers a **Resume**
-  transport action when another device left off meaningfully later. The decision
-  lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
-  positions are stored, and no credential-bearing URL is ever persisted.
-
-- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
-  held back by Dependabot. It records the current pins, the trigger that unblocks
-  each upgrade, the migration steps, and the checks required before merging, and
-  is referenced from `AGENTS.md` next to the Dependabot rules.
-
-- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
-  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
-  support on 10 November 2026, the same day as the currently used .NET 8, so
-  moving to it would be a dead end. The record now carries the support-window
-  table, the .NET 10 migration steps, and the note that
-  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
-  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
-  instead of waiting for an upstream release.
-
-- Fixed the failing Dependabot GitHub Actions update. `dotnet-desktop.yml` still
-  pinned `actions/checkout@v6`, `actions/setup-dotnet@v5`, and
-  `actions/upload-artifact@v6` while every other workflow used `@v7`/`@v6`/`@v7`,
-  which made Dependabot abort with `Error processing actions/setup-dotnet
-  (RuntimeError)` / `No files changed!`. All 18 action references now use one
-  version per action, and the new `scripts/verify-github-actions-pins.ps1` (wired
-  into `scripts/verify-all.ps1` and the CI verify job) fails the build when a
-  workflow reintroduces a mixed major.
-
 ### Fixed
 
 - Enabled the A–Z index in the Plex folder view. Available letters now come
@@ -8971,62 +4916,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   the cache size limit in megabytes. Eviction removes the least recently used
   downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
   the most recently used episode is always kept.
-- Added an optional automatic server-side library backup schedule. The
-  `Orynivo:BackupSchedule` configuration section (disabled by default) writes a
-  versioned library ZIP at most once per `IntervalDays` into its target folder and
-  removes archives beyond `RetentionCount`. It reuses the shared
-  `Orynivo.Library.BackupRetention` decisions, derives its last run from the newest
-  archive so no extra state is stored, holds no credentials, and never includes
-  audio files. Automatic archive naming moved into the shared
-  `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
-- Added an optional WebDAV upload target for completed library backups.
-  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
-  sub-folder, and user name, while the password lives only in the encrypted
-  credential store and stays out of `settings.json`. Only plain `http`/`https`
-  URLs without embedded credentials are accepted, the upload is best effort and
-  never removes the local archive, and credentials never reach a URL, a log, or
-  an error message. The scheduled and **Back up now** paths share the upload,
-  and Settings gained the corresponding fields under the backup schedule.
-
-- Added a **Reduce motion** option under Appearance that disables the optional
-  Genre Cloud, Dashboard cover-stage, and karaoke animations. The decision lives
-  in the pure `Orynivo.Controls.MotionPreferences` helper. The album and artist
-  artwork grids can now be opened with Enter or Space in addition to a
-  double-click, and the transport controls (previous, play/pause, next, volume,
-  artist info, lyrics, favorite, shuffle, equalizer, and output) expose
-  accessible names.
-
-- Added cross-device resume for remote Orynivo Server tracks. The server stores the
-  last playback position per profile and track (`profile_track_position`) through
-  the new authenticated `GET`/`PUT /api/tracks/{id}/position` endpoints; the client
-  publishes its audible position at most every 20 seconds and offers a **Resume**
-  transport action when another device left off meaningfully later. The decision
-  lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
-  positions are stored, and no credential-bearing URL is ever persisted.
-
-- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
-  held back by Dependabot. It records the current pins, the trigger that unblocks
-  each upgrade, the migration steps, and the checks required before merging, and
-  is referenced from `AGENTS.md` next to the Dependabot rules.
-
-- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
-  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
-  support on 10 November 2026, the same day as the currently used .NET 8, so
-  moving to it would be a dead end. The record now carries the support-window
-  table, the .NET 10 migration steps, and the note that
-  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
-  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
-  instead of waiting for an upstream release.
-
-- Fixed the failing Dependabot GitHub Actions update. `dotnet-desktop.yml` still
-  pinned `actions/checkout@v6`, `actions/setup-dotnet@v5`, and
-  `actions/upload-artifact@v6` while every other workflow used `@v7`/`@v6`/`@v7`,
-  which made Dependabot abort with `Error processing actions/setup-dotnet
-  (RuntimeError)` / `No files changed!`. All 18 action references now use one
-  version per action, and the new `scripts/verify-github-actions-pins.ps1` (wired
-  into `scripts/verify-all.ps1` and the CI verify job) fails the build when a
-  workflow reintroduces a mixed major.
-
 ### Fixed
 
 ## [0.8.0] - 2026-06-21
@@ -9072,62 +4961,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   the cache size limit in megabytes. Eviction removes the least recently used
   downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
   the most recently used episode is always kept.
-- Added an optional automatic server-side library backup schedule. The
-  `Orynivo:BackupSchedule` configuration section (disabled by default) writes a
-  versioned library ZIP at most once per `IntervalDays` into its target folder and
-  removes archives beyond `RetentionCount`. It reuses the shared
-  `Orynivo.Library.BackupRetention` decisions, derives its last run from the newest
-  archive so no extra state is stored, holds no credentials, and never includes
-  audio files. Automatic archive naming moved into the shared
-  `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
-- Added an optional WebDAV upload target for completed library backups.
-  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
-  sub-folder, and user name, while the password lives only in the encrypted
-  credential store and stays out of `settings.json`. Only plain `http`/`https`
-  URLs without embedded credentials are accepted, the upload is best effort and
-  never removes the local archive, and credentials never reach a URL, a log, or
-  an error message. The scheduled and **Back up now** paths share the upload,
-  and Settings gained the corresponding fields under the backup schedule.
-
-- Added a **Reduce motion** option under Appearance that disables the optional
-  Genre Cloud, Dashboard cover-stage, and karaoke animations. The decision lives
-  in the pure `Orynivo.Controls.MotionPreferences` helper. The album and artist
-  artwork grids can now be opened with Enter or Space in addition to a
-  double-click, and the transport controls (previous, play/pause, next, volume,
-  artist info, lyrics, favorite, shuffle, equalizer, and output) expose
-  accessible names.
-
-- Added cross-device resume for remote Orynivo Server tracks. The server stores the
-  last playback position per profile and track (`profile_track_position`) through
-  the new authenticated `GET`/`PUT /api/tracks/{id}/position` endpoints; the client
-  publishes its audible position at most every 20 seconds and offers a **Resume**
-  transport action when another device left off meaningfully later. The decision
-  lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
-  positions are stored, and no credential-bearing URL is ever persisted.
-
-- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
-  held back by Dependabot. It records the current pins, the trigger that unblocks
-  each upgrade, the migration steps, and the checks required before merging, and
-  is referenced from `AGENTS.md` next to the Dependabot rules.
-
-- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
-  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
-  support on 10 November 2026, the same day as the currently used .NET 8, so
-  moving to it would be a dead end. The record now carries the support-window
-  table, the .NET 10 migration steps, and the note that
-  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
-  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
-  instead of waiting for an upstream release.
-
-- Fixed the failing Dependabot GitHub Actions update. `dotnet-desktop.yml` still
-  pinned `actions/checkout@v6`, `actions/setup-dotnet@v5`, and
-  `actions/upload-artifact@v6` while every other workflow used `@v7`/`@v6`/`@v7`,
-  which made Dependabot abort with `Error processing actions/setup-dotnet
-  (RuntimeError)` / `No files changed!`. All 18 action references now use one
-  version per action, and the new `scripts/verify-github-actions-pins.ps1` (wired
-  into `scripts/verify-all.ps1` and the CI verify job) fails the build when a
-  workflow reintroduces a mixed major.
-
 ### Fixed
 
 - Preserved manual artist renames across watcher updates and later library
@@ -9198,62 +5031,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   the cache size limit in megabytes. Eviction removes the least recently used
   downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
   the most recently used episode is always kept.
-- Added an optional automatic server-side library backup schedule. The
-  `Orynivo:BackupSchedule` configuration section (disabled by default) writes a
-  versioned library ZIP at most once per `IntervalDays` into its target folder and
-  removes archives beyond `RetentionCount`. It reuses the shared
-  `Orynivo.Library.BackupRetention` decisions, derives its last run from the newest
-  archive so no extra state is stored, holds no credentials, and never includes
-  audio files. Automatic archive naming moved into the shared
-  `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
-- Added an optional WebDAV upload target for completed library backups.
-  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
-  sub-folder, and user name, while the password lives only in the encrypted
-  credential store and stays out of `settings.json`. Only plain `http`/`https`
-  URLs without embedded credentials are accepted, the upload is best effort and
-  never removes the local archive, and credentials never reach a URL, a log, or
-  an error message. The scheduled and **Back up now** paths share the upload,
-  and Settings gained the corresponding fields under the backup schedule.
-
-- Added a **Reduce motion** option under Appearance that disables the optional
-  Genre Cloud, Dashboard cover-stage, and karaoke animations. The decision lives
-  in the pure `Orynivo.Controls.MotionPreferences` helper. The album and artist
-  artwork grids can now be opened with Enter or Space in addition to a
-  double-click, and the transport controls (previous, play/pause, next, volume,
-  artist info, lyrics, favorite, shuffle, equalizer, and output) expose
-  accessible names.
-
-- Added cross-device resume for remote Orynivo Server tracks. The server stores the
-  last playback position per profile and track (`profile_track_position`) through
-  the new authenticated `GET`/`PUT /api/tracks/{id}/position` endpoints; the client
-  publishes its audible position at most every 20 seconds and offers a **Resume**
-  transport action when another device left off meaningfully later. The decision
-  lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
-  positions are stored, and no credential-bearing URL is ever persisted.
-
-- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
-  held back by Dependabot. It records the current pins, the trigger that unblocks
-  each upgrade, the migration steps, and the checks required before merging, and
-  is referenced from `AGENTS.md` next to the Dependabot rules.
-
-- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
-  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
-  support on 10 November 2026, the same day as the currently used .NET 8, so
-  moving to it would be a dead end. The record now carries the support-window
-  table, the .NET 10 migration steps, and the note that
-  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
-  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
-  instead of waiting for an upstream release.
-
-- Fixed the failing Dependabot GitHub Actions update. `dotnet-desktop.yml` still
-  pinned `actions/checkout@v6`, `actions/setup-dotnet@v5`, and
-  `actions/upload-artifact@v6` while every other workflow used `@v7`/`@v6`/`@v7`,
-  which made Dependabot abort with `Error processing actions/setup-dotnet
-  (RuntimeError)` / `No files changed!`. All 18 action references now use one
-  version per action, and the new `scripts/verify-github-actions-pins.ps1` (wired
-  into `scripts/verify-all.ps1` and the CI verify job) fails the build when a
-  workflow reintroduces a mixed major.
-
 ### Fixed
 
 - Fixed the application failing during startup because the lyrics
@@ -9301,62 +5078,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   the cache size limit in megabytes. Eviction removes the least recently used
   downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
   the most recently used episode is always kept.
-- Added an optional automatic server-side library backup schedule. The
-  `Orynivo:BackupSchedule` configuration section (disabled by default) writes a
-  versioned library ZIP at most once per `IntervalDays` into its target folder and
-  removes archives beyond `RetentionCount`. It reuses the shared
-  `Orynivo.Library.BackupRetention` decisions, derives its last run from the newest
-  archive so no extra state is stored, holds no credentials, and never includes
-  audio files. Automatic archive naming moved into the shared
-  `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
-- Added an optional WebDAV upload target for completed library backups.
-  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
-  sub-folder, and user name, while the password lives only in the encrypted
-  credential store and stays out of `settings.json`. Only plain `http`/`https`
-  URLs without embedded credentials are accepted, the upload is best effort and
-  never removes the local archive, and credentials never reach a URL, a log, or
-  an error message. The scheduled and **Back up now** paths share the upload,
-  and Settings gained the corresponding fields under the backup schedule.
-
-- Added a **Reduce motion** option under Appearance that disables the optional
-  Genre Cloud, Dashboard cover-stage, and karaoke animations. The decision lives
-  in the pure `Orynivo.Controls.MotionPreferences` helper. The album and artist
-  artwork grids can now be opened with Enter or Space in addition to a
-  double-click, and the transport controls (previous, play/pause, next, volume,
-  artist info, lyrics, favorite, shuffle, equalizer, and output) expose
-  accessible names.
-
-- Added cross-device resume for remote Orynivo Server tracks. The server stores the
-  last playback position per profile and track (`profile_track_position`) through
-  the new authenticated `GET`/`PUT /api/tracks/{id}/position` endpoints; the client
-  publishes its audible position at most every 20 seconds and offers a **Resume**
-  transport action when another device left off meaningfully later. The decision
-  lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
-  positions are stored, and no credential-bearing URL is ever persisted.
-
-- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
-  held back by Dependabot. It records the current pins, the trigger that unblocks
-  each upgrade, the migration steps, and the checks required before merging, and
-  is referenced from `AGENTS.md` next to the Dependabot rules.
-
-- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
-  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
-  support on 10 November 2026, the same day as the currently used .NET 8, so
-  moving to it would be a dead end. The record now carries the support-window
-  table, the .NET 10 migration steps, and the note that
-  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
-  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
-  instead of waiting for an upstream release.
-
-- Fixed the failing Dependabot GitHub Actions update. `dotnet-desktop.yml` still
-  pinned `actions/checkout@v6`, `actions/setup-dotnet@v5`, and
-  `actions/upload-artifact@v6` while every other workflow used `@v7`/`@v6`/`@v7`,
-  which made Dependabot abort with `Error processing actions/setup-dotnet
-  (RuntimeError)` / `No files changed!`. All 18 action references now use one
-  version per action, and the new `scripts/verify-github-actions-pins.ps1` (wired
-  into `scripts/verify-all.ps1` and the CI verify job) fails the build when a
-  workflow reintroduces a mixed major.
-
 ### Fixed
 
 - Added the theme-aware now-playing highlight to tracks in the Plex folder
@@ -9450,62 +5171,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   the cache size limit in megabytes. Eviction removes the least recently used
   downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
   the most recently used episode is always kept.
-- Added an optional automatic server-side library backup schedule. The
-  `Orynivo:BackupSchedule` configuration section (disabled by default) writes a
-  versioned library ZIP at most once per `IntervalDays` into its target folder and
-  removes archives beyond `RetentionCount`. It reuses the shared
-  `Orynivo.Library.BackupRetention` decisions, derives its last run from the newest
-  archive so no extra state is stored, holds no credentials, and never includes
-  audio files. Automatic archive naming moved into the shared
-  `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
-- Added an optional WebDAV upload target for completed library backups.
-  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
-  sub-folder, and user name, while the password lives only in the encrypted
-  credential store and stays out of `settings.json`. Only plain `http`/`https`
-  URLs without embedded credentials are accepted, the upload is best effort and
-  never removes the local archive, and credentials never reach a URL, a log, or
-  an error message. The scheduled and **Back up now** paths share the upload,
-  and Settings gained the corresponding fields under the backup schedule.
-
-- Added a **Reduce motion** option under Appearance that disables the optional
-  Genre Cloud, Dashboard cover-stage, and karaoke animations. The decision lives
-  in the pure `Orynivo.Controls.MotionPreferences` helper. The album and artist
-  artwork grids can now be opened with Enter or Space in addition to a
-  double-click, and the transport controls (previous, play/pause, next, volume,
-  artist info, lyrics, favorite, shuffle, equalizer, and output) expose
-  accessible names.
-
-- Added cross-device resume for remote Orynivo Server tracks. The server stores the
-  last playback position per profile and track (`profile_track_position`) through
-  the new authenticated `GET`/`PUT /api/tracks/{id}/position` endpoints; the client
-  publishes its audible position at most every 20 seconds and offers a **Resume**
-  transport action when another device left off meaningfully later. The decision
-  lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
-  positions are stored, and no credential-bearing URL is ever persisted.
-
-- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
-  held back by Dependabot. It records the current pins, the trigger that unblocks
-  each upgrade, the migration steps, and the checks required before merging, and
-  is referenced from `AGENTS.md` next to the Dependabot rules.
-
-- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
-  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
-  support on 10 November 2026, the same day as the currently used .NET 8, so
-  moving to it would be a dead end. The record now carries the support-window
-  table, the .NET 10 migration steps, and the note that
-  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
-  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
-  instead of waiting for an upstream release.
-
-- Fixed the failing Dependabot GitHub Actions update. `dotnet-desktop.yml` still
-  pinned `actions/checkout@v6`, `actions/setup-dotnet@v5`, and
-  `actions/upload-artifact@v6` while every other workflow used `@v7`/`@v6`/`@v7`,
-  which made Dependabot abort with `Error processing actions/setup-dotnet
-  (RuntimeError)` / `No files changed!`. All 18 action references now use one
-  version per action, and the new `scripts/verify-github-actions-pins.ps1` (wired
-  into `scripts/verify-all.ps1` and the CI verify job) fails the build when a
-  workflow reintroduces a mixed major.
-
 ### Fixed
 
 - Added a theme-aware background highlight for the currently audible item in
@@ -9577,62 +5242,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   the cache size limit in megabytes. Eviction removes the least recently used
   downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
   the most recently used episode is always kept.
-- Added an optional automatic server-side library backup schedule. The
-  `Orynivo:BackupSchedule` configuration section (disabled by default) writes a
-  versioned library ZIP at most once per `IntervalDays` into its target folder and
-  removes archives beyond `RetentionCount`. It reuses the shared
-  `Orynivo.Library.BackupRetention` decisions, derives its last run from the newest
-  archive so no extra state is stored, holds no credentials, and never includes
-  audio files. Automatic archive naming moved into the shared
-  `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
-- Added an optional WebDAV upload target for completed library backups.
-  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
-  sub-folder, and user name, while the password lives only in the encrypted
-  credential store and stays out of `settings.json`. Only plain `http`/`https`
-  URLs without embedded credentials are accepted, the upload is best effort and
-  never removes the local archive, and credentials never reach a URL, a log, or
-  an error message. The scheduled and **Back up now** paths share the upload,
-  and Settings gained the corresponding fields under the backup schedule.
-
-- Added a **Reduce motion** option under Appearance that disables the optional
-  Genre Cloud, Dashboard cover-stage, and karaoke animations. The decision lives
-  in the pure `Orynivo.Controls.MotionPreferences` helper. The album and artist
-  artwork grids can now be opened with Enter or Space in addition to a
-  double-click, and the transport controls (previous, play/pause, next, volume,
-  artist info, lyrics, favorite, shuffle, equalizer, and output) expose
-  accessible names.
-
-- Added cross-device resume for remote Orynivo Server tracks. The server stores the
-  last playback position per profile and track (`profile_track_position`) through
-  the new authenticated `GET`/`PUT /api/tracks/{id}/position` endpoints; the client
-  publishes its audible position at most every 20 seconds and offers a **Resume**
-  transport action when another device left off meaningfully later. The decision
-  lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
-  positions are stored, and no credential-bearing URL is ever persisted.
-
-- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
-  held back by Dependabot. It records the current pins, the trigger that unblocks
-  each upgrade, the migration steps, and the checks required before merging, and
-  is referenced from `AGENTS.md` next to the Dependabot rules.
-
-- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
-  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
-  support on 10 November 2026, the same day as the currently used .NET 8, so
-  moving to it would be a dead end. The record now carries the support-window
-  table, the .NET 10 migration steps, and the note that
-  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
-  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
-  instead of waiting for an upstream release.
-
-- Fixed the failing Dependabot GitHub Actions update. `dotnet-desktop.yml` still
-  pinned `actions/checkout@v6`, `actions/setup-dotnet@v5`, and
-  `actions/upload-artifact@v6` while every other workflow used `@v7`/`@v6`/`@v7`,
-  which made Dependabot abort with `Error processing actions/setup-dotnet
-  (RuntimeError)` / `No files changed!`. All 18 action references now use one
-  version per action, and the new `scripts/verify-github-actions-pins.ps1` (wired
-  into `scripts/verify-all.ps1` and the CI verify job) fails the build when a
-  workflow reintroduces a mixed major.
-
 ### Fixed
 
 - Fixed the table-header column chooser not opening on right-click and then
@@ -9697,62 +5306,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   the cache size limit in megabytes. Eviction removes the least recently used
   downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
   the most recently used episode is always kept.
-- Added an optional automatic server-side library backup schedule. The
-  `Orynivo:BackupSchedule` configuration section (disabled by default) writes a
-  versioned library ZIP at most once per `IntervalDays` into its target folder and
-  removes archives beyond `RetentionCount`. It reuses the shared
-  `Orynivo.Library.BackupRetention` decisions, derives its last run from the newest
-  archive so no extra state is stored, holds no credentials, and never includes
-  audio files. Automatic archive naming moved into the shared
-  `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
-- Added an optional WebDAV upload target for completed library backups.
-  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
-  sub-folder, and user name, while the password lives only in the encrypted
-  credential store and stays out of `settings.json`. Only plain `http`/`https`
-  URLs without embedded credentials are accepted, the upload is best effort and
-  never removes the local archive, and credentials never reach a URL, a log, or
-  an error message. The scheduled and **Back up now** paths share the upload,
-  and Settings gained the corresponding fields under the backup schedule.
-
-- Added a **Reduce motion** option under Appearance that disables the optional
-  Genre Cloud, Dashboard cover-stage, and karaoke animations. The decision lives
-  in the pure `Orynivo.Controls.MotionPreferences` helper. The album and artist
-  artwork grids can now be opened with Enter or Space in addition to a
-  double-click, and the transport controls (previous, play/pause, next, volume,
-  artist info, lyrics, favorite, shuffle, equalizer, and output) expose
-  accessible names.
-
-- Added cross-device resume for remote Orynivo Server tracks. The server stores the
-  last playback position per profile and track (`profile_track_position`) through
-  the new authenticated `GET`/`PUT /api/tracks/{id}/position` endpoints; the client
-  publishes its audible position at most every 20 seconds and offers a **Resume**
-  transport action when another device left off meaningfully later. The decision
-  lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
-  positions are stored, and no credential-bearing URL is ever persisted.
-
-- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
-  held back by Dependabot. It records the current pins, the trigger that unblocks
-  each upgrade, the migration steps, and the checks required before merging, and
-  is referenced from `AGENTS.md` next to the Dependabot rules.
-
-- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
-  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
-  support on 10 November 2026, the same day as the currently used .NET 8, so
-  moving to it would be a dead end. The record now carries the support-window
-  table, the .NET 10 migration steps, and the note that
-  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
-  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
-  instead of waiting for an upstream release.
-
-- Fixed the failing Dependabot GitHub Actions update. `dotnet-desktop.yml` still
-  pinned `actions/checkout@v6`, `actions/setup-dotnet@v5`, and
-  `actions/upload-artifact@v6` while every other workflow used `@v7`/`@v6`/`@v7`,
-  which made Dependabot abort with `Error processing actions/setup-dotnet
-  (RuntimeError)` / `No files changed!`. All 18 action references now use one
-  version per action, and the new `scripts/verify-github-actions-pins.ps1` (wired
-  into `scripts/verify-all.ps1` and the CI verify job) fails the build when a
-  workflow reintroduces a mixed major.
-
 ### Fixed
 
 - Restored visible text in Avalonia table/list navigation and restored vector
@@ -9865,62 +5418,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   the cache size limit in megabytes. Eviction removes the least recently used
   downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
   the most recently used episode is always kept.
-- Added an optional automatic server-side library backup schedule. The
-  `Orynivo:BackupSchedule` configuration section (disabled by default) writes a
-  versioned library ZIP at most once per `IntervalDays` into its target folder and
-  removes archives beyond `RetentionCount`. It reuses the shared
-  `Orynivo.Library.BackupRetention` decisions, derives its last run from the newest
-  archive so no extra state is stored, holds no credentials, and never includes
-  audio files. Automatic archive naming moved into the shared
-  `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
-- Added an optional WebDAV upload target for completed library backups.
-  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
-  sub-folder, and user name, while the password lives only in the encrypted
-  credential store and stays out of `settings.json`. Only plain `http`/`https`
-  URLs without embedded credentials are accepted, the upload is best effort and
-  never removes the local archive, and credentials never reach a URL, a log, or
-  an error message. The scheduled and **Back up now** paths share the upload,
-  and Settings gained the corresponding fields under the backup schedule.
-
-- Added a **Reduce motion** option under Appearance that disables the optional
-  Genre Cloud, Dashboard cover-stage, and karaoke animations. The decision lives
-  in the pure `Orynivo.Controls.MotionPreferences` helper. The album and artist
-  artwork grids can now be opened with Enter or Space in addition to a
-  double-click, and the transport controls (previous, play/pause, next, volume,
-  artist info, lyrics, favorite, shuffle, equalizer, and output) expose
-  accessible names.
-
-- Added cross-device resume for remote Orynivo Server tracks. The server stores the
-  last playback position per profile and track (`profile_track_position`) through
-  the new authenticated `GET`/`PUT /api/tracks/{id}/position` endpoints; the client
-  publishes its audible position at most every 20 seconds and offers a **Resume**
-  transport action when another device left off meaningfully later. The decision
-  lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
-  positions are stored, and no credential-bearing URL is ever persisted.
-
-- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
-  held back by Dependabot. It records the current pins, the trigger that unblocks
-  each upgrade, the migration steps, and the checks required before merging, and
-  is referenced from `AGENTS.md` next to the Dependabot rules.
-
-- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
-  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
-  support on 10 November 2026, the same day as the currently used .NET 8, so
-  moving to it would be a dead end. The record now carries the support-window
-  table, the .NET 10 migration steps, and the note that
-  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
-  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
-  instead of waiting for an upstream release.
-
-- Fixed the failing Dependabot GitHub Actions update. `dotnet-desktop.yml` still
-  pinned `actions/checkout@v6`, `actions/setup-dotnet@v5`, and
-  `actions/upload-artifact@v6` while every other workflow used `@v7`/`@v6`/`@v7`,
-  which made Dependabot abort with `Error processing actions/setup-dotnet
-  (RuntimeError)` / `No files changed!`. All 18 action references now use one
-  version per action, and the new `scripts/verify-github-actions-pins.ps1` (wired
-  into `scripts/verify-all.ps1` and the CI verify job) fails the build when a
-  workflow reintroduces a mixed major.
-
 ### Fixed
 
 - Plex folder playback now queues only the tracks on the selected file's

@@ -793,6 +793,7 @@ public partial class MainWindow : Window
             _settings.AlwaysConvertDsdToPcm = window.AlwaysConvertDsdToPcm;
             _settings.DsdOverPcmEnabled = window.DsdOverPcmEnabled;
             _settings.PcmOutputBoostEnabled = window.PcmOutputBoostEnabled;
+            _settings.MaxOutputSampleRateHz  = window.MaxOutputSampleRateHz;
             _settings.NonGaplessCrossfadeSeconds = window.NonGaplessCrossfadeSeconds;
             _settings.EqualizerEnabled      = window.EqualizerEnabled;
             _settings.EqualizerProfile      = window.SelectedEqualizerProfile;

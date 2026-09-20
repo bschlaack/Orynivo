@@ -1,6 +1,9 @@
 <Window x:Class="Orynivo.MainWindow"
         xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:local="using:Orynivo"
+        xmlns:lib="using:Orynivo.Library"
+        xmlns:audio="using:Orynivo.Audio"
         xmlns:controls="clr-namespace:Orynivo.Controls"
         xmlns:conv="using:Avalonia.Data.Converters"
         xmlns:ai="using:Orynivo.AI"
@@ -43,7 +46,7 @@
         <!-- Shared album artwork card. Used by the Albums artwork view and by the
              Dashboard "recently added" strip/full view so both look identical and
              support the same cover-change and favorite actions. -->
-        <DataTemplate x:Key="AlbumArtworkCardTemplate">
+        <DataTemplate x:Key="AlbumArtworkCardTemplate" x:DataType="local:ContentRow">
             <Border Classes="motionCard"
                     AutomationProperties.Name="{Binding Title}"
                     Width="180"
@@ -1413,7 +1416,7 @@
                                  Foreground="{DynamicResource AppPrimaryTextBrush}"
                                  BorderBrush="{DynamicResource AppHeaderBorderBrush}"
                                  CornerRadius="18"
-                                 Watermark="{DynamicResource L_Search}"
+                                 PlaceholderText="{DynamicResource L_Search}"
                                  ToolTip.Tip="{DynamicResource L_Search}"
                                  TextChanged="SearchTextBox_OnTextChanged"/>
                         <Border x:Name="AlbumViewModeBorder"
@@ -1558,7 +1561,7 @@
                                      Background="{DynamicResource AppInputBrush}"
                                      Foreground="{DynamicResource AppPrimaryTextBrush}"
                                      BorderBrush="{DynamicResource AppHeaderBorderBrush}"
-                                     Watermark="{DynamicResource L_BulkGenre}"
+                                     PlaceholderText="{DynamicResource L_BulkGenre}"
                                      ToolTip.Tip="{DynamicResource L_BulkGenreTooltip}"/>
                             <Button x:Name="BulkGenreApplyButton"
                                     Padding="12,5"
@@ -1960,6 +1963,7 @@
 
                 <Grid Grid.Row="3" Margin="28,0,28,24">
                     <DataGrid x:Name="RadioStationsDataGrid"
+                              x:DataType="local:RadioStationViewModel"
                               Background="{DynamicResource AppContentBrush}"
                               BorderThickness="0"
                               RowHeight="54"
@@ -1975,7 +1979,7 @@
                         <DataGrid.Columns>
                             <DataGridTemplateColumn Width="70" SortMemberPath="Name">
                                 <DataGridTemplateColumn.CellTemplate>
-                                    <DataTemplate>
+                                    <DataTemplate x:DataType="local:RadioStationViewModel">
                                         <Border Width="38"
                                                 Height="38"
                                                 CornerRadius="8"
@@ -2036,7 +2040,7 @@
                                                 Width="220"/>
                             <DataGridTemplateColumn Width="120" CanUserSort="False">
                                 <DataGridTemplateColumn.CellTemplate>
-                                    <DataTemplate>
+                                    <DataTemplate x:DataType="local:RadioStationViewModel">
                                         <Button Content="{DynamicResource L_PlayRadio}"
                                                 Tag="{Binding}"
                                                 Padding="10,5"
@@ -2047,7 +2051,7 @@
                             </DataGridTemplateColumn>
                             <DataGridTemplateColumn Width="180" CanUserSort="False">
                                 <DataGridTemplateColumn.CellTemplate>
-                                    <DataTemplate>
+                                    <DataTemplate x:DataType="local:RadioStationViewModel">
                                         <Button Content="{DynamicResource L_AddToOwnRadios}"
                                                 Tag="{Binding}"
                                                 Padding="10,5"
@@ -2230,6 +2234,7 @@
 
                 <Grid Grid.Row="2" Margin="28,0,28,24">
                     <DataGrid x:Name="PodcastsDataGrid"
+                              x:DataType="local:PodcastViewModel"
                               Background="{DynamicResource AppContentBrush}"
                               BorderThickness="0"
                               RowHeight="64"
@@ -2244,7 +2249,7 @@
                         <DataGrid.Columns>
                             <DataGridTemplateColumn Width="78" SortMemberPath="Name">
                                 <DataGridTemplateColumn.CellTemplate>
-                                    <DataTemplate>
+                                    <DataTemplate x:DataType="local:PodcastViewModel">
                                         <Border Width="48"
                                                 Height="48"
                                                 CornerRadius="8"
@@ -2289,7 +2294,7 @@
                                                 Width="280"/>
                             <DataGridTemplateColumn Width="160" CanUserSort="False">
                                 <DataGridTemplateColumn.CellTemplate>
-                                    <DataTemplate>
+                                    <DataTemplate x:DataType="local:PodcastViewModel">
                                         <Button Content="{DynamicResource L_ShowEpisodes}"
                                                 Tag="{Binding}"
                                                 Padding="10,5"
@@ -2300,7 +2305,7 @@
                             </DataGridTemplateColumn>
                             <DataGridTemplateColumn Width="180" CanUserSort="False">
                                 <DataGridTemplateColumn.CellTemplate>
-                                    <DataTemplate>
+                                    <DataTemplate x:DataType="local:PodcastViewModel">
                                         <Button Content="{DynamicResource L_AddToMyPodcasts}"
                                                 Tag="{Binding}"
                                                 Padding="10,5"
@@ -2394,6 +2399,7 @@
 
                     <Grid Grid.Row="1" Margin="28,0,28,24">
                         <DataGrid x:Name="PodcastEpisodesDataGrid"
+                                  x:DataType="local:PodcastEpisodeViewModel"
                                   Background="{DynamicResource AppContentBrush}"
                                   BorderThickness="0"
                                   RowHeight="54"
@@ -2450,6 +2456,7 @@
                 </Grid.RowDefinitions>
 
                 <Border x:Name="AlbumDetailHeader"
+                        x:DataType="local:ContentRow"
                         Grid.Row="0"
                         IsVisible="False"
                         Margin="24,22,24,18"
@@ -2831,7 +2838,7 @@
                     </ControlTheme>
                 </ListBox.ItemContainerTheme>
                 <ListBox.ItemTemplate>
-                    <DataTemplate>
+                    <DataTemplate x:DataType="local:ContentRow">
                         <Border Classes="motionCard"
                                 AutomationProperties.Name="{Binding Title}"
                                 Width="200"
@@ -3102,6 +3109,7 @@
                     </Grid>
                     <Grid Grid.Row="1">
                         <ListBox x:Name="LyricsListBox"
+                                  x:DataType="local:LyricLineViewModel"
                                  Background="Transparent"
                                  BorderThickness="0"
                                  Padding="80,26,80,60"
@@ -3127,7 +3135,7 @@
                                 </ControlTheme>
                             </ListBox.ItemContainerTheme>
                             <ListBox.ItemTemplate>
-                                <DataTemplate>
+                                <DataTemplate x:DataType="local:LyricLineViewModel">
                                     <TextBlock Text="{Binding Text}"
                                                Padding="16,10"
                                                TextWrapping="Wrap"
@@ -3726,6 +3734,7 @@
                                     <ColumnDefinition Width="Auto"/>
                                 </Grid.ColumnDefinitions>
                                 <ComboBox x:Name="EqPickerComboBox"
+                                          x:DataType="audio:EqualizerProfile"
                                           Height="30"
                                           HorizontalAlignment="Stretch"
                                           DisplayMemberBinding="{Binding Name}"
@@ -3767,6 +3776,7 @@
                                 <ColumnDefinition Width="Auto"/>
                             </Grid.ColumnDefinitions>
                             <ComboBox x:Name="OutputPickerComboBox"
+                                      x:DataType="local:OutputProfile"
                                       Height="30"
                                       HorizontalAlignment="Stretch"
                                       DisplayMemberBinding="{Binding Name}"
@@ -3868,5 +3878,4 @@
 
     </Grid>
 </Window>
-
 

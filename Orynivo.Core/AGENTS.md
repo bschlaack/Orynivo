@@ -18,7 +18,7 @@ This file applies to `Orynivo.Core/` and supplements `../AGENTS.md`.
   Preserve punctuation-aware query fallbacks. The transport regression harness
   is `scripts/CoverSearchSmoke` (offline by default; `--live` is opt-in).
 
-- Keep the project cross-platform `net8.0`; do not introduce Avalonia, Windows,
+- Keep the project cross-platform `net10.0`; do not introduce Avalonia, Windows,
   DPAPI, WASAPI, ASIO, or other platform-specific dependencies.
 - Put shared library scanning, SQLite persistence, search, streaming models and
   clients, FFmpeg primitives, and web-fetching behavior here.

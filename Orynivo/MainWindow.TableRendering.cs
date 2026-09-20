@@ -350,7 +350,7 @@ public partial class MainWindow : Window
         await dialog.ShowDialog(this);
     }
 
-    private static IReadOnlyList<TrackInfoDialog.TrackInfoEntry> BuildTrackInfoEntries(ContentRow row)
+    private static IReadOnlyList<TrackInfoEntry> BuildTrackInfoEntries(ContentRow row)
     {
         var physicalPath = row.SourcePath;
         if (string.IsNullOrWhiteSpace(physicalPath) ||

@@ -424,7 +424,7 @@ public partial class MainWindow : Window
             : $"{LocalizationManager.Current.PodcastLanguages} ({_selectedPodcastLanguages.Count})";
     }
 
-    private static string FormatPodcastLanguage(string? language)
+    internal static string FormatPodcastLanguage(string? language)
     {
         if (string.IsNullOrWhiteSpace(language))
             return string.Empty;

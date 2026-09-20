@@ -13,18 +13,27 @@ public sealed class ProfileTrackPositionTests
         using var fixture = CoreTestDatabase.Create("orynivo-position");
         using var db = fixture.Open();
         var trackId = AddTrack(db, fixture, "song.flac");
+        // ActiveProfileId is process-wide AsyncLocal state; pin it for the test and
+        // restore whatever the surrounding context had.
+        var previousProfile = AudioDatabase.ActiveProfileId;
+        try
+        {
+            AudioDatabase.SetActiveProfile("standard");
+            db.SaveProfileTrackPosition(trackId, 123.5);
+            Assert.Equal(123.5, db.GetProfileTrackPosition(trackId));
 
-        AudioDatabase.SetActiveProfile("standard");
-        db.SaveProfileTrackPosition(trackId, 123.5);
-        Assert.Equal(123.5, db.GetProfileTrackPosition(trackId));
+            AudioDatabase.SetActiveProfile("guest");
+            Assert.Null(db.GetProfileTrackPosition(trackId));
+            db.SaveProfileTrackPosition(trackId, 42);
+            Assert.Equal(42, db.GetProfileTrackPosition(trackId));
 
-        AudioDatabase.SetActiveProfile("guest");
-        Assert.Null(db.GetProfileTrackPosition(trackId));
-        db.SaveProfileTrackPosition(trackId, 42);
-        Assert.Equal(42, db.GetProfileTrackPosition(trackId));
-
-        AudioDatabase.SetActiveProfile("standard");
-        Assert.Equal(123.5, db.GetProfileTrackPosition(trackId));
+            AudioDatabase.SetActiveProfile("standard");
+            Assert.Equal(123.5, db.GetProfileTrackPosition(trackId));
+        }
+        finally
+        {
+            AudioDatabase.SetActiveProfile(previousProfile);
+        }
     }
 
     /// <summary>A non-positive or invalid position clears the stored entry.</summary>
@@ -37,11 +46,19 @@ public sealed class ProfileTrackPositionTests
         using var fixture = CoreTestDatabase.Create("orynivo-position");
         using var db = fixture.Open();
         var trackId = AddTrack(db, fixture, "song.flac");
+        var previousProfile = AudioDatabase.ActiveProfileId;
+        try
+        {
+            AudioDatabase.SetActiveProfile("standard");
+            db.SaveProfileTrackPosition(trackId, 90);
+            db.SaveProfileTrackPosition(trackId, position);
 
-        db.SaveProfileTrackPosition(trackId, 90);
-        db.SaveProfileTrackPosition(trackId, position);
-
-        Assert.Null(db.GetProfileTrackPosition(trackId));
+            Assert.Null(db.GetProfileTrackPosition(trackId));
+        }
+        finally
+        {
+            AudioDatabase.SetActiveProfile(previousProfile);
+        }
     }
 
     /// <summary>An unknown track has no stored position.</summary>

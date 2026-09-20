@@ -9,8 +9,8 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
   changes require `CHANGELOG.md` and usually `README.md`; architectural or
   behavioral changes require this file or the root `AGENTS.md` to be updated.
 - Build with `dotnet build Orynivo/Orynivo.csproj` after client changes. Linux
-  and macOS compile the `net8.0` compatibility build; Windows continues to
-  target `net8.0-windows10.0.19041.0`.
+  and macOS compile the `net10.0` compatibility build; Windows continues to
+  target `net10.0-windows10.0.19041.0`.
 - New visible text must use `LocalizationManager` and exist in German, English,
   French, Spanish, Russian, Simplified Chinese, and Hindi.
 - `ApplicationCredentialStore` is the only persistent client credential
@@ -468,6 +468,39 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
   or an error message (`Orynivo.Library.BackupUploader`). The scheduled and
   **Back up now** paths share `MainWindow.TryUploadBackupAsync`; the explicit
   **Export library** action still writes only the user-chosen local ZIP.
+- `AppSettings.MaxOutputSampleRateHz` caps the PCM output rate for exclusive WASAPI and
+  ASIO/cwASIO; zero means automatic. Both players must honour it, the WASAPI cap only
+  reorders the candidates (never removes them) so a device that supports nothing at or
+  below the cap still plays, and the Settings control lists automatic plus the standard
+  rates.
+- A DSD source reports its 1-bit rate (352800 for DSD64), so its PCM conversion target
+  must stay an exact division of that rate. `WasapiAudioPlayer.OrderCandidateSampleRates`
+  prefers such a division that does not exceed the conversion hint, and both probes report
+  the same 176400 Hz hint for DSD. Never let the exclusive-format chooser fall back to the
+  device's maximum rate for DSD: a fractional ratio resampled DSD into pure noise on a
+  Sound BlasterX AE-5. The device's reported exclusive-format set is not stable between
+  queries: the same AE-5 reported 192 kHz and 384 kHz as supported in one run and neither
+  in another, under .NET 8 and .NET 10 alike. Never make the DSD conversion depend on that
+  answer alone.
+- The desktop runs on Avalonia 12.1.2 with **compiled bindings enabled by default**;
+  do not add `AvaloniaUseCompiledBindingsByDefault=false` back. Every `DataTemplate`
+  and every item-binding scope needs an explicit `x:DataType`:
+  - Put the item type on the **column or template**, never on the `DataGrid` itself.
+    A grid-level directive also applies to the grid's own bindings (`ItemsSource`,
+    `IsVisible`), which then fail against the item type. `DataGridTemplateColumn` cell
+    templates do not inherit a grid-level directive, so they need their own.
+  - A view model that XAML binds must be a **top-level type**; a nested or private
+    type cannot be named in `x:DataType`. That is why `RadioStationViewModel`,
+    `PodcastViewModel`, `PodcastEpisodeViewModel`, `LyricLineViewModel`,
+    `DailyHistoryRow`, `MetadataProblemRow`, `MetadataRepairHeaderViewModel`,
+    `MetadataRepairPreviewRow`, `TrackInfoEntry`, and the three search-window result
+    view models live in their own files, and why the metadata dialog uses a named
+    header record instead of an anonymous type.
+  - `ContentRow` and `LogicalAlbumPart` are top-level types too; there is no
+    `{ReflectionBinding}` left in the views. Keep it that way: a row model bound from
+    XAML must never move back into `MainWindow`.
+  SkiaSharp moves with Avalonia: use `SKSamplingOptions`/`SKFont` instead of the
+  removed 2.88 text and sampling APIs on `SKPaint`.
 - Cross-device resume for remote Orynivo Server tracks lives in
   `MainWindow.CrossDeviceResume.cs`. The last audible position is published at
   most every 20 seconds and only through the authenticated, profile-scoped

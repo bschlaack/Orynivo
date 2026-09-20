@@ -45,26 +45,30 @@ internal static class YearInReviewPdfExporter
     private static void Draw(SKCanvas canvas, YearInReviewSummary summary)
     {
         canvas.Clear(SKColors.White);
-        using var titlePaint = CreatePaint(0x18, 0x19, 0x2E, 26);
-        using var bodyPaint = CreatePaint(0x33, 0x33, 0x44, 12);
-        using var mutedPaint = CreatePaint(0x6A, 0x6A, 0x7A, 10);
-        using var sectionPaint = CreatePaint(0x18, 0x19, 0x2E, 14, bold: true);
+        using var titlePaint = CreatePaint(0x18, 0x19, 0x2E);
+        using var bodyPaint = CreatePaint(0x33, 0x33, 0x44);
+        using var mutedPaint = CreatePaint(0x6A, 0x6A, 0x7A);
+        using var sectionPaint = CreatePaint(0x18, 0x19, 0x2E);
+        using var titleFont = CreateFont(26);
+        using var bodyFont = CreateFont(12);
+        using var mutedFont = CreateFont(10);
+        using var sectionFont = CreateFont(14, bold: true);
         using var barPaint = new SKPaint { Color = new SKColor(0x20, 0xD9, 0xE8), IsAntialias = true };
         using var trackPaint = new SKPaint { Color = new SKColor(0xEE, 0xEE, 0xF2), IsAntialias = true };
 
         var bottom = PageHeight - Margin;
         var y = Margin;
-        canvas.DrawText(YearInReviewLayout.BuildTitle(summary), Margin, y, titlePaint);
+        canvas.DrawText(YearInReviewLayout.BuildTitle(summary), Margin, y, titleFont, titlePaint);
         y += 30;
 
         foreach (var line in YearInReviewLayout.BuildHeadline(summary))
         {
-            canvas.DrawText(line, Margin, y, bodyPaint);
+            canvas.DrawText(line, Margin, y, bodyFont, bodyPaint);
             y += 18;
         }
 
         y += 14;
-        DrawMonthlyBars(canvas, summary, y, trackPaint, barPaint, mutedPaint);
+        DrawMonthlyBars(canvas, summary, y, trackPaint, barPaint, mutedPaint, mutedFont);
         y += 134;
 
         var available = PageWidth - (Margin * 2);
@@ -72,15 +76,15 @@ internal static class YearInReviewPdfExporter
         {
             if (y > bottom - 40)
                 break;
-            canvas.DrawText(section.Title, Margin, y, sectionPaint);
+            canvas.DrawText(section.Title, Margin, y, sectionFont, sectionPaint);
             y += 20;
             foreach (var row in section.Rows)
             {
                 if (y > bottom)
                     break;
-                var valueWidth = bodyPaint.MeasureText(row.Value);
-                canvas.DrawText(Truncate(row.Label, 56), Margin, y, bodyPaint);
-                canvas.DrawText(row.Value, PageWidth - Margin - valueWidth, y, bodyPaint);
+                var valueWidth = bodyFont.MeasureText(row.Value);
+                canvas.DrawText(Truncate(row.Label, 56), Margin, y, bodyFont, bodyPaint);
+                canvas.DrawText(row.Value, PageWidth - Margin - valueWidth, y, bodyFont, bodyPaint);
 
                 var barWidth = available * 0.55f;
                 canvas.DrawRect(new SKRect(Margin, y + 4, Margin + barWidth, y + 7), trackPaint);
@@ -102,7 +106,8 @@ internal static class YearInReviewPdfExporter
         float top,
         SKPaint trackPaint,
         SKPaint barPaint,
-        SKPaint labelPaint)
+        SKPaint labelPaint,
+        SKFont labelFont)
     {
         var bars = YearInReviewLayout.BuildMonthlyBars(summary);
         var available = PageWidth - (Margin * 2);
@@ -118,18 +123,30 @@ internal static class YearInReviewPdfExporter
             var height = chartHeight * (float)bars[index].Ratio;
             if (height > 0)
                 canvas.DrawRect(new SKRect(x, baseline - height, x + barWidth, baseline), barPaint);
-            canvas.DrawText(bars[index].Label, x, baseline + 13, labelPaint);
+            canvas.DrawText(bars[index].Label, x, baseline + 13, labelFont, labelPaint);
         }
     }
 
-    private static SKPaint CreatePaint(byte red, byte green, byte blue, float size, bool bold = false) => new()
+    /// <summary>Creates a solid, antialiased paint for the given colour.</summary>
+    /// <param name="red">Red channel.</param>
+    /// <param name="green">Green channel.</param>
+    /// <param name="blue">Blue channel.</param>
+    /// <returns>The configured paint.</returns>
+    private static SKPaint CreatePaint(byte red, byte green, byte blue) => new()
     {
         Color = new SKColor(red, green, blue),
-        TextSize = size,
-        IsAntialias = true,
-        Typeface = SKTypeface.Default,
-        FakeBoldText = bold
+        IsAntialias = true
     };
+
+    /// <summary>
+    /// Creates the text font. SkiaSharp 3 moved the text properties from
+    /// <see cref="SKPaint"/> to <see cref="SKFont"/>.
+    /// </summary>
+    /// <param name="size">Font size in points.</param>
+    /// <param name="bold">Whether the text is emboldened.</param>
+    /// <returns>The configured font.</returns>
+    private static SKFont CreateFont(float size, bool bold = false) =>
+        new(SKTypeface.Default, size) { Embolden = bold };
 
     private static string Truncate(string value, int maximum) =>
         value.Length <= maximum ? value : value[..maximum] + "…";

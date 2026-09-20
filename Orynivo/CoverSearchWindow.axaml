@@ -1,6 +1,7 @@
 <Window x:Class="Orynivo.CoverSearchWindow"
         xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:local="using:Orynivo"
         Title="{DynamicResource L_CoverSearchTitle}"
         Icon="avares://Orynivo/Assets/Orynivo.ico"
         Height="560"
@@ -75,7 +76,7 @@
                  ItemContainerTheme="{StaticResource AppSearchResultItemTheme}"
                  ScrollViewer.HorizontalScrollBarVisibility="Disabled">
             <ListBox.ItemTemplate>
-                <DataTemplate>
+                    <DataTemplate x:DataType="local:CoverSearchResultViewModel">
                     <Grid>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="96"/>

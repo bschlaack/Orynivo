@@ -11,8 +11,8 @@ before the pin is raised.
 
 ## Toolchain support window
 
-The desktop targets `net8.0`. Per the Microsoft .NET support policy, the relevant
-lines are:
+The solution targets `net10.0`. Per the Microsoft .NET support policy, the
+relevant lines are:
 
 | Version | Type | Phase | End of support |
 | --- | --- | --- | --- |
@@ -20,11 +20,11 @@ lines are:
 | .NET 9 | STS | Maintenance (security fixes only) | 10 November 2026 |
 | .NET 8 | LTS | Maintenance (security fixes only) | 10 November 2026 |
 
-**Target `net10.0`, not `net9.0`.** .NET 9 is already in its security-only
+**Target `net10.0`, not `net9.0`.** .NET 9 was already in its security-only
 maintenance phase and reaches end of support on the same day as .NET 8, so moving
-to it would be a dead end. The next LTS release is the only sensible destination.
-The `net8.0` line this repository currently uses stops receiving fixes on
-10 November 2026, so the migration below is time-boxed rather than optional.
+to it would have been a dead end. The .NET 10 migration is complete (see below);
+the previous `net8.0` line stops receiving fixes on 10 November 2026, so staying
+there was not an option.
 
 Re-check these dates against the .NET support policy before planning the work; the
 table is a snapshot, not a permanent fact.
@@ -33,122 +33,180 @@ table is a snapshot, not a permanent fact.
 
 | Dependency | Current | Pinned because | Blocked by |
 | --- | --- | --- | --- |
-| .NET runtime and SDK | `net8.0` / `net8.0-windows10.0.19041.0` | The Avalonia line in use needs the .NET 8 toolchain | The .NET 10 LTS migration (see below) |
-| Avalonia | `11.3.22` (`Avalonia`, `Avalonia.Desktop`, `Avalonia.Fonts.Inter`) | Avalonia 12 needs a newer SDK than `net8.0` and has breaking API changes | The .NET 10 LTS migration (see below) |
-| `Avalonia.Themes.Fluent`, `Avalonia.Controls.DataGrid`, `Avalonia.Diagnostics` | `11.3.13` | `Avalonia.Controls.DataGrid` is in upstream maintenance mode and has no release beyond 11.3.13 | No upstream release is planned; evaluate the successor controls |
-| SkiaSharp | `2.88.9` (`Orynivo.Core`, plus `SkiaSharp.NativeAssets.Linux.NoDependencies` in `Orynivo.Server`) | `Avalonia.Skia` 11.3 depends on SkiaSharp `2.88.9` | An Avalonia release on a SkiaSharp 3/4 line |
-| `Microsoft.Data.Sqlite` | `9.0.20` | The `10.x` line targets a newer runtime than `net8.0` | The .NET 10 LTS migration |
-| `Microsoft.NET.Test.Sdk` | `17.14.1` | The `18.x` line targets a newer toolchain | A deliberate evaluation with all three test projects |
+| .NET runtime and SDK | `net10.0` / `net10.0-windows10.0.19041.0` (SDK 10.0.401) | LTS with support until 14 November 2028 | None |
+| Avalonia | `12.1.2` (incl. `Avalonia.Controls.DataGrid`) | Matches the .NET 10 toolchain | None (a future major needs review) |
+| `AvaloniaUI.DiagnosticsSupport` | not referenced | The Debug-only DevTools bridge; the app never called `AttachDevTools` | Add it deliberately if DevTools are wanted again |
+| SkiaSharp | `3.119.4` (`Orynivo.Core`, plus `SkiaSharp.NativeAssets.Linux.NoDependencies` in `Orynivo.Server`) | `Avalonia.Skia` 12.1.2 depends on SkiaSharp `3.119.4` | None (major upgrades still need review) |
+| `Microsoft.Data.Sqlite` | `10.0.12` | Matches the .NET 10 toolchain | None (major upgrades still need review) |
+| `Microsoft.NET.Test.Sdk` | `18.10.1` | Matches the .NET 10 toolchain | None (major upgrades still need review) |
 | `Tmds.DBus.Protocol` | `0.95.1` | Linux-only; `0.92.0` is the documented floor | None (minor/patch updates are welcome) |
 
 Target frameworks today: `Orynivo` and `Orynivo.Tests` use
-`net8.0-windows10.0.19041.0` on Windows and `net8.0` elsewhere;
+`net10.0-windows10.0.19041.0` on Windows and `net10.0` elsewhere;
 `Orynivo.Core`, `Orynivo.Server`, `Orynivo.Core.Tests`, and
-`Orynivo.Server.Tests` use `net8.0`.
+`Orynivo.Server.Tests` use `net10.0`. `global.json` pins SDK `10.0.100` with
+`rollForward: latestFeature`, so any installed `10.0.x` SDK satisfies it.
 
-## Moving to .NET 10 LTS and Avalonia 12
+## Completed: the .NET 10 LTS migration
 
-**Trigger:** the .NET 10 SDK (LTS) available on every build and release runner,
-plus an Avalonia 12 release whose breaking changes are documented. Confirm the
-exact minimum .NET version Avalonia 12 requires in its release notes before
-choosing the SDK; the repository's Dependabot rules only record that it is newer
-than .NET 8.
+The projects now target `net10.0` / `net10.0-windows10.0.19041.0` on the .NET 10
+LTS line. What changed:
 
-**Steps:**
+1. `global.json` pins SDK `10.0.100` with `rollForward: latestFeature`, so any
+   installed `10.0.x` SDK satisfies it.
+2. Every `TargetFramework` moved in one commit. A mixed set does not build,
+   because the desktop project would reference a `net10.0` `Orynivo.Core` from a
+   `net8.0` target.
+3. `Microsoft.Data.Sqlite` moved to `10.0.12`, `Microsoft.AspNetCore.TestHost` to
+   `10.0.12`, and `Microsoft.NET.Test.Sdk` to `18.10.1`.
+4. Every workflow pins `dotnet-version: 10.0.x`.
+5. `Orynivo/Orynivo.csproj` now copies the Lucene `NOTICE.txt` from the
+   `4.8.0-beta00018` package directory it actually references; the path still
+   named `beta00017`, so the license file was silently skipped.
 
-1. Install and pin the .NET 10 SDK in `.github/workflows/dotnet-desktop.yml`,
-   `.github/workflows/release.yml`, `.github/workflows/server-release.yml`, and
-   `.github/workflows/player-linux-release.yml`; drop the .NET 8 SDK once no
-   project targets `net8.0` any more.
-2. Change every `TargetFramework` together. A mixed `net8.0`/`net10.0` set makes
-   the `Orynivo` desktop project reference a `net10.0` `Orynivo.Core` from a
-   `net8.0` target, which does not build.
-3. Bump every Avalonia package in one commit, including
-   `Avalonia.Controls.DataGrid` (see below), and keep them on one version.
-4. Check which SkiaSharp line Avalonia 12 pulls in. If it moved to 3.x/4.x, fold
-   the SkiaSharp migration into the same commit (see below).
-5. Work through the Avalonia 12 breaking changes. The areas that historically
-   needed work here are drag and drop (`IDataTransfer`/`DataTransfer`), the
-   `DataGrid` theming and `ControlTheme` templates, `Popup`/`Flyout` placement,
-   `Transitions` and `RenderTransform` animation APIs, and the Skia render
-   interface.
-6. Re-check the `App.axaml` control themes, the transport and table styles, the
-   `VirtualizingWrapPanel`, and the macOS `AvaloniaNativePlatformOptions`
-   rendering mode. Avalonia 12 changes the EGL/OpenGL handling on Linux and macOS,
-   so the documented OpenGL-first/software-second macOS workaround must be
-   re-evaluated rather than carried over blindly.
-7. Fold in the `Microsoft.Data.Sqlite` and `Microsoft.NET.Test.Sdk` lines that are
-   currently pinned only because they need a newer runtime.
-8. Update `AGENTS.md`, `README.md`, `CHANGELOG.md`, and this file.
+Verification: `scripts/verify-all.ps1` green in Debug and Release with
+`--warnaserror`, and 570 tests passing on `net10.0`
+(`Orynivo.Core.Tests` 427, `Orynivo.Tests` 105, `Orynivo.Server.Tests` 38).
 
-**Checks before merging:** `scripts/verify-all.ps1` green; a manual pass over
-playback, the library tables, drag and drop into Up Next, the Dashboard, the
-Genre Cloud, and the artwork grids on Windows and Linux.
+## Completed: the Avalonia 12 migration
 
-## `Avalonia.Controls.DataGrid` on 11.3.13 and the successor question
+Avalonia moved from 11.3.22 to **12.1.2** in one commit, together with SkiaSharp
+2.88.9 to **3.119.4** (Avalonia.Skia 12.1.2 depends on that line). What changed:
 
-`Avalonia.Controls.DataGrid` is in upstream **maintenance mode** and has no
-release beyond 11.3.13, so waiting for a newer DataGrid is not a plan. This
-repository uses DataGrid heavily (shared Tracks/Albums/Artists tables, playlist
-and queue tables, nested album-detail grids) with custom `ControlTheme`
-templates, the column chooser, column reordering, and direct
-`PART_VerticalScrollbar` handling, so a replacement is a real project rather than
-a package bump.
+1. Every Avalonia package moved together, including
+   `Avalonia.Controls.DataGrid`. The earlier note that DataGrid "has no release
+   beyond 11.3.13" was wrong: DataGrid ships 12.1.2 again and is not abandoned.
+2. `Avalonia.Diagnostics` was dropped. It has no 12.x release, the app never
+   called `AttachDevTools`, and the Debug-only reference was therefore unused. The
+   official successor for a future DevTools bridge is
+   `AvaloniaUI.DiagnosticsSupport`.
+3. SkiaSharp 3 removed the 2.88 text and sampling APIs. `SKPaint` no longer
+   carries `TextSize`, `Typeface`, `FakeBoldText`, `FilterQuality`, or
+   `MeasureText`; text uses `SKFont` (`Embolden`, `MeasureText`) and drawing takes
+   `SKSamplingOptions`. `SKCanvas.DrawText` now needs the font, and a scaled bitmap
+   is drawn with `DrawImage(..., SKSamplingOptions, paint)`. `SKFilterQuality.High`
+   became `new SKSamplingOptions(SKCubicResampler.Mitchell)`.
+4. Avalonia 12 deprecations that fail the `--warnaserror` build were fixed:
+   `TextBox.Watermark` became `PlaceholderText` (8 sites) and
+   `Window.SystemDecorations` became `WindowDecorations`.
+5. `IClipboard.SetTextAsync` was replaced by the data-transfer model
+   (`clipboard.SetDataAsync(DataTransfer)`), and `DragDrop.DoDragDropAsync` now
+   requires the originating `PointerPressedEventArgs` rather than the move event.
+6. **Bindings stay on the reflection mode for now.**
+   `AvaloniaUseCompiledBindingsByDefault=false` keeps `{Binding}` working;
+   Avalonia 12 otherwise compiles bindings and requires an explicit `x:DataType` on
+   every template and root, which the existing views do not carry (232 compiler
+   diagnostics across 8 files). Adopting compiled bindings is the recorded
+   follow-up below.
 
-**Trigger:** either a DataGrid release on the same line as the other Avalonia
-packages, or a decision to evaluate a successor control.
+Verification: clean Debug and Release builds with `--warnaserror` (0 errors,
+0 warnings) and `scripts/verify-all.ps1` green, with 570 tests passing.
 
-**Steps:**
+**Runtime verification.** A Windows smoke test of the Release build in
+`Orynivo/bin/Release/net10.0-windows10.0.19041.0` found no obvious defects. That
+build was confirmed to carry `Avalonia*` 12.1.2, `Avalonia.Controls.DataGrid`
+12.1.2, `SkiaSharp` 3.119.4, and `Microsoft.Data.Sqlite` 10.0.12, so it exercises
+both this migration and the .NET 10 one.
 
-1. If a matching DataGrid release appears, bump it together with
-   `Avalonia.Themes.Fluent` and the Debug-only `Avalonia.Diagnostics`, then verify
-   the mixed set still builds with `--warnaserror`.
-2. Otherwise evaluate the successors against the shared table requirements:
-   `TableView` (free, read-only columns, row and cell recycling, resizable
-   columns) and `TreeDataGrid` (Avalonia Pro). Decide whether one of them can own
-   the shared table surfaces before writing a migration.
-3. Confirm the `DataGridSortIconMinWidth` override, the per-view column width and
-   order stores, the column chooser flyout, and the pixel-based scroll handling
-   have an equivalent in the chosen control.
-4. Migrate one surface first (the shared Tracks table is the best candidate) and
-   keep the DataGrid path until every table has moved.
+The pass covered the library tables, playback and the transport, the Dashboard
+(including the cover stage), the Genre Cloud (including the background mosaic), the
+search and detail views, Settings, and the AI chat, on Windows.
 
-**Checks before merging:** `scripts/verify-all.ps1` green plus a manual pass over
-the shared Tracks/Albums/Artists tables, the column chooser, column reordering,
-row selection and double-click playback, and the A-Z index.
+Still outstanding:
 
-## Revisiting the SkiaSharp 2.88.9 pin
+- The Linux and macOS builds, including direct ALSA and OpenAL PCM output, native
+  DSD/DoP, and MPRIS.
+- Native ASIO and cwASIO playback on Windows (the Steinberg bridge is not part of
+  the CI artifact).
+- macOS rendering. Avalonia 12 changes the EGL/OpenGL handling, so the documented
+  OpenGL-first/software-second workaround must be re-checked rather than assumed to
+  still apply.
+- Features a general pass does not reach: drag and drop into Up Next, the
+  year-in-review PNG and PDF export, the fullscreen karaoke view, the output and
+  equalizer profile dialogs, remote Orynivo Server and Plex playback, MCP and AI
+  tool execution, cross-device resume, and the WebDAV backup upload.
 
-**Trigger:** an Avalonia release that depends on a SkiaSharp 3.x or 4.x line.
+## Completed: compiled bindings
 
-**Steps:**
+Avalonia 12 compiles bindings by default, so every binding scope now carries an
+explicit `x:DataType` and `AvaloniaUseCompiledBindingsByDefault=false` is gone.
+The migration produced 232 compiler diagnostics across eight files and resolved
+them as follows:
 
-1. Bump `SkiaSharp` in `Orynivo.Core` and
-   `SkiaSharp.NativeAssets.Linux.NoDependencies` in `Orynivo.Server` in the same
-   commit as the Avalonia packages, so the desktop never renders through an
-   incompatible managed/native Skia pair.
-2. Replace the removed 2.88-era APIs. `SKFilterQuality` was dropped in 3.x; the
-   remaining uses are in the artwork thumbnail generation and the year-in-review
-   PDF export.
-3. Keep the desktop free of a separate `SkiaSharp` package reference: it must
-   consume Skia only through `Avalonia.Skia`, as `YearInReviewPdfExporter` does.
-4. Verify the Linux packages still ship the native Skia library through
-   `SkiaSharp.NativeAssets.Linux.NoDependencies`; do not replace it with an
-   external ImageMagick/convert runtime dependency.
+1. `DataTemplate`s and grid columns got the item type: `ContentRow` for the shared
+   cards, `RadioStationViewModel`/`PodcastViewModel`/`PodcastEpisodeViewModel` for
+   the catalogs, `DailyHistoryRow` for the history grid,
+   `MetadataProblemRow`/`MetadataRepairTrack`/`MetadataRepairPreviewRow` for the
+   metadata views, `LyricLineViewModel` for the lyrics list, `TrackInfoEntry` for
+   the track information dialog, `EqualizerProfile` and `OutputProfile` for the
+   transport pickers.
+2. The item type goes on the **column or template**, not on the `DataGrid` itself:
+   a grid-level directive also applies to the grid's own `ItemsSource`/`IsVisible`
+   bindings and breaks them, and `DataGridTemplateColumn` cell templates do not
+   inherit it.
+3. Ten view models moved out of their window or view into top-level types, because
+   XAML cannot name a nested type: `RadioStationViewModel`, `PodcastViewModel`,
+   `PodcastEpisodeViewModel`, `LyricLineViewModel` (out of `MainWindow`),
+   `DailyHistoryRow` (out of `DailyHistoryDialog`), `MetadataProblemRow` (out of
+   `SettingsView`), `MetadataRepairHeaderViewModel` and `MetadataRepairPreviewRow`
+   (out of `MetadataRepairDialog`, the former replacing an anonymous type),
+   `TrackInfoEntry` (out of `TrackInfoDialog`), and the three search-window result
+   view models. The helpers they call became `internal static`.
+4. `ContentRow` is still a nested private type, so the scopes that bind it
+   (`AlbumArtworkCardTemplate`, the artist artwork card, the artist-info track
+   table, and the podcast and album hero cards whose `DataContext` is assigned to a
+   row in code) used explicit `{ReflectionBinding}`; they were converted when
+   `ContentRow` was extracted.
+
+Verification: clean Debug and Release builds with `--warnaserror` (0 errors, 0
+warnings) and `scripts/verify-all.ps1` green, with 570 tests passing.
+
+## Completed: `ContentRow` extraction
+
+`ContentRow` (287 lines, 77 members) and its `LogicalAlbumPart` companion moved out of
+`MainWindow.xaml.cs` into `ContentRow.cs` and `LogicalAlbumPart.cs` as top-level
+`internal` types, with English XML documentation for every member; 69 members gained
+a summary. `MainWindow.LocalSourceKey` and `MainWindow.GetServerSourceKey` became
+`internal static` so the row model can still build its source key and badge.
+
+The scopes that bind a row (`AlbumArtworkCardTemplate`, the `AlbumDetailHeader` whose
+`DataContext` is assigned in code, and the artist artwork card) now carry
+`x:DataType="local:ContentRow"`, and every `{ReflectionBinding}` in the views is back
+to `{Binding}`. There is no reflection binding left in the XAML.
+
+Verification: clean Debug and Release builds with `--warnaserror` (0 errors, 0
+warnings) and `scripts/verify-all.ps1` green, with 570 tests passing.
+## `Avalonia.Controls.DataGrid`
+
+`Avalonia.Controls.DataGrid` ships with the Avalonia 12 line (12.1.2) and is
+therefore no longer a pin. An earlier revision of this record claimed it was in
+maintenance mode with no release beyond 11.3.13 and proposed evaluating
+`TableView` or `TreeDataGrid` as a replacement; that was wrong. The shared tables
+keep using `DataGrid`, including the custom `ControlTheme` templates, the column
+chooser, the column order and width stores, the `DataGridSortIconMinWidth`
+override, and the pixel-based `PART_VerticalScrollbar` handling. Re-evaluate the
+successor controls only if a future Avalonia line changes or removes `DataGrid`.
+## SkiaSharp line
+
+SkiaSharp is on `3.119.4`, matching `Avalonia.Skia` 12.1.2. A future Avalonia
+release that moves to SkiaSharp 4.x repeats the same procedure: bump `SkiaSharp`
+in `Orynivo.Core` and `SkiaSharp.NativeAssets.Linux.NoDependencies` in
+`Orynivo.Server` in the same commit as the Avalonia packages, replace the APIs the
+new line removed, keep the desktop free of a separate SkiaSharp reference, and
+verify the Linux packages still ship the native library.
 
 **Checks before merging:** `scripts/verify-all.ps1` green; a manual pass over
 album/artist artwork generation, thumbnails, and the year-in-review PNG and PDF
 export on Windows and Linux.
-
 ## `Microsoft.Data.Sqlite` and the test SDK
 
-**Trigger:** a deliberate decision to move the toolchain forward, normally
-together with the .NET 10 LTS migration.
+**Trigger:** a deliberate decision to move the toolchain forward. Both lines
+already match the .NET 10 toolchain, so only a major bump remains.
 
 **Steps:**
 
-1. Evaluate the newer line against `net8.0` first; if it requires a newer
-   runtime, fold it into the .NET 10 migration.
+1. Evaluate the newer line against `net10.0` first; a line that needs an even
+   newer runtime has to wait for the next LTS migration.
 2. Bump `Microsoft.Data.Sqlite` in `Orynivo.Core` and re-run every database test
    through `Orynivo.Core.Tests.CoreTestDatabase`.
 3. Bump `Microsoft.NET.Test.Sdk` in all three test projects together and re-run

@@ -7,7 +7,7 @@
         Height="340"
         CanResize="False"
         WindowStartupLocation="CenterScreen"
-        SystemDecorations="None"
+        WindowDecorations="None"
         ShowInTaskbar="False"
         Background="#13142A">
     <Border Padding="28" CornerRadius="12" Background="#13142A">

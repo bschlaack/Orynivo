@@ -36,15 +36,6 @@ internal partial class SettingsView : UserControl
         public override string ToString() => Label;
     }
 
-    private sealed record MetadataProblemRow(
-        string Source,
-        string Folder,
-        LibraryDoctorSeverity SeverityValue,
-        string Severity,
-        string Issues,
-        int TrackCount,
-        IReadOnlySet<string> FindingCodes,
-        MetadataFolderCandidate? Candidate);
 
     private sealed record MissingArtistImageTarget(
         long ArtistId,
@@ -188,6 +179,20 @@ internal partial class SettingsView : UserControl
             Math.Clamp(settings.GenreCloudBackgroundOpacity, 0, 1) * 100);
         UpdateGenreCloudVisibilityText();
         UpdateGenreCloudVisibilityEnabled();
+        // A cap keeps a driver that advertises an unusable maximum rate out of reach; zero
+        // leaves the choice entirely to the device.
+        var maxOutputSampleRateChoices = new[]
+        {
+            new SettingChoice<int>(0, LocalizationManager.Current.MaxOutputSampleRateAutomatic),
+            new SettingChoice<int>(384_000, "384 kHz"),
+            new SettingChoice<int>(352_800, "352.8 kHz"),
+            new SettingChoice<int>(192_000, "192 kHz"),
+            new SettingChoice<int>(176_400, "176.4 kHz"),
+            new SettingChoice<int>(96_000, "96 kHz"),
+            new SettingChoice<int>(88_200, "88.2 kHz"),
+            new SettingChoice<int>(48_000, "48 kHz"),
+            new SettingChoice<int>(44_100, "44.1 kHz")
+        };
         var replayGainChoices = new[]
         {
             new SettingChoice<ReplayGainMode>(ReplayGainMode.Off, LocalizationManager.Current.ReplayGainOff),
@@ -203,6 +208,10 @@ internal partial class SettingsView : UserControl
         DsdOverPcmCheckBox.IsChecked = settings.DsdOverPcmEnabled;
         AlwaysConvertDsdToPcmCheckBox.IsCheckedChanged += AlwaysConvertDsdToPcmCheckBox_OnIsCheckedChanged;
         PcmOutputBoostCheckBox.IsChecked = settings.PcmOutputBoostEnabled;
+        MaxOutputSampleRateComboBox.ItemsSource = maxOutputSampleRateChoices;
+        MaxOutputSampleRateComboBox.SelectedItem = maxOutputSampleRateChoices
+            .FirstOrDefault(choice => choice.Value == Math.Clamp(settings.MaxOutputSampleRateHz, 0, 768_000))
+            ?? maxOutputSampleRateChoices[0];
         NonGaplessCrossfadeNumericUpDown.Value = (decimal)Math.Clamp(
             settings.NonGaplessCrossfadeSeconds,
             0,
@@ -521,6 +530,10 @@ internal partial class SettingsView : UserControl
     public bool DsdOverPcmEnabled => DsdOverPcmCheckBox.IsChecked == true;
     /// <summary>Gets a value indicating whether PCM playback should receive the additional output boost.</summary>
     public bool PcmOutputBoostEnabled => PcmOutputBoostCheckBox.IsChecked == true;
+
+    /// <summary>Gets the configured maximum PCM output sample rate in hertz, or zero for automatic.</summary>
+    public int MaxOutputSampleRateHz =>
+        MaxOutputSampleRateComboBox.SelectedItem is SettingChoice<int> choice ? choice.Value : 0;
 
     /// <summary>Disables forced PCM conversion when DoP is selected.</summary>
     /// <param name="sender">DoP checkbox.</param>
@@ -3516,3 +3529,26 @@ internal partial class SettingsView : UserControl
         return disabled;
     }
 }
+
+/// <summary>
+/// One metadata-review finding shown in the Settings analysis grid. It lives outside
+/// the view so XAML can name it in an <c>x:DataType</c> directive, which compiled
+/// bindings require (a nested private type cannot be referenced from XAML).
+/// </summary>
+/// <param name="Source">Display name of the library source.</param>
+/// <param name="Folder">Physical folder the finding belongs to.</param>
+/// <param name="SeverityValue">Severity used for sorting.</param>
+/// <param name="Severity">Localized severity label.</param>
+/// <param name="Issues">Localized list of detected issues.</param>
+/// <param name="TrackCount">Number of tracks in the folder.</param>
+/// <param name="FindingCodes">Stable finding codes used by the filters.</param>
+/// <param name="Candidate">Album candidate offered for the folder, when available.</param>
+internal sealed record MetadataProblemRow(
+    string Source,
+    string Folder,
+    LibraryDoctorSeverity SeverityValue,
+    string Severity,
+    string Issues,
+    int TrackCount,
+    IReadOnlySet<string> FindingCodes,
+    MetadataFolderCandidate? Candidate);

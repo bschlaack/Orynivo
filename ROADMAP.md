@@ -1,6 +1,6 @@
 # Orynivo Roadmap
 
-Items 1-29 are complete and listed for reference only.
+Items 1-35 are complete and listed for reference only.
 
 Each item is one commit and must follow the completion checklist in
 `AGENTS.md`: build every affected project, run the three test projects, update
@@ -276,3 +276,108 @@ Steps:
 **Tests**: none; documentation only.
 
 **Commit**: `docs: correct the dependency migration target to .NET 10 LTS`
+
+## 30. Migrate the solution to .NET 10 LTS - `Done`
+
+**Design**
+
+- All six projects target `net10.0` / `net10.0-windows10.0.19041.0`;
+  `global.json` pins SDK `10.0.100` with `rollForward: latestFeature`; every
+  workflow pins `dotnet-version: 10.0.x`.
+- `Microsoft.Data.Sqlite` 10.0.12, `Microsoft.AspNetCore.TestHost` 10.0.12, and
+  `Microsoft.NET.Test.Sdk` 18.10.1 match the new toolchain.
+- Avalonia stays on 11.3 for now; the Avalonia 12 migration is a separate step
+  recorded in `DEPENDENCY-MIGRATION.md`.
+- Drive-by license fix: `Orynivo.csproj` copies the Lucene `NOTICE.txt` from the
+  `4.8.0-beta00018` directory it actually references.
+
+**Tests**: the existing 570 tests (Core 427, Desktop 105, Server 38) run on
+`net10.0`; `scripts/verify-all.ps1` is green in Debug and Release.
+
+**Commit**: `chore(dotnet): migrate the solution to .NET 10 LTS`
+
+## 31. Migrate the desktop to Avalonia 12 - `Done`
+
+**Design**
+
+- Avalonia 11.3.22 to 12.1.2 in one commit, including
+  `Avalonia.Controls.DataGrid` (which does ship 12.1.2; the earlier "no release
+  beyond 11.3.13" note was wrong) and SkiaSharp 2.88.9 to 3.119.4.
+- The unused Debug-only `Avalonia.Diagnostics` reference was dropped; it has no
+  12.x release and the app never called `AttachDevTools`.
+- SkiaSharp 3 text and sampling APIs moved to `SKFont`/`SKSamplingOptions`; the
+  Avalonia 12 deprecations that fail `--warnaserror` were fixed
+  (`Watermark`/`SystemDecorations`/clipboard/drag-drop).
+- Bindings stay on reflection mode for now; converting each view to compiled
+  bindings with an explicit `x:DataType` is recorded in
+  `DEPENDENCY-MIGRATION.md` with its measured scope.
+
+**Tests**: 570 tests green; clean Debug and Release builds with `--warnaserror`
+report 0 errors and 0 warnings. A runtime pass is still outstanding and listed in
+`DEPENDENCY-MIGRATION.md`.
+
+**Commit**: `chore(avalonia): migrate the desktop to Avalonia 12`
+
+## 32. Adopt Avalonia 12 compiled bindings - `Done`
+
+**Design**
+
+- Every template and item-binding scope carries an explicit `x:DataType`;
+  `AvaloniaUseCompiledBindingsByDefault=false` is gone.
+- The item type goes on the column or template, never on the `DataGrid` itself.
+- Ten view models moved to top-level types because XAML cannot name a nested type;
+  the scopes that bind the still-nested `ContentRow` keep `{ReflectionBinding}`
+  until that type is extracted (recorded as a follow-up in
+  `DEPENDENCY-MIGRATION.md`).
+
+**Tests**: 570 tests green; clean Debug and Release builds with `--warnaserror`
+report 0 errors and 0 warnings.
+
+**Commit**: `refactor(xaml): adopt Avalonia 12 compiled bindings`
+
+## 33. Extract `ContentRow` and finish compiled bindings - `Done`
+
+**Design**
+
+- `ContentRow` (287 lines, 77 members) and `LogicalAlbumPart` moved out of
+  `MainWindow.xaml.cs` into top-level `internal` types with full XML docs.
+- `LocalSourceKey` and `GetServerSourceKey` became `internal static`.
+- The three row scopes carry `x:DataType="local:ContentRow"`; no
+  `{ReflectionBinding}` remains in the views.
+
+**Tests**: 570 tests green; clean Debug and Release builds with `--warnaserror`
+report 0 errors and 0 warnings.
+
+**Commit**: `refactor(ui): extract the ContentRow row model`
+
+## 34. Fix DSD-to-PCM playback over exclusive WASAPI - `Done`
+
+**Design**
+
+- The WASAPI format chooser ordered candidates from `Math.Max(SourceSampleRate,
+  OutputSampleRate)`, so a DSD source preferred the device's highest supported rate
+  (384 kHz, a fractional division of the DSD rate). DSD now prefers an exact division
+  of its rate that does not exceed the conversion hint, matching the ASIO path, and the
+  WASAPI probe reports the same 176400 Hz hint as the FFmpeg player.
+- The probe order is extracted into the pure `WasapiAudioPlayer.OrderCandidateSampleRates`.
+
+**Tests**: seven new cases in `Orynivo.Tests` cover the DSD division order, the
+fractional-rate ordering, DSD128, the PCM ordering, and uniqueness.
+
+**Commit**: `fix(playback): keep DSD-to-PCM on an exact rate division`
+
+## 35. Add a maximum output sample rate setting - `Done`
+
+**Design**
+
+- `AppSettings.MaxOutputSampleRateHz` (zero = automatic) caps the PCM output rate for
+  exclusive WASAPI and ASIO/cwASIO, so a driver that advertises an unusable maximum rate
+  can be kept out of reach.
+- The WASAPI cap only reorders the candidate rates; playback still falls back to a rate
+  above the cap when the device supports nothing at or below it.
+- Settings > Playback offers Automatic plus the standard rates.
+
+**Tests**: three more cases in `WasapiSampleRateSelectionTests` cover the cap, the
+fallback when the cap excludes every rate, and the DSD preference under a cap.
+
+**Commit**: `feat(playback): add a maximum output sample rate setting`

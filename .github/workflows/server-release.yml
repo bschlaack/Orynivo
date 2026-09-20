@@ -62,10 +62,10 @@ jobs:
           }
           git checkout --detach "$TAG"
 
-      - name: Set up .NET 8
+      - name: Set up .NET 10
         uses: actions/setup-dotnet@v6
         with:
-          dotnet-version: 8.0.x
+          dotnet-version: 10.0.x
 
       - name: Restore dependencies
         run: dotnet restore Orynivo.Server/Orynivo.Server.csproj --runtime ${{ matrix.rid }}

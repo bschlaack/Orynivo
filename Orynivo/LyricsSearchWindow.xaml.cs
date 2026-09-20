@@ -9,27 +9,7 @@ namespace Orynivo;
 
 public partial class LyricsSearchWindow : Window
 {
-    private sealed record ResultViewModel(LyricsSearchResult Result)
-    {
-        public string TrackName => Result.TrackName;
-        public string ArtistName => Result.ArtistName;
-        public string Details
-        {
-            get
-            {
-                var parts = new List<string>();
-                if (!string.IsNullOrWhiteSpace(Result.AlbumName))
-                    parts.Add(Result.AlbumName);
-                if (Result.Duration is > 0)
-                    parts.Add(TimeSpan.FromSeconds(Result.Duration.Value).ToString(@"m\:ss"));
-                if (!string.IsNullOrWhiteSpace(Result.SyncedLyrics))
-                    parts.Add(LocalizationManager.Current.SynchronizedLyrics);
-                return string.Join(" · ", parts);
-            }
-        }
-    }
-
-    private readonly ObservableCollection<ResultViewModel> _results = [];
+    private readonly ObservableCollection<LyricsSearchResultViewModel> _results = [];
     private readonly DispatcherTimer _busyTimer;
     private readonly string[] _busyFrames = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
     private int _busyFrameIndex;
@@ -76,7 +56,7 @@ public partial class LyricsSearchWindow : Window
                 TrackNameTextBox.Text ?? string.Empty,
                 ArtistNameTextBox.Text ?? string.Empty);
             foreach (var result in results)
-                _results.Add(new ResultViewModel(result));
+                _results.Add(new LyricsSearchResultViewModel(result));
             StatusTextBlock.Text = _results.Count == 0
                 ? LocalizationManager.Current.LyricsSearchNoResults
                 : string.Empty;
@@ -94,7 +74,7 @@ public partial class LyricsSearchWindow : Window
 
     private void ResultsListBox_OnSelectionChanged(object? sender, SelectionChangedEventArgs e)
     {
-        if (ResultsListBox.SelectedItem is not ResultViewModel selected)
+        if (ResultsListBox.SelectedItem is not LyricsSearchResultViewModel selected)
             return;
         PreviewTextBlock.Text =
             selected.Result.SyncedLyrics ??
@@ -104,9 +84,40 @@ public partial class LyricsSearchWindow : Window
 
     private void UseSelectedLyricsButton_OnClick(object? sender, RoutedEventArgs e)
     {
-        if (ResultsListBox.SelectedItem is not ResultViewModel selected)
+        if (ResultsListBox.SelectedItem is not LyricsSearchResultViewModel selected)
             return;
         SelectedResult = selected.Result;
         Close(true);
+    }
+}
+
+/// <summary>
+/// Presentation wrapper for one lyrics search result. It lives outside the window so
+/// XAML can name it in an <c>x:DataType</c> directive, which compiled bindings require
+/// (a nested private type cannot be referenced from XAML).
+/// </summary>
+/// <param name="Result">Underlying lyrics search result.</param>
+internal sealed record LyricsSearchResultViewModel(LyricsSearchResult Result)
+{
+    /// <summary>Gets the track name.</summary>
+    public string TrackName => Result.TrackName;
+
+    /// <summary>Gets the artist name.</summary>
+    public string ArtistName => Result.ArtistName;
+
+    /// <summary>Gets the compact album, duration, and synchronized-lyrics summary.</summary>
+    public string Details
+    {
+        get
+        {
+            var parts = new List<string>();
+            if (!string.IsNullOrWhiteSpace(Result.AlbumName))
+                parts.Add(Result.AlbumName);
+            if (Result.Duration is > 0)
+                parts.Add(TimeSpan.FromSeconds(Result.Duration.Value).ToString(@"m\:ss"));
+            if (!string.IsNullOrWhiteSpace(Result.SyncedLyrics))
+                parts.Add(LocalizationManager.Current.SynchronizedLyrics);
+            return string.Join(" · ", parts);
+        }
     }
 }

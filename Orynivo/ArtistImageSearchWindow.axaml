@@ -1,6 +1,7 @@
 <Window x:Class="Orynivo.ArtistImageSearchWindow"
         xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:local="using:Orynivo"
         Title="{DynamicResource L_ArtistImageSearchTitle}"
         Icon="avares://Orynivo/Assets/Orynivo.ico"
         Height="620"
@@ -70,7 +71,7 @@
                  ItemContainerTheme="{StaticResource AppSearchResultItemTheme}"
                  ScrollViewer.HorizontalScrollBarVisibility="Disabled">
             <ListBox.ItemTemplate>
-                <DataTemplate>
+                    <DataTemplate x:DataType="local:ArtistImageSearchResultViewModel">
                     <Grid>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="112"/>

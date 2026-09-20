@@ -15,16 +15,8 @@ namespace Orynivo;
 /// </summary>
 public partial class ArtistImageSearchWindow : Window
 {
-    private sealed record ResultViewModel(
-        ArtistImageDownload Result,
-        Bitmap Image,
-        string Title,
-        string? Attribution,
-        string? License)
-    {
-    }
 
-    private readonly ObservableCollection<ResultViewModel> _results = [];
+    private readonly ObservableCollection<ArtistImageSearchResultViewModel> _results = [];
     private readonly DispatcherTimer _busyTimer;
     private readonly string[] _busyFrames = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
     private readonly string _fanartTvApiKey;
@@ -97,7 +89,7 @@ public partial class ArtistImageSearchWindow : Window
                         _fanartTvApiKey);
                     if (fanartResult is not null)
                     {
-                        _results.Add(new ResultViewModel(
+                        _results.Add(new ArtistImageSearchResultViewModel(
                             fanartResult,
                             CreateBitmap(fanartResult.ImageData),
                             query,
@@ -116,7 +108,7 @@ public partial class ArtistImageSearchWindow : Window
             var results = await ArtistImageSearchService.SearchAsync(query);
             foreach (var result in results)
             {
-                _results.Add(new ResultViewModel(
+                _results.Add(new ArtistImageSearchResultViewModel(
                     new ArtistImageDownload(result.ImageData, result.MimeType, result.SourceUrl),
                     CreateBitmap(result.ImageData),
                     result.Title,
@@ -141,7 +133,7 @@ public partial class ArtistImageSearchWindow : Window
 
     private void UseSelectedImageButton_OnClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
-        if (ResultsListBox.SelectedItem is not ResultViewModel selected)
+        if (ResultsListBox.SelectedItem is not ArtistImageSearchResultViewModel selected)
             return;
 
         SelectedResult = selected.Result;
@@ -153,4 +145,18 @@ public partial class ArtistImageSearchWindow : Window
         using var stream = new MemoryStream(data);
         return new Bitmap(stream);
     }
+}
+
+/// <summary>
+/// Presentation wrapper for one ArtistImageSearchWindow result. It lives outside the window so XAML
+/// can name it in an <c>x:DataType</c> directive, which compiled bindings require
+/// (a nested private type cannot be referenced from XAML).
+/// </summary>
+internal sealed record ArtistImageSearchResultViewModel(
+    ArtistImageDownload Result,
+    Bitmap Image,
+    string Title,
+    string? Attribution,
+    string? License)
+{
 }

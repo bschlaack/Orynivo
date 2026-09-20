@@ -13,6 +13,9 @@ public sealed class AudioDatabaseProfileHistoryTests
         var root = Path.Combine(Path.GetTempPath(), $"orynivo-profile-history-{Guid.NewGuid():N}");
         Directory.CreateDirectory(root);
         var databasePath = Path.Combine(root, "library.db");
+        // ActiveProfileId is process-wide AsyncLocal state; restore whatever the
+        // surrounding context had instead of assuming the default.
+        var previousProfile = AudioDatabase.ActiveProfileId;
         try
         {
             using var database = new AudioDatabase(databasePath);
@@ -32,7 +35,7 @@ public sealed class AudioDatabaseProfileHistoryTests
         }
         finally
         {
-            AudioDatabase.SetActiveProfile("standard");
+            AudioDatabase.SetActiveProfile(previousProfile);
             CoreTestDatabase.ClearPool(databasePath);
             Directory.Delete(root, recursive: true);
         }

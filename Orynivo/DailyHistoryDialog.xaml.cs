@@ -38,44 +38,11 @@ public enum HistorySource
 public partial class DailyHistoryDialog : Window
 {
     private readonly AppSettings _settings;
-    private readonly List<HistoryRow> _allRows = new();
+    private readonly List<DailyHistoryRow> _allRows = new();
     private readonly HashSet<HistorySource> _activeSources = new();
-    public sealed class HistoryRow
-    {
-        public required DailyHistoryEntry Entry { get; init; }
-        public required HistorySource Source { get; init; }
-        public required string PlayedAt { get; init; }
-        public required string MediaType { get; init; }
-        public required string Title { get; init; }
-        public required string Artist { get; init; }
-        public required string Album { get; init; }
-        public required string ListenedDuration { get; init; }
-        public required string TotalDuration { get; init; }
-        /// <summary>Gets the original playback timestamp used for chronological table sorting.</summary>
-        public DateTime PlayedAtSort => Entry.StartedAt;
-        /// <summary>Gets the listened duration in seconds used for numeric table sorting.</summary>
-        public double ListenedDurationSort => Entry.ListenedSeconds;
-        /// <summary>Gets the media duration in seconds used for numeric table sorting.</summary>
-        public double TotalDurationSort => Entry.DurationSeconds ?? double.PositiveInfinity;
-        public bool CanOpenTrack =>
-            Entry.TrackId.HasValue &&
-            (File.Exists(Entry.Path) ||
-             CueSheetParser.IsVirtualPath(Entry.Path));
-        public bool CanOpenArtist =>
-            Entry.ArtistId.HasValue ||
-            (IsPotentialOrynivoTrack(Entry) && !string.IsNullOrWhiteSpace(Entry.Artist)) ||
-            IsPlexTrackWithArtist(Entry);
-        public bool CanOpenAlbum =>
-            Entry.AlbumId.HasValue ||
-            (IsPotentialOrynivoTrack(Entry) && !string.IsNullOrWhiteSpace(Entry.Album)) ||
-            IsPlexTrackWithAlbum(Entry);
-        public bool IsPlainTitle => !CanOpenTrack;
-        public bool IsPlainArtist => !CanOpenArtist;
-        public bool IsPlainAlbum => !CanOpenAlbum;
-    }
 
     public string DialogTitle { get; }
-    public ObservableCollection<HistoryRow> Rows { get; }
+    public ObservableCollection<DailyHistoryRow> Rows { get; }
     public bool ShowEmpty => Rows.Count == 0;
     public bool ShowGrid => Rows.Count > 0;
     public DailyHistoryAction SelectedAction { get; private set; }
@@ -107,7 +74,7 @@ public partial class DailyHistoryDialog : Window
         _allRows.AddRange(entries.Select(CreateRow));
         foreach (var source in Enum.GetValues<HistorySource>())
             _activeSources.Add(source);
-        Rows = new ObservableCollection<HistoryRow>(_allRows);
+        Rows = new ObservableCollection<DailyHistoryRow>(_allRows);
         InitializeComponent();
         DataContext = this;
         BuildFilterChips();
@@ -133,10 +100,10 @@ public partial class DailyHistoryDialog : Window
         base.OnClosed(e);
     }
 
-    private HistoryRow CreateRow(DailyHistoryEntry entry)
+    private DailyHistoryRow CreateRow(DailyHistoryEntry entry)
     {
         var source = ClassifySource(entry);
-        return new HistoryRow
+        return new DailyHistoryRow
         {
             Entry = entry,
             Source = source,
@@ -191,7 +158,7 @@ public partial class DailyHistoryDialog : Window
         return false;
     }
 
-    private static bool IsPotentialOrynivoTrack(DailyHistoryEntry entry)
+    internal static bool IsPotentialOrynivoTrack(DailyHistoryEntry entry)
     {
         if (!string.Equals(entry.MediaType, "track", StringComparison.OrdinalIgnoreCase))
             return false;
@@ -203,13 +170,13 @@ public partial class DailyHistoryDialog : Window
                uri.AbsolutePath.Contains("/api/stream/", StringComparison.OrdinalIgnoreCase);
     }
 
-    private static bool IsPlexTrackWithAlbum(DailyHistoryEntry entry) =>
+    internal static bool IsPlexTrackWithAlbum(DailyHistoryEntry entry) =>
         TryGetPlexKeys(entry, out var albumKey, out _) && !string.IsNullOrWhiteSpace(albumKey);
 
-    private static bool IsPlexTrackWithArtist(DailyHistoryEntry entry) =>
+    internal static bool IsPlexTrackWithArtist(DailyHistoryEntry entry) =>
         TryGetPlexKeys(entry, out _, out var artistKey) && !string.IsNullOrWhiteSpace(artistKey);
 
-    private static bool TryGetPlexKeys(DailyHistoryEntry entry, out string albumKey, out string artistKey)
+    internal static bool TryGetPlexKeys(DailyHistoryEntry entry, out string albumKey, out string artistKey)
     {
         albumKey = artistKey = string.Empty;
         if (entry.ExternalId is null ||
@@ -307,7 +274,7 @@ public partial class DailyHistoryDialog : Window
 
     private void SelectAction(object? sender, DailyHistoryAction action)
     {
-        if (sender is not Control { DataContext: HistoryRow row })
+        if (sender is not Control { DataContext: DailyHistoryRow row })
             return;
         SelectedAction = action;
         SelectedEntry = row.Entry;
