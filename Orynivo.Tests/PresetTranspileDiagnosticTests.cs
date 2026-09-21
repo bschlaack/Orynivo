@@ -85,7 +85,7 @@ public sealed class PresetTranspileDiagnosticTests
                     }
 
                     if (list.Count < 3)
-                        list.Add(detail ?? Path.GetFileName(file));
+                        list.Add($"{Path.GetFileName(file)} :: {detail}");
                 }
             }
         }

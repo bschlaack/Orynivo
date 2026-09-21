@@ -142,9 +142,18 @@ public sealed class ShaderInterpreter
                 // the behaviour this refactor deliberately preserves.
                 return ExecuteBlock(statement.Items, depth);
             case ShaderNodeKind.Declaration:
-                var name = statement.Items.Count > 0 ? statement.Items[0].Text : string.Empty;
-                if (name.Length > 0)
-                    _variables[name] = statement.Left is null ? ShaderRuntime.DefaultFor(statement.Text) : Evaluate(statement.Left, depth);
+                // Every declared name exists; only the first may carry the initializer.
+                for (var index = 0; index < statement.Items.Count; index++)
+                {
+                    var declared = statement.Items[index].Text;
+                    if (declared.Length == 0)
+                        continue;
+
+                    _variables[declared] = index == 0 && statement.Left is not null
+                        ? Evaluate(statement.Left, depth)
+                        : ShaderRuntime.DefaultFor(statement.Text);
+                }
+
                 return null;
             case ShaderNodeKind.ExpressionStatement:
                 if (statement.Left is not null)

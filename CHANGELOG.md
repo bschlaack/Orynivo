@@ -173,6 +173,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   rather than in the file, which is recorded as roadmap item 39i.
 
 ### Fixed
+- Fixed a declaration that names several variables, as in `float3 ret1, neu, blur;`, keeping only
+  the first name. Every other name stayed undeclared, so the interpreter read it as zero and the
+  SkSL emitter failed on an unknown identifier — a survey found 57 warp shaders declaring
+  `float2 rs` this way. The parser keeps all names, the interpreter declares them all, and the
+  emitter writes them as one SkSL declaration. Over a 500-file sample the share of shaders that
+  translate and are accepted by Skia rose from 377 to 382 of 764, that is to 50 percent.
 - Emitted a shader's helper functions as SkSL functions before the entry point. The emitter used to
   inline a definition, which ran its body at the wrong place and referenced parameters that do not
   exist in that scope; a call now resolves to the function, and its parameter types come from the

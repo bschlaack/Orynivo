@@ -238,10 +238,14 @@ public static class ShaderTranspiler
                     if (declared == "shader")
                         return;
 
+                    var names = string.Join(", ", statement.Items.Select(item => item.Text));
                     if (_types is not null)
-                        _types[name] = declared;
+                    {
+                        foreach (var item in statement.Items)
+                            _types[item.Text] = declared;
+                    }
 
-                    builder.Append(indent).Append(declared).Append(' ').Append(name);
+                    builder.Append(indent).Append(declared).Append(' ').Append(names);
                     if (statement.Left is not null)
                         builder.Append(" = ").Append(EmitInitializer(statement.Text, statement.Left));
                     builder.Append(";\n");

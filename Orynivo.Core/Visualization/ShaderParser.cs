@@ -244,15 +244,23 @@ public static class ShaderParser
             if (TryConsume("="))
                 initializer = ParseInitializer(type);
             SkipAnnotation();
+            // A declaration may name several variables, as in "float3 ret1, neu, blur;". Every name
+            // has to be kept: dropping the ones after the first leaves them undeclared, which reads
+            // as zero in the interpreter and fails outright in SkSL.
+            var names = new List<ShaderNode>
+            {
+                new(ShaderNodeKind.Identifier, name.Position, name.Text)
+            };
             while (TryConsume(","))
             {
-                ExpectIdentifier();
+                var extra = ExpectIdentifier();
+                names.Add(new ShaderNode(ShaderNodeKind.Identifier, extra.Position, extra.Text));
                 if (TryConsume("="))
                     ParseExpression();
             }
 
             Expect(";");
-            return new ShaderNode(ShaderNodeKind.Declaration, type.Position, type.Text, 0f, initializer, null, null, [new ShaderNode(ShaderNodeKind.Identifier, name.Position, name.Text)]);
+            return new ShaderNode(ShaderNodeKind.Declaration, type.Position, type.Text, 0f, initializer, null, null, names);
         }
 
         /// <summary>Parses a function signature and its body.</summary>
