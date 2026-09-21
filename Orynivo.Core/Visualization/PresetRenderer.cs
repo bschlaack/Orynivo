@@ -273,6 +273,12 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler
     /// </summary>
     public string? PresetError { get; private set; }
 
+    /// <summary>
+    /// Gets or sets the sink for the stage trace of a preset's first frames. A stage that never
+    /// returns leaves its own line as the last one, which is how a frozen frame is located.
+    /// </summary>
+    public Action<string>? StageLogger { get; set; }
+
     /// <summary>The motion variables a per-pixel program may change for the following pixel.</summary>
     private static readonly string[] MotionVariables =
         ["zoom", "zoomexp", "rot", "cx", "cy", "dx", "dy", "sx", "sy"];
@@ -340,6 +346,11 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler
             _initialized = true;
         }
 
+        // A stage that never returns leaves the last line of the trace as the stage it hung in, so
+        // the first frames of a preset are traced stage by stage. Later frames are not, or a busy
+        // visualizer would fill the log.
+        var trace = _frame < 2 ? StageLogger : null;
+        trace?.Invoke($"stage=perFrame begin frame={_frame} preset={Preset.Name}");
         try
         {
             Preset.PerFrame.Execute(_slots);
@@ -357,8 +368,10 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler
         var useShaders = HasShaders;
         if (useShaders)
             SeedCompiledShaderFrame();
+        trace?.Invoke($"stage=warp begin frame={_frame}");
         Warp(useShaders);
         var warp = Mark();
+        trace?.Invoke($"stage=blur begin frame={_frame}");
 
         for (var pass = 0; pass < BlurPasses(); pass++)
             _warped.Blur();
@@ -371,6 +384,7 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler
         ApplyGamma();
         var postProcess = Mark();
 
+        trace?.Invoke($"stage=overlay begin frame={_frame}");
         DrawOverlay();
         var overlay = Mark();
         Composite();
@@ -379,6 +393,7 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler
         var shader = 0d;
         if (useShaders)
         {
+            trace?.Invoke($"stage=compShader begin frame={_frame}");
             _shaderClock.Restart();
             ApplyCompShaders();
             _shaderClock.Stop();
@@ -386,6 +401,7 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler
         }
 
         LastShaderMilliseconds = shader + _warpShaderMilliseconds;
+        trace?.Invoke($"stage=done frame={_frame}");
         _previous.CopyFrom(_fresh);
         _frame++;
         RecordTimings(warp, blur, postProcess, overlay, composite, LastShaderMilliseconds);
@@ -1051,7 +1067,14 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler
                 for (var index = 0; index < _compShaders.Count; index++)
                 {
                     var (interpreter, shader) = _compShaders[index];
+                    // The comp stage is the one that can stall, so its first pixel is traced in
+                    // three steps: the preset's own per-pixel block, the shader, and its sampling.
+                    var trace = x == 0 && y == 0 && index == 0 && StageLogger is not null && _frame < 2;
+                    if (trace)
+                        StageLogger!($"stage=comp perPixel begin frame={_frame}");
                     shader.PerPixel.Execute(_slots);
+                    if (trace)
+                        StageLogger!($"stage=comp shader begin frame={_frame}");
                     var compiled = _compiledComp[index];
                     ShaderValue colour;
                     if (compiled.IsCompiled)
@@ -1069,9 +1092,10 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler
                             colour = written;
                     }
 
+                    if (trace)
+                        StageLogger!($"stage=comp sampled frame={_frame}");
                     var offset = (((y * shaderWidth) + x) * 4);
-                    output.Pixels[offset] = Math.Clamp(colour.X, 0f, 1f);
-                    output.Pixels[offset + 1] = Math.Clamp(colour.Y, 0f, 1f);
+                    output.Pixels[offset] = Math.Clamp(colour.X, 0f, 1f);                    output.Pixels[offset + 1] = Math.Clamp(colour.Y, 0f, 1f);
                     output.Pixels[offset + 2] = Math.Clamp(colour.Z, 0f, 1f);
                 }
             }

@@ -50,6 +50,8 @@ public partial class VisualizerWindow : Window
     private int _presentPending;
     private string? _renderError;
     private int _renderErrorFrames;
+    private string? _presentError;
+    private int _presentErrorFrames;
     private volatile string? _pendingDiagnostics;
     private double _lastFrame;
     private double _lastDiagnostics;
@@ -289,6 +291,8 @@ public partial class VisualizerWindow : Window
             var preset = _library.At(_presetIndex);
             var loadMs = switchClock.ElapsedMilliseconds;
             _renderer = new PresetRenderer(preset, _renderWidth, _renderHeight);
+            // The first frames are traced stage by stage so a frozen frame names its own stage.
+            _renderer.StageLogger = message => SeekDiagnostics.Log("visualizer", message);
             // Parsing and compiling a preset happen here, on the render thread, so a preset that
             // takes seconds to build looks exactly like a frozen window. Log both halves.
             SeekDiagnostics.Log(
@@ -436,13 +440,37 @@ public partial class VisualizerWindow : Window
             + (_renderer.ShaderError is { } shaderError ? $"shaderError=[{shaderError}] " : string.Empty)
             + (_renderError is { } renderError ? $"renderError=[{renderError}] " : string.Empty)
             + (_renderer.PresetError is { } presetError ? $"presetError=[{presetError}] " : string.Empty)
+            + (_presentError is { } presentError ? $"presentError=[{presentError}] " : string.Empty)
             + $"preset={_renderer.Preset.Name} userPresets={_library.Count - VisualizerPresets.BuiltIn.Count}";
         // Start a fresh averaging window so the next line describes its own second.
         _renderer.ResetTimings();
         return message;
     }
 
+    /// <summary>
+    /// Writes the finished frame into the presented bitmap. A failure here is invisible: the render
+    /// thread keeps producing frames and the once-per-second diagnostic line keeps being written, so
+    /// the log looks healthy while the screen never changes. It is therefore reported.
+    /// </summary>
     private void Present()
+    {
+        try
+        {
+            PresentCore();
+            _presentError = null;
+        }
+        catch (Exception exception)
+        {
+            if (_presentError is not null && ++_presentErrorFrames % 30 != 0)
+                return;
+
+            _presentErrorFrames = 0;
+            _presentError = $"{exception.GetType().Name}: {exception.Message}";
+            SeekDiagnostics.Log("visualizer", $"present failed {_presentError}");
+        }
+    }
+
+    private void PresentCore()
     {
         using var buffer = _bitmap.Lock();
         var stride = _renderWidth * 4;

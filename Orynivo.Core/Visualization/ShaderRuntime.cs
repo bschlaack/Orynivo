@@ -39,6 +39,7 @@ internal static class ShaderRuntime
         Sqrt,
         Tan,
         Pow,
+    Atan2,
         Min,
         Max,
         Step,
@@ -89,6 +90,7 @@ internal static class ShaderRuntime
         ["sqrt"] = Opcode.Sqrt,
         ["tan"] = Opcode.Tan,
         ["pow"] = Opcode.Pow,
+        ["atan2"] = Opcode.Atan2,
         ["min"] = Opcode.Min,
         ["max"] = Opcode.Max,
         ["step"] = Opcode.Step,
@@ -201,6 +203,9 @@ internal static class ShaderRuntime
                 return Unary(count, a, MathF.Tan);
             case Opcode.Pow:
                 return ComponentWise(a, b, (left, right) => MathF.Pow(left, right));
+            case Opcode.Atan2:
+                // Milkdrop shaders use atan2(y, x) for their polar coordinates.
+                return ComponentWise(a, b, (y, x) => MathF.Atan2(y, x));
             case Opcode.Min:
                 return ComponentWise(a, b, MathF.Min);
             case Opcode.Max:
