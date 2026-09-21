@@ -674,6 +674,16 @@ affordable. This is a project of its own and must keep the CPU path as the fallb
   and must then keep the parallel warp on one thread). `PresetFolderDiagnosticTests` lists the
   current reasons; keep the diagnostic test updated as the compiler grows.
 
+- 39i Milkdrop 2 shader templates and blur/edge keys - `Pending`: measured against a real
+  2000-file collection, 1706 presets (85 percent) declare their `warp_N`/`comp_N` values as
+  Milkdrop 2 template references such as `` `shader_body ``, whose actual HLSL lives in Milkdrop 2's
+  built-in templates rather than in the file, so no shader is loaded for them and they render only
+  the generic warp and the shared overlay. The same presets use Milkdrop 2's per-frame blur and
+  edge parameter keys (`b1n`, `b1x`, `b1ed`). Implement our own equivalents of the default shader
+  bodies and the blur/edge chain, resolve the template markers before parsing, and extend the
+  diagnostic to separate template presets from genuinely broken ones. Do not copy Milkdrop's
+  sources; the shipped templates stay written here.
+
 **Tests**: each phase adds its own; 39a is the prerequisite for claiming any speed-up.
 
 **Commit**: `perf(visualizer): add render measurement` (39a), then one commit per phase

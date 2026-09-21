@@ -217,8 +217,8 @@ public sealed class VisualizerPreset
             ParseShapes(values, layout, failed),
             ParseWaves(values, layout, failed),
             ParseDefaults(values),
-            ParseShaders(values, layout, "warp"),
-            ParseShaders(values, layout, "comp"))
+            ParseShaders(values, layout, "warp", failed),
+            ParseShaders(values, layout, "comp", failed))
         {
             Version = ReadVersion(values),
             FailedBlocks = failed
@@ -262,11 +262,13 @@ public sealed class VisualizerPreset
     /// <param name="values">Parsed preset values.</param>
     /// <param name="layout">Shared slot layout.</param>
     /// <param name="prefix">Either <c>warp</c> or <c>comp</c>.</param>
+    /// <param name="failed">Collects the names of the shaders that could not be parsed.</param>
     /// <returns>The enabled shaders, in preset order.</returns>
     private static IReadOnlyList<VisualizerShader> ParseShaders(
         Dictionary<string, string> values,
         PresetVariableLayout layout,
-        string prefix)
+        string prefix,
+        List<string> failed)
     {
         var shaders = new List<VisualizerShader>();
         for (var index = 1; index <= 16; index++)
@@ -283,8 +285,11 @@ public sealed class VisualizerPreset
             {
                 program = ShaderParser.Parse(source);
             }
-            catch (PresetExpressionException)
+            catch (PresetExpressionException exception)
             {
+                // Recording the reason matters: a skipped shader used to be invisible, which made
+                // a preset that renders only its overlay look like a rendering bug.
+                failed.Add($"{key}: {exception.Message}");
                 continue;
             }
 

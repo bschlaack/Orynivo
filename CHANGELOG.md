@@ -6,6 +6,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Fixed
+- Fixed a skipped shader being invisible. When a preset's `warp_N` or `comp_N` value cannot be
+  parsed the shader is dropped, which used to leave a preset that renders only the shared overlay
+  looking like a rendering bug; the reason is now recorded on `VisualizerPreset.FailedBlocks`, and
+  the preset-folder diagnostic reports it grouped. Measured against a real 2000-file collection,
+  this showed that 1706 presets (85 percent) declare their shaders as Milkdrop 2 template
+  references such as `` `shader_body `` whose actual HLSL lives in Milkdrop 2's built-in templates
+  rather than in the file, which is recorded as roadmap item 39i.
+
 ### Added
 - Added the Milkdrop functions real presets rely on: `above`, `below`, and `equal`
   (which yield one or zero, not a boolean), `sqr`, `sigmoid`, and the bitwise `band`,
