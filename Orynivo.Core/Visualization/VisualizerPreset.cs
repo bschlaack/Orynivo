@@ -271,6 +271,33 @@ public sealed class VisualizerPreset
         List<string> failed)
     {
         var shaders = new List<VisualizerShader>();
+
+        // Milkdrop 2 stores a shader as one numbered key per source line, each line carrying a
+        // backtick marker, while Milkdrop 1 and hand-written presets store a whole shader in one
+        // key. The marker tells the two apart, and such a preset has exactly one shader of that
+        // kind, so its lines are joined instead of being read as separate shaders.
+        if (IsLineBasedShader(values, prefix))
+        {
+            var source = JoinShaderLines(values, prefix);
+            if (source.Length > 0 && ReadShape(values, prefix + "_1_", "enabled", 1f) >= 0.5f)
+            {
+                try
+                {
+                    shaders.Add(new VisualizerShader(
+                        1,
+                        ShaderParser.Parse(source),
+                        PresetCompiler.Compile(Join(values, prefix + "_1_per_frame"), layout),
+                        PresetCompiler.Compile(Join(values, prefix + "_1_per_pixel"), layout)));
+                }
+                catch (PresetExpressionException exception)
+                {
+                    failed.Add($"{prefix}_1: {exception.Message}");
+                }
+            }
+
+            return shaders;
+        }
+
         for (var index = 1; index <= 16; index++)
         {
             var key = $"{prefix}_{index}";
@@ -301,6 +328,42 @@ public sealed class VisualizerPreset
         }
 
         return shaders;
+    }
+
+    /// <summary>Reports whether a shader is stored one source line per numbered key.</summary>
+    /// <param name="values">Parsed preset values.</param>
+    /// <param name="prefix">Either <c>warp</c> or <c>comp</c>.</param>
+    /// <returns><see langword="true"/> when the first line carries the Milkdrop 2 marker.</returns>
+    private static bool IsLineBasedShader(Dictionary<string, string> values, string prefix) =>
+        values.TryGetValue(prefix + "_1", out var first) && first.TrimStart().StartsWith('`');
+
+    /// <summary>
+    /// Joins the line-per-key shader source of a Milkdrop 2 preset, removing the backtick marker
+    /// from every line and the body marker that starts it.
+    /// </summary>
+    /// <param name="values">Parsed preset values.</param>
+    /// <param name="prefix">Either <c>warp</c> or <c>comp</c>.</param>
+    /// <returns>The shader source, or an empty string when the preset declares none.</returns>
+    private static string JoinShaderLines(Dictionary<string, string> values, string prefix)
+    {
+        var builder = new System.Text.StringBuilder();
+        for (var index = 1; index <= 4096; index++)
+        {
+            if (!values.TryGetValue($"{prefix}_{index}", out var line))
+                break;
+
+            var text = line.Trim();
+            if (text.StartsWith('`'))
+                text = text[1..];
+
+            // The body marker only says where the shader starts.
+            if (string.Equals(text.Trim(), "shader_body", StringComparison.OrdinalIgnoreCase))
+                continue;
+
+            builder.Append(text).Append('\n');
+        }
+
+        return builder.ToString();
     }
 
     /// <summary>

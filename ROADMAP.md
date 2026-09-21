@@ -741,6 +741,13 @@ affordable. This is a project of its own and must keep the CPU path as the fallb
   `b1n`, `b1x`, and `b1ed` (plus `b2*` and `b3*`) appear in 313 of 400 sampled files, and their
   exact semantics are not in the presets, so they need our own documented approximation.
 
+  The storage format is decoded now: Milkdrop 2 writes a shader one source line per numbered key,
+  each line carrying a backtick marker, and `` `shader_body `` only says where the body starts.
+  `VisualizerPreset` detects that form and joins the lines, so a real collection went from 50,707
+  skipped shader slots to 1,020 against the same 2,000 files. What remains is the HLSL preprocessor
+  (`#if` and friends) and the macro constants such as `M_INV_PI_2`, which account for the rest, plus
+  the blur and edge parameter keys (`b1n`, `b1x`, `b1ed`, and the `b2`/`b3` family) that need our own
+  documented approximation because their semantics are not in the presets.
 **Tests**: each phase adds its own; 39a is the prerequisite for claiming any speed-up.
 
 **Commit**: `perf(visualizer): add render measurement` (39a), then one commit per phase

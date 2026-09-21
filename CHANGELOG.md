@@ -7,6 +7,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Fixed
+- Fixed real preset collections loading no shader at all. Milkdrop 2 stores a shader one
+  source line per numbered key, each line carrying a backtick marker, and the reader used to
+  take the first key alone, which is only the `` `shader_body `` marker; the lines are joined
+  now, which took the skipped shader slots in a 2,000-file collection from 50,707 to 1,020.
+  The remainder needs the HLSL preprocessor and the macro constants such as `M_INV_PI_2`.
 - Fixed the numbered expression parts of a preset being joined with a semicolon. Milkdrop
   concatenates them, and presets split one expression across parts, so a part may end with an
   operator and the next part continues it; a separator is now inserted only when the previous part
