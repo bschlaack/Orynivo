@@ -206,8 +206,10 @@ public partial class VisualizerWindow : Window
 
     /// <summary>
     /// Writes one bounded diagnostic line per second so an empty window can be told apart
-    /// from a picture that never reaches the screen. Only counts and a brightness average
-    /// are recorded, never media names or paths.
+    /// from a picture that never reaches the screen, and so the render cost per stage is
+    /// measurable instead of guessed. The timings are averaged over the frames of this second.
+    /// Only counts, a brightness average, and stage timings are recorded, never media names or
+    /// paths.
     /// </summary>
     private void LogDiagnostics()
     {
@@ -225,11 +227,20 @@ public partial class VisualizerWindow : Window
             samples += 3;
         }
 
-        SeekDiagnostics.Log(
-            "visualizer",
+        var timings = _renderer.AverageTimings;
+        var message =
             $"frames={_renderer.FrameCount} audioFrames={VisualizerAudioHub.Shared.AnalyzedFrames} "
             + $"reduceMotion={ReduceMotion} brightness={(samples == 0 ? 0f : total / samples):F4} "
-            + $"preset={_renderer.Preset.Name} userPresets={_library.Presets.Count - VisualizerPresets.BuiltIn.Count}");
+            + $"size={_renderWidth}x{_renderHeight} "
+            + $"renderMs={timings.Total:F2} warpMs={timings.Warp:F2} blurMs={timings.Blur:F2} "
+            + $"postMs={timings.PostProcess:F2} overlayMs={timings.Overlay:F2} "
+            + $"compositeMs={timings.Composite:F2} compShaderMs={timings.Shader:F2} "
+            + $"shaders=warp{_renderer.Preset.WarpShaders.Count}/comp{_renderer.Preset.CompShaders.Count} "
+            + $"skipped={_renderer.ShadersSkipped} "
+            + $"preset={_renderer.Preset.Name} userPresets={_library.Presets.Count - VisualizerPresets.BuiltIn.Count}";
+        SeekDiagnostics.Log("visualizer", message);
+        // Start a fresh averaging window so the next line describes its own second.
+        _renderer.ResetTimings();
     }
 
     private void Present()

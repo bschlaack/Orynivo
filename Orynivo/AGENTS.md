@@ -508,7 +508,11 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
   `VisualizerAlwaysShowOverlay` decides whether the overlay is permanent or appears on pointer
   activity for three seconds; the reveal is driven by the window's own `PointerMoved`, which
   only fires while the pointer is over it, so a mouse move on another monitor must never
-  reveal the overlay. Never replace that with a global pointer hook.
+  reveal the overlay. Never replace that with a global pointer hook. The window's once-per-second
+  diagnostic line also carries the averaged `RenderTimings` per stage (render, warp, blur, post,
+  overlay, composite, comp shader) plus the render size and whether the shaders are being
+  skipped, so render cost is measured rather than guessed; keep it bounded and free of media
+  names and paths.
   `VisualizerPresetLibrary` loads the built-in presets plus `.oryvis` and `.milk` files from
   `AppSettings.VisualizerPresetDirectory` (default: a `visualizer-presets` folder below the
   data root); every `[presetNN]` section of a `.milk` file becomes its own preset, a file that

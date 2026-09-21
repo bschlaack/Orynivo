@@ -603,10 +603,15 @@ to a `WriteableBitmap` that Skia scales up.
 
 **Phases**
 
-- 39a Render measurement - `Pending`: per-stage timings (warp, blur, shader, overlay, composite,
+- 39a Render measurement - `Done`: per-stage timings (warp, blur, shader, overlay, composite,
   present) reported per preset and per resolution, surfaced in the window's diagnostic line and
   asserted in tests as bounded ratios rather than absolute times. Every later phase must show
-  its gain here instead of by eye.
+  its gain here instead of by eye. `RenderTimings` reports warp, blur, post-processing, overlay,
+  composite, comp shaders, and the frame total, both per frame and averaged over a window that
+  `ResetTimings` restarts. The window's diagnostic line carries those averages once per second
+  together with the render size and the skip state. A warp shader stays part of `Warp` because
+  timing it per pixel would cost more than the measurement; the frame budget now compares the
+  complete frame. Covered by 8 tests, all asserting ratios rather than absolute times.
 - 39b Off the UI thread - `Pending`: move the render loop off the Avalonia dispatcher into a
   background loop that presents by marshalling only the bitmap invalidation, so a heavy frame can
   no longer stall the interface. Keep shutdown, preset switching, reduce-motion, and the overlay

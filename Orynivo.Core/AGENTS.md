@@ -57,10 +57,15 @@ This file applies to `Orynivo.Core/` and supplements `../AGENTS.md`.
   `[presetNN]` headers, so a file that holds several presets yields several presets; the declared
   format version is reported but never gates loading, because Milkdrop versions its presets and
   every version must stay usable. `PresetRenderer` implements `IShaderSampler` and enforces
-  `ShaderTimeBudgetMilliseconds`: when a frame's shaders exceed the budget they are skipped until
+  `ShaderTimeBudgetMilliseconds`: when a frame exceeds the budget the shaders, being the optional
   the periodic retry, so a heavy preset degrades instead of stalling playback. The interpreter
   walks the tree per pixel, which is the known cost limit; a JIT compiler for shaders is the
-  documented follow-up if the CPU cost proves too high. Keep the
+  documented follow-up if the CPU cost proves too high.
+  `PresetRenderer.Timings` and `AverageTimings` carry the `RenderTimings` breakdown per frame and
+  per averaging window, and `ResetTimings` restarts that window; keep the measurement cheap (one
+  stopwatch and a handful of marks per frame) and never time a per-pixel shader call, because the
+  measurement would cost more than the work. A warp shader is therefore part of `Warp`, while
+  `Shader` is the comp stage. Keep the
   interpreter off the audio thread and bound its per-frame cost so a heavy shader degrades the
   render resolution instead of stalling playback.
 - Keep the project cross-platform `net10.0`; do not introduce Avalonia, Windows,

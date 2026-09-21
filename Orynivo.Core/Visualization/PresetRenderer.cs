@@ -42,6 +42,16 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler
     private readonly PixelBuffer _frameCopy;
     private readonly PixelBuffer _blurred;
     private readonly Stopwatch _shaderClock = new();
+    private readonly Stopwatch _clock = new();
+    private double _mark;
+    private double _sumWarp;
+    private double _sumBlur;
+    private double _sumPostProcess;
+    private double _sumOverlay;
+    private double _sumComposite;
+    private double _sumShader;
+    private double _sumTotal;
+    private int _timingFrames;
     private readonly List<(ShaderInterpreter Interpreter, VisualizerShader Shader)> _warpShaders = [];
     private readonly List<(ShaderInterpreter Interpreter, VisualizerShader Shader)> _compShaders = [];
     private bool _shadersSkipped;
@@ -98,14 +108,38 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler
     public long FrameCount => _frame;
 
     /// <summary>
-    /// Gets or sets how long the shaders may take per frame, in milliseconds. A frame that
-    /// exceeds the budget disables the shaders for a while, so a heavy preset keeps a smooth
-    /// picture instead of stalling playback.
+    /// Gets or sets how long a complete frame may take, in milliseconds, before the shaders are
+    /// treated as the optional work and skipped for a while. Skipping them keeps a heavy preset
+    /// smooth instead of stalling playback.
     /// </summary>
     public double ShaderTimeBudgetMilliseconds { get; set; } = 20d;
 
-    /// <summary>Gets how long the shaders took on the last rendered frame, in milliseconds.</summary>
+    /// <summary>Gets how long the comp shaders took on the last rendered frame, in milliseconds.</summary>
     public double LastShaderMilliseconds { get; private set; }
+
+    /// <summary>Gets the stage timings of the last rendered frame.</summary>
+    public RenderTimings Timings { get; private set; }
+
+    /// <summary>
+    /// Gets the stage timings averaged over every frame since the renderer was created or since
+    /// <see cref="ResetTimings"/> was called. Averaging keeps a single jittery frame from
+    /// misrepresenting where the cost is.
+    /// </summary>
+    public RenderTimings AverageTimings { get; private set; }
+
+    /// <summary>Restarts the averaging window used by <see cref="AverageTimings"/>.</summary>
+    public void ResetTimings()
+    {
+        _sumWarp = 0d;
+        _sumBlur = 0d;
+        _sumPostProcess = 0d;
+        _sumOverlay = 0d;
+        _sumComposite = 0d;
+        _sumShader = 0d;
+        _sumTotal = 0d;
+        _timingFrames = 0;
+        AverageTimings = Timings;
+    }
 
     /// <summary>Gets a value indicating whether the shaders are currently being skipped.</summary>
     public bool ShadersSkipped => _shadersSkipped;
@@ -145,6 +179,8 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler
         _elapsed += Math.Clamp(deltaSeconds, 0d, 0.25d);
         SmoothBands();
 
+        _clock.Restart();
+        _mark = 0d;
         SeedFrameVariables();
         if (!_initialized)
         {
@@ -163,24 +199,38 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler
 
         var decay = Math.Clamp(Read("decay", Preset.Decay), 0f, 1f);
         var useShaders = BeginShaderFrame();
-        _shaderClock.Restart();
         Warp(useShaders);
+        var warp = Mark();
 
         for (var pass = 0; pass < BlurPasses(); pass++)
             _warped.Blur();
+        var blur = Mark();
 
         _warped.Scale(decay);
         ApplyVideoEcho();
         DarkenCenter();
         DrawBorders();
         ApplyGamma();
+        var postProcess = Mark();
+
         DrawOverlay();
+        var overlay = Mark();
         Composite();
+        var composite = Mark();
+
+        var shader = 0d;
         if (useShaders)
+        {
+            _shaderClock.Restart();
             ApplyCompShaders();
-        MeasureShaderTime();
+            _shaderClock.Stop();
+            shader = _shaderClock.Elapsed.TotalMilliseconds;
+        }
+
+        LastShaderMilliseconds = shader;
         _previous.CopyFrom(_fresh);
         _frame++;
+        RecordTimings(warp, blur, postProcess, overlay, composite, shader);
     }
 
     /// <summary>
@@ -196,9 +246,13 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler
         Mid = audio.Mid;
         Treble = audio.Treble;
         Volume = audio.Volume;
+        _clock.Restart();
+        _mark = 0d;
         DrawOverlay();
+        var overlay = Mark();
         _previous.CopyFrom(_fresh);
         _frame++;
+        RecordTimings(0d, 0d, 0d, overlay, 0d, 0d);
     }
 
     /// <summary>Clears every buffer and restarts the preset on the next frame.</summary>
@@ -222,6 +276,8 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler
         Array.Clear(_motionCount);
         _attBass = _attMid = _attTreble = _attVolume = 0f;
         Bass = Mid = Treble = Volume = 0f;
+        Timings = default;
+        ResetTimings();
     }
 
     /// <summary>Keeps the smoothed <c>*_att</c> bands the presets read alongside the raw bands.</summary>
@@ -401,18 +457,53 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler
         return true;
     }
 
-    /// <summary>Measures the shader cost of this frame and skips them when they exceed the budget.</summary>
-    private void MeasureShaderTime()
+    /// <summary>Returns the milliseconds since the previous mark and moves the mark.</summary>
+    /// <returns>Elapsed milliseconds of the stage that just finished.</returns>
+    private double Mark()
     {
-        if (!HasShaders)
-        {
-            LastShaderMilliseconds = 0d;
-            return;
-        }
+        var now = _clock.Elapsed.TotalMilliseconds;
+        var delta = now - _mark;
+        _mark = now;
+        return delta;
+    }
 
-        _shaderClock.Stop();
-        LastShaderMilliseconds = _shaderClock.Elapsed.TotalMilliseconds;
-        if (LastShaderMilliseconds > ShaderTimeBudgetMilliseconds)
+    /// <summary>Stores the stage timings of this frame and updates the averaging window.</summary>
+    /// <param name="warp">Feedback warp stage.</param>
+    /// <param name="blur">Blur passes.</param>
+    /// <param name="postProcess">Fade, video echo, centre darkening, borders, and gamma.</param>
+    /// <param name="overlay">Waveforms, spectrum, motion vectors, and shapes.</param>
+    /// <param name="composite">Composite stage.</param>
+    /// <param name="shader">Comp shader stage.</param>
+    private void RecordTimings(
+        double warp,
+        double blur,
+        double postProcess,
+        double overlay,
+        double composite,
+        double shader)
+    {
+        var total = _clock.Elapsed.TotalMilliseconds;
+        Timings = new RenderTimings(warp, blur, postProcess, overlay, composite, shader, total);
+        _sumWarp += warp;
+        _sumBlur += blur;
+        _sumPostProcess += postProcess;
+        _sumOverlay += overlay;
+        _sumComposite += composite;
+        _sumShader += shader;
+        _sumTotal += total;
+        _timingFrames++;
+        AverageTimings = new RenderTimings(
+            _sumWarp / _timingFrames,
+            _sumBlur / _timingFrames,
+            _sumPostProcess / _timingFrames,
+            _sumOverlay / _timingFrames,
+            _sumComposite / _timingFrames,
+            _sumShader / _timingFrames,
+            _sumTotal / _timingFrames);
+
+        // A frame that costs more than the budget means the optional shader work is what has to
+        // give, so it is skipped until the periodic retry.
+        if (HasShaders && total > ShaderTimeBudgetMilliseconds)
             _shadersSkipped = true;
     }
 
