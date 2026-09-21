@@ -173,6 +173,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   rather than in the file, which is recorded as roadmap item 39i.
 
 ### Added
+- Added the parameter list to the parsed function node. `ShaderParser` used to skip a function's
+  parameters, so a call could never be bound to them; the names are now kept (the types are dropped
+  because the engine stores every value as a float) and a test pins them. This is the first step of
+  making a shader's helper functions callable instead of running their bodies where they are
+  declared, which is a wrong picture in both execution paths today.
 - Added `SkiaShaderRunner`, which runs a translated shader as a Skia runtime effect and is the GPU
   counterpart of `ShaderInterpreter`. Three tests render the same shader on the GPU and through the
   interpreter and assert that the pixels agree within one byte, for a sampled shader, a looping

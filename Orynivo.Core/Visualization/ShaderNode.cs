@@ -72,6 +72,10 @@ public enum ShaderNodeKind
 /// <param name="Right">Right operand, then branch, condition, or increment.</param>
 /// <param name="Third">Else branch or third operand of a ternary.</param>
 /// <param name="Children">Statement or argument list.</param>
+/// <param name="Parameters">
+/// Parameter names of a function definition, or <see langword="null"/> for every other node. The
+/// engine stores every value as a float, so only the names matter.
+/// </param>
 public sealed record ShaderNode(
     ShaderNodeKind Kind,
     int Position,
@@ -80,8 +84,12 @@ public sealed record ShaderNode(
     ShaderNode? Left = null,
     ShaderNode? Right = null,
     ShaderNode? Third = null,
-    IReadOnlyList<ShaderNode>? Children = null)
+    IReadOnlyList<ShaderNode>? Children = null,
+    IReadOnlyList<ShaderNode>? Parameters = null)
 {
     /// <summary>Gets the child nodes, never <see langword="null"/>.</summary>
     public IReadOnlyList<ShaderNode> Items => Children ?? [];
+
+    /// <summary>Gets the parameter names of a function definition, never <see langword="null"/>.</summary>
+    public IReadOnlyList<ShaderNode> ParameterList => Parameters ?? [];
 }

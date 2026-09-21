@@ -262,19 +262,45 @@ public static class ShaderParser
         private ShaderNode ParseFunctionBody(ShaderToken type, ShaderToken name)
         {
             Expect("(");
+            // The parameter names are kept so a call can bind its arguments; their types are dropped
+            // because the engine stores every value as a float.
+            var parameters = new List<ShaderNode>();
             var depth = 1;
             while (Current.Kind != ShaderTokenKind.End && depth > 0)
             {
                 if (Current.Text == "(")
+                {
                     depth++;
+                }
                 else if (Current.Text == ")")
+                {
                     depth--;
+                    if (depth == 0)
+                        break;
+                }
+                else if (depth == 1 && Current.Kind == ShaderTokenKind.Identifier)
+                {
+                    var next = _tokens[Math.Min(_index + 1, _tokens.Count - 1)];
+                    if (next.Text is "," or ")" && !IsType(Current))
+                        parameters.Add(new ShaderNode(ShaderNodeKind.Identifier, Current.Position, Current.Text));
+                }
+
                 Advance();
             }
 
+            Expect(")");
             SkipAnnotation();
             Expect("{");
-            return new ShaderNode(ShaderNodeKind.Function, type.Position, name.Text, 0f, null, null, null, ParseBlock());
+            return new ShaderNode(
+                ShaderNodeKind.Function,
+                type.Position,
+                name.Text,
+                0f,
+                null,
+                null,
+                null,
+                ParseBlock(),
+                parameters);
         }
 
         /// <summary>Parses an <c>if</c> statement with its optional <c>else</c> branch.</summary>

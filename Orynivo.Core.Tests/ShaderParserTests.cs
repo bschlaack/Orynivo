@@ -140,4 +140,22 @@ public sealed class ShaderParserTests
 
         Assert.True(error.Position >= 10);
     }
-}
+
+    /// <summary>A function's parameter names are kept, because a call has to bind them.</summary>
+    [Fact]
+    public void Parse_ReadsFunctionParameters()
+    {
+        var node = ShaderParser.Parse("""
+            float2 rs (float2 uv, float amount) : COLOR
+            {
+                return uv * amount;
+            }
+            """);
+
+        var function = Assert.Single(node.Items);
+        Assert.Equal(ShaderNodeKind.Function, function.Kind);
+        Assert.Equal("rs", function.Text);
+        Assert.Equal(
+            ["uv", "amount"],
+            function.ParameterList.Select(parameter => parameter.Text));
+    }}
