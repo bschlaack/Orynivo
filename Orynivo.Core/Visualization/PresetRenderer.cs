@@ -798,13 +798,19 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler
         values[13] = ShaderValue.Vector(_randFrame[0], _randFrame[1], _randFrame[2], _randFrame[3], 4);
         foreach (var compiled in _compiledWarp)
         {
-            for (var index = 0; index < values.Length; index++)
+            if (!compiled.IsCompiled)
+                continue;
+
+            for (var index = 0; index < compiled.FrameIndices.Length; index++)
                 compiled.SetAt(compiled.FrameIndices[index], values[index]);
         }
 
         foreach (var compiled in _compiledComp)
         {
-            for (var index = 0; index < values.Length; index++)
+            if (!compiled.IsCompiled)
+                continue;
+
+            for (var index = 0; index < compiled.FrameIndices.Length; index++)
                 compiled.SetAt(compiled.FrameIndices[index], values[index]);
         }
     }

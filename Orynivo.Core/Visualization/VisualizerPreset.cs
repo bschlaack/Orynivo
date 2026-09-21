@@ -147,20 +147,61 @@ public sealed class VisualizerPreset
             var trimmed = line.TrimEnd();
             if (trimmed.StartsWith('[') && trimmed.TrimStart().StartsWith('['))
             {
-                if (current.ToString().Trim().Length > 0)
-                    sections.Add(current.ToString());
-                current.Clear();
+                AddSection(sections, current);
                 continue;
             }
 
             current.Append(line).Append('\n');
         }
 
-        if (current.ToString().Trim().Length > 0)
-            sections.Add(current.ToString());
-
+        AddSection(sections, current);
         return sections;
     }
+
+    /// <summary>
+    /// Adds the buffered section when it carries preset content. A Milkdrop file usually opens with
+    /// a version preamble before its first <c>[presetNN]</c> header; that preamble parses into a
+    /// preset with nothing but defaults, which renders only the shared overlay and makes a user
+    /// stepping through a collection see an empty picture every few presses.
+    /// </summary>
+    /// <param name="sections">Sections collected so far.</param>
+    /// <param name="current">Buffered section text, cleared afterwards.</param>
+    private static void AddSection(List<string> sections, System.Text.StringBuilder current)
+    {
+        var text = current.ToString();
+        if (text.Trim().Length > 0 && CarriesPresetKeys(text))
+            sections.Add(text);
+
+        current.Clear();
+    }
+
+    /// <summary>Reports whether a section declares anything besides the version preamble.</summary>
+    /// <param name="section">Section text.</param>
+    /// <returns><see langword="true"/> when the section holds preset content.</returns>
+    private static bool CarriesPresetKeys(string section)
+    {
+        foreach (var line in section.Split('\n'))
+        {
+            var trimmed = line.Trim();
+            if (trimmed.Length == 0 || trimmed.StartsWith('[') || trimmed.StartsWith("//", StringComparison.Ordinal))
+                continue;
+
+            var separator = trimmed.IndexOf('=');
+            if (separator <= 0)
+                continue;
+
+            if (!PreambleKeys.Contains(trimmed[..separator].Trim()))
+                return true;
+        }
+
+        return false;
+    }
+
+    /// <summary>The keys a Milkdrop file carries before its first preset.</summary>
+    private static readonly HashSet<string> PreambleKeys = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "MILKDROP_PRESET_VERSION", "MILKDROP_VERSION", "PSVERSION", "PSVERSION_WARP", "PSVERSION_COMP"
+    };
 
     /// <summary>Parses preset text.</summary>
     /// <param name="text">INI-style preset text.</param>

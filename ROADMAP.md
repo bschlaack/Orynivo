@@ -805,6 +805,21 @@ affordable. This is a project of its own and must keep the CPU path as the fallb
   (2), and four single cases. Arrays stay a hard failure rather than a declaration that is ignored,
   because an unknown array name would render a wrong picture instead of dropping the block; modelling
   them needs its own value kind in the interpreter.
+  A measurement of real presets at the shipped 480 x 270 render size found the reason the
+  collection looks empty rather than merely imprecise. The warp stage costs 83 to 218 ms per frame
+  and the comp shader up to 87 ms, while `ShaderTimeBudgetMilliseconds` is 30 ms and the target
+  frame interval at the default 30 fps is 33 ms, so `RecordTimings` marks the frame as over budget
+  and `BeginShaderFrame` then leaves the shaders off for the next 119 frames. A user therefore sees
+  the generic warp of the decayed feedback plus the shared overlay, which is the empty picture with
+  a waveform line and a spectrum, and the shaders only come back for one frame in every 120. Two
+  separate defects are behind that: the budget compares the whole frame against a threshold that
+  only the optional shader work should have to meet, and the penalty for a slow frame is two to
+  four seconds of no shaders instead of a smaller one. The deeper cause is that the per-pixel stage
+  runs per screen pixel: Milkdrop evaluates its per-vertex program on a mesh of about 32 x 24
+  vertices and only the comp pass per pixel, so our 129,600 evaluations are roughly 170 times the
+  reference's work. Moving the per-pixel program and the warp shader onto a mesh grid, and letting
+  the budget degrade that grid instead of disabling the shaders, is the next step; it is a
+  behaviour change to the warp, so it needs its own identical-frame verification.
 **Tests**: each phase adds its own; 39a is the prerequisite for claiming any speed-up.
 
 **Commit**: `perf(visualizer): add render measurement` (39a), then one commit per phase

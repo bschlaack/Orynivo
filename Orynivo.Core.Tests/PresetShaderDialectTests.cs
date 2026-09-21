@@ -76,6 +76,40 @@ public sealed class PresetShaderDialectTests
         Assert.Empty(preset.FailedBlocks);
     }
 
+    /// <summary>A shader the compiler leaves to the interpreter still renders a frame.</summary>
+    [Fact]
+    public void RenderFrame_RunsAnInterpretedShader()
+    {
+        // The branch keeps this body off the compiled path, which is the common case for real
+        // presets; the frame used to throw because the uncompiled shader carries no frame slots.
+        var preset = VisualizerPreset.Parse("""
+            PSVERSION_WARP=2
+            warp_1=`shader_body
+            warp_2=`{
+            warp_3=`    float3 c = tex2D(sampler_main, uv).rgb;
+            warp_4=`    if (c.x > 0.5) { c = c * 0.5; }
+            warp_5=`    return float4(c, 1);
+            warp_6=`}
+            """);
+        var renderer = new PresetRenderer(preset, 8, 8) { ShaderTimeBudgetMilliseconds = 100_000d };
+
+        renderer.RenderFrame(new Silent(), 1d / 60d);
+
+        Assert.Single(preset.WarpShaders);
+        Assert.Empty(preset.FailedBlocks);
+    }
+
+    /// <summary>The version preamble before the first preset header is not a preset of its own.</summary>
+    [Fact]
+    public void ParseSections_DropsTheVersionPreamble()
+    {
+        var sections = VisualizerPreset.ParseSections(
+            "MILKDROP_PRESET_VERSION=201\nPSVERSION=2\nPSVERSION_WARP=2\n[preset00]\nfDecay=0.9\nnWaveMode=3\n");
+
+        var section = Assert.Single(sections);
+        Assert.Contains("fDecay", section, StringComparison.Ordinal);
+    }
+
     /// <summary>An audio source that reports silence.</summary>
     private sealed class Silent : IVisualizerAudioSource
     {

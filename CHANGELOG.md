@@ -7,6 +7,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Fixed
+- Fixed the visualizer frame throwing `IndexOutOfRangeException` as soon as a preset carried a
+  shader the compiler leaves to the interpreter, which is the common case because branches and
+  loops stay interpreted. The per-frame variable seeding indexed every shader's frame-variable
+  map, but an uncompiled shader has none, so the render thread died on the first such preset.
+  Covered by a test.
+- Fixed the version preamble of a Milkdrop file being loaded as a preset of its own. A file that
+  opens with `MILKDROP_PRESET_VERSION`/`PSVERSION` before its first `[presetNN]` header produced a
+  second, empty preset that renders only the shared overlay, so stepping through a collection
+  showed an empty picture every few presses. The splitter now keeps a section only when it
+  declares something besides the preamble. Covered by a test.
 - Fixed the preset expression language failing on compound assignments. `PresetLexer` split
   `+=` into `+` and `=`, so every block containing `n += 1` or `zoom -= 0.03` — which is most
   real presets — was reported as `Unexpected '='` and dropped, silently losing that preset's
