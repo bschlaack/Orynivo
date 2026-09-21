@@ -301,7 +301,7 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
     /// textures, so its picture differs from the interpreter by up to one level; the cutover waits
     /// until the result has been validated against the interpreter.
     /// </summary>
-    public bool UseSkiaCompPass { get; set; }
+    public bool UseSkiaPasses { get; set; }
 
     /// <summary>
     /// Gets or sets a value indicating whether full-frame passes may use more than one thread.
@@ -1232,7 +1232,7 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
     /// <returns><see langword="true"/> when the pass ran on the Skia path.</returns>
     private bool TryApplySkiaCompShader(int width, int height)
     {
-        if (!UseSkiaCompPass)
+        if (!UseSkiaPasses)
             return false;
         if (_compShaders.Count != 1 || !_compShaders[0].Shader.PerPixel.IsEmpty)
             return false;
@@ -1778,6 +1778,19 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
             Read("echo_orient", Read("nVideoEchoOrientation", 0f)),
             0f,
             3f);
+        if (UseSkiaPasses)
+        {
+            try
+            {
+                SkiaShaderRunner.VideoEcho(_warped, alpha, zoom, orientation);
+                return;
+            }
+            catch (Exception exception)
+            {
+                ShaderError = "echo (skia): " + exception.GetType().Name + ": " + exception.Message;
+            }
+        }
+
         var width = _warped.Width;
         var height = _warped.Height;
         _fresh.CopyFrom(_warped);

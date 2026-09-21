@@ -704,10 +704,10 @@ affordable. This is a project of its own and must keep the CPU path as the fallb
   and the CPU/GPU comparison tests agree within one byte. A shader that cannot be translated keeps
   the CPU path for that preset.
 - 40c GPU passes - `In progress`: a comp shader without a per-pixel block runs as a Skia runtime
-  effect over the renderer's frames when `PresetRenderer.UseSkiaCompPass` is enabled, with the
+  effect over the renderer's frames when `PresetRenderer.UseSkiaPasses` is enabled, with the
   interpreter as the fallback, and its blur levels are built on the GPU as a chain of box-blur passes
-  (`SkiaShaderRunner.BlurFrame` reproduces `PixelBuffer.Blur`); warp, video echo, borders, and
-  composite still need GPU passes.
+  (`SkiaShaderRunner.BlurFrame` reproduces `PixelBuffer.Blur`); the video echo also runs on the Skia
+  path (`SkiaShaderRunner.VideoEcho`). Warp, borders, and composite still need GPU passes.
   The comp pass binds the composited frame, its blur levels, and the previous frame per sampler, and
   scales each sampler by its own `texsize_*`, so the noise textures are sampled at their real size.
   It stays opt-in because the Skia path carries the frame through eight-bit textures and differs

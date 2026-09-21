@@ -336,6 +336,73 @@ public static class SkiaShaderRunner
         }
     }
 
+    /// <summary>
+    /// Applies Milkdrop's video echo in place: the frame is sampled through a zoom and an optional
+    /// horizontal or vertical flip and blended back over itself. It reproduces
+    /// <c>PresetRenderer.ApplyVideoEcho</c>, including leaving a pixel untouched when the sample falls
+    /// outside the frame.
+    /// </summary>
+    /// <param name="frame">Frame to modify in place.</param>
+    /// <param name="alpha">Echo blend amount from zero to one.</param>
+    /// <param name="zoom">Echo zoom.</param>
+    /// <param name="orientation">Zero to three: horizontal, vertical, or both flipped.</param>
+    /// <exception cref="PresetExpressionException">Skia rejects the echo effect.</exception>
+    public static void VideoEcho(PixelBuffer frame, float alpha, float zoom, int orientation)
+    {
+        ArgumentNullException.ThrowIfNull(frame);
+        alpha = Math.Clamp(alpha, 0f, 1f);
+        if (alpha <= 0f)
+            return;
+
+        zoom = Math.Clamp(zoom, 0.1f, 4f);
+        orientation = Math.Clamp(orientation, 0, 3);
+
+        using var effect = SKRuntimeEffect.CreateShader(EchoSkSL, out var errors)
+            ?? throw new PresetExpressionException($"SkSL was rejected: {errors}", 0);
+        using var sourceBitmap = CreateBitmap(frame.Pixels, frame.Width, frame.Height);
+        using var sourceShader = sourceBitmap.ToShader(SKShaderTileMode.Clamp, SKShaderTileMode.Clamp, LinearSampling);
+        var uniforms = new SKRuntimeEffectUniforms(effect)
+        {
+            ["size"] = new float[] { frame.Width, frame.Height },
+            ["zoom"] = zoom,
+            ["alpha"] = alpha,
+            ["orientation"] = (float)orientation
+        };
+        var children = new SKRuntimeEffectChildren(effect) { ["frame"] = sourceShader };
+        using var shader = effect.ToShader(uniforms, children);
+        using var target = CreateBitmap(new float[frame.Width * frame.Height * 4], frame.Width, frame.Height);
+        using var surface = SKSurface.Create(target.Info, target.GetPixels(), target.RowBytes);
+        var canvas = surface.Canvas;
+        canvas.Clear(SKColors.Black);
+        using (var paint = new SKPaint { Shader = shader })
+            canvas.DrawRect(new SKRect(0, 0, frame.Width, frame.Height), paint);
+
+        canvas.Flush();
+        ReadPixels(target, frame.Width, frame.Height).AsSpan().CopyTo(frame.Pixels);
+    }
+
+    /// <summary>
+    /// The SkSL of the video echo. The frame is sampled through the zoom and the orientation; a sample
+    /// outside the frame leaves the pixel as it was, which is what the CPU pass does.
+    /// </summary>
+    private const string EchoSkSL = """
+        uniform shader frame;
+        uniform float2 size;
+        uniform float zoom;
+        uniform float alpha;
+        uniform float orientation;
+        half4 main(float2 coord) {
+            float4 original = float4(frame.eval(coord));
+            float2 uv = coord / size;
+            float2 s = ((uv - 0.5) / zoom) + 0.5;
+            if (orientation == 1.0 || orientation == 3.0) s.x = 1.0 - s.x;
+            if (orientation == 2.0 || orientation == 3.0) s.y = 1.0 - s.y;
+            if (s.x < 0.0 || s.x > 1.0 || s.y < 0.0 || s.y > 1.0) return half4(original);
+            float4 sampled = float4(frame.eval((s * (size - 1.0)) + 0.5));
+            return half4(mix(original, sampled, alpha));
+        }
+        """;
+
     /// <summary>Converts a zero-to-one component into a byte.</summary>
     /// <param name="value">Component value.</param>
     /// <returns>The byte value.</returns>

@@ -59,6 +59,61 @@ public sealed class SkiaCompPassTests
         Assert.InRange(difference, 0.0001f, 0.01f);
     }
 
+    /// <summary>The Skia video echo matches the CPU echo within the eight-bit quantisation.</summary>
+    [Fact]
+    public void VideoEcho_MatchesTheCpuEcho()
+    {
+        var source = CreatePattern();
+        var gpu = new PixelBuffer(source.Width, source.Height);
+        gpu.CopyFrom(source);
+        SkiaShaderRunner.VideoEcho(gpu, 0.5f, 1.5f, 0);
+
+        var cpu = new PixelBuffer(source.Width, source.Height);
+        cpu.CopyFrom(source);
+        CpuVideoEcho(cpu, 0.5f, 1.5f, 0);
+
+        var difference = MeanAbsoluteDifference(cpu.Pixels.ToArray(), gpu.Pixels.ToArray());
+        Assert.InRange(difference, 0.0001f, 0.01f);
+    }
+
+    /// <summary>The CPU video echo, mirroring <c>PresetRenderer.ApplyVideoEcho</c>.</summary>
+    /// <param name="buffer">Frame to modify in place.</param>
+    /// <param name="alpha">Echo blend amount.</param>
+    /// <param name="zoom">Echo zoom.</param>
+    /// <param name="orientation">Echo orientation.</param>
+    private static void CpuVideoEcho(PixelBuffer buffer, float alpha, float zoom, int orientation)
+    {
+        var width = buffer.Width;
+        var height = buffer.Height;
+        var copy = new PixelBuffer(width, height);
+        copy.CopyFrom(buffer);
+        var source = copy.Pixels;
+        var target = buffer.Pixels;
+        var sample = new float[4];
+        for (var y = 0; y < height; y++)
+        {
+            var v = (y + 0.5f) / height;
+            for (var x = 0; x < width; x++)
+            {
+                var u = (x + 0.5f) / width;
+                var sampleU = ((u - 0.5f) / zoom) + 0.5f;
+                var sampleV = ((v - 0.5f) / zoom) + 0.5f;
+                if (orientation is 1 or 3)
+                    sampleU = 1f - sampleU;
+                if (orientation is 2 or 3)
+                    sampleV = 1f - sampleV;
+                if (sampleU < 0f || sampleU > 1f || sampleV < 0f || sampleV > 1f)
+                    continue;
+
+                copy.SampleBilinear(sampleU, sampleV, sample);
+                var offset = (((y * width) + x) * 4);
+                target[offset] = Math.Clamp((target[offset] * (1f - alpha)) + (sample[0] * alpha), 0f, 1f);
+                target[offset + 1] = Math.Clamp((target[offset + 1] * (1f - alpha)) + (sample[1] * alpha), 0f, 1f);
+                target[offset + 2] = Math.Clamp((target[offset + 2] * (1f - alpha)) + (sample[2] * alpha), 0f, 1f);
+            }
+        }
+    }
+
     /// <summary>Builds a frame with structure, so a blur visibly changes it.</summary>
     /// <returns>The frame.</returns>
     private static PixelBuffer CreatePattern()
@@ -90,7 +145,7 @@ public sealed class SkiaCompPassTests
         var renderer = new PresetRenderer(VisualizerPreset.Parse(preset), 32, 18)
         {
             ShaderTimeBudgetMilliseconds = 100_000d,
-            UseSkiaCompPass = skia
+            UseSkiaPasses = skia
         };
         try
         {

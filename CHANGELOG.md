@@ -7,6 +7,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Added
+- Moved the video echo onto the GPU. `SkiaShaderRunner.VideoEcho` reproduces the zoom, the optional
+  horizontal or vertical flip, the alpha blend, and the leave-untouched rule of
+  `PresetRenderer.ApplyVideoEcho` as a Skia runtime effect, and the renderer uses it when the pass
+  flag is enabled. The flag is now the general `PresetRenderer.UseSkiaPasses` because it gates the
+  comp shader and the frame passes together.
 - Moved the blur pass onto the GPU. `SkiaShaderRunner.BlurFrame` reproduces `PixelBuffer.Blur`'s
   nine-tap clamped box filter as a Skia runtime effect, and the Skia comp pass now builds its blur
   levels as a chain of those passes over the composited frame instead of pre-blurring on the CPU.
@@ -18,7 +23,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   sampler (the composited frame, its blur levels, and the previous frame), the generated noise and
   volume textures, and the scalar and vector uniforms, and each sampler is scaled by its own
   `texsize_*` so the noise textures are sampled at their real size instead of the frame size. It is
-  opt-in through `PresetRenderer.UseSkiaCompPass` because the Skia path carries the frame through
+  opt-in through `PresetRenderer.UseSkiaPasses` because the Skia path carries the frame through
   eight-bit textures and therefore differs from the interpreter by up to one level; the interpreter
   stays the fallback, and the CPU/GPU tests keep the two within a level.
 
