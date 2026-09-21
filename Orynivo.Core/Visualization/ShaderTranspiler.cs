@@ -90,6 +90,81 @@ public static class ShaderTranspiler
         return builder.ToString();
     }
 
+    /// <summary>
+    /// Emits the SkSL helpers that sample a cubic volume texture, which is what <c>tex3D</c> reads.
+    /// Skia's runtime effects only sample two dimensional shaders, so the volume is carried as a slice
+    /// atlas and sampled trilinearly here. The layout and the interpolation match
+    /// <see cref="VisualizerTextureBank.SampleVolume"/> exactly, so the GPU and the CPU interpreter
+    /// produce the same values from the same volume. SkSL does not allow a <c>shader</c> parameter on a
+    /// user function, so each volume sampler gets its own helper that names the global uniform.
+    /// </summary>
+    /// <returns>The generated helper functions.</returns>
+    private static string GeneratedVolumeHelpers()
+    {
+        var builder = new StringBuilder();
+        EmitVolumeHelper(builder, "orynivoTex3DLq", "sampler_noisevol_lq");
+        EmitVolumeHelper(builder, "orynivoTex3DHq", "sampler_noisevol_hq");
+        return builder.ToString();
+    }
+
+    /// <summary>Emits one volume sampling helper bound to a specific sampler uniform.</summary>
+    /// <param name="builder">Output.</param>
+    /// <param name="name">Helper function name.</param>
+    /// <param name="sampler">Sampler uniform the helper reads.</param>
+    private static void EmitVolumeHelper(StringBuilder builder, string name, string sampler)
+    {
+        var size = VisualizerTextureBank.VolumeSize.ToString(CultureInfo.InvariantCulture);
+        var columns = VisualizerTextureBank.VolumeAtlasColumns.ToString(CultureInfo.InvariantCulture);
+        builder.Append("float4 ").Append(name).Append("(float3 coord) {\n");
+        builder.Append("    float3 t = (fract(coord) * ").Append(size).Append(".0) - 0.5;\n");
+        builder.Append("    float3 base = floor(t);\n");
+        builder.Append("    float3 d = t - base;\n");
+        builder.Append("    float3 i0 = mod(base, ").Append(size).Append(".0);\n");
+        builder.Append("    float3 i1 = mod(base + 1.0, ").Append(size).Append(".0);\n");
+        EmitVolumeCorner(builder, sampler, "c000", columns, size, "i0.x", "i0.y", "i0.z");
+        EmitVolumeCorner(builder, sampler, "c100", columns, size, "i1.x", "i0.y", "i0.z");
+        EmitVolumeCorner(builder, sampler, "c010", columns, size, "i0.x", "i1.y", "i0.z");
+        EmitVolumeCorner(builder, sampler, "c110", columns, size, "i1.x", "i1.y", "i0.z");
+        EmitVolumeCorner(builder, sampler, "c001", columns, size, "i0.x", "i0.y", "i1.z");
+        EmitVolumeCorner(builder, sampler, "c101", columns, size, "i1.x", "i0.y", "i1.z");
+        EmitVolumeCorner(builder, sampler, "c011", columns, size, "i0.x", "i1.y", "i1.z");
+        EmitVolumeCorner(builder, sampler, "c111", columns, size, "i1.x", "i1.y", "i1.z");
+        builder.Append("    float4 b00 = mix(c000, c100, d.x);\n");
+        builder.Append("    float4 b10 = mix(c010, c110, d.x);\n");
+        builder.Append("    float4 b01 = mix(c001, c101, d.x);\n");
+        builder.Append("    float4 b11 = mix(c011, c111, d.x);\n");
+        builder.Append("    float4 b0 = mix(b00, b10, d.y);\n");
+        builder.Append("    float4 b1 = mix(b01, b11, d.y);\n");
+        builder.Append("    return mix(b0, b1, d.z);\n");
+        builder.Append("}\n");
+    }
+
+    /// <summary>Emits one trilinear volume corner sample.</summary>
+    /// <param name="builder">Output.</param>
+    /// <param name="sampler">Sampler uniform the helper reads.</param>
+    /// <param name="variable">Corner variable name.</param>
+    /// <param name="columns">Atlas columns.</param>
+    /// <param name="size">Volume edge length.</param>
+    /// <param name="x">X index expression.</param>
+    /// <param name="y">Y index expression.</param>
+    /// <param name="z">Slice index expression.</param>
+    private static void EmitVolumeCorner(
+        StringBuilder builder,
+        string sampler,
+        string variable,
+        string columns,
+        string size,
+        string x,
+        string y,
+        string z)
+    {
+        builder.Append("    float4 ").Append(variable).Append(" = ").Append(sampler)
+            .Append(".eval(float2((mod(").Append(z).Append(", ").Append(columns).Append(".0) * ")
+            .Append(size).Append(".0) + ").Append(x).Append(" + 0.5, (floor(").Append(z)
+            .Append(" / ").Append(columns).Append(".0) * ").Append(size).Append(".0) + ").Append(y)
+            .Append(" + 0.5));\n");
+    }
+
     /// <summary>The sampler a shader reads when it does not name one.</summary>
     private const string MainSampler = "sampler_main";
 
@@ -156,7 +231,7 @@ public static class ShaderTranspiler
     {
         ArgumentNullException.ThrowIfNull(program);
         var builder = new StringBuilder();
-        builder.Append(Prelude).Append(GeneratedUniforms()).Append('\n');
+        builder.Append(Prelude).Append(GeneratedUniforms()).Append(GeneratedVolumeHelpers()).Append('\n');
 
         // The type table has to stand before the helpers are emitted, because their parameter types
         // are recorded as they are written out.
@@ -642,16 +717,27 @@ public static class ShaderTranspiler
     /// <returns>The assignment text.</returns>
     private static string EmitAssignment(string left, string right, ShaderNode expression)
     {
+        right = ConvertToTarget(expression, right, expression.Right is null ? null : TypeOf(expression.Right));
+        return $"{left} = {right}";
+    }
+
+    /// <summary>
+    /// Converts an assignment value to the declared type of its target variable. It only acts when the
+    /// target is a plain identifier with a known type, so a swizzle target or an unknown type is left
+    /// alone rather than guessed at.
+    /// </summary>
+    /// <param name="expression">Assignment node.</param>
+    /// <param name="right">Value text.</param>
+    /// <param name="valueType">The value's inferred type, or nothing.</param>
+    /// <returns>The converted value text.</returns>
+    private static string ConvertToTarget(ShaderNode expression, string right, string? valueType)
+    {
         var targetType = expression.Left is { Kind: ShaderNodeKind.Identifier } target &&
             _types is not null &&
             _types.TryGetValue(target.Text, out var declared)
                 ? declared
                 : null;
-        var valueType = expression.Right is null ? null : TypeOf(expression.Right);
-        if (targetType is not null && expression.Right is not null)
-            right = Convert(right, valueType, targetType);
-
-        return $"{left} = {right}";
+        return targetType is null ? right : Convert(right, valueType, targetType);
     }
 
     /// <summary>Emits a unary expression, keeping the preset convention that zero is false.</summary>
@@ -698,6 +784,11 @@ public static class ShaderTranspiler
             left = Convert(left, leftType, common);
             right = Convert(right, rightType, common);
         }
+
+        // A compound assignment hands its value back to the target's declared type, so a
+        // "float3 *= float4" becomes a swizzle rather than a SkSL type error.
+        if (expression.Text is "+=" or "-=" or "*=" or "/=")
+            right = ConvertToTarget(expression, right, rightType);
 
         return expression.Text switch
         {
@@ -769,13 +860,18 @@ public static class ShaderTranspiler
                 // texsize applies to it.
                 return $"float4({arguments[0]}.eval({arguments[1]} * texsize.xy))";
             case "tex3d":
-                // Milkdrop samples a 3D noise volume, and Skia's runtime effects only sample 2D
-                // shaders. A procedural replacement was tried and rejected: a sine-based hash is not
-                // reproducible between SkSL and the interpreter, so the two paths disagreed by 98 of
-                // 255 levels. The GPU needs a real volume texture, shared by both paths, first.
-                throw new PresetExpressionException(
-                    "tex3D needs a volume texture, which the GPU path does not have yet.",
-                    call.Position);
+                // Milkdrop samples a 3D noise volume. Skia's runtime effects only sample 2D
+                // shaders, so the volume travels as a slice atlas and the generated helper does the
+                // trilinear filtering; the CPU sampler applies the identical math to the same volume.
+                // SkSL forbids a shader parameter on a user function, so each volume sampler has its
+                // own helper.
+                if (arguments.Count < 2)
+                    throw new PresetExpressionException("tex3D needs a sampler and a coordinate.", call.Position);
+
+                var volumeHelper = arguments[0].Contains("hq", StringComparison.Ordinal)
+                    ? "orynivoTex3DHq"
+                    : "orynivoTex3DLq";
+                return $"{volumeHelper}({arguments[1]})";
             case "getpixel":
                 return arguments.Count >= 2
                     ? $"float4({MainSampler}.eval(float2({arguments[0]}, {arguments[1]}))).rgb"
