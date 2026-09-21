@@ -137,6 +137,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   rather than in the file, which is recorded as roadmap item 39i.
 
 ### Added
+- Added `SkiaShaderRunner`, which runs a translated shader as a Skia runtime effect and is the GPU
+  counterpart of `ShaderInterpreter`. Three tests render the same shader on the GPU and through the
+  interpreter and assert that the pixels agree within one byte, for a sampled shader, a looping
+  shader that writes `ret`, and the frame helpers. That agreement is what the GPU path is built on:
+  the CPU stays the reference, so the two cannot drift apart unnoticed.
+- Added `ShaderTranspiler`, the first step of the GPU visualizer (roadmap phase 40a). It translates
+  the shader tree that `ShaderParser` already produces into SkSL, so the GPU path shares the front
+  end with the CPU interpreter and only the back end differs. Four tests prove that Skia compiles
+  the result for a sampled shader, a looping shader, and the frame helpers, and that an unsupported
+  construct is reported instead of being emitted wrongly.
 - Added `ShaderStatementFormTests`, which pin the statement forms real presets use inside a
   shader body: an inline block after a condition, an `else` glued to its block with a
   trailing semicolon, a block on the following line, a `while` loop, the comma operator
