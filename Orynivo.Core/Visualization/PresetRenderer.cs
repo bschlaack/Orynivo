@@ -67,6 +67,7 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler
     private const int ShaderPixelBudget = 10_000;
 
     private readonly VisualizerTextureBank _textures = new();
+    private readonly float[] _randFrame = new float[4];
     private bool _samplerMainIsWarped;
     private PixelBuffer? _shaderOutput;
     private bool _warpShadersFailed;
@@ -411,6 +412,10 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler
         Write("meshx", width);
         Write("meshy", height);
         Write("progress", 0f);
+        // Milkdrop keeps a random vector per frame; presets use it to vary a shader without
+        // changing it every pixel.
+        for (var index = 0; index < _randFrame.Length; index++)
+            _randFrame[index] = Random.Shared.NextSingle();
         // The per-frame defaults a preset can override before the warp reads them back.
         Write("decay", Preset.Decay);
         Write("fDecay", Preset.Decay);
@@ -790,6 +795,7 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler
         values[10] = ShaderValue.Scalar(Read("aspectx", 1f));
         values[11] = ShaderValue.Scalar(Read("aspecty", 1f));
         values[12] = ShaderValue.Vector(width, height, 1f / Math.Max(1, width), 1f / Math.Max(1, height), 4);
+        values[13] = ShaderValue.Vector(_randFrame[0], _randFrame[1], _randFrame[2], _randFrame[3], 4);
         foreach (var compiled in _compiledWarp)
         {
             for (var index = 0; index < values.Length; index++)
@@ -939,6 +945,7 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler
         interpreter.SetVariable("treb_att", Read("treb_att", 0f));
         interpreter.SetVariable("aspectx", Read("aspectx", 1f));
         interpreter.SetVariable("aspecty", Read("aspecty", 1f));
+        interpreter.SetVariable("rand_frame", ShaderValue.Vector(_randFrame[0], _randFrame[1], _randFrame[2], _randFrame[3], 4));
         var x = (u * 2f) - 1f;
         var y = (v * 2f) - 1f;
         interpreter.SetVariable("rad", MathF.Sqrt((x * x) + (y * y)));
@@ -955,7 +962,7 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler
         public static readonly string[] FrameVariables =
         [
             "time", "frame", "fps", "bass", "mid", "treb", "vol",
-            "bass_att", "mid_att", "treb_att", "aspectx", "aspecty", "texsize"
+            "bass_att", "mid_att", "treb_att", "aspectx", "aspecty", "texsize", "rand_frame"
         ];
 
         private readonly ShaderProgram? _program;

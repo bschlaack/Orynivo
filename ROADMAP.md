@@ -769,6 +769,9 @@ affordable. This is a project of its own and must keep the CPU path as the fallb
   instead of falling back to the frame, so the bank built in 38c is in use. What remains is the
   preprocessor and the macro vocabulary from `MilkdropShader.cpp` plus the per-frame random
   variables it keeps (`rand_frame` and the random translation and rotation vectors).
+  `rand_frame` is bound now as well: a random four-component vector, refreshed once per frame and
+  available to both shader paths. Still missing from that family are the random translation and
+  rotation vectors the reference keeps per preset.
 **Tests**: each phase adds its own; 39a is the prerequisite for claiming any speed-up.
 
 **Commit**: `perf(visualizer): add render measurement` (39a), then one commit per phase

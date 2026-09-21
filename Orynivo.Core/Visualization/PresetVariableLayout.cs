@@ -46,7 +46,7 @@ public sealed class PresetVariableLayout
             "mv_x", "mv_y", "mv_dx", "mv_dy", "mv_l",
             "echo_zoom", "echo_alpha", "echo_orient",
             "fVideoEchoZoom", "fVideoEchoAlpha", "nVideoEchoOrientation",
-            "x", "y", "rad", "ang", "progress", "meshx", "meshy"
+            "x", "y", "rad", "ang", "progress", "meshx", "meshy", "rand_frame"
         ];
         foreach (var name in names)
             layout.GetOrAdd(name);

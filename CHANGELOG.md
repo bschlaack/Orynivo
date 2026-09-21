@@ -7,6 +7,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Fixed
+- Fixed `rand_frame` not being bound. Milkdrop keeps a random four-component vector per
+  frame, and a shader that used it rendered black because the variable did not exist; it is
+  now seeded once per frame for both the compiled and the interpreted shader path, and it
+  changes between frames. Covered by 2 tests.
 - Fixed shaders sampling Milkdrop's noise and random textures getting the frame instead.
   Unknown sampler names fell back to `sampler_main`, so `sampler_noise_lq`, `sampler_noise_mq`,
   `sampler_noise_hq`, and `sampler_rand00`-`sampler_rand15` rendered as if they sampled the
