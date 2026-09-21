@@ -113,7 +113,7 @@ public sealed class ShaderInterpreter
             case ShaderNodeKind.Declaration:
                 var name = statement.Items.Count > 0 ? statement.Items[0].Text : string.Empty;
                 if (name.Length > 0)
-                    _variables[name] = statement.Left is null ? DefaultFor(statement.Text) : Evaluate(statement.Left, depth);
+                    _variables[name] = statement.Left is null ? ShaderRuntime.DefaultFor(statement.Text) : Evaluate(statement.Left, depth);
                 return null;
             case ShaderNodeKind.ExpressionStatement:
                 if (statement.Left is not null)
@@ -174,7 +174,7 @@ public sealed class ShaderInterpreter
             case ShaderNodeKind.Identifier:
                 return _variables.TryGetValue(expression.Text, out var variable) ? variable : ShaderValue.Scalar(0f);
             case ShaderNodeKind.Member:
-                return Swizzle(Evaluate(expression.Left!, depth), expression.Text, expression.Position);
+                return ShaderRuntime.Swizzle(Evaluate(expression.Left!, depth), expression.Text, expression.Position);
             case ShaderNodeKind.Call:
                 return EvaluateCall(expression, depth);
             case ShaderNodeKind.Unary:
@@ -200,16 +200,16 @@ public sealed class ShaderInterpreter
         switch (expression.Text)
         {
             case "-":
-                return Map(operand, value => -value);
+                return ShaderRuntime.Map(operand, value => -value);
             case "+":
                 return operand;
             case "!":
                 return ShaderValue.Scalar(operand.IsTrue ? 0f : 1f);
             case "~":
-                return Map(operand, value => (float)~(int)value);
+                return ShaderRuntime.Map(operand, value => (float)~(int)value);
             case "++":
             case "--":
-                var updated = Map(operand, value => expression.Text == "++" ? value + 1f : value - 1f);
+                var updated = ShaderRuntime.Map(operand, value => expression.Text == "++" ? value + 1f : value - 1f);
                 if (expression.Left!.Kind == ShaderNodeKind.Identifier)
                     _variables[expression.Left.Text] = updated;
                 return updated;
@@ -232,10 +232,10 @@ public sealed class ShaderInterpreter
             var assigned = name switch
             {
                 "=" => operand,
-                "+=" => ComponentWise(current, operand, (a, b) => a + b),
-                "-=" => ComponentWise(current, operand, (a, b) => a - b),
-                "*=" => ComponentWise(current, operand, (a, b) => a * b),
-                _ => ComponentWise(current, operand, SafeDivide)
+                "+=" => ShaderRuntime.ComponentWise(current, operand, (a, b) => a + b),
+                "-=" => ShaderRuntime.ComponentWise(current, operand, (a, b) => a - b),
+                "*=" => ShaderRuntime.ComponentWise(current, operand, (a, b) => a * b),
+                _ => ShaderRuntime.ComponentWise(current, operand, ShaderRuntime.SafeDivide)
             };
             Assign(expression.Left!, assigned);
             return assigned;
@@ -256,17 +256,17 @@ public sealed class ShaderInterpreter
         var second = Evaluate(expression.Right!, depth);
         return name switch
         {
-            "+" => ComponentWise(first, second, (a, b) => a + b),
-            "-" => ComponentWise(first, second, (a, b) => a - b),
-            "*" => ComponentWise(first, second, (a, b) => a * b),
-            "/" => ComponentWise(first, second, SafeDivide),
-            "%" => ComponentWise(first, second, (a, b) => b == 0f ? 0f : a % b),
-            "==" => ComponentWise(first, second, (a, b) => a == b ? 1f : 0f),
-            "!=" => ComponentWise(first, second, (a, b) => a != b ? 1f : 0f),
-            "<" => ComponentWise(first, second, (a, b) => a < b ? 1f : 0f),
-            ">" => ComponentWise(first, second, (a, b) => a > b ? 1f : 0f),
-            "<=" => ComponentWise(first, second, (a, b) => a <= b ? 1f : 0f),
-            ">=" => ComponentWise(first, second, (a, b) => a >= b ? 1f : 0f),
+            "+" => ShaderRuntime.ComponentWise(first, second, (a, b) => a + b),
+            "-" => ShaderRuntime.ComponentWise(first, second, (a, b) => a - b),
+            "*" => ShaderRuntime.ComponentWise(first, second, (a, b) => a * b),
+            "/" => ShaderRuntime.ComponentWise(first, second, ShaderRuntime.SafeDivide),
+            "%" => ShaderRuntime.ComponentWise(first, second, (a, b) => b == 0f ? 0f : a % b),
+            "==" => ShaderRuntime.ComponentWise(first, second, (a, b) => a == b ? 1f : 0f),
+            "!=" => ShaderRuntime.ComponentWise(first, second, (a, b) => a != b ? 1f : 0f),
+            "<" => ShaderRuntime.ComponentWise(first, second, (a, b) => a < b ? 1f : 0f),
+            ">" => ShaderRuntime.ComponentWise(first, second, (a, b) => a > b ? 1f : 0f),
+            "<=" => ShaderRuntime.ComponentWise(first, second, (a, b) => a <= b ? 1f : 0f),
+            ">=" => ShaderRuntime.ComponentWise(first, second, (a, b) => a >= b ? 1f : 0f),
             _ => ShaderValue.Scalar(0f)
         };
     }
@@ -287,8 +287,9 @@ public sealed class ShaderInterpreter
 
         var name = target.Left.Text;
         var current = _variables.TryGetValue(name, out var existing) ? existing : ShaderValue.Scalar(0f);
-        var components = ComponentIndices(target.Text, target.Position);
-        for (var index = 0; index < components.Count && index < value.Count; index++)
+        Span<int> components = stackalloc int[4];
+        var count = ShaderRuntime.ComponentIndices(target.Text, target.Position, components);
+        for (var index = 0; index < count && index < value.Count; index++)
             current = current.With(components[index], value.Get(index));
 
         _variables[name] = current;
@@ -301,256 +302,24 @@ public sealed class ShaderInterpreter
     private ShaderValue EvaluateCall(ShaderNode call, int depth)
     {
         var name = call.Text;
-        var arguments = new ShaderValue[call.Items.Count];
-        for (var index = 0; index < arguments.Length; index++)
+        var count = call.Items.Count;
+        Span<ShaderValue> arguments = stackalloc ShaderValue[4];
+        for (var index = 0; index < count && index < 4; index++)
             arguments[index] = Evaluate(call.Items[index], depth);
 
-        if (name is "float" or "half")
-            return ShaderValue.Scalar(arguments.Length > 0 ? arguments[0].X : 0f);
-        if (name is "int" or "uint" or "bool")
-            return ShaderValue.Scalar(arguments.Length > 0 ? (float)(int)arguments[0].X : 0f);
-        if (TryConstruct(name, arguments, out var constructed))
-            return constructed;
-
-        return name switch
-        {
-            "abs" => Unary(arguments, MathF.Abs),
-            "ceil" => Unary(arguments, MathF.Ceiling),
-            "cos" => Unary(arguments, MathF.Cos),
-            "exp" => Unary(arguments, MathF.Exp),
-            "floor" => Unary(arguments, MathF.Floor),
-            "frac" => Unary(arguments, value => value - MathF.Floor(value)),
-            "log" => Unary(arguments, value => value <= 0f ? 0f : MathF.Log(value)),
-            "saturate" => Unary(arguments, value => Math.Clamp(value, 0f, 1f)),
-            "sign" => Unary(arguments, value => MathF.Sign(value)),
-            "sin" => Unary(arguments, MathF.Sin),
-            "sqrt" => Unary(arguments, value => value <= 0f ? 0f : MathF.Sqrt(value)),
-            "tan" => Unary(arguments, MathF.Tan),
-            "length" => ShaderValue.Scalar(Length(arguments.Length > 0 ? arguments[0] : ShaderValue.Scalar(0f))),
-            "normalize" => Normalize(arguments.Length > 0 ? arguments[0] : ShaderValue.Scalar(0f)),
-            "dot" => ShaderValue.Scalar(Dot(arguments[0], arguments[1])),
-            "pow" => ComponentWise(arguments[0], arguments[1], (a, b) => MathF.Pow(a, b)),
-            "min" => ComponentWise(arguments[0], arguments[1], MathF.Min),
-            "max" => ComponentWise(arguments[0], arguments[1], MathF.Max),
-            "step" => ComponentWise(arguments[1], arguments[0], (a, b) => a >= b ? 1f : 0f),
-            "lerp" or "mix" => Lerp(arguments[0], arguments[1], arguments[2]),
-            "clamp" => ComponentWise(
-                ComponentWise(arguments[0], arguments[1], MathF.Max),
-                arguments[2],
-                MathF.Min),
-            "mul" => ComponentWise(arguments[0], arguments[1], (a, b) => a * b),
-            "smoothstep" => Smoothstep(arguments[0], arguments[1], arguments[2]),
-            "tex2D" or "tex2Dlod" => Sample(call, arguments),
-            "GetBlur1" => SampleBlur(call, arguments, 1),
-            "GetBlur2" => SampleBlur(call, arguments, 2),
-            "GetBlur3" => SampleBlur(call, arguments, 3),
-            "GetPixel" => SamplePixel(call, arguments),
-            _ => throw new PresetExpressionException($"Unknown shader function '{name}'.", call.Position)
-        };
-    }
-
-    /// <summary>Samples a texture through the bound sampler.</summary>
-    /// <param name="call">Call node, used for the error position.</param>
-    /// <param name="arguments">Evaluated arguments; the first names the sampler.</param>
-    /// <returns>The sampled colour.</returns>
-    private ShaderValue Sample(ShaderNode call, ShaderValue[] arguments)
-    {
-        if (_sampler is null || arguments.Length < 2)
-            throw new PresetExpressionException("The shader sampled a texture without a sampler.", call.Position);
-
-        var name = call.Items[0].Kind == ShaderNodeKind.Identifier
+        var samplerName = call.Items.Count > 0 && call.Items[0].Kind == ShaderNodeKind.Identifier
             ? call.Items[0].Text
-            : "sampler_main";
-        var u = arguments[1].X;
-        var v = arguments.Length >= 3 ? arguments[2].X : arguments[1].Y;
-        return _sampler.Sample(name, u, v);
+            : string.Empty;
+        return ShaderRuntime.Call(
+            name,
+            samplerName,
+            call.Position,
+            _sampler,
+            arguments[0],
+            arguments[1],
+            arguments[2],
+            arguments[3],
+            count);
     }
 
-    /// <summary>Samples a blurred copy of the frame.</summary>
-    /// <param name="call">Call node, used for the error position.</param>
-    /// <param name="arguments">Evaluated arguments; the first pair is the coordinate.</param>
-    /// <param name="level">Blur level from one to three.</param>
-    /// <returns>The sampled colour.</returns>
-    private ShaderValue SampleBlur(ShaderNode call, ShaderValue[] arguments, int level)
-    {
-        if (_sampler is null || arguments.Length < 1)
-            throw new PresetExpressionException("The shader sampled a texture without a sampler.", call.Position);
-
-        return _sampler.SampleBlur(level, arguments[0].X, arguments[0].Y);
-    }
-
-    /// <summary>Reads one frame pixel by integer coordinate.</summary>
-    /// <param name="call">Call node, used for the error position.</param>
-    /// <param name="arguments">Evaluated arguments; the first pair is the coordinate.</param>
-    /// <returns>The pixel colour.</returns>
-    private ShaderValue SamplePixel(ShaderNode call, ShaderValue[] arguments)
-    {
-        if (_sampler is null || arguments.Length < 2)
-            throw new PresetExpressionException("The shader sampled a texture without a sampler.", call.Position);
-
-        return _sampler.SamplePixel((int)arguments[0].X, (int)arguments[1].X);
-    }
-
-    /// <summary>Builds a vector from a constructor call.</summary>
-    /// <param name="name">Constructor name.</param>
-    /// <param name="arguments">Evaluated arguments.</param>
-    /// <param name="value">The constructed value.</param>
-    /// <returns><see langword="true"/> when the name was a vector constructor.</returns>
-    private static bool TryConstruct(string name, ShaderValue[] arguments, out ShaderValue value)
-    {
-        value = ShaderValue.Scalar(0f);
-        var count = name switch
-        {
-            "float2" or "half2" => 2,
-            "float3" or "half3" => 3,
-            "float4" or "half4" => 4,
-            _ => 0
-        };
-        if (count == 0)
-            return false;
-
-        if (arguments.Length == 0)
-        {
-            value = ShaderValue.Scalar(0f);
-            return true;
-        }
-
-        if (arguments.Length == 1)
-        {
-            var single = arguments[0];
-            var components = new float[4];
-            for (var index = 0; index < 4; index++)
-                components[index] = single.Get(Math.Min(index, single.Count - 1));
-            value = new ShaderValue(components[0], components[1], components[2], components[3], count);
-            return true;
-        }
-
-        var flattened = new List<float>(count);
-        foreach (var argument in arguments)
-        {
-            for (var index = 0; index < argument.Count && flattened.Count < count; index++)
-                flattened.Add(argument.Get(index));
-        }
-
-        while (flattened.Count < 4)
-            flattened.Add(0f);
-        value = new ShaderValue(flattened[0], flattened[1], flattened[2], flattened[3], count);
-        return true;
-    }
-
-    /// <summary>Applies a swizzle to a value.</summary>
-    /// <param name="value">Value to swizzle.</param>
-    /// <param name="components">Swizzle letters.</param>
-    /// <param name="position">Source position for the error message.</param>
-    /// <returns>The swizzled value.</returns>
-    private static ShaderValue Swizzle(ShaderValue value, string components, int position)
-    {
-        var indices = ComponentIndices(components, position);
-        var result = new float[4];
-        for (var index = 0; index < indices.Count; index++)
-            result[index] = value.Get(indices[index]);
-
-        return new ShaderValue(result[0], result[1], result[2], result[3], indices.Count);
-    }
-
-    /// <summary>Maps swizzle letters to component indices.</summary>
-    /// <param name="components">Swizzle letters.</param>
-    /// <param name="position">Source position for the error message.</param>
-    /// <returns>The component indices in order.</returns>
-    private static List<int> ComponentIndices(string components, int position)
-    {
-        var indices = new List<int>(components.Length);
-        foreach (var letter in components)
-        {
-            var index = letter switch
-            {
-                'x' or 'r' => 0,
-                'y' or 'g' => 1,
-                'z' or 'b' => 2,
-                'w' or 'a' => 3,
-                _ => -1
-            };
-            if (index < 0)
-                throw new PresetExpressionException($"Invalid swizzle '{components}'.", position);
-            indices.Add(index);
-        }
-
-        return indices;
-    }
-
-    /// <summary>Applies one function to every component of a value.</summary>
-    private static ShaderValue Map(ShaderValue value, Func<float, float> map) =>
-        new(map(value.X), map(value.Y), map(value.Z), map(value.W), value.Count);
-
-    /// <summary>Applies one function to the first argument, component by component.</summary>
-    private static ShaderValue Unary(ShaderValue[] arguments, Func<float, float> map) =>
-        arguments.Length > 0 ? Map(arguments[0], map) : ShaderValue.Scalar(0f);
-
-    /// <summary>Combines two values component by component.</summary>
-    private static ShaderValue ComponentWise(ShaderValue left, ShaderValue right, Func<float, float, float> combine)
-    {
-        var count = Math.Max(left.Count, right.Count);
-        var components = new float[4];
-        for (var index = 0; index < 4; index++)
-            components[index] = combine(left.Get(index), right.Get(index));
-        return new ShaderValue(components[0], components[1], components[2], components[3], count);
-    }
-
-    /// <summary>Interpolates between two values.</summary>
-    private static ShaderValue Lerp(ShaderValue from, ShaderValue to, ShaderValue amount)
-    {
-        var difference = ComponentWise(from, to, (a, b) => b - a);
-        var scaled = ComponentWise(difference, amount, (delta, t) => delta * t);
-        return ComponentWise(from, scaled, (a, b) => a + b);
-    }
-
-    /// <summary>Evaluates the smooth Hermite interpolation between two edges.</summary>
-    private static ShaderValue Smoothstep(ShaderValue edge0, ShaderValue edge1, ShaderValue value)
-    {
-        var ratio = ComponentWise(
-            ComponentWise(value, edge0, (a, b) => a - b),
-            ComponentWise(edge1, edge0, (a, b) => a - b),
-            SafeDivide);
-        return ComponentWise(ratio, ratio, (t, _) => t * t * (3f - (2f * t)));
-    }
-
-    /// <summary>Divides, treating a zero divisor as zero instead of producing an infinity.</summary>
-    private static float SafeDivide(float numerator, float denominator) =>
-        denominator == 0f ? 0f : numerator / denominator;
-
-    /// <summary>Computes the length of the first components of a value.</summary>
-    private static float Length(ShaderValue value)
-    {
-        var total = 0f;
-        for (var index = 0; index < value.Count; index++)
-            total += value.Get(index) * value.Get(index);
-        return MathF.Sqrt(total);
-    }
-
-    /// <summary>Normalizes a value, leaving a zero vector alone.</summary>
-    private static ShaderValue Normalize(ShaderValue value)
-    {
-        var length = Length(value);
-        return length <= 0f ? value : Map(value, component => component / length);
-    }
-
-    /// <summary>Computes the dot product of two values.</summary>
-    private static float Dot(ShaderValue left, ShaderValue right)
-    {
-        var total = 0f;
-        for (var index = 0; index < Math.Max(left.Count, right.Count); index++)
-            total += left.Get(index) * right.Get(index);
-        return total;
-    }
-
-    /// <summary>Returns the default value of a declared type.</summary>
-    /// <param name="type">Type name.</param>
-    /// <returns>The default value.</returns>
-    private static ShaderValue DefaultFor(string type) => type switch
-    {
-        "float2" or "half2" => ShaderValue.Vector(0f, 0f, 0f, 0f, 2),
-        "float3" or "half3" => ShaderValue.Vector(0f, 0f, 0f, 0f, 3),
-        "float4" or "half4" => ShaderValue.Vector(0f, 0f, 0f, 0f, 4),
-        _ => ShaderValue.Scalar(0f)
-    };
 }

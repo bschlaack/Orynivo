@@ -32,6 +32,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   rather than in the file, which is recorded as roadmap item 39i.
 
 ### Added
+- The visualizer compiles straight-line shader bodies instead of interpreting them. `ShaderCompiler`
+  turns a shader with local declarations and a single return into a delegate over a slot array, and
+  both the compiled path and the interpreter call the same `ShaderRuntime` operations, so
+  `ShaderCompilerTests` can prove they produce identical values. The renderer prefers the compiled
+  shader and seeds the frame-constant variables once per frame rather than per pixel. Measured, the
+  per-pixel shader cost fell from about 660 to about 242 nanoseconds, which is not yet inside the
+  frame budget, so no shader runs at full resolution yet; the remaining work is recorded in the
+  roadmap under phase 39e.
 - Added the Milkdrop functions real presets rely on: `above`, `below`, and `equal`
   (which yield one or zero, not a boolean), `sqr`, `sigmoid`, and the bitwise `band`,
   `bor`, and `bnot`. Function and constant names are matched case-insensitively now, as
@@ -230,6 +238,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.45.0] - 2026-09-20
 
 ### Added
+- The visualizer compiles straight-line shader bodies instead of interpreting them. `ShaderCompiler`
+  turns a shader with local declarations and a single return into a delegate over a slot array, and
+  both the compiled path and the interpreter call the same `ShaderRuntime` operations, so
+  `ShaderCompilerTests` can prove they produce identical values. The renderer prefers the compiled
+  shader and seeds the frame-constant variables once per frame rather than per pixel. Measured, the
+  per-pixel shader cost fell from about 660 to about 242 nanoseconds, which is not yet inside the
+  frame budget, so no shader runs at full resolution yet; the remaining work is recorded in the
+  roadmap under phase 39e.
 
 - Added a **Maximum output sample rate** option under Playback. It caps the PCM output
   rate for exclusive WASAPI and ASIO/cwASIO (Automatic keeps the previous behaviour of
@@ -314,6 +330,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.44.0] - 2026-09-20
 
 ### Added
+- The visualizer compiles straight-line shader bodies instead of interpreting them. `ShaderCompiler`
+  turns a shader with local declarations and a single return into a delegate over a slot array, and
+  both the compiled path and the interpreter call the same `ShaderRuntime` operations, so
+  `ShaderCompilerTests` can prove they produce identical values. The renderer prefers the compiled
+  shader and seeds the frame-constant variables once per frame rather than per pixel. Measured, the
+  per-pixel shader cost fell from about 660 to about 242 nanoseconds, which is not yet inside the
+  frame budget, so no shader runs at full resolution yet; the remaining work is recorded in the
+  roadmap under phase 39e.
 
 - The year-in-review summary can now also be exported as a single-page A4 PDF.
   The on-screen card and the PDF share the new pure
@@ -470,6 +494,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.43.1] - 2026-09-18
 
 ### Added
+- The visualizer compiles straight-line shader bodies instead of interpreting them. `ShaderCompiler`
+  turns a shader with local declarations and a single return into a delegate over a slot array, and
+  both the compiled path and the interpreter call the same `ShaderRuntime` operations, so
+  `ShaderCompilerTests` can prove they produce identical values. The renderer prefers the compiled
+  shader and seeds the frame-constant variables once per frame rather than per pixel. Measured, the
+  per-pixel shader cost fell from about 660 to about 242 nanoseconds, which is not yet inside the
+  frame budget, so no shader runs at full resolution yet; the remaining work is recorded in the
+  roadmap under phase 39e.
 
 - Linux desktop builds now expose the full MPRIS 2 media player interface
   (`org.mpris.MediaPlayer2.orynivo`) on the session bus, giving desktop media
@@ -498,6 +530,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.43.0] - 2026-09-18
 
 ### Added
+- The visualizer compiles straight-line shader bodies instead of interpreting them. `ShaderCompiler`
+  turns a shader with local declarations and a single return into a delegate over a slot array, and
+  both the compiled path and the interpreter call the same `ShaderRuntime` operations, so
+  `ShaderCompilerTests` can prove they produce identical values. The renderer prefers the compiled
+  shader and seeds the frame-constant variables once per frame rather than per pixel. Measured, the
+  per-pixel shader cost fell from about 660 to about 242 nanoseconds, which is not yet inside the
+  frame budget, so no shader runs at full resolution yet; the remaining work is recorded in the
+  roadmap under phase 39e.
 
 - Migrated queue drag-and-drop to the modern Avalonia data-transfer API
   (`DataTransfer`, `DataTransferItem`, `IDataTransfer`, `DataFormat<string>`, and
@@ -593,6 +633,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.42.0] - 2026-09-17
 
 ### Added
+- The visualizer compiles straight-line shader bodies instead of interpreting them. `ShaderCompiler`
+  turns a shader with local declarations and a single return into a delegate over a slot array, and
+  both the compiled path and the interpreter call the same `ShaderRuntime` operations, so
+  `ShaderCompilerTests` can prove they produce identical values. The renderer prefers the compiled
+  shader and seeds the frame-constant variables once per frame rather than per pixel. Measured, the
+  per-pixel shader cost fell from about 660 to about 242 nanoseconds, which is not yet inside the
+  frame budget, so no shader runs at full resolution yet; the remaining work is recorded in the
+  roadmap under phase 39e.
 
 - Added `Orynivo.Library.QueuePathPolicy` in `Orynivo.Core` as the single,
   unit-tested decision for whether a playback or queue path may be persisted
@@ -769,6 +817,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.41.7] - 2026-09-11
 
 ### Added
+- The visualizer compiles straight-line shader bodies instead of interpreting them. `ShaderCompiler`
+  turns a shader with local declarations and a single return into a delegate over a slot array, and
+  both the compiled path and the interpreter call the same `ShaderRuntime` operations, so
+  `ShaderCompilerTests` can prove they produce identical values. The renderer prefers the compiled
+  shader and seeds the frame-constant variables once per frame rather than per pixel. Measured, the
+  per-pixel shader cost fell from about 660 to about 242 nanoseconds, which is not yet inside the
+  frame budget, so no shader runs at full resolution yet; the remaining work is recorded in the
+  roadmap under phase 39e.
 
 - Added Hindi (हिन्दी, hi-IN) as a complete built-in desktop language and a
   static website locale with language selection, metadata, gallery and sitemap
@@ -791,6 +847,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.41.5] - 2026-09-09
 
 ### Added
+- The visualizer compiles straight-line shader bodies instead of interpreting them. `ShaderCompiler`
+  turns a shader with local declarations and a single return into a delegate over a slot array, and
+  both the compiled path and the interpreter call the same `ShaderRuntime` operations, so
+  `ShaderCompilerTests` can prove they produce identical values. The renderer prefers the compiled
+  shader and seeds the frame-constant variables once per frame rather than per pixel. Measured, the
+  per-pixel shader cost fell from about 660 to about 242 nanoseconds, which is not yet inside the
+  frame budget, so no shader runs at full resolution yet; the remaining work is recorded in the
+  roadmap under phase 39e.
 
 - Extended the static product website with Russian and Simplified Chinese
   pages, language-selector entries, localized metadata, hreflang links, and
@@ -818,6 +882,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.41.4] - 2026-09-08
 
 ### Added
+- The visualizer compiles straight-line shader bodies instead of interpreting them. `ShaderCompiler`
+  turns a shader with local declarations and a single return into a delegate over a slot array, and
+  both the compiled path and the interpreter call the same `ShaderRuntime` operations, so
+  `ShaderCompilerTests` can prove they produce identical values. The renderer prefers the compiled
+  shader and seeds the frame-constant variables once per frame rather than per pixel. Measured, the
+  per-pixel shader cost fell from about 660 to about 242 nanoseconds, which is not yet inside the
+  frame budget, so no shader runs at full resolution yet; the remaining work is recorded in the
+  roadmap under phase 39e.
 
 - Added Russian and Simplified Chinese (`zh-CN`) as selectable interface
   languages, including culture-aware formatting and artist-profile language
@@ -878,6 +950,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.41.0] - 2026-09-05
 
 ### Added
+- The visualizer compiles straight-line shader bodies instead of interpreting them. `ShaderCompiler`
+  turns a shader with local declarations and a single return into a delegate over a slot array, and
+  both the compiled path and the interpreter call the same `ShaderRuntime` operations, so
+  `ShaderCompilerTests` can prove they produce identical values. The renderer prefers the compiled
+  shader and seeds the frame-constant variables once per frame rather than per pixel. Measured, the
+  per-pixel shader cost fell from about 660 to about 242 nanoseconds, which is not yet inside the
+  frame budget, so no shader runs at full resolution yet; the remaining work is recorded in the
+  roadmap under phase 39e.
 
 - Began the multi-user profile foundation with stable local profile identities
   and per-server profile mappings. Existing installations automatically receive
@@ -922,6 +1002,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.40.2] - 2026-09-05
 
 ### Added
+- The visualizer compiles straight-line shader bodies instead of interpreting them. `ShaderCompiler`
+  turns a shader with local declarations and a single return into a delegate over a slot array, and
+  both the compiled path and the interpreter call the same `ShaderRuntime` operations, so
+  `ShaderCompilerTests` can prove they produce identical values. The renderer prefers the compiled
+  shader and seeds the frame-constant variables once per frame rather than per pixel. Measured, the
+  per-pixel shader cost fell from about 660 to about 242 nanoseconds, which is not yet inside the
+  frame budget, so no shader runs at full resolution yet; the remaining work is recorded in the
+  roadmap under phase 39e.
 
 - Metadata review now explains the review/compare/confirm workflow, distinguishes
   read-only server reports from local corrections, and shows phase progress,
@@ -950,6 +1038,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.40.0] - 2026-09-05
 
 ### Added
+- The visualizer compiles straight-line shader bodies instead of interpreting them. `ShaderCompiler`
+  turns a shader with local declarations and a single return into a delegate over a slot array, and
+  both the compiled path and the interpreter call the same `ShaderRuntime` operations, so
+  `ShaderCompilerTests` can prove they produce identical values. The renderer prefers the compiled
+  shader and seeds the frame-constant variables once per frame rather than per pixel. Measured, the
+  per-pixel shader cost fell from about 660 to about 242 nanoseconds, which is not yet inside the
+  frame budget, so no shader runs at full resolution yet; the remaining work is recorded in the
+  roadmap under phase 39e.
 
 - Added LAN IPv4 address selection and an offline-generated QR code in mobile
   remote settings. Scanning signs in with the dedicated token from a URL fragment,
@@ -1006,6 +1102,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.39.0] - 2026-09-04
 
 ### Added
+- The visualizer compiles straight-line shader bodies instead of interpreting them. `ShaderCompiler`
+  turns a shader with local declarations and a single return into a delegate over a slot array, and
+  both the compiled path and the interpreter call the same `ShaderRuntime` operations, so
+  `ShaderCompilerTests` can prove they produce identical values. The renderer prefers the compiled
+  shader and seeds the frame-constant variables once per frame rather than per pixel. Measured, the
+  per-pixel shader cost fell from about 660 to about 242 nanoseconds, which is not yet inside the
+  frame budget, so no shader runs at full resolution yet; the remaining work is recorded in the
+  roadmap under phase 39e.
 
 - Added the version-two provider-neutral similarity feature contract and a
   compact local query that combines effective genres, BPM, explicit mood tags,
@@ -1044,6 +1148,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   ## [0.38.0] - 2026-09-04
 
 ### Added
+- The visualizer compiles straight-line shader bodies instead of interpreting them. `ShaderCompiler`
+  turns a shader with local declarations and a single return into a delegate over a slot array, and
+  both the compiled path and the interpreter call the same `ShaderRuntime` operations, so
+  `ShaderCompilerTests` can prove they produce identical values. The renderer prefers the compiled
+  shader and seeds the frame-constant variables once per frame rather than per pixel. Measured, the
+  per-pixel shader cost fell from about 660 to about 242 nanoseconds, which is not yet inside the
+  frame budget, so no shader runs at full resolution yet; the remaining work is recorded in the
+  roadmap under phase 39e.
 
 - Added explicit cancellation and duplicate-start protection to Library Doctor
   analysis; cancellation is checked between folders and physical source files.
@@ -1081,6 +1193,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.37.4] - 2026-09-04
 
 ### Added
+- The visualizer compiles straight-line shader bodies instead of interpreting them. `ShaderCompiler`
+  turns a shader with local declarations and a single return into a delegate over a slot array, and
+  both the compiled path and the interpreter call the same `ShaderRuntime` operations, so
+  `ShaderCompilerTests` can prove they produce identical values. The renderer prefers the compiled
+  shader and seeds the frame-constant variables once per frame rather than per pixel. Measured, the
+  per-pixel shader cost fell from about 660 to about 242 nanoseconds, which is not yet inside the
+  frame budget, so no shader runs at full resolution yet; the remaining work is recorded in the
+  roadmap under phase 39e.
 
 - Added an explicit opt-in setting for exposing the embedded MCP endpoint to
   the local network. Remote MCP requests require a generated 256-bit bearer
@@ -1093,6 +1213,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.37.3] - 2026-09-02
 
 ### Added
+- The visualizer compiles straight-line shader bodies instead of interpreting them. `ShaderCompiler`
+  turns a shader with local declarations and a single return into a delegate over a slot array, and
+  both the compiled path and the interpreter call the same `ShaderRuntime` operations, so
+  `ShaderCompilerTests` can prove they produce identical values. The renderer prefers the compiled
+  shader and seeds the frame-constant variables once per frame rather than per pixel. Measured, the
+  per-pixel shader cost fell from about 660 to about 242 nanoseconds, which is not yet inside the
+  frame budget, so no shader runs at full resolution yet; the remaining work is recorded in the
+  roadmap under phase 39e.
 
 - Added automatic and manual AI model discovery plus a connection test in the
   AI Chat settings. OpenAI-compatible and Ollama model-list responses populate
@@ -1101,6 +1229,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.37.2] - 2026-08-27
 
 ### Added
+- The visualizer compiles straight-line shader bodies instead of interpreting them. `ShaderCompiler`
+  turns a shader with local declarations and a single return into a delegate over a slot array, and
+  both the compiled path and the interpreter call the same `ShaderRuntime` operations, so
+  `ShaderCompilerTests` can prove they produce identical values. The renderer prefers the compiled
+  shader and seeds the frame-constant variables once per frame rather than per pixel. Measured, the
+  per-pixel shader cost fell from about 660 to about 242 nanoseconds, which is not yet inside the
+  frame budget, so no shader runs at full resolution yet; the remaining work is recorded in the
+  roadmap under phase 39e.
 
 - Added nine individually permissioned MCP and AI-chat tools for current-track
   favorites, Infinite Mix, output and equalizer profiles, cached lyrics, and
@@ -1118,6 +1254,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.37.1] - 2026-08-27
 
 ### Added
+- The visualizer compiles straight-line shader bodies instead of interpreting them. `ShaderCompiler`
+  turns a shader with local declarations and a single return into a delegate over a slot array, and
+  both the compiled path and the interpreter call the same `ShaderRuntime` operations, so
+  `ShaderCompilerTests` can prove they produce identical values. The renderer prefers the compiled
+  shader and seeds the frame-constant variables once per frame rather than per pixel. Measured, the
+  per-pixel shader cost fell from about 660 to about 242 nanoseconds, which is not yet inside the
+  frame budget, so no shader runs at full resolution yet; the remaining work is recorded in the
+  roadmap under phase 39e.
 
 - Added a responsive, localized five-minute quick-start guide to the product
   website, a wiki feature-status page that distinguishes everyday,
@@ -1204,6 +1348,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   and are not exposed by the current classic RAOP backend.
 
 ### Added
+- The visualizer compiles straight-line shader bodies instead of interpreting them. `ShaderCompiler`
+  turns a shader with local declarations and a single return into a delegate over a slot array, and
+  both the compiled path and the interpreter call the same `ShaderRuntime` operations, so
+  `ShaderCompilerTests` can prove they produce identical values. The renderer prefers the compiled
+  shader and seeds the frame-constant variables once per frame rather than per pixel. Measured, the
+  per-pixel shader cost fell from about 660 to about 242 nanoseconds, which is not yet inside the
+  frame budget, so no shader runs at full resolution yet; the remaining work is recorded in the
+  roadmap under phase 39e.
 
 - Native AirPlay 2 sessions now publish the current title, artist, album, and
   optional bounded JPEG/PNG cover artwork to receiver displays instead of the
@@ -1239,6 +1391,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.36.7] - 2026-08-25
 
 ### Added
+- The visualizer compiles straight-line shader bodies instead of interpreting them. `ShaderCompiler`
+  turns a shader with local declarations and a single return into a delegate over a slot array, and
+  both the compiled path and the interpreter call the same `ShaderRuntime` operations, so
+  `ShaderCompilerTests` can prove they produce identical values. The renderer prefers the compiled
+  shader and seeds the frame-constant variables once per frame rather than per pixel. Measured, the
+  per-pixel shader cost fell from about 660 to about 242 nanoseconds, which is not yet inside the
+  frame budget, so no shader runs at full resolution yet; the remaining work is recorded in the
+  roadmap under phase 39e.
 
 - Unified artist and album details now reconcile missing artwork between the
   local library and matching reachable Orynivo Server identities. Existing
@@ -1254,6 +1414,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.36.6] - 2026-08-25
 
 ### Added
+- The visualizer compiles straight-line shader bodies instead of interpreting them. `ShaderCompiler`
+  turns a shader with local declarations and a single return into a delegate over a slot array, and
+  both the compiled path and the interpreter call the same `ShaderRuntime` operations, so
+  `ShaderCompilerTests` can prove they produce identical values. The renderer prefers the compiled
+  shader and seeds the frame-constant variables once per frame rather than per pixel. Measured, the
+  per-pixel shader cost fell from about 660 to about 242 nanoseconds, which is not yet inside the
+  frame budget, so no shader runs at full resolution yet; the remaining work is recorded in the
+  roadmap under phase 39e.
 
 - Dashboard loading now records sanitized per-phase performance timings in a
   bounded rolling diagnostic log, separating local data, remote rounds,
@@ -1310,6 +1478,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.36.4] - 2026-08-12
 
 ### Added
+- The visualizer compiles straight-line shader bodies instead of interpreting them. `ShaderCompiler`
+  turns a shader with local declarations and a single return into a delegate over a slot array, and
+  both the compiled path and the interpreter call the same `ShaderRuntime` operations, so
+  `ShaderCompilerTests` can prove they produce identical values. The renderer prefers the compiled
+  shader and seeds the frame-constant variables once per frame rather than per pixel. Measured, the
+  per-pixel shader cost fell from about 660 to about 242 nanoseconds, which is not yet inside the
+  frame budget, so no shader runs at full resolution yet; the remaining work is recorded in the
+  roadmap under phase 39e.
 
 - Genre Cloud now starts Infinite Mix directly from the genres represented by
   its current level. A selected node contributes its complete taxonomy subtree,
@@ -1354,6 +1530,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.36.2] - 2026-08-10
 
 ### Added
+- The visualizer compiles straight-line shader bodies instead of interpreting them. `ShaderCompiler`
+  turns a shader with local declarations and a single return into a delegate over a slot array, and
+  both the compiled path and the interpreter call the same `ShaderRuntime` operations, so
+  `ShaderCompilerTests` can prove they produce identical values. The renderer prefers the compiled
+  shader and seeds the frame-constant variables once per frame rather than per pixel. Measured, the
+  per-pixel shader cost fell from about 660 to about 242 nanoseconds, which is not yet inside the
+  frame budget, so no shader runs at full resolution yet; the remaining work is recorded in the
+  roadmap under phase 39e.
 
 - The explicit **Calculate missing ReplayGain** action now processes the local
   library and every configured Orynivo Server. Servers expose a separate
@@ -1371,6 +1555,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.36.1] - 2026-08-10
 
 ### Added
+- The visualizer compiles straight-line shader bodies instead of interpreting them. `ShaderCompiler`
+  turns a shader with local declarations and a single return into a delegate over a slot array, and
+  both the compiled path and the interpreter call the same `ShaderRuntime` operations, so
+  `ShaderCompilerTests` can prove they produce identical values. The renderer prefers the compiled
+  shader and seeds the frame-constant variables once per frame rather than per pixel. Measured, the
+  per-pixel shader cost fell from about 660 to about 242 nanoseconds, which is not yet inside the
+  frame budget, so no shader runs at full resolution yet; the remaining work is recorded in the
+  roadmap under phase 39e.
 
 - Added a transport output-lock button beside the Equalizer and Output
   quick-pickers. It closes the active exclusive audio player to release the
@@ -1387,6 +1579,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.36.0] - 2026-08-10
 
 ### Added
+- The visualizer compiles straight-line shader bodies instead of interpreting them. `ShaderCompiler`
+  turns a shader with local declarations and a single return into a delegate over a slot array, and
+  both the compiled path and the interpreter call the same `ShaderRuntime` operations, so
+  `ShaderCompilerTests` can prove they produce identical values. The renderer prefers the compiled
+  shader and seeds the frame-constant variables once per frame rather than per pixel. Measured, the
+  per-pixel shader cost fell from about 660 to about 242 nanoseconds, which is not yet inside the
+  frame budget, so no shader runs at full resolution yet; the remaining work is recorded in the
+  roadmap under phase 39e.
 
 - MusicBrainz recording refreshes now retrieve curated genres and positively
   confirmed community tags alongside ratings. Supplemental values are stored
@@ -1423,6 +1623,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.35.4] - 2026-08-10
 
 ### Added
+- The visualizer compiles straight-line shader bodies instead of interpreting them. `ShaderCompiler`
+  turns a shader with local declarations and a single return into a delegate over a slot array, and
+  both the compiled path and the interpreter call the same `ShaderRuntime` operations, so
+  `ShaderCompilerTests` can prove they produce identical values. The renderer prefers the compiled
+  shader and seeds the frame-constant variables once per frame rather than per pixel. Measured, the
+  per-pixel shader cost fell from about 660 to about 242 nanoseconds, which is not yet inside the
+  frame budget, so no shader runs at full resolution yet; the remaining work is recorded in the
+  roadmap under phase 39e.
 
 - Added album names to Dashboard Recently Played cards, with direct album
   navigation for local, Orynivo Server, and Plex history entries.
@@ -1487,6 +1695,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.35.0] - 2026-08-03
 
 ### Added
+- The visualizer compiles straight-line shader bodies instead of interpreting them. `ShaderCompiler`
+  turns a shader with local declarations and a single return into a delegate over a slot array, and
+  both the compiled path and the interpreter call the same `ShaderRuntime` operations, so
+  `ShaderCompilerTests` can prove they produce identical values. The renderer prefers the compiled
+  shader and seeds the frame-constant variables once per frame rather than per pixel. Measured, the
+  per-pixel shader cost fell from about 660 to about 242 nanoseconds, which is not yet inside the
+  frame budget, so no shader runs at full resolution yet; the remaining work is recorded in the
+  roadmap under phase 39e.
 
 - Added a unified artist detail page for every non-Plex artist navigation path.
   Its album-style hero shows the artist image, biography/source, rename and
@@ -1530,6 +1746,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.34.0] - 2026-08-02
 
 ### Added
+- The visualizer compiles straight-line shader bodies instead of interpreting them. `ShaderCompiler`
+  turns a shader with local declarations and a single return into a delegate over a slot array, and
+  both the compiled path and the interpreter call the same `ShaderRuntime` operations, so
+  `ShaderCompilerTests` can prove they produce identical values. The renderer prefers the compiled
+  shader and seeds the frame-constant variables once per frame rather than per pixel. Measured, the
+  per-pixel shader cost fell from about 660 to about 242 nanoseconds, which is not yet inside the
+  frame budget, so no shader runs at full resolution yet; the remaining work is recorded in the
+  roadmap under phase 39e.
 
 - Added authenticated Orynivo Server library backup download and restore. The
   versioned ZIP contains a consistent SQLite snapshot, playlists, playback
@@ -1591,6 +1815,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.33.0] - 2026-08-01
 
 ### Added
+- The visualizer compiles straight-line shader bodies instead of interpreting them. `ShaderCompiler`
+  turns a shader with local declarations and a single return into a delegate over a slot array, and
+  both the compiled path and the interpreter call the same `ShaderRuntime` operations, so
+  `ShaderCompilerTests` can prove they produce identical values. The renderer prefers the compiled
+  shader and seeds the frame-constant variables once per frame rather than per pixel. Measured, the
+  per-pixel shader cost fell from about 660 to about 242 nanoseconds, which is not yet inside the
+  frame budget, so no shader runs at full resolution yet; the remaining work is recorded in the
+  roadmap under phase 39e.
 
 - Added an Infinite Mix that builds a source-aware queue from configurable
   recent listening affinities, favorites, local tracks, and selected reachable
@@ -1638,6 +1870,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.32.0] - 2026-08-01
 
 ### Added
+- The visualizer compiles straight-line shader bodies instead of interpreting them. `ShaderCompiler`
+  turns a shader with local declarations and a single return into a delegate over a slot array, and
+  both the compiled path and the interpreter call the same `ShaderRuntime` operations, so
+  `ShaderCompilerTests` can prove they produce identical values. The renderer prefers the compiled
+  shader and seeds the frame-constant variables once per frame rather than per pixel. Measured, the
+  per-pixel shader cost fell from about 660 to about 242 nanoseconds, which is not yet inside the
+  frame budget, so no shader runs at full resolution yet; the remaining work is recorded in the
+  roadmap under phase 39e.
 
 - Added an interactive, count-scaled genre cloud with hierarchical drill-down
   and listening-history-based track recommendations. It merges the local
@@ -1690,6 +1930,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.31.0] - 2026-08-01
 
 ### Added
+- The visualizer compiles straight-line shader bodies instead of interpreting them. `ShaderCompiler`
+  turns a shader with local declarations and a single return into a delegate over a slot array, and
+  both the compiled path and the interpreter call the same `ShaderRuntime` operations, so
+  `ShaderCompilerTests` can prove they produce identical values. The renderer prefers the compiled
+  shader and seeds the frame-constant variables once per frame rather than per pixel. Measured, the
+  per-pixel shader cost fell from about 660 to about 242 nanoseconds, which is not yet inside the
+  frame budget, so no shader runs at full resolution yet; the remaining work is recorded in the
+  roadmap under phase 39e.
 
 - Added a complete responsive multilingual product website under `html/`, including
   current in-app screenshots, feature and privacy information, installation
@@ -1728,6 +1976,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.30.3] - 2026-07-30
 
 ### Added
+- The visualizer compiles straight-line shader bodies instead of interpreting them. `ShaderCompiler`
+  turns a shader with local declarations and a single return into a delegate over a slot array, and
+  both the compiled path and the interpreter call the same `ShaderRuntime` operations, so
+  `ShaderCompilerTests` can prove they produce identical values. The renderer prefers the compiled
+  shader and seeds the frame-constant variables once per frame rather than per pixel. Measured, the
+  per-pixel shader cost fell from about 660 to about 242 nanoseconds, which is not yet inside the
+  frame budget, so no shader runs at full resolution yet; the remaining work is recorded in the
+  roadmap under phase 39e.
 
 - The review dialog for missing artist images can cancel the complete
   assignment run.
@@ -1743,6 +1999,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.30.2] - 2026-07-29
 
 ### Added
+- The visualizer compiles straight-line shader bodies instead of interpreting them. `ShaderCompiler`
+  turns a shader with local declarations and a single return into a delegate over a slot array, and
+  both the compiled path and the interpreter call the same `ShaderRuntime` operations, so
+  `ShaderCompilerTests` can prove they produce identical values. The renderer prefers the compiled
+  shader and seeds the frame-constant variables once per frame rather than per pixel. Measured, the
+  per-pixel shader cost fell from about 660 to about 242 nanoseconds, which is not yet inside the
+  frame budget, so no shader runs at full resolution yet; the remaining work is recorded in the
+  roadmap under phase 39e.
 
 - Added a cancellable Settings action that searches sequentially for missing
   artist images in the local library and every configured Orynivo Server. It
@@ -1761,6 +2025,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.30.1] - 2026-07-28
 
 ### Added
+- The visualizer compiles straight-line shader bodies instead of interpreting them. `ShaderCompiler`
+  turns a shader with local declarations and a single return into a delegate over a slot array, and
+  both the compiled path and the interpreter call the same `ShaderRuntime` operations, so
+  `ShaderCompilerTests` can prove they produce identical values. The renderer prefers the compiled
+  shader and seeds the frame-constant variables once per frame rather than per pixel. Measured, the
+  per-pixel shader cost fell from about 660 to about 242 nanoseconds, which is not yet inside the
+  frame budget, so no shader runs at full resolution yet; the remaining work is recorded in the
+  roadmap under phase 39e.
 
 - Added **Library > Review metadata** to Settings. It detects
   physically grouped folders split by inconsistent album titles or album artists,
@@ -1797,6 +2069,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.30.0] - 2026-07-28
 
 ### Added
+- The visualizer compiles straight-line shader bodies instead of interpreting them. `ShaderCompiler`
+  turns a shader with local declarations and a single return into a delegate over a slot array, and
+  both the compiled path and the interpreter call the same `ShaderRuntime` operations, so
+  `ShaderCompilerTests` can prove they produce identical values. The renderer prefers the compiled
+  shader and seeds the frame-constant variables once per frame rather than per pixel. Measured, the
+  per-pixel shader cost fell from about 660 to about 242 nanoseconds, which is not yet inside the
+  frame budget, so no shader runs at full resolution yet; the remaining work is recorded in the
+  roadmap under phase 39e.
 
 - The Dashboard now suggests albums from local and Orynivo Server libraries by
   matching album genres against the selected listening-history period. Users can
@@ -1833,6 +2113,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.29.2] - 2026-07-27
 
 ### Added
+- The visualizer compiles straight-line shader bodies instead of interpreting them. `ShaderCompiler`
+  turns a shader with local declarations and a single return into a delegate over a slot array, and
+  both the compiled path and the interpreter call the same `ShaderRuntime` operations, so
+  `ShaderCompilerTests` can prove they produce identical values. The renderer prefers the compiled
+  shader and seeds the frame-constant variables once per frame rather than per pixel. Measured, the
+  per-pixel shader cost fell from about 660 to about 242 nanoseconds, which is not yet inside the
+  frame budget, so no shader runs at full resolution yet; the remaining work is recorded in the
+  roadmap under phase 39e.
 
 - Added optional Fanart.tv artist thumbnails. Orynivo uses embedded MusicBrainz
   artist IDs when available, otherwise accepts only an unambiguous exact
@@ -1877,6 +2165,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.29.0] - 2026-07-26
 
 ### Added
+- The visualizer compiles straight-line shader bodies instead of interpreting them. `ShaderCompiler`
+  turns a shader with local declarations and a single return into a delegate over a slot array, and
+  both the compiled path and the interpreter call the same `ShaderRuntime` operations, so
+  `ShaderCompilerTests` can prove they produce identical values. The renderer prefers the compiled
+  shader and seeds the frame-constant variables once per frame rather than per pixel. Measured, the
+  per-pixel shader cost fell from about 660 to about 242 nanoseconds, which is not yet inside the
+  frame budget, so no shader runs at full resolution yet; the remaining work is recorded in the
+  roadmap under phase 39e.
 
 - Added macOS desktop support for Intel (`osx-x64`) and Apple Silicon
   (`osx-arm64`). The Avalonia player now uses the macOS system OpenAL framework
@@ -1923,6 +2219,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.28.0] - 2026-07-25
 
 ### Added
+- The visualizer compiles straight-line shader bodies instead of interpreting them. `ShaderCompiler`
+  turns a shader with local declarations and a single return into a delegate over a slot array, and
+  both the compiled path and the interpreter call the same `ShaderRuntime` operations, so
+  `ShaderCompilerTests` can prove they produce identical values. The renderer prefers the compiled
+  shader and seeds the frame-constant variables once per frame rather than per pixel. Measured, the
+  per-pixel shader cost fell from about 660 to about 242 nanoseconds, which is not yet inside the
+  frame budget, so no shader runs at full resolution yet; the remaining work is recorded in the
+  roadmap under phase 39e.
 
 - Added bit-perfect DSF playback over DoP through direct ALSA on Linux.
   Orynivo bypasses FFmpeg and PCM processing, adds alternating standard DoP
@@ -1993,6 +2297,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.27.0] - 2026-07-15
 
 ### Added
+- The visualizer compiles straight-line shader bodies instead of interpreting them. `ShaderCompiler`
+  turns a shader with local declarations and a single return into a delegate over a slot array, and
+  both the compiled path and the interpreter call the same `ShaderRuntime` operations, so
+  `ShaderCompilerTests` can prove they produce identical values. The renderer prefers the compiled
+  shader and seeds the frame-constant variables once per frame rather than per pixel. Measured, the
+  per-pixel shader cost fell from about 660 to about 242 nanoseconds, which is not yet inside the
+  frame budget, so no shader runs at full resolution yet; the remaining work is recorded in the
+  roadmap under phase 39e.
 
 - Added Matroska Audio (`.mka`) files to library scanning, desktop file
   recognition, and Orynivo Server streaming. Chaptered MKA albums are expanded
@@ -2008,6 +2320,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.26.6] - 2026-07-15
 
 ### Added
+- The visualizer compiles straight-line shader bodies instead of interpreting them. `ShaderCompiler`
+  turns a shader with local declarations and a single return into a delegate over a slot array, and
+  both the compiled path and the interpreter call the same `ShaderRuntime` operations, so
+  `ShaderCompilerTests` can prove they produce identical values. The renderer prefers the compiled
+  shader and seeds the frame-constant variables once per frame rather than per pixel. Measured, the
+  per-pixel shader cost fell from about 660 to about 242 nanoseconds, which is not yet inside the
+  frame budget, so no shader runs at full resolution yet; the remaining work is recorded in the
+  roadmap under phase 39e.
 
 - Added the authenticated Orynivo Server `/api/library/summary` endpoint and
   client method for compact aggregate Dashboard counts without transferring
@@ -2025,6 +2345,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.26.5] - 2026-07-15
 
 ### Added
+- The visualizer compiles straight-line shader bodies instead of interpreting them. `ShaderCompiler`
+  turns a shader with local declarations and a single return into a delegate over a slot array, and
+  both the compiled path and the interpreter call the same `ShaderRuntime` operations, so
+  `ShaderCompilerTests` can prove they produce identical values. The renderer prefers the compiled
+  shader and seeds the frame-constant variables once per frame rather than per pixel. Measured, the
+  per-pixel shader cost fell from about 660 to about 242 nanoseconds, which is not yet inside the
+  frame budget, so no shader runs at full resolution yet; the remaining work is recorded in the
+  roadmap under phase 39e.
 
 - Added an Appearance option for maximized startup; when disabled, Orynivo
   restores the last normal main-window size and on-screen position.
@@ -2041,6 +2369,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.26.4] - 2026-07-15
 
 ### Added
+- The visualizer compiles straight-line shader bodies instead of interpreting them. `ShaderCompiler`
+  turns a shader with local declarations and a single return into a delegate over a slot array, and
+  both the compiled path and the interpreter call the same `ShaderRuntime` operations, so
+  `ShaderCompilerTests` can prove they produce identical values. The renderer prefers the compiled
+  shader and seeds the frame-constant variables once per frame rather than per pixel. Measured, the
+  per-pixel shader cost fell from about 660 to about 242 nanoseconds, which is not yet inside the
+  frame budget, so no shader runs at full resolution yet; the remaining work is recorded in the
+  roadmap under phase 39e.
 
 - Added a Playback setting to make automatic FFmpeg calculation of missing
   ReplayGain values during library scans optional and disabled by default;
@@ -2055,6 +2391,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.26.3] - 2026-07-15
 
 ### Added
+- The visualizer compiles straight-line shader bodies instead of interpreting them. `ShaderCompiler`
+  turns a shader with local declarations and a single return into a delegate over a slot array, and
+  both the compiled path and the interpreter call the same `ShaderRuntime` operations, so
+  `ShaderCompilerTests` can prove they produce identical values. The renderer prefers the compiled
+  shader and seeds the frame-constant variables once per frame rather than per pixel. Measured, the
+  per-pixel shader cost fell from about 660 to about 242 nanoseconds, which is not yet inside the
+  frame budget, so no shader runs at full resolution yet; the remaining work is recorded in the
+  roadmap under phase 39e.
 
 - Desktop updates now relay the same signed release to every reachable,
   update-enabled Orynivo Server before launching the Windows installer; failed
@@ -2072,6 +2416,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.26.2] - 2026-07-15
 
 ### Added
+- The visualizer compiles straight-line shader bodies instead of interpreting them. `ShaderCompiler`
+  turns a shader with local declarations and a single return into a delegate over a slot array, and
+  both the compiled path and the interpreter call the same `ShaderRuntime` operations, so
+  `ShaderCompilerTests` can prove they produce identical values. The renderer prefers the compiled
+  shader and seeds the frame-constant variables once per frame rather than per pixel. Measured, the
+  per-pixel shader cost fell from about 660 to about 242 nanoseconds, which is not yet inside the
+  frame budget, so no shader runs at full resolution yet; the remaining work is recorded in the
+  roadmap under phase 39e.
 
 - Added an Appearance setting that optionally checks the signed GitHub Release
   manifest in the background at application startup and notifies the user when
@@ -2105,6 +2457,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.26.0] - 2026-07-15
 
 ### Added
+- The visualizer compiles straight-line shader bodies instead of interpreting them. `ShaderCompiler`
+  turns a shader with local declarations and a single return into a delegate over a slot array, and
+  both the compiled path and the interpreter call the same `ShaderRuntime` operations, so
+  `ShaderCompilerTests` can prove they produce identical values. The renderer prefers the compiled
+  shader and seeds the frame-constant variables once per frame rather than per pixel. Measured, the
+  per-pixel shader cost fell from about 660 to about 242 nanoseconds, which is not yet inside the
+  frame budget, so no shader runs at full resolution yet; the remaining work is recorded in the
+  roadmap under phase 39e.
 
 - Added build-time desktop/server version reporting and signed GitHub Release
   updates. The About window can check, verify, download, and launch a newer
@@ -2131,6 +2491,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.25.0] - 2026-07-15
 
 ### Added
+- The visualizer compiles straight-line shader bodies instead of interpreting them. `ShaderCompiler`
+  turns a shader with local declarations and a single return into a delegate over a slot array, and
+  both the compiled path and the interpreter call the same `ShaderRuntime` operations, so
+  `ShaderCompilerTests` can prove they produce identical values. The renderer prefers the compiled
+  shader and seeds the frame-constant variables once per frame rather than per pixel. Measured, the
+  per-pixel shader cost fell from about 660 to about 242 nanoseconds, which is not yet inside the
+  frame budget, so no shader runs at full resolution yet; the remaining work is recorded in the
+  roadmap under phase 39e.
 
 - Added vector previous/next controls directly beside Show all in the Dashboard's
   20-item Recently Played and Recently Added headers. Scrolling uses a short,
@@ -2226,6 +2594,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.24.0] - 2026-07-08
 
 ### Added
+- The visualizer compiles straight-line shader bodies instead of interpreting them. `ShaderCompiler`
+  turns a shader with local declarations and a single return into a delegate over a slot array, and
+  both the compiled path and the interpreter call the same `ShaderRuntime` operations, so
+  `ShaderCompilerTests` can prove they produce identical values. The renderer prefers the compiled
+  shader and seeds the frame-constant variables once per frame rather than per pixel. Measured, the
+  per-pixel shader cost fell from about 660 to about 242 nanoseconds, which is not yet inside the
+  frame budget, so no shader runs at full resolution yet; the remaining work is recorded in the
+  roadmap under phase 39e.
 
 - Smart-playlist editor live preview: while editing a smart playlist's criteria,
   a debounced preview line shows how many tracks currently match, resolved the
@@ -2320,6 +2696,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.23.3] - 2026-07-05
 
 ### Added
+- The visualizer compiles straight-line shader bodies instead of interpreting them. `ShaderCompiler`
+  turns a shader with local declarations and a single return into a delegate over a slot array, and
+  both the compiled path and the interpreter call the same `ShaderRuntime` operations, so
+  `ShaderCompilerTests` can prove they produce identical values. The renderer prefers the compiled
+  shader and seeds the frame-constant variables once per frame rather than per pixel. Measured, the
+  per-pixel shader cost fell from about 660 to about 242 nanoseconds, which is not yet inside the
+  frame budget, so no shader runs at full resolution yet; the remaining work is recorded in the
+  roadmap under phase 39e.
 
 - Added an artist-info button beside the artist name in album/track detail
   headers, opening the same biography, image, and rename/merge view used by the
@@ -2381,6 +2765,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.23.0] - 2026-07-05
 
 ### Added
+- The visualizer compiles straight-line shader bodies instead of interpreting them. `ShaderCompiler`
+  turns a shader with local declarations and a single return into a delegate over a slot array, and
+  both the compiled path and the interpreter call the same `ShaderRuntime` operations, so
+  `ShaderCompilerTests` can prove they produce identical values. The renderer prefers the compiled
+  shader and seeds the frame-constant variables once per frame rather than per pixel. Measured, the
+  per-pixel shader cost fell from about 660 to about 242 nanoseconds, which is not yet inside the
+  frame budget, so no shader runs at full resolution yet; the remaining work is recorded in the
+  roadmap under phase 39e.
 
 - The Tracks search now honours the active facet filters. The **source** facet
   restricts which sources are searched at all (e.g. with only an Orynivo Server
@@ -2489,6 +2881,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.22.0] - 2026-07-04
 
 ### Added
+- The visualizer compiles straight-line shader bodies instead of interpreting them. `ShaderCompiler`
+  turns a shader with local declarations and a single return into a delegate over a slot array, and
+  both the compiled path and the interpreter call the same `ShaderRuntime` operations, so
+  `ShaderCompilerTests` can prove they produce identical values. The renderer prefers the compiled
+  shader and seeds the frame-constant variables once per frame rather than per pixel. Measured, the
+  per-pixel shader cost fell from about 660 to about 242 nanoseconds, which is not yet inside the
+  frame budget, so no shader runs at full resolution yet; the remaining work is recorded in the
+  roadmap under phase 39e.
 
 - Reworked the Dashboard into a more personal "music hub": a time-of-day
   greeting with a short tagline now opens the page, followed by a new **Recently
@@ -2622,6 +3022,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.21.0] - 2026-07-04
 
 ### Added
+- The visualizer compiles straight-line shader bodies instead of interpreting them. `ShaderCompiler`
+  turns a shader with local declarations and a single return into a delegate over a slot array, and
+  both the compiled path and the interpreter call the same `ShaderRuntime` operations, so
+  `ShaderCompilerTests` can prove they produce identical values. The renderer prefers the compiled
+  shader and seeds the frame-constant variables once per frame rather than per pixel. Measured, the
+  per-pixel shader cost fell from about 660 to about 242 nanoseconds, which is not yet inside the
+  frame budget, so no shader runs at full resolution yet; the remaining work is recorded in the
+  roadmap under phase 39e.
 
 - Added a waveform-style transport progress view that keeps the existing seek
   behaviour while showing local-file peak data with the active transport accent
@@ -2717,6 +3125,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.20.5] - 2026-07-01
 
 ### Added
+- The visualizer compiles straight-line shader bodies instead of interpreting them. `ShaderCompiler`
+  turns a shader with local declarations and a single return into a delegate over a slot array, and
+  both the compiled path and the interpreter call the same `ShaderRuntime` operations, so
+  `ShaderCompilerTests` can prove they produce identical values. The renderer prefers the compiled
+  shader and seeds the frame-constant variables once per frame rather than per pixel. Measured, the
+  per-pixel shader cost fell from about 660 to about 242 nanoseconds, which is not yet inside the
+  frame budget, so no shader runs at full resolution yet; the remaining work is recorded in the
+  roadmap under phase 39e.
 
 - Introduced a shared typography scale as application resources
   (`FontSizeMeta`, `FontSizeCaption`, `FontSizeBody`, `FontSizeBodyStrong`,
@@ -2822,6 +3238,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.20.3] - 2026-06-30
 
 ### Added
+- The visualizer compiles straight-line shader bodies instead of interpreting them. `ShaderCompiler`
+  turns a shader with local declarations and a single return into a delegate over a slot array, and
+  both the compiled path and the interpreter call the same `ShaderRuntime` operations, so
+  `ShaderCompilerTests` can prove they produce identical values. The renderer prefers the compiled
+  shader and seeds the frame-constant variables once per frame rather than per pixel. Measured, the
+  per-pixel shader cost fell from about 660 to about 242 nanoseconds, which is not yet inside the
+  frame budget, so no shader runs at full resolution yet; the remaining work is recorded in the
+  roadmap under phase 39e.
 
 - The Dashboard's "Recently added albums" strip now also includes albums from
   every configured remote Orynivo Server, merged with the local library and
@@ -2893,6 +3317,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.20.0] - 2026-06-29
 
 ### Added
+- The visualizer compiles straight-line shader bodies instead of interpreting them. `ShaderCompiler`
+  turns a shader with local declarations and a single return into a delegate over a slot array, and
+  both the compiled path and the interpreter call the same `ShaderRuntime` operations, so
+  `ShaderCompilerTests` can prove they produce identical values. The renderer prefers the compiled
+  shader and seeds the frame-constant variables once per frame rather than per pixel. Measured, the
+  per-pixel shader cost fell from about 660 to about 242 nanoseconds, which is not yet inside the
+  frame budget, so no shader runs at full resolution yet; the remaining work is recorded in the
+  roadmap under phase 39e.
 
 - Remote Orynivo Server Tracks now caches the downloaded full track list under
   `%LOCALAPPDATA%\Orynivo\remote-track-cache\` and reuses it while the server's
@@ -2949,6 +3381,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.18.0] - 2026-06-28
 
 ### Added
+- The visualizer compiles straight-line shader bodies instead of interpreting them. `ShaderCompiler`
+  turns a shader with local declarations and a single return into a delegate over a slot array, and
+  both the compiled path and the interpreter call the same `ShaderRuntime` operations, so
+  `ShaderCompilerTests` can prove they produce identical values. The renderer prefers the compiled
+  shader and seeds the frame-constant variables once per frame rather than per pixel. Measured, the
+  per-pixel shader cost fell from about 660 to about 242 nanoseconds, which is not yet inside the
+  frame budget, so no shader runs at full resolution yet; the remaining work is recorded in the
+  roadmap under phase 39e.
 
 - Added a shared playlist provider layer for local and remote Orynivo Server
   libraries so track/album/folder context menus use the same playlist actions
@@ -2976,6 +3416,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.16.0] - 2026-06-28
 
 ### Added
+- The visualizer compiles straight-line shader bodies instead of interpreting them. `ShaderCompiler`
+  turns a shader with local declarations and a single return into a delegate over a slot array, and
+  both the compiled path and the interpreter call the same `ShaderRuntime` operations, so
+  `ShaderCompilerTests` can prove they produce identical values. The renderer prefers the compiled
+  shader and seeds the frame-constant variables once per frame rather than per pixel. Measured, the
+  per-pixel shader cost fell from about 660 to about 242 nanoseconds, which is not yet inside the
+  frame budget, so no shader runs at full resolution yet; the remaining work is recorded in the
+  roadmap under phase 39e.
 
 - The transport favourite (heart) button now works while playing a remote
   Orynivo Server track and toggles the client-side favourite for that track
@@ -3159,6 +3607,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.15.0] - 2026-06-27
 
 ### Added
+- The visualizer compiles straight-line shader bodies instead of interpreting them. `ShaderCompiler`
+  turns a shader with local declarations and a single return into a delegate over a slot array, and
+  both the compiled path and the interpreter call the same `ShaderRuntime` operations, so
+  `ShaderCompilerTests` can prove they produce identical values. The renderer prefers the compiled
+  shader and seeds the frame-constant variables once per frame rather than per pixel. Measured, the
+  per-pixel shader cost fell from about 660 to about 242 nanoseconds, which is not yet inside the
+  frame budget, so no shader runs at full resolution yet; the remaining work is recorded in the
+  roadmap under phase 39e.
 
 - **Orynivo.Core** — extracted the cross-platform library layer from the
   Windows player into a standalone `net8.0` class library.  `Orynivo.Core`
@@ -3252,6 +3708,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.14.0] - 2026-06-26
 
 ### Added
+- The visualizer compiles straight-line shader bodies instead of interpreting them. `ShaderCompiler`
+  turns a shader with local declarations and a single return into a delegate over a slot array, and
+  both the compiled path and the interpreter call the same `ShaderRuntime` operations, so
+  `ShaderCompilerTests` can prove they produce identical values. The renderer prefers the compiled
+  shader and seeds the frame-constant variables once per frame rather than per pixel. Measured, the
+  per-pixel shader cost fell from about 660 to about 242 nanoseconds, which is not yet inside the
+  frame budget, so no shader runs at full resolution yet; the remaining work is recorded in the
+  roadmap under phase 39e.
 
 - Added a Windows installer and portable ZIP built via GitHub Actions.
   Pushing a version tag (e.g. `v0.14.0`) triggers the release workflow
@@ -3265,6 +3729,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.13.0] - 2026-06-26
 
 ### Added
+- The visualizer compiles straight-line shader bodies instead of interpreting them. `ShaderCompiler`
+  turns a shader with local declarations and a single return into a delegate over a slot array, and
+  both the compiled path and the interpreter call the same `ShaderRuntime` operations, so
+  `ShaderCompilerTests` can prove they produce identical values. The renderer prefers the compiled
+  shader and seeds the frame-constant variables once per frame rather than per pixel. Measured, the
+  per-pixel shader cost fell from about 660 to about 242 nanoseconds, which is not yet inside the
+  frame budget, so no shader runs at full resolution yet; the remaining work is recorded in the
+  roadmap under phase 39e.
 
 - **Embedded AI Chat** — a new **AI Chat** sidebar view that sends
   natural-language questions about the music library to any
@@ -3290,6 +3762,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.12.0] - 2026-06-26
 
 ### Added
+- The visualizer compiles straight-line shader bodies instead of interpreting them. `ShaderCompiler`
+  turns a shader with local declarations and a single return into a delegate over a slot array, and
+  both the compiled path and the interpreter call the same `ShaderRuntime` operations, so
+  `ShaderCompilerTests` can prove they produce identical values. The renderer prefers the compiled
+  shader and seeds the frame-constant variables once per frame rather than per pixel. Measured, the
+  per-pixel shader cost fell from about 660 to about 242 nanoseconds, which is not yet inside the
+  frame budget, so no shader runs at full resolution yet; the remaining work is recorded in the
+  roadmap under phase 39e.
 
 - Internet Radio, Podcasts, and **Up Next** sidebar items can
   now be hidden individually in Settings > Appearance, consistent with the
@@ -3327,6 +3807,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.11.0] - 2026-06-25
 
 ### Added
+- The visualizer compiles straight-line shader bodies instead of interpreting them. `ShaderCompiler`
+  turns a shader with local declarations and a single return into a delegate over a slot array, and
+  both the compiled path and the interpreter call the same `ShaderRuntime` operations, so
+  `ShaderCompilerTests` can prove they produce identical values. The renderer prefers the compiled
+  shader and seeds the frame-constant variables once per frame rather than per pixel. Measured, the
+  per-pixel shader cost fell from about 660 to about 242 nanoseconds, which is not yet inside the
+  frame budget, so no shader runs at full resolution yet; the remaining work is recorded in the
+  roadmap under phase 39e.
 
 - Added **EQ** and **Output** quick-pick buttons to the right side of the
   transport bar (below the volume control). The EQ button opens a popup with
@@ -3401,6 +3889,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.10.0] - 2026-06-22
 
 ### Added
+- The visualizer compiles straight-line shader bodies instead of interpreting them. `ShaderCompiler`
+  turns a shader with local declarations and a single return into a delegate over a slot array, and
+  both the compiled path and the interpreter call the same `ShaderRuntime` operations, so
+  `ShaderCompilerTests` can prove they produce identical values. The renderer prefers the compiled
+  shader and seeds the frame-constant variables once per frame rather than per pixel. Measured, the
+  per-pixel shader cost fell from about 660 to about 242 nanoseconds, which is not yet inside the
+  frame budget, so no shader runs at full resolution yet; the remaining work is recorded in the
+  roadmap under phase 39e.
 
 - Added a persisted **Always convert DSD files to PCM** option. When enabled,
   DSF and DFF playback uses the FFmpeg PCM path with ASIO/cwASIO as well as
@@ -3485,6 +3981,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.9.0] - 2026-06-21
 
 ### Added
+- The visualizer compiles straight-line shader bodies instead of interpreting them. `ShaderCompiler`
+  turns a shader with local declarations and a single return into a delegate over a slot array, and
+  both the compiled path and the interpreter call the same `ShaderRuntime` operations, so
+  `ShaderCompilerTests` can prove they produce identical values. The renderer prefers the compiled
+  shader and seeds the frame-constant variables once per frame rather than per pixel. Measured, the
+  per-pixel shader cost fell from about 660 to about 242 nanoseconds, which is not yet inside the
+  frame budget, so no shader runs at full resolution yet; the remaining work is recorded in the
+  roadmap under phase 39e.
 
 - Added CUE-sheet support for large FLAC/WAV images. Library scans expose CUE
   entries as independently searchable virtual tracks with their own metadata,
@@ -3497,6 +4001,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.8.0] - 2026-06-21
 
 ### Added
+- The visualizer compiles straight-line shader bodies instead of interpreting them. `ShaderCompiler`
+  turns a shader with local declarations and a single return into a delegate over a slot array, and
+  both the compiled path and the interpreter call the same `ShaderRuntime` operations, so
+  `ShaderCompilerTests` can prove they produce identical values. The renderer prefers the compiled
+  shader and seeds the frame-constant variables once per frame rather than per pixel. Measured, the
+  per-pixel shader cost fell from about 660 to about 242 nanoseconds, which is not yet inside the
+  frame budget, so no shader runs at full resolution yet; the remaining work is recorded in the
+  roadmap under phase 39e.
 
 - Added a localized, editable **Up next** view backed by the active playback
   queue. Tracks, albums, folders, search results, playlist entries, and Plex
@@ -3608,6 +4120,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.7.0] - 2026-06-21
 
 ### Added
+- The visualizer compiles straight-line shader bodies instead of interpreting them. `ShaderCompiler`
+  turns a shader with local declarations and a single return into a delegate over a slot array, and
+  both the compiled path and the interpreter call the same `ShaderRuntime` operations, so
+  `ShaderCompilerTests` can prove they produce identical values. The renderer prefers the compiled
+  shader and seeds the frame-constant variables once per frame rather than per pixel. Measured, the
+  per-pixel shader cost fell from about 660 to about 242 nanoseconds, which is not yet inside the
+  frame budget, so no shader runs at full resolution yet; the remaining work is recorded in the
+  roadmap under phase 39e.
 
 - Expanded smart playlists with a dedicated localized editor for year, artist,
   album, duration, recently added or played windows, never-played tracks,
@@ -3694,6 +4214,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.6.0] - 2026-06-19
 
 ### Added
+- The visualizer compiles straight-line shader bodies instead of interpreting them. `ShaderCompiler`
+  turns a shader with local declarations and a single return into a delegate over a slot array, and
+  both the compiled path and the interpreter call the same `ShaderRuntime` operations, so
+  `ShaderCompilerTests` can prove they produce identical values. The renderer prefers the compiled
+  shader and seeds the frame-constant variables once per frame rather than per pixel. Measured, the
+  per-pixel shader cost fell from about 660 to about 242 nanoseconds, which is not yet inside the
+  frame budget, so no shader runs at full resolution yet; the remaining work is recorded in the
+  roadmap under phase 39e.
 
 - Licensed Orynivo's original source code and documentation under Apache
   License 2.0, with repository and release copies of `LICENSE`, `NOTICE`,
@@ -3741,6 +4269,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   New NuGet packages: `Avalonia.Fonts.Inter`, `SkiaSharp`.
 
 ### Added
+- The visualizer compiles straight-line shader bodies instead of interpreting them. `ShaderCompiler`
+  turns a shader with local declarations and a single return into a delegate over a slot array, and
+  both the compiled path and the interpreter call the same `ShaderRuntime` operations, so
+  `ShaderCompilerTests` can prove they produce identical values. The renderer prefers the compiled
+  shader and seeds the frame-constant variables once per frame rather than per pixel. Measured, the
+  per-pixel shader cost fell from about 660 to about 242 nanoseconds, which is not yet inside the
+  frame budget, so no shader runs at full resolution yet; the remaining work is recorded in the
+  roadmap under phase 39e.
 
 - Automatic FFmpeg download: when `ffmpeg.exe` and `ffprobe.exe` are not found in
   the application directory or the system PATH, Orynivo downloads the BtbN
@@ -3867,6 +4403,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   automatically.
 
 ### Added
+- The visualizer compiles straight-line shader bodies instead of interpreting them. `ShaderCompiler`
+  turns a shader with local declarations and a single return into a delegate over a slot array, and
+  both the compiled path and the interpreter call the same `ShaderRuntime` operations, so
+  `ShaderCompilerTests` can prove they produce identical values. The renderer prefers the compiled
+  shader and seeds the frame-constant variables once per frame rather than per pixel. Measured, the
+  per-pixel shader cost fell from about 660 to about 242 nanoseconds, which is not yet inside the
+  frame budget, so no shader runs at full resolution yet; the remaining work is recorded in the
+  roadmap under phase 39e.
 
 - Plex music-library browsing with switchable artist, album, track, and lazy
   folder views, artist/album drill-down, paginated large result sets, and

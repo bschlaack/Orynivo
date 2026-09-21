@@ -635,7 +635,7 @@ to a `WriteableBitmap` that Skia scales up.
   stage resolves its slots once instead of looking each name up per pixel, and it skips the polar
   pair, the motion grid, and the seeded sampling position when the preset never reads them. A
   rendered frame allocates nothing. Covered by 5 tests, including the allocation check.
-- 39e JIT-compiled shaders - `Pending`: compile the parsed shader tree to
+- 39e JIT-compiled shaders - `Pending` (compiler done, target not yet met): compile the parsed shader tree to
   `System.Linq.Expressions` through the existing preset compiler machinery instead of walking it
   per pixel, keep the interpreter as the validation and fallback path, and compare both against
   the same reference frames. Measured first, because the target matters: the interpreter costs
@@ -643,6 +643,15 @@ to a `WriteableBitmap` that Skia scales up.
   budget skips it, which is why no shader runs at all. `ShaderCostDiagnosticTests` reports that
   number per resolution; the JIT has to bring it to roughly 10 ns per pixel for the shaders to fit
   inside the budget, and that measurement is the acceptance criterion for this phase.
+  `ShaderCompiler` and `ShaderProgram` now compile straight-line shader bodies (declarations and
+  one return) into a delegate over a slot array, calling the same `ShaderRuntime` operations as the
+  interpreter; anything else stays interpreted, and `ShaderCompilerTests` proves both paths produce
+  identical values. The renderer uses the compiled shader when it is available and seeds the
+  frame-constant variables once per frame instead of per pixel. That took the measured cost from
+  about 660 to about 242 ns per pixel (2.7x), which is real but not enough: 720p still needs 232 ms
+  and the budget skips it. The remaining cost is helper overhead — a string dispatch per call, a
+  delegate indirection per component, and a loop per swizzle — so the next step is to emit the
+  arithmetic inline instead of calling helpers, which is what the 10 ns target requires.
 - 39f Sharper defaults - `Pending`: raise the default render resolution and frame rate to what
   the measured cost allows, keep the existing settings ranges, and document the recommended
   values in README and the wiki.

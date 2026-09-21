@@ -54,6 +54,8 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler
     private int _timingFrames;
     private readonly List<(ShaderInterpreter Interpreter, VisualizerShader Shader)> _warpShaders = [];
     private readonly List<(ShaderInterpreter Interpreter, VisualizerShader Shader)> _compShaders = [];
+    private readonly List<CompiledShader> _compiledWarp = [];
+    private readonly List<CompiledShader> _compiledComp = [];
     private bool _shadersSkipped;
     private int _framesSinceSkip;
     private int _blurLevel;
@@ -127,9 +129,16 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler
         }
 
         foreach (var shader in preset.WarpShaders)
+        {
             _warpShaders.Add((new ShaderInterpreter(shader.Program, this), shader));
+            _compiledWarp.Add(CompiledShader.Create(shader.Program));
+        }
+
         foreach (var shader in preset.CompShaders)
+        {
             _compShaders.Add((new ShaderInterpreter(shader.Program, this), shader));
+            _compiledComp.Add(CompiledShader.Create(shader.Program));
+        }
     }
 
     /// <summary>Gets the preset being rendered.</summary>
@@ -247,6 +256,8 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler
 
         var decay = Math.Clamp(Read("decay", Preset.Decay), 0f, 1f);
         var useShaders = BeginShaderFrame();
+        if (useShaders)
+            SeedCompiledShaderFrame();
         Warp(useShaders);
         var warp = Mark();
 
@@ -613,11 +624,25 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler
     private void RunWarpShaders(float u, float v, float originalU, float originalV)
     {
         _samplerMainIsWarped = false;
-        foreach (var (interpreter, shader) in _warpShaders)
+        for (var index = 0; index < _warpShaders.Count; index++)
         {
+            var (interpreter, shader) = _warpShaders[index];
             shader.PerFrame.Execute(_slots);
-            BindShaderVariables(interpreter, u, v, originalU, originalV);
-            var colour = interpreter.Run();
+            var compiled = _compiledWarp[index];
+            ShaderValue colour;
+            if (compiled.IsCompiled)
+            {
+                compiled.SetAt(compiled.UvIndex, ShaderValue.Vector(u, v, 0f, 0f, 2));
+                compiled.SetAt(compiled.UvOrigIndex, ShaderValue.Vector(originalU, originalV, 0f, 0f, 2));
+                SeedPolar(compiled, u, v);
+                colour = compiled.Run(this);
+            }
+            else
+            {
+                BindShaderVariables(interpreter, u, v, originalU, originalV);
+                colour = interpreter.Run();
+            }
+
             _sample[0] = colour.X;
             _sample[1] = colour.Y;
             _sample[2] = colour.Z;
@@ -626,6 +651,56 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler
 
         if (_warpShaders.Count == 0)
             _previous.SampleBilinear(u, v, _sample);
+    }
+
+    /// <summary>Writes the polar pair for one pixel, and only when the shader reads it.</summary>
+    /// <param name="compiled">Compiled shader about to run.</param>
+    /// <param name="u">Sampling coordinate in the range zero to one.</param>
+    /// <param name="v">Sampling row in the range zero to one.</param>
+    private static void SeedPolar(CompiledShader compiled, float u, float v)
+    {
+        if (compiled.RadIndex < 0 && compiled.AngIndex < 0)
+            return;
+
+        var x = (u * 2f) - 1f;
+        var y = (v * 2f) - 1f;
+        compiled.SetAt(compiled.RadIndex, ShaderValue.Scalar(MathF.Sqrt((x * x) + (y * y))));
+        compiled.SetAt(compiled.AngIndex, ShaderValue.Scalar(MathF.Atan2(y, x)));
+    }
+
+    /// <summary>
+    /// Seeds the frame-constant variables of every compiled shader once per frame, so the per-pixel
+    /// loop only writes what actually changes per pixel.
+    /// </summary>
+    private void SeedCompiledShaderFrame()
+    {
+        var width = _previous.Width;
+        var height = _previous.Height;
+        Span<ShaderValue> values = stackalloc ShaderValue[CompiledShader.FrameVariables.Length];
+        values[0] = ShaderValue.Scalar(Read("time", 0f));
+        values[1] = ShaderValue.Scalar(Read("frame", 0f));
+        values[2] = ShaderValue.Scalar(Read("fps", 0f));
+        values[3] = ShaderValue.Scalar(Bass);
+        values[4] = ShaderValue.Scalar(Mid);
+        values[5] = ShaderValue.Scalar(Treble);
+        values[6] = ShaderValue.Scalar(Volume);
+        values[7] = ShaderValue.Scalar(Read("bass_att", 0f));
+        values[8] = ShaderValue.Scalar(Read("mid_att", 0f));
+        values[9] = ShaderValue.Scalar(Read("treb_att", 0f));
+        values[10] = ShaderValue.Scalar(Read("aspectx", 1f));
+        values[11] = ShaderValue.Scalar(Read("aspecty", 1f));
+        values[12] = ShaderValue.Vector(width, height, 1f / Math.Max(1, width), 1f / Math.Max(1, height), 4);
+        foreach (var compiled in _compiledWarp)
+        {
+            for (var index = 0; index < values.Length; index++)
+                compiled.SetAt(compiled.FrameIndices[index], values[index]);
+        }
+
+        foreach (var compiled in _compiledComp)
+        {
+            for (var index = 0; index < values.Length; index++)
+                compiled.SetAt(compiled.FrameIndices[index], values[index]);
+        }
     }
 
     /// <summary>Runs the comp shaders over the composited frame.</summary>
@@ -646,11 +721,24 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler
             {
                 var normalizedX = width > 1 ? (x / (float)(width - 1) * 2f) - 1f : 0f;
                 var u = (x + 0.5f) / width;
-                foreach (var (interpreter, shader) in _compShaders)
+                for (var index = 0; index < _compShaders.Count; index++)
                 {
+                    var (interpreter, shader) = _compShaders[index];
                     shader.PerPixel.Execute(_slots);
-                    BindShaderVariables(interpreter, u, v, u, v);
-                    var colour = interpreter.Run();
+                    var compiled = _compiledComp[index];
+                    ShaderValue colour;
+                    if (compiled.IsCompiled)
+                    {
+                        compiled.SetAt(compiled.UvIndex, ShaderValue.Vector(u, v, 0f, 0f, 2));
+                        compiled.SetAt(compiled.UvOrigIndex, ShaderValue.Vector(u, v, 0f, 0f, 2));
+                        SeedPolar(compiled, u, v);
+                        colour = compiled.Run(this);
+                    }
+                    else
+                    {
+                        BindShaderVariables(interpreter, u, v, u, v);
+                        colour = interpreter.Run();
+                    }
                     var offset = (((y * width) + x) * 4);
                     _fresh.Pixels[offset] = Math.Clamp(colour.X, 0f, 1f);
                     _fresh.Pixels[offset + 1] = Math.Clamp(colour.Y, 0f, 1f);
@@ -689,6 +777,72 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler
         var y = (v * 2f) - 1f;
         interpreter.SetVariable("rad", MathF.Sqrt((x * x) + (y * y)));
         interpreter.SetVariable("ang", MathF.Atan2(y, x));
+    }
+
+    /// <summary>
+    /// One shader that may have been compiled. The interpreter stays the reference implementation
+    /// and runs whenever the compiler reported the body as unsupported.
+    /// </summary>
+    private sealed class CompiledShader
+    {
+        /// <summary>The engine variables a shader reads, seeded once per frame.</summary>
+        public static readonly string[] FrameVariables =
+        [
+            "time", "frame", "fps", "bass", "mid", "treb", "vol",
+            "bass_att", "mid_att", "treb_att", "aspectx", "aspecty", "texsize"
+        ];
+
+        private readonly ShaderProgram? _program;
+        private readonly ShaderValue[]? _slots;
+
+        private CompiledShader(ShaderProgram? program)
+        {
+            _program = program;
+            _slots = program is null ? null : new ShaderValue[program.SlotCount];
+            FrameIndices = program is null ? [] : Array.ConvertAll(FrameVariables, program.IndexOf);
+            UvIndex = program?.IndexOf("uv") ?? -1;
+            UvOrigIndex = program?.IndexOf("uv_orig") ?? -1;
+            RadIndex = program?.IndexOf("rad") ?? -1;
+            AngIndex = program?.IndexOf("ang") ?? -1;
+        }
+
+        /// <summary>Gets the resolved slots of the frame variables, aligned with the name list.</summary>
+        public int[] FrameIndices { get; }
+
+        /// <summary>Gets the resolved slot of the sampling coordinate.</summary>
+        public int UvIndex { get; }
+
+        /// <summary>Gets the resolved slot of the unmodified sampling coordinate.</summary>
+        public int UvOrigIndex { get; }
+
+        /// <summary>Gets the resolved slot of the pixel radius.</summary>
+        public int RadIndex { get; }
+
+        /// <summary>Gets the resolved slot of the pixel angle.</summary>
+        public int AngIndex { get; }
+
+        /// <summary>Writes one resolved slot.</summary>
+        /// <param name="index">Slot index, or a negative value when the shader lacks the variable.</param>
+        /// <param name="value">Value to store.</param>
+        public void SetAt(int index, ShaderValue value)
+        {
+            if (_slots is not null && index >= 0)
+                _slots[index] = value;
+        }
+
+        /// <summary>Gets a value indicating whether this shader runs compiled.</summary>
+        public bool IsCompiled => _program is not null;
+
+        /// <summary>Compiles a shader body, or reports that it stays interpreted.</summary>
+        /// <param name="program">Parsed shader body.</param>
+        /// <returns>The holder.</returns>
+        public static CompiledShader Create(ShaderNode program) => new(ShaderCompiler.Compile(program));
+
+        /// <summary>Runs the compiled shader.</summary>
+        /// <param name="sampler">Bound sampler.</param>
+        /// <returns>The returned value.</returns>
+        public ShaderValue Run(IShaderSampler sampler) =>
+            _program!.Execute(_slots!, sampler);
     }
 
     /// <inheritdoc/>

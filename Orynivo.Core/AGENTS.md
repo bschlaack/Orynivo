@@ -66,6 +66,13 @@ This file applies to `Orynivo.Core/` and supplements `../AGENTS.md`.
   stopwatch and a handful of marks per frame) and never time a per-pixel shader call, because the
   measurement would cost more than the work. A warp shader is therefore part of `Warp`, while
   `Shader` is the comp stage.
+  `ShaderRuntime` owns every shader operation and both execution paths call it, so the interpreter
+  stays the reference implementation and `ShaderCompiler` can only be correct if it produces the
+  same values; `ShaderCompilerTests` asserts exactly that and must keep passing. Only straight-line
+  bodies (declarations and one return) are compiled — branches, loops, and swizzle assignments stay
+  on the interpreter, because a wrong picture is worse than a slow one — and the compiled path must
+  seed the frame-constant variables once per frame and only `uv`, `uv_orig`, `rad`, and `ang` per
+  pixel.
   The per-pixel path is the measured bottleneck, so it must stay free of avoidable work:
   `PresetProgram.ReferencedVariables` (filled by the compiler as it resolves each variable) is
   the conservative usage set, and the warp stage resolves its slots once in the constructor and
