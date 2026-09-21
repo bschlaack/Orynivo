@@ -637,6 +637,198 @@ public static class SkiaShaderRunner
     private static byte ToByte(float value) => (byte)Math.Clamp((int)MathF.Round(value * 255f), 0, 255);
 
     /// <summary>
+    /// A compiled warp pass that runs as a Skia runtime effect over the previous frame. It is the
+    /// GPU counterpart of the CPU warp stage: the entry point builds the sampling coordinate from
+    /// the Milkdrop motion transform, runs the preset's per-pixel expression block, and then either
+    /// runs the warp shader or samples the previous frame directly. The runtime effect, the static
+    /// noise and volume child shaders, and the per-pixel uniforms are built once.
+    /// </summary>
+    public sealed class WarpPass : IDisposable
+    {
+        /// <summary>The motion uniform names, which have to match <c>ShaderTranspiler.WarpUniforms</c>.</summary>
+        private const string SizeUniform = "_orynivo_size";
+        private const string ZoomUniform = "_orynivo_zoom";
+        private const string ZoomExpUniform = "_orynivo_zoomExp";
+        private const string RotationUniform = "_orynivo_rotation";
+        private const string CentreUniform = "_orynivo_centre";
+        private const string OffsetUniform = "_orynivo_offset";
+        private const string StretchUniform = "_orynivo_stretch";
+
+        private readonly SKRuntimeEffect _effect;
+        private readonly IReadOnlyList<string> _samplers;
+        private readonly IReadOnlyList<string> _perPixelUniforms;
+        private readonly Dictionary<string, SKShader> _static = new(StringComparer.Ordinal);
+        private readonly List<SKBitmap> _bitmaps = [];
+        private readonly List<SKShader> _shaders = [];
+
+        /// <summary>Creates the pass.</summary>
+        /// <param name="effect">Runtime effect to draw with.</param>
+        /// <param name="samplers">Samplers the effect declares.</param>
+        /// <param name="perPixelUniforms">Preset variables the per-pixel block reads.</param>
+        /// <param name="textures">Texture bank for the static noise and volume samplers.</param>
+        private WarpPass(
+            SKRuntimeEffect effect,
+            IReadOnlyList<string> samplers,
+            IReadOnlyList<string> perPixelUniforms,
+            VisualizerTextureBank textures)
+        {
+            _effect = effect;
+            _samplers = samplers;
+            _perPixelUniforms = perPixelUniforms;
+
+            foreach (var name in samplers)
+            {
+                if (name is "sampler_noisevol_lq" or "sampler_noisevol_hq")
+                {
+                    var shader = CreateVolumeShader(
+                        textures,
+                        name.EndsWith("hq", StringComparison.Ordinal)
+                            ? VisualizerTexture.NoiseVolumeHigh
+                            : VisualizerTexture.NoiseVolumeLow);
+                    _static[name] = shader;
+                    _shaders.Add(shader);
+                }
+                else if (VisualizerTextureBank.TryResolve(name, out var texture))
+                {
+                    var size = VisualizerTextureBank.GetSize(texture);
+                    var bitmap = CreateBitmap(textures.GetPixels(texture), size, size);
+                    _bitmaps.Add(bitmap);
+                    var shader = bitmap.ToShader(SKShaderTileMode.Repeat, SKShaderTileMode.Repeat, LinearSampling);
+                    _static[name] = shader;
+                    _shaders.Add(shader);
+                }
+            }
+        }
+
+        /// <summary>Gets the samplers the effect declares.</summary>
+        public IReadOnlyList<string> Samplers => _samplers;
+
+        /// <summary>Gets the preset variables the per-pixel block reads, which the caller has to seed.</summary>
+        public IReadOnlyList<string> PerPixelUniforms => _perPixelUniforms;
+
+        /// <summary>Compiles a warp pass, or reports why it cannot run on the GPU.</summary>
+        /// <param name="program">Parsed warp shader body, or <see langword="null"/> for a warp without a shader.</param>
+        /// <param name="perPixel">Per-pixel expression block, or <see langword="null"/>.</param>
+        /// <param name="textures">Texture bank for the noise and volume samplers.</param>
+        /// <param name="error">Failure reason, or <see langword="null"/> on success.</param>
+        /// <returns>The pass, or <see langword="null"/> when the warp stays on the CPU.</returns>
+        public static WarpPass? TryCreate(
+            ShaderNode? program,
+            PresetProgram? perPixel,
+            VisualizerTextureBank textures,
+            out string? error)
+        {
+            try
+            {
+                var sksl = ShaderTranspiler.TranspileWarp(program, perPixel, out var samplers, out var uniforms);
+                var effect = SKRuntimeEffect.CreateShader(sksl, out var errors);
+                if (effect is null)
+                {
+                    error = errors;
+                    return null;
+                }
+
+                error = null;
+                return new WarpPass(effect, samplers, uniforms, textures);
+            }
+            catch (PresetExpressionException exception)
+            {
+                error = exception.Message;
+                return null;
+            }
+        }
+
+        /// <summary>Draws the warp pass over the previous frame.</summary>
+        /// <param name="previous">Frame to sample.</param>
+        /// <param name="target">Frame to write; must have the same size.</param>
+        /// <param name="parameters">Motion parameters.</param>
+        /// <param name="scalars">Scalar uniforms the shader and per-pixel block read.</param>
+        /// <param name="vectors">Vector uniforms such as <c>rand_frame</c>.</param>
+        /// <exception cref="ArgumentException">The frames have different sizes.</exception>
+        public void Render(
+            PixelBuffer previous,
+            PixelBuffer target,
+            WarpParameters parameters,
+            IReadOnlyDictionary<string, float> scalars,
+            IReadOnlyDictionary<string, float[]> vectors)
+        {
+            ArgumentNullException.ThrowIfNull(previous);
+            ArgumentNullException.ThrowIfNull(target);
+            if (previous.Width != target.Width || previous.Height != target.Height)
+                throw new ArgumentException("The frames have different sizes.", nameof(target));
+
+            var width = target.Width;
+            var height = target.Height;
+            using var sourceBitmap = CreateBitmap(previous.Pixels, width, height);
+            using var sourceShader = sourceBitmap.ToShader(SKShaderTileMode.Clamp, SKShaderTileMode.Clamp, LinearSampling);
+            var children = new SKRuntimeEffectChildren(_effect);
+            foreach (var name in _samplers)
+            {
+                // A static noise or volume texture keeps its own shader; every frame sampler reads
+                // the previous frame, which is what the CPU warp samples for sampler_main.
+                children[name] = new SKRuntimeEffectChild(
+                    _static.TryGetValue(name, out var cached) ? cached : sourceShader);
+            }
+
+            var uniforms = new SKRuntimeEffectUniforms(_effect);
+            foreach (var (name, count) in ShaderTranspiler.UniformComponents)
+            {
+                if (count == 1)
+                    uniforms[name] = 0f;
+                else
+                    uniforms[name] = new float[count];
+            }
+
+            uniforms["texsize"] = TexSize(width, height);
+            SetSamplerSizes(uniforms, width, height);
+            uniforms[SizeUniform] = new float[] { width, height };
+            uniforms[ZoomUniform] = parameters.Zoom;
+            uniforms[ZoomExpUniform] = parameters.ZoomExp;
+            uniforms[RotationUniform] = parameters.Rotation;
+            uniforms[CentreUniform] = new float[] { parameters.CentreX, parameters.CentreY };
+            uniforms[OffsetUniform] = new float[] { parameters.OffsetX, parameters.OffsetY };
+            uniforms[StretchUniform] = new float[] { parameters.StretchX, parameters.StretchY };
+
+            // Every declared uniform has to be set, so the per-pixel variables default to zero
+            // and the caller fills in the slots it knows.
+            foreach (var name in _perPixelUniforms)
+            {
+                var emitted = PresetExpressionTranspiler.UniformName(name);
+                uniforms[emitted] = scalars.TryGetValue(emitted, out var value) ? value : 0f;
+            }
+
+            foreach (var (name, value) in scalars)
+                uniforms[name] = value;
+            foreach (var (name, value) in vectors)
+                uniforms[name] = value;
+
+            using var shader = _effect.ToShader(uniforms, children);
+            using var result = CreateBitmap(new float[width * height * 4], width, height);
+            using var surface = SKSurface.Create(result.Info, result.GetPixels(), result.RowBytes);
+            var canvas = surface.Canvas;
+            canvas.Clear(SKColors.Black);
+            using (var paint = new SKPaint { Shader = shader })
+                canvas.DrawRect(new SKRect(0, 0, width, height), paint);
+
+            canvas.Flush();
+            ReadPixels(result, width, height).AsSpan().CopyTo(target.Pixels);
+        }
+
+        /// <inheritdoc/>
+        public void Dispose()
+        {
+            foreach (var shader in _shaders)
+                shader.Dispose();
+            foreach (var bitmap in _bitmaps)
+                bitmap.Dispose();
+            _static.Clear();
+            _shaders.Clear();
+            _bitmaps.Clear();
+            _effect.Dispose();
+        }
+    }
+
+    /// <summary>
     /// A compiled comp shader that runs as a Skia runtime effect over the renderer's frames. The
     /// runtime effect and the static noise and volume child shaders are built once; each draw binds
     /// the composited frame, its blur levels, and the previous frame, which is what the interpreter's

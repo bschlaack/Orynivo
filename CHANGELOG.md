@@ -7,6 +7,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Added
+- Emitted the preset per-pixel expression block as SkSL so the warp stage can run on the GPU without
+  the per-pixel-block condition. `PresetCompiler` now parses a block once into a `PresetSyntaxNode`
+  tree that both the LINQ interpreter back end and the new `PresetExpressionTranspiler` consume, so
+  the two paths cannot disagree about a block. The emitter reports the uniforms the caller has to
+  seed, maps the engine-bound `x`, `y`, `rad`, and `ang` onto locals, and refuses `megabuf`/`gmegabuf`
+  and `rand`, which stay on the interpreter. Against a 500-file sample all 315 global per-pixel blocks
+  translate. `ShaderTranspiler.TranspileWarp` composes the block with a warp shader (or a direct frame
+  sample) into a warped-`uv` entry point, and `SkiaShaderRunner.WarpPass` runs it over the previous
+  frame; the renderer uses it for a preset with at most one warp shader, no per-shader per-frame
+  block, no motion recording, and a per-pixel program whose written values are assigned before they
+  are read, so the GPU never has to reproduce a value carried from the previous pixel. Against the
+  same sample 249 of the 315 global blocks qualify and all 249 translate and are accepted by Skia.
+  Anything else keeps the interpreter, which stays the reference and the fallback, and the passes
+  remain opt-in through `PresetRenderer.UseSkiaPasses`. The two SkSL emitters now share the naming and
+  type helpers in `SkSL`.
 - Moved the geometric warp onto the GPU. `SkiaShaderRunner.Warp` applies the Milkdrop motion
   transform (centre, stretch, rotate, zoom, zoom exponent, and offset) and reads the previous frame
   bilinearly, leaving a sample outside the frame black the way `PixelBuffer.SampleBilinear` does. The

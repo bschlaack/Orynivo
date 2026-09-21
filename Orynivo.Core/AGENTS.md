@@ -110,13 +110,25 @@ This file applies to `Orynivo.Core/` and supplements `../AGENTS.md`.
   alpha blend, and leave-untouched rule.   `SkiaShaderRunner.Composite` is the GPU additive composite
   and must keep the CPU pass's clamp.   `SkiaShaderRunner.Borders` is the GPU border pass and must
   keep the CPU ring geometry and blend. `SkiaShaderRunner.Warp` is the GPU geometric warp and must
-  keep the CPU motion transform and the black-outside-the-frame rule; it runs only when the preset's
-  per-pixel block and warp shader are empty, because those expressions stay on the interpreter.
+  keep the CPU motion transform and the black-outside-the-frame rule. `PresetExpressionTranspiler`
+  emits the preset's per-pixel expression language as SkSL from the same `PresetSyntaxNode` tree the
+  interpreter compiles, so the GPU and the CPU cannot disagree about a block; it reports the uniforms
+  the caller seeds, maps `x`/`y`/`rad`/`ang` onto engine locals, and refuses `megabuf`/`gmegabuf` and
+  `rand`, which stay on the interpreter. `ShaderTranspiler.TranspileWarp` composes that block with a
+  warp shader (or a direct frame sample) into a warped-`uv` entry point: `uv` comes from the motion
+  transform plus the per-pixel block, `uv_orig` is the pixel position, and the shader's polar pair is
+  derived from `uv`, exactly as the CPU stage computes them. `SkiaShaderRunner.WarpPass` runs that
+  effect over the previous frame; the renderer uses it for a preset with at most one warp shader, no
+  per-shader per-frame block, no motion recording, and a per-pixel program whose written values are
+  assigned before they are read (`PresetExpressionTranspiler.CanRunInParallel`), because the GPU
+  evaluates every pixel independently and cannot reproduce a value carried from the previous pixel.
+  Anything else keeps the interpreter, which is the reference for those expressions. The per-pixel
+  emitter and the shader emitter share the naming and type helpers in `SkSL`.
   A frame sampler must keep the renderer's coordinate convention: `PixelBuffer.SampleBilinear` maps a
   normalised coordinate to `zero..size-1`, while a generated texture maps it to `zero..size`, so
   `tex2D`, `GetBlur1`-`GetBlur3`, and `GetPixel` on a frame scale by `texsize - 1` with a half-texel
   shift (or an integer truncation for `GetPixel`).
-  `PresetRenderer.UseSkiaPasses` gates the comp shader and
+  `PresetRenderer.UseSkiaPasses` gates the comp shader, the warp pass, and
   these frame passes together. Only
   straight-line
   bodies (declarations and one return) are compiled — branches, loops, and swizzle assignments stay

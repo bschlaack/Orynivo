@@ -709,11 +709,20 @@ affordable. This is a project of its own and must keep the CPU path as the fallb
   (`SkiaShaderRunner.BlurFrame` reproduces `PixelBuffer.Blur`); the video echo also runs on the Skia
   path (`SkiaShaderRunner.VideoEcho`), and so does the final additive composite
   (`SkiaShaderRunner.Composite`). The borders also run on the Skia path
-  (`SkiaShaderRunner.Borders`), and so does the geometric warp (`SkiaShaderRunner.Warp`) for a preset
-  whose per-pixel block and warp shader are empty. What remains is the per-pixel expression block and
-  the warp shader on the GPU, which needs the expression language emitted as SkSL. The SkSL frame
-  samplers already follow the renderer's coordinate convention (`PixelBuffer.SampleBilinear` maps to
-  `zero..size-1`), which the warp shader needs.
+  (`SkiaShaderRunner.Borders`), and so does the geometric warp (`SkiaShaderRunner.Warp`).
+  The per-pixel expression block now translates too: `PresetCompiler` parses a block once into a
+  `PresetSyntaxNode` tree, the LINQ back end still produces the interpreter delegate, and
+  `PresetExpressionTranspiler` emits the same tree as SkSL. The emitter reports the uniforms the
+  caller seeds, maps `x`/`y`/`rad`/`ang` onto engine locals, and refuses `megabuf`/`gmegabuf` and
+  `rand`; against a 500-file sample every one of the 315 global per-pixel blocks translates.
+  `ShaderTranspiler.TranspileWarp` composes the block with a warp shader (or a direct frame sample)
+  into a warped-`uv` entry point, and `SkiaShaderRunner.WarpPass` runs it over the previous frame.
+  The renderer uses it for a preset with at most one warp shader, no per-shader per-frame block, no
+  motion recording, and a per-pixel program whose written values are assigned before they are read;
+  against the same sample 249 of the 315 global blocks qualify and all 249 translate and are accepted
+  by Skia. Anything else keeps the interpreter. The two emitters share the `SkSL` naming and type
+  helpers. What remains is the comp shader's own per-pixel block and the warp shader's per-frame
+  block.
   The comp pass binds the composited frame, its blur levels, and the previous frame per sampler, and
   scales each sampler by its own `texsize_*`, so the noise textures are sampled at their real size.
   It stays opt-in because the Skia path carries the frame through eight-bit textures and differs

@@ -91,6 +91,8 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
     private PixelBuffer? _shaderOutput;
     private SkiaShaderRunner.CompPass? _skiaComp;
     private bool _skiaCompTried;
+    private SkiaShaderRunner.WarpPass? _skiaWarp;
+    private bool _skiaWarpTried;
     private bool _warpShadersFailed;
     private bool _compShadersFailed;
     private readonly float[] _slots;
@@ -119,6 +121,9 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
     private readonly float[][] _workerSlots;
     private readonly float[][] _workerSample;
     private readonly bool _canParallelizeWarp;
+    // Resolved once: whether the per-pixel program may run on the GPU, which evaluates every pixel
+    // independently and therefore cannot reproduce a value carried from the previous pixel.
+    private readonly bool _perPixelGpuSafe;
     private readonly float[] _sample = new float[4];
     private IVisualizerAudioSource? _audio;
     private bool _initialized;
@@ -175,6 +180,7 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
         // what another pixel wrote and the picture would depend on the split.
         _canParallelizeWarp = preset.WarpShaders.Count == 0 &&
                               preset.PerPixel.WrittenVariables.All(IsSeededPerPixel);
+        _perPixelGpuSafe = PresetExpressionTranspiler.CanRunInParallel(preset.PerPixel);
         var workers = ParallelRows.WorkerCount;
         _workerSlots = new float[workers][];
         _workerSample = new float[workers][];
@@ -480,6 +486,8 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
     {
         _skiaComp?.Dispose();
         _skiaComp = null;
+        _skiaWarp?.Dispose();
+        _skiaWarp = null;
     }
 
     /// <summary>Keeps the smoothed <c>*_att</c> bands the presets read alongside the raw bands.</summary>
@@ -611,33 +619,50 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
             Array.Clear(_motionCount);
         }
 
-        // A preset whose per-pixel block and warp shader are empty has a pure geometric warp, which
-        // the Skia path can run over the full frame; anything that evaluates per pixel stays on the
-        // interpreter, which is the reference for those expressions.
-        if (UseSkiaPasses && Preset.PerPixel.IsEmpty && _warpShaders.Count == 0 &&
-            !_perPixelWritesMotion && !recordMotion)
+        // The Skia path runs the whole warp stage when it can: the geometric warp for a preset with
+        // no per-pixel code and no warp shader, and a warp shader (with or without the per-pixel
+        // expression block) as a runtime effect. A per-pixel program that changes a value another
+        // pixel could read, or that records motion vectors, stays on the interpreter, which is the
+        // reference for those expressions.
+        if (UseSkiaPasses && !_perPixelWritesMotion && !recordMotion)
         {
-            try
+            if (_warpShaders.Count == 0 && Preset.PerPixel.IsEmpty)
             {
-                SkiaShaderRunner.Warp(
-                    _previous,
-                    _warped,
-                    new SkiaShaderRunner.WarpParameters(
-                        zoom,
-                        zoomExp,
-                        rotation,
-                        centreX,
-                        centreY,
-                        offsetX,
-                        offsetY,
-                        stretchX,
-                        stretchY));
-                _warpShaderMilliseconds = 0d;
-                return;
+                try
+                {
+                    SkiaShaderRunner.Warp(
+                        _previous,
+                        _warped,
+                        new SkiaShaderRunner.WarpParameters(
+                            zoom,
+                            zoomExp,
+                            rotation,
+                            centreX,
+                            centreY,
+                            offsetX,
+                            offsetY,
+                            stretchX,
+                            stretchY));
+                    _warpShaderMilliseconds = 0d;
+                    return;
+                }
+                catch (Exception exception)
+                {
+                    ShaderError = "warp (skia): " + exception.GetType().Name + ": " + exception.Message;
+                }
             }
-            catch (Exception exception)
+            else if (TrySkiaWarpPass(
+                zoom,
+                zoomExp,
+                rotation,
+                centreX,
+                centreY,
+                offsetX,
+                offsetY,
+                stretchX,
+                stretchY))
             {
-                ShaderError = "warp (skia): " + exception.GetType().Name + ": " + exception.Message;
+                return;
             }
         }
 
@@ -793,6 +818,102 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
         {
             WarpRows(-1, 0, height);
         }
+    }
+
+    /// <summary>
+    /// Runs the warp stage as a Skia runtime effect when the preset qualifies: at most one warp
+    /// shader, no per-shader per-frame block, and a per-pixel program that only writes the values the
+    /// engine re-seeds for every pixel. Anything else returns <see langword="false"/> so the caller
+    /// keeps the interpreter, which is the reference implementation.
+    /// </summary>
+    /// <param name="zoom">Zoom factor.</param>
+    /// <param name="zoomExp">Zoom exponent.</param>
+    /// <param name="rotation">Rotation in radians.</param>
+    /// <param name="centreX">Rotation and zoom centre x.</param>
+    /// <param name="centreY">Rotation and zoom centre y.</param>
+    /// <param name="offsetX">Translation x.</param>
+    /// <param name="offsetY">Translation y.</param>
+    /// <param name="stretchX">Horizontal stretch.</param>
+    /// <param name="stretchY">Vertical stretch.</param>
+    /// <returns><see langword="true"/> when the pass ran on the Skia path.</returns>
+    private bool TrySkiaWarpPass(
+        float zoom,
+        float zoomExp,
+        float rotation,
+        float centreX,
+        float centreY,
+        float offsetX,
+        float offsetY,
+        float stretchX,
+        float stretchY)
+    {
+        if (_warpShaders.Count > 1)
+            return false;
+        if (_warpShaders.Count == 1 && !_warpShaders[0].Shader.PerFrame.IsEmpty)
+            return false;
+        // The GPU evaluates every pixel independently, so a per-pixel program may only read a value
+        // it writes after assigning it; a carried value would make the picture depend on the
+        // execution order, which the interpreter has and the GPU does not.
+        if (!_perPixelGpuSafe)
+            return false;
+
+        if (!_skiaWarpTried)
+        {
+            _skiaWarpTried = true;
+            var program = _warpShaders.Count == 1 ? _warpShaders[0].Shader.Program : null;
+            var perPixel = Preset.PerPixel.IsEmpty ? null : Preset.PerPixel;
+            // An untranslatable block is expected, not an error: the interpreter renders it.
+            _skiaWarp = SkiaShaderRunner.WarpPass.TryCreate(program, perPixel, _textures, out _);
+        }
+
+        if (_skiaWarp is null)
+            return false;
+
+        try
+        {
+            _skiaWarp.Render(
+                _previous,
+                _warped,
+                new SkiaShaderRunner.WarpParameters(
+                    zoom,
+                    zoomExp,
+                    rotation,
+                    centreX,
+                    centreY,
+                    offsetX,
+                    offsetY,
+                    stretchX,
+                    stretchY),
+                BuildSkiaWarpScalars(_skiaWarp),
+                BuildSkiaVectors());
+            _warpShaderMilliseconds = 0d;
+            return true;
+        }
+        catch (Exception exception)
+        {
+            // An unexpected failure must not take the frame with it, so the pass is dropped and the
+            // interpreter takes over on the next frame.
+            ShaderError = "warp (skia): " + exception.GetType().Name + ": " + exception.Message;
+            _skiaWarp.Dispose();
+            _skiaWarp = null;
+            return false;
+        }
+    }
+
+    /// <summary>Collects the scalar uniforms the warp shader and its per-pixel block read.</summary>
+    /// <param name="pass">Warp pass whose per-pixel variables are seeded.</param>
+    /// <returns>The scalar uniforms.</returns>
+    private Dictionary<string, float> BuildSkiaWarpScalars(SkiaShaderRunner.WarpPass pass)
+    {
+        var scalars = BuildSkiaScalars();
+        foreach (var name in pass.PerPixelUniforms)
+        {
+            var slot = Preset.Layout.IndexOf(name);
+            scalars[PresetExpressionTranspiler.UniformName(name)] =
+                slot >= 0 && slot < _slots.Length ? _slots[slot] : 0f;
+        }
+
+        return scalars;
     }
 
     /// <summary>Runs the warp shaders on the adaptive grid and scales the result over the frame.</summary>
@@ -1305,7 +1426,7 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
 
     /// <summary>Collects the scalar uniforms the shader reads from the seeded slots.</summary>
     /// <returns>The scalar uniforms.</returns>
-    private IReadOnlyDictionary<string, float> BuildSkiaScalars()
+    private Dictionary<string, float> BuildSkiaScalars()
     {
         var scalars = new Dictionary<string, float>(StringComparer.Ordinal);
         var layout = Preset.Layout;

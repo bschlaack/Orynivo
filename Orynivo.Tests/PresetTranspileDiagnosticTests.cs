@@ -103,7 +103,116 @@ public sealed class PresetTranspileDiagnosticTests
         }
     }
 
+    /// <summary>
+    /// Measures how the per-pixel expression blocks of a real collection fare on the GPU path. A
+    /// block that cannot be emitted keeps its preset's warp on the interpreter, so the share that
+    /// translates is what decides whether the GPU warp pass carries the collection.
+    /// </summary>
+    [Fact]
+    public void Report_PerPixelTranslationOverARealCollection()
+    {
+        var folder = ResolveFolder();
+        if (folder is null)
+        {
+            _output.WriteLine("no preset folder configured; nothing to report");
+            return;
+        }
+
+        var globalBlocks = 0;
+        var globalEligible = 0;
+        var globalTranslated = 0;
+        var shaderBlocks = 0;
+        var shaderTranslated = 0;
+        var failures = new Dictionary<string, int>(StringComparer.Ordinal);
+        foreach (var file in Directory
+            .EnumerateFiles(folder, "*.milk", SearchOption.AllDirectories)
+            .OrderBy(path => path, StringComparer.Ordinal)
+            .Take(FileCount))
+        {
+            foreach (var section in VisualizerPreset.ParseSections(File.ReadAllText(file)))
+            {
+                VisualizerPreset preset;
+                try
+                {
+                    preset = VisualizerPreset.Parse(section, Path.GetFileNameWithoutExtension(file));
+                }
+                catch (PresetExpressionException)
+                {
+                    continue;
+                }
+
+                if (!preset.PerPixel.IsEmpty)
+                {
+                    globalBlocks++;
+                    // The renderer only uses the GPU warp for a block that writes nothing another
+                    // pixel could read; a block that carries a value stays on the interpreter.
+                    if (IsGpuEligible(preset.PerPixel))
+                    {
+                        globalEligible++;
+                        if (TryTranspileBlock(preset.PerPixel, failures))
+                            globalTranslated++;
+                    }
+                }
+
+                foreach (var shader in preset.WarpShaders.Concat(preset.CompShaders))
+                {
+                    if (shader.PerPixel.IsEmpty)
+                        continue;
+
+                    shaderBlocks++;
+                    if (TryTranspileBlock(shader.PerPixel, failures))
+                        shaderTranslated++;
+                }
+            }
+        }
+
+        _output.WriteLine(
+            $"global per-pixel blocks: {globalBlocks}   GPU-eligible: {globalEligible}   translated+accepted: {globalTranslated}");
+        _output.WriteLine($"shader per-pixel blocks: {shaderBlocks}   translated: {shaderTranslated}");
+        _output.WriteLine("top reasons:");
+        foreach (var (reason, count) in failures.OrderByDescending(pair => pair.Value).Take(MaxReported))
+            _output.WriteLine($"{count,6}  {reason}");
+    }
+
+    /// <summary>Reports whether the renderer would run a per-pixel block on the GPU warp pass.</summary>
+    /// <param name="program">Block to test.</param>
+    /// <returns><see langword="true"/> when the block never reads a carried value.</returns>
+    private static bool IsGpuEligible(PresetProgram program) =>
+        PresetExpressionTranspiler.CanRunInParallel(program);
+
+    /// <summary>Transpiles one per-pixel block and records the failure reason.</summary>
+    /// <param name="program">Block to transpile.</param>
+    /// <param name="failures">Failure counts, keyed by reason.</param>
+    /// <returns><see langword="true"/> when the block translated and Skia accepted it.</returns>
+    private static bool TryTranspileBlock(PresetProgram program, Dictionary<string, int> failures)
+    {
+        try
+        {
+            // The whole warp entry point is compiled, so the result also covers the emitted helper
+            // and the uniform declarations Skia has to accept.
+            var sksl = ShaderTranspiler.TranspileWarp(null, program, out _, out _);
+            using var effect = SKRuntimeEffect.CreateShader(sksl, out var errors);
+            if (effect is not null)
+                return true;
+
+            Record(failures, "SkSL rejected: " + FirstError(errors));
+            return false;
+        }
+        catch (PresetExpressionException exception)
+        {
+            Record(failures, Normalize(exception.Message));
+            return false;
+        }
+    }
+
+    /// <summary>Adds one failure to the reason counts.</summary>
+    /// <param name="failures">Failure counts.</param>
+    /// <param name="reason">Reason to count.</param>
+    private static void Record(Dictionary<string, int> failures, string reason) =>
+        failures[reason] = failures.TryGetValue(reason, out var count) ? count + 1 : 1;
+
     /// <summary>Translates one shader and reports why it failed, or nothing when it worked.</summary>
+
     /// <param name="shader">Shader to translate.</param>
     /// <returns>The failure reason, or <see langword="null"/>.</returns>
     private static (string? Reason, string? Detail) TryTranslate(VisualizerShader shader)

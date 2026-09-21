@@ -17,14 +17,17 @@ public sealed class PresetProgram
     /// <param name="execute">Compiled statements, or <see langword="null"/> when empty.</param>
     /// <param name="referenced">Variable names the statements mention, or <see langword="null"/>.</param>
     /// <param name="written">Variable names the statements assign to, or <see langword="null"/>.</param>
+    /// <param name="syntax">Parsed statement tree, or <see langword="null"/> when empty.</param>
     internal PresetProgram(
         PresetVariableLayout layout,
         Action<float[]>? execute,
         IReadOnlyCollection<string>? referenced = null,
-        IReadOnlyCollection<string>? written = null)
+        IReadOnlyCollection<string>? written = null,
+        PresetBlockNode? syntax = null)
     {
         Layout = layout;
         _execute = execute;
+        Syntax = syntax;
         _referenced = referenced is null
             ? new HashSet<string>(StringComparer.Ordinal)
             : new HashSet<string>(referenced, StringComparer.Ordinal);
@@ -38,6 +41,12 @@ public sealed class PresetProgram
 
     /// <summary>Gets the slot layout every program of the owning preset shares.</summary>
     public PresetVariableLayout Layout { get; }
+
+    /// <summary>
+    /// Gets the parsed statement tree, or <see langword="null"/> for an empty program. The GPU
+    /// emitter consumes it, so both execution paths share one parse of the same source.
+    /// </summary>
+    internal PresetBlockNode? Syntax { get; }
 
     /// <summary>Gets the variable names this program reads or writes, in slot order.</summary>
     public IReadOnlyList<string> Variables => Layout.Names;
