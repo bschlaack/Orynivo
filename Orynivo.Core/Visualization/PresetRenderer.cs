@@ -80,6 +80,19 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler
     private readonly bool _perPixelUsesY;
     private readonly bool _perPixelUsesRadius;
     private readonly bool _perPixelUsesAngle;
+    // Milkdrop treats the motion variables as per-vertex values that a per-pixel program may
+    // change, and the change carries into the next pixel. That costs a read per pixel, so it is
+    // only done for the presets that actually write one of them.
+    private readonly bool _perPixelWritesMotion;
+    private readonly int _slotZoom;
+    private readonly int _slotZoomExp;
+    private readonly int _slotRot;
+    private readonly int _slotCx;
+    private readonly int _slotCy;
+    private readonly int _slotDx;
+    private readonly int _slotDy;
+    private readonly int _slotSx;
+    private readonly int _slotSy;
     private readonly float[][] _workerSlots;
     private readonly float[][] _workerSample;
     private readonly bool _canParallelizeWarp;
@@ -124,6 +137,16 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler
         _perPixelUsesY = preset.PerPixel.Uses("y");
         _perPixelUsesRadius = preset.PerPixel.Uses("rad");
         _perPixelUsesAngle = preset.PerPixel.Uses("ang");
+        _perPixelWritesMotion = MotionVariables.Any(preset.PerPixel.Writes);
+        _slotZoom = preset.Layout.IndexOf("zoom");
+        _slotZoomExp = preset.Layout.IndexOf("zoomexp");
+        _slotRot = preset.Layout.IndexOf("rot");
+        _slotCx = preset.Layout.IndexOf("cx");
+        _slotCy = preset.Layout.IndexOf("cy");
+        _slotDx = preset.Layout.IndexOf("dx");
+        _slotDy = preset.Layout.IndexOf("dy");
+        _slotSx = preset.Layout.IndexOf("sx");
+        _slotSy = preset.Layout.IndexOf("sy");
         // A per-pixel pass may only run in parallel when everything it writes is re-seeded for
         // every pixel and no shader interpreter state is involved; otherwise one pixel could see
         // what another pixel wrote and the picture would depend on the split.
@@ -196,6 +219,10 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler
 
     /// <summary>Gets a value indicating whether the shaders are currently being skipped.</summary>
     public bool ShadersSkipped => _shadersSkipped;
+
+    /// <summary>The motion variables a per-pixel program may change for the following pixel.</summary>
+    private static readonly string[] MotionVariables =
+        ["zoom", "zoomexp", "rot", "cx", "cy", "dx", "dy", "sx", "sy"];
 
     /// <summary>Gets a value indicating whether the preset carries any shader.</summary>
     public bool HasShaders => _warpShaders.Count > 0 || _compShaders.Count > 0;
@@ -478,6 +505,8 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler
         var height = _warped.Height;
         var perPixel = Preset.PerPixel;
 
+        var perPixelMotion = _perPixelWritesMotion && !recordMotion;
+
         void WarpRows(int worker, int from, int to)
         {
             // The span is taken inside the body, because a local function cannot capture one.
@@ -493,19 +522,46 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler
                 {
                     var normalizedX = width > 1 ? (x / (float)(width - 1) * 2f) - 1f : 0f;
 
-                    // Centre, stretch, rotate, and zoom the sampling position.
-                    var warpedX = (normalizedX - centreX) * stretchX;
-                    var warpedY = (normalizedY - centreY) * stretchY;
-                    var rotatedX = (warpedX * cosRotation) - (warpedY * sinRotation);
-                    var rotatedY = (warpedX * sinRotation) + (warpedY * cosRotation);
+                    // Centre, stretch, rotate, and zoom the sampling position. A preset that changes
+                    // one of these inside per_pixel sees the change here, on the next pixel, the way
+                    // Milkdrop does it.
+                    var zoomNow = zoom;
+                    var zoomExpNow = zoomExp;
+                    var cosNow = cosRotation;
+                    var sinNow = sinRotation;
+                    var centreXNow = centreX;
+                    var centreYNow = centreY;
+                    var offsetXNow = offsetX;
+                    var offsetYNow = offsetY;
+                    var stretchXNow = stretchX;
+                    var stretchYNow = stretchY;
+                    if (perPixelMotion)
+                    {
+                        zoomNow = Math.Max(0.01f, Read(slots, _slotZoom, zoom));
+                        zoomExpNow = Read(slots, _slotZoomExp, zoomExp);
+                        var rotationNow = Read(slots, _slotRot, rotation);
+                        cosNow = MathF.Cos(rotationNow);
+                        sinNow = MathF.Sin(rotationNow);
+                        centreXNow = Read(slots, _slotCx, centreX);
+                        centreYNow = Read(slots, _slotCy, centreY);
+                        offsetXNow = Read(slots, _slotDx, offsetX);
+                        offsetYNow = Read(slots, _slotDy, offsetY);
+                        stretchXNow = Read(slots, _slotSx, stretchX);
+                        stretchYNow = Read(slots, _slotSy, stretchY);
+                    }
+
+                    var warpedX = (normalizedX - centreXNow) * stretchXNow;
+                    var warpedY = (normalizedY - centreYNow) * stretchYNow;
+                    var rotatedX = (warpedX * cosNow) - (warpedY * sinNow);
+                    var rotatedY = (warpedX * sinNow) + (warpedY * cosNow);
                     if (needsRadius || needsAngle)
                     {
                         var radius = MathF.Sqrt((rotatedX * rotatedX) + (rotatedY * rotatedY));
-                        var pixelZoom = needsRadius && zoomExp != 1f
-                            ? MathF.Pow(zoom, 1f + (zoomExp * radius * 2f))
-                            : zoom;
-                        warpedX = (rotatedX * pixelZoom) + centreX + offsetX;
-                        warpedY = (rotatedY * pixelZoom) + centreY + offsetY;
+                        var pixelZoom = needsRadius && zoomExpNow != 1f
+                            ? MathF.Pow(zoomNow, 1f + (zoomExpNow * radius * 2f))
+                            : zoomNow;
+                        warpedX = (rotatedX * pixelZoom) + centreXNow + offsetXNow;
+                        warpedY = (rotatedY * pixelZoom) + centreYNow + offsetYNow;
                         if (needsRadius)
                             Write(slots, _slotRad, radius);
                         if (needsAngle)
@@ -513,8 +569,8 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler
                     }
                     else
                     {
-                        warpedX = (rotatedX * zoom) + centreX + offsetX;
-                        warpedY = (rotatedY * zoom) + centreY + offsetY;
+                    warpedX = (rotatedX * zoomNow) + centreXNow + offsetXNow;
+                    warpedY = (rotatedY * zoomNow) + centreYNow + offsetYNow;
                     }
 
                     if (_perPixelUsesX)

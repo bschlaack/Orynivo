@@ -7,6 +7,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Fixed
+- Fixed the per-pixel motion variables having no effect. Milkdrop treats `zoom`, `zoomexp`,
+  `rot`, `cx`, `cy`, `dx`, `dy`, `sx`, and `sy` as per-vertex values that a per-pixel
+  program may change, and the change carries into the following pixel; the warp used to read
+  them once per frame as constants, so a preset that wrote one of them rendered as if it had
+  not. The warp now reads them per pixel for exactly those presets, so every other preset
+  keeps the cheaper per-frame path. Covered by 3 tests.
 - Added Milkdrop's eight general-purpose `t1`-`t8` variables to the preset variable set.
   They sit next to the 32 `q` variables, and presets that keep state in them now work.
 - Added the `progress`, `meshx`, and `meshy` variables as well: the mesh is our sampling grid,

@@ -756,7 +756,11 @@ affordable. This is a project of its own and must keep the CPU path as the fallb
   reads them once per frame as constants, so a preset that writes any of them inside `per_pixel`
   has no effect here, and the reference notes that some presets depend on that. Moving those reads
   into the pixel loop is the next fidelity step; it is a behaviour change to the warp, so it needs
-  its own verification.
+  its own verification. Done: the warp reads those variables inside the pixel loop when, and only
+  when, the preset's per-pixel program writes one of them — the compiler reports that through
+  `WrittenVariables` — so a preset that changes them sees the change on the following pixel while
+  every other preset keeps the cheaper per-frame path. `PerPixelMotionTests` covers a per-pixel
+  zoom, a per-pixel rotation, and the unchanged per-frame path.
 **Tests**: each phase adds its own; 39a is the prerequisite for claiming any speed-up.
 
 **Commit**: `perf(visualizer): add render measurement` (39a), then one commit per phase
