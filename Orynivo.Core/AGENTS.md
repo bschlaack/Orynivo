@@ -90,7 +90,15 @@ This file applies to `Orynivo.Core/` and supplements `../AGENTS.md`.
   `Shader` is the comp stage.
   `ShaderRuntime` owns every shader operation and both execution paths call it, so the interpreter
   stays the reference implementation and `ShaderCompiler` can only be correct if it produces the
-  same values; `ShaderCompilerTests` asserts exactly that and must keep passing. Only straight-line
+  same values; `ShaderCompilerTests` asserts exactly that and must keep passing. `ShaderTranspiler`
+  is the SkSL back end for the GPU path and must stay honest against the same reference: the GPU and
+  the interpreter have to agree on one variable universe, so the emitter knows the engine-bound
+  per-pixel variables (`uv`, `uv_orig`, `rad`, `ang`), infers an intrinsic's return type from its
+  arguments, declares a sampler from the shader's own `tex2D`/`tex3D` call instead of a fixed list,
+  reads an undeclared variable as a zero constant the way the interpreter does, gives a written
+  uniform a writable copy in main, and renames a name SkSL reserves. `SkiaShaderRunner` must bind a
+  child shader for every sampler `Transpile` reports, and the CPU/GPU comparison tests must keep
+  passing. Only straight-line
   bodies (declarations and one return) are compiled — branches, loops, and swizzle assignments stay
   on the interpreter, because a wrong picture is worse than a slow one — and the compiled path must
   seed the frame-constant variables once per frame and only `uv`, `uv_orig`, `rad`, and `ang` per

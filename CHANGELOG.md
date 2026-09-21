@@ -7,6 +7,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Fixed
+- Made the SkSL emitter carry the whole Milkdrop variable and function vocabulary. A call's return
+  type is now inferred from its arguments instead of staying unknown, which had left an intrinsic
+  such as `saturate(...)` untyped and let a later operation fail on mismatched component counts;
+  `uv`, `uv_orig`, `rad`, and `ang` are known from the start; a variable the shader never declares
+  reads as a zero constant, matching the interpreter; a sampler the shader names is declared from
+  its own `tex2D`/`tex3D` call instead of a fixed list; a uniform the shader writes gets a writable
+  copy in main; `lum` converts its argument to float3 for its implicit weight vector; sampling
+  coordinates are narrowed to the float2 Skia's `eval` takes; vector element reads use an integer
+  index; compound assignments convert to the target's type; `for` loops become a bounded counter;
+  and a name SkSL reserves such as `output` is renamed. Over a 500-file sample the share of shaders
+  that translate and are accepted by Skia rose from 484 to 748 of 764, that is from 63 to 98 percent.
 - Replaced the procedural sine hash behind `tex3D` with a real cubic volume texture that both
   execution paths sample. `VisualizerTextureBank` now generates the two 32³ volume noises
   (`sampler_noisevol_lq`/`sampler_noisevol_hq`) from a fixed seed with three dimensional smoothing and

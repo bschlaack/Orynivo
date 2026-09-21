@@ -699,8 +699,8 @@ affordable. This is a project of its own and must keep the CPU path as the fallb
   `Orynivo.Core` and the path stays testable headlessly. The decision, its three risks, and the
   fallback rule are recorded in `DEPENDENCY-MIGRATION.md`.
 - 40b Shader translation - `Done`: `ShaderTranspiler` emits SkSL from the parsed tree and
-  `SkiaShaderRunner` executes it. Skia accepts the emitted program for 395 of 764 shaders in a
-  500-file sample of the preset collection (52 percent, up from 25 percent at the phase start),
+  `SkiaShaderRunner` executes it. Skia accepts the emitted program for 748 of 764 shaders in a
+  500-file sample of the preset collection (98 percent, up from 25 percent at the phase start),
   and the CPU/GPU comparison tests agree within one byte. A shader that cannot be translated keeps
   the CPU path for that preset.
 - 40c GPU passes - `In progress`: the comp-shader grid and the per-pixel programs run on the GPU
@@ -715,9 +715,13 @@ affordable. This is a project of its own and must keep the CPU path as the fallb
   fixed seed with 3D smoothing and eight-bit quantisation, the CPU interpreter reads them through
   `IShaderSampler.SampleVolume`, and the SkSL emitter samples the same volume from a slice atlas
   with a trilinear helper instead of rejecting the shader. The procedural substitute is replaced
-  rather than ported, and the CPU/GPU comparison test covers the volume. Over a 500-file sample
-  the share of shaders that translate and are accepted by Skia rose from 395 to 484 of 764
-  (52 to 63 percent); the remaining failures are unrelated type mismatches.
+  rather than ported, and the CPU/GPU comparison test covers the volume. The emitter also grew the
+  rest of the Milkdrop vocabulary (inferred call return types, engine-bound and undeclared variables,
+  samplers named by the shader, writable uniforms, narrowed sampling coordinates, integer vector
+  indices, bounded `for` loops, and reserved names), which lifted the share of shaders that translate
+  and are accepted by Skia from 395 to 748 of 764, that is from 52 to 98 percent. The remaining 16
+  are a few `aspect.zw` presets, constant divisions by zero, two shaders whose helper reads a global
+  variable, and a couple of vector comparisons.
 - 40d Platform, packaging, and CI - `Pending`: native dependencies for Windows, Linux, and macOS,
   packaging, the signed release manifest, and the CI build matrix.
 - 40e Cutover and validation - `Pending`: the GPU path becomes the default where it is available,

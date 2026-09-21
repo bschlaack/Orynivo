@@ -35,7 +35,7 @@ public static class SkiaShaderRunner
         ArgumentNullException.ThrowIfNull(program);
         ArgumentNullException.ThrowIfNull(source);
 
-        var sksl = ShaderTranspiler.Transpile(program);
+        var sksl = ShaderTranspiler.Transpile(program, out var samplers);
         using var effect = SKRuntimeEffect.CreateShader(sksl, out var errors)
             ?? throw new PresetExpressionException($"SkSL was rejected: {errors}", 0);
 
@@ -68,7 +68,7 @@ public static class SkiaShaderRunner
         // sampler_main; the frame stands in for the blur levels and the noise textures, while the
         // two volumes get their own slice atlas.
         var children = new SKRuntimeEffectChildren(effect);
-        foreach (var name in SamplerNames)
+        foreach (var name in samplers)
         {
             children[name] = name switch
             {
@@ -89,15 +89,6 @@ public static class SkiaShaderRunner
         canvas.Flush();
         return ReadPixels(target, width, height);
     }
-
-    /// <summary>The samplers the transpiler's prelude declares.</summary>
-    private static readonly string[] SamplerNames =
-    [
-        "sampler_main", "sampler_blur1", "sampler_blur2", "sampler_blur3",
-        "sampler_noise_lq", "sampler_noise_mq", "sampler_noise_hq",
-        "sampler_fc_main", "sampler_pc_main", "sampler_noisevol_lq", "sampler_noisevol_hq",
-        "sampler_pw_main", "sampler_pw_noise_lq", "sampler_worms"
-    ];
 
     /// <summary>Creates an eight-bit bitmap from a frame of zero-to-one components.</summary>
     /// <param name="pixels">Frame components.</param>

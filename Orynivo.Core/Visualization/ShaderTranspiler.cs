@@ -52,6 +52,8 @@ public static class ShaderTranspiler
             ["mid_att"] = 1,
             ["treb_att"] = 1,
             ["aspect"] = 2,
+            ["aspectx"] = 1,
+            ["aspecty"] = 1,
             ["rand_frame"] = 4,
             ["rand_preset"] = 4
         };
@@ -168,6 +170,27 @@ public static class ShaderTranspiler
     /// <summary>The sampler a shader reads when it does not name one.</summary>
     private const string MainSampler = "sampler_main";
 
+    /// <summary>
+    /// The samplers the prelude declares. They are never treated as user variables, and the GPU
+    /// runner binds one child shader for each.
+    /// </summary>
+    public static IReadOnlyList<string> Samplers { get; } =
+    [
+        "sampler_main", "sampler_blur1", "sampler_blur2", "sampler_blur3",
+        "sampler_noise_lq", "sampler_noise_mq", "sampler_noise_hq",
+        "sampler_fc_main", "sampler_pc_main", "sampler_noisevol_lq", "sampler_noisevol_hq",
+        "sampler_pw_main", "sampler_pw_noise_lq", "sampler_worms"
+    ];
+
+    /// <summary>The sampler names as a lookup set.</summary>
+    private static readonly HashSet<string> SamplerSet = new(Samplers, StringComparer.Ordinal);
+
+    /// <summary>Names SkSL reserves, which a preset variable has to avoid.</summary>
+    private static readonly HashSet<string> ReservedNames = new(StringComparer.Ordinal)
+    {
+        "output", "input", "main"
+    };
+
     /// <summary>Built-in functions that keep their name in SkSL.</summary>
     private static readonly HashSet<string> DirectFunctions = new(StringComparer.Ordinal)
     {
@@ -227,15 +250,45 @@ public static class ShaderTranspiler
     /// <param name="program">Root node returned by <see cref="ShaderParser.Parse"/>.</param>
     /// <returns>SkSL source for a <c>half4 main(float2 fragCoord)</c> runtime effect.</returns>
     /// <exception cref="PresetExpressionException">The body uses something SkSL cannot express here.</exception>
-    public static string Transpile(ShaderNode program)
+    public static string Transpile(ShaderNode program) => Transpile(program, out _);
+
+    /// <summary>
+    /// Translates a parsed shader body into SkSL and reports the samplers it declares. Milkdrop names
+    /// a long tail of samplers, so the shader's own <c>tex2D</c>/<c>tex3D</c> calls decide which ones
+    /// are declared instead of a fixed list; the GPU runner has to bind a child shader for every one.
+    /// </summary>
+    /// <param name="program">Root node returned by <see cref="ShaderParser.Parse"/>.</param>
+    /// <param name="samplers">The samplers the generated SkSL declares.</param>
+    /// <returns>SkSL source for a <c>half4 main(float2 fragCoord)</c> runtime effect.</returns>
+    /// <exception cref="PresetExpressionException">The body uses something SkSL cannot express here.</exception>
+    public static string Transpile(ShaderNode program, out IReadOnlyList<string> samplers)
     {
         ArgumentNullException.ThrowIfNull(program);
         var builder = new StringBuilder();
-        builder.Append(Prelude).Append(GeneratedUniforms()).Append(GeneratedVolumeHelpers()).Append('\n');
+
+        // Every sampler the shader names is declared, so an unknown sampler does not become a zero
+        // constant with a broken ".eval". The base set keeps the prelude's literal declarations.
+        var samplerNames = new SortedSet<string>(Samplers, StringComparer.Ordinal);
+        CollectSamplers(program, samplerNames);
+        samplers = [.. samplerNames];
+
+        builder.Append(Prelude).Append(GeneratedUniforms()).Append(GeneratedVolumeHelpers());
+        var extras = samplerNames.Where(name => !SamplerSet.Contains(name)).ToList();
+        foreach (var name in extras)
+            builder.Append("uniform shader ").Append(name).Append(";\n");
 
         // The type table has to stand before the helpers are emitted, because their parameter types
         // are recorded as they are written out.
-        _types = new Dictionary<string, string>(StringComparer.Ordinal) { ["ret"] = "float3" };
+        _types = new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            ["ret"] = "float3",
+            // The per-pixel variables main declares itself; the body may use them before the
+            // declaration line is reached in source order, so their types are known up front.
+            ["uv"] = "float2",
+            ["uv_orig"] = "float2",
+            ["rad"] = "float",
+            ["ang"] = "float"
+        };
         foreach (var (uniform, count) in UniformComponents)
             _types[uniform] = count switch { 1 => "float", 2 => "float2", 4 => "float4", _ => "float" };
 
@@ -244,6 +297,25 @@ public static class ShaderTranspiler
         // paths identical cannot be chosen, which leaves the expression in a shape SkSL rejects.
         foreach (var statement in program.Items)
             CollectDeclarations(statement);
+
+        // An identifier the shader never declares and the engine never binds reads as zero on the
+        // interpreter, so the GPU declares it as a zero constant instead of failing on an unknown
+        // name. That keeps the two paths on the same picture rather than losing the shader.
+        var unknowns = CollectUnknownIdentifiers(program, samplerNames);
+        foreach (var name in unknowns)
+            _types[name] = "float";
+        if (unknowns.Count > 0)
+        {
+            builder.Append('\n');
+            foreach (var name in unknowns)
+                builder.Append("const float ").Append(name).Append(" = 0.0;\n");
+        }
+
+        builder.Append('\n');
+
+        // A uniform the shader writes becomes a writable local in main, because SkSL uniforms are
+        // immutable and the interpreter treats the write as per-pixel state.
+        _mutableUniforms = CollectAssignedUniforms(program);
 
         // A helper is emitted as a function before the entry point, so a call resolves to it instead
         // of running its body where it is defined. Their return types are collected first, because a
@@ -270,6 +342,12 @@ public static class ShaderTranspiler
         builder.Append("    float rad = length(centred);\n");
         builder.Append("    float ang = atan(centred.y, centred.x);\n");
         builder.Append("    float3 ret = float3(0.0);\n");
+        foreach (var name in _mutableUniforms.OrderBy(name => name, StringComparer.Ordinal))
+        {
+            builder.Append("    ")
+                .Append(_types is not null && _types.TryGetValue(name, out var type) ? type : "float")
+                .Append(" _orynivo_").Append(name).Append(" = ").Append(name).Append(";\n");
+        }
         foreach (var statement in program.Items)
         {
             // A helper was already emitted before main; emitting it here would run its body at
@@ -319,7 +397,7 @@ public static class ShaderTranspiler
                     if (declared == "shader")
                         return;
 
-                    var names = string.Join(", ", statement.Items.Select(item => item.Text));
+                    var names = string.Join(", ", statement.Items.Select(item => SafeName(item.Text)));
                     if (_types is not null)
                     {
                         foreach (var item in statement.Items)
@@ -347,14 +425,7 @@ public static class ShaderTranspiler
 
                 return;
             case ShaderNodeKind.For:
-                builder.Append(indent).Append("for (");
-                builder.Append(statement.Left is null ? string.Empty : EmitForPart(statement.Left));
-                builder.Append("; ");
-                builder.Append(statement.Right is null ? string.Empty : EmitCondition(statement.Right));
-                builder.Append("; ");
-                builder.Append(statement.Third is null ? string.Empty : EmitExpression(statement.Third));
-                builder.Append(") ");
-                EmitBody(builder, statement.Items.Count > 0 ? statement.Items[0] : null, depth);
+                EmitFor(builder, statement, depth);
                 return;
             case ShaderNodeKind.While:
                 // SkSL runtime effects reject while and require a counted for whose index is the
@@ -393,6 +464,34 @@ public static class ShaderTranspiler
                     $"The shader statement '{statement.Kind}' has no SkSL translation.",
                     statement.Position);
         }
+    }
+
+    /// <summary>
+    /// Emits a for loop as a bounded counter, the same shape the while translation uses, because SkSL
+    /// runtime effects reject a condition that is not a plain comparison against the loop index and the
+    /// engine's one-or-zero convention turns every condition into a ternary.
+    /// </summary>
+    /// <param name="builder">Output.</param>
+    /// <param name="loop">Loop node.</param>
+    /// <param name="depth">Indentation depth.</param>
+    private static void EmitFor(StringBuilder builder, ShaderNode loop, int depth)
+    {
+        var indent = Indent(depth);
+        var counter = $"_orynivoLoop{depth}";
+        builder.Append(indent).Append("{\n");
+        if (loop.Left is not null)
+            builder.Append(indent).Append("    ").Append(EmitForPart(loop.Left)).Append(";\n");
+        builder.Append(indent).Append("    for (int ").Append(counter).Append(" = 0; ")
+            .Append(counter).Append(" < ").Append(MaxTranslatedIterations)
+            .Append("; ").Append(counter).Append("++) {\n");
+        if (loop.Right is not null)
+            builder.Append(indent).Append("        if (!(").Append(EmitCondition(loop.Right)).Append(")) { break; }\n");
+        if (loop.Items.Count > 0)
+            EmitStatement(builder, loop.Items[0], depth + 2);
+        if (loop.Third is not null)
+            builder.Append(indent).Append("        ").Append(EmitExpression(loop.Third)).Append(";\n");
+        builder.Append(indent).Append("    }\n");
+        builder.Append(indent).Append("}\n");
     }
 
     /// <summary>Emits the body of a control statement, adding braces when it is a single statement.</summary>
@@ -468,9 +567,9 @@ public static class ShaderTranspiler
     private static string EmitExpression(ShaderNode expression) => expression.Kind switch
     {
         ShaderNodeKind.Literal => expression.Number.ToString("0.0########", CultureInfo.InvariantCulture),
-        ShaderNodeKind.Identifier => expression.Text,
-        ShaderNodeKind.Member => $"{EmitExpression(expression.Left!)}.{expression.Text}",
-        ShaderNodeKind.Index => $"{EmitExpression(expression.Left!)}[{EmitExpression(expression.Right!)}]",
+        ShaderNodeKind.Identifier => IdentifierText(expression.Text),
+        ShaderNodeKind.Member => EmitMember(expression),
+        ShaderNodeKind.Index => $"{EmitExpression(expression.Left!)}[int({EmitExpression(expression.Right!)})]",
         ShaderNodeKind.Unary => EmitUnary(expression),
         ShaderNodeKind.Binary => EmitBinary(expression),
         ShaderNodeKind.Ternary =>
@@ -480,6 +579,40 @@ public static class ShaderTranspiler
             $"The shader expression '{expression.Kind}' has no SkSL translation.",
             expression.Position)
     };
+
+    /// <summary>
+    /// Emits an identifier. A uniform the shader writes is read from its writable copy in main, while
+    /// a helper keeps the uniform name because SkSL forbids a shader parameter on a user function and
+    /// the helper cannot see the copy.
+    /// </summary>
+    /// <param name="name">Identifier name.</param>
+    /// <returns>The name to emit.</returns>
+    private static string IdentifierText(string name) =>
+        !_inHelper && _mutableUniforms is not null && _mutableUniforms.Contains(name)
+            ? "_orynivo_" + name
+            : SafeName(name);
+
+    /// <summary>Renames a variable whose name SkSL reserves.</summary>
+    /// <param name="name">Declared name.</param>
+    /// <returns>The name to emit.</returns>
+    private static string SafeName(string name) => ReservedNames.Contains(name) ? "_orynivo_" + name : name;
+
+    /// <summary>
+    /// Emits a component access. A scalar broadcasts to every component the way
+    /// <see cref="ShaderValue.Scalar"/> does, so swizzling a scalar yields the scalar itself (or a
+    /// broadcast vector) instead of a SkSL "invalid swizzle" error.
+    /// </summary>
+    /// <param name="expression">Member node.</param>
+    /// <returns>The access text.</returns>
+    private static string EmitMember(ShaderNode expression)
+    {
+        var operand = EmitExpression(expression.Left!);
+        var operandType = TypeOf(expression.Left!);
+        if (operandType is not null && ComponentCount(operandType) == 1)
+            return Convert(operand, "float", ComponentType(expression.Text.Length));
+
+        return $"{operand}.{expression.Text}";
+    }
 
     /// <summary>
     /// The declared type of every variable of the shader being translated. SkSL is strictly typed
@@ -493,6 +626,13 @@ public static class ShaderTranspiler
     /// <summary>The return type of every helper function of the shader being translated.</summary>
     [ThreadStatic]
     private static Dictionary<string, string>? _helperReturns;
+
+    /// <summary>
+    /// The uniforms the shader assigns to. SkSL uniforms are immutable, so main keeps a writable copy
+    /// of each and the body writes that instead, which is the per-pixel behaviour the interpreter has.
+    /// </summary>
+    [ThreadStatic]
+    private static HashSet<string>? _mutableUniforms;
 
     /// <summary>Whether the statement being emitted belongs to a helper rather than the entry.</summary>
     [ThreadStatic]
@@ -561,6 +701,8 @@ public static class ShaderTranspiler
         switch (call.Text.ToLowerInvariant())
         {
             case "tex2d":
+            case "tex2dlod":
+            case "tex2dbias":
             case "tex3d":
                 return "float4";
             case "getpixel":
@@ -581,10 +723,18 @@ public static class ShaderTranspiler
             return MapType(call.Text);
 
         // An intrinsic keeps the widest component count of its arguments, which is how pow(float3, …)
-        // and max(float3, …) behave.
+        // and max(float3, …) behave. The accumulator must skip an unknown argument instead of folding
+        // it in, because Wider reports nothing when either side is unknown and starting from nothing
+        // would keep the whole call unknown.
         string? widest = null;
         foreach (var argument in call.Items)
-            widest = Wider(widest, TypeOf(argument));
+        {
+            if (TypeOf(argument) is not { } argumentType)
+                continue;
+
+            widest = widest is null ? argumentType : Wider(widest, argumentType);
+        }
+
         return widest;
     }
 
@@ -650,6 +800,18 @@ public static class ShaderTranspiler
             }
         }
 
+        // A helper parameter is a declaration too, so a call to the helper knows its argument types.
+        if (statement.Kind == ShaderNodeKind.Function && _types is not null)
+        {
+            foreach (var parameter in statement.ParameterList)
+            {
+                if (parameter.Text.Length == 0)
+                    continue;
+
+                _types[parameter.Text] = parameter.Items.Count > 0 ? MapType(parameter.Items[0].Text) : "float";
+            }
+        }
+
         foreach (var child in statement.Items)
             CollectDeclarations(child);
 
@@ -659,6 +821,149 @@ public static class ShaderTranspiler
             CollectDeclarations(statement.Right);
         if (statement.Third is not null)
             CollectDeclarations(statement.Third);
+    }
+
+    /// <summary>
+    /// Finds every identifier the shader uses but never declares, so it can be declared as a zero
+    /// constant. The interpreter reads an unbound variable as zero, so this keeps the GPU on the same
+    /// picture instead of failing on an unknown name.
+    /// </summary>
+    /// <param name="program">Root node of the shader.</param>
+    /// <param name="samplers">The samplers the shader declares, which are never user variables.</param>
+    /// <returns>The unknown names in stable order.</returns>
+    private static List<string> CollectUnknownIdentifiers(ShaderNode program, ISet<string> samplers)
+    {
+        var names = new SortedSet<string>(StringComparer.Ordinal);
+        foreach (var statement in program.Items)
+            CollectIdentifiers(statement, names);
+
+        var unknown = new List<string>();
+        foreach (var name in names)
+        {
+            if (_types is not null && _types.ContainsKey(name))
+                continue;
+            if (samplers.Contains(name))
+                continue;
+            // A type name is not a variable, and neither are the boolean literals. The parser also
+            // keeps a few tokens such as a parameter's ":" as identifiers, which are not names.
+            if (IsTypeName(name) || name is "true" or "false" or "null")
+                continue;
+            if (!IsIdentifier(name))
+                continue;
+
+            unknown.Add(name);
+        }
+
+        return unknown;
+    }
+
+    /// <summary>Reports whether a name is a plain identifier.</summary>
+    /// <param name="name">Name to test.</param>
+    /// <returns><see langword="true"/> when the name is a valid identifier.</returns>
+    private static bool IsIdentifier(string name)
+    {
+        if (name.Length == 0 || !(char.IsLetter(name[0]) || name[0] == '_'))
+            return false;
+
+        for (var index = 1; index < name.Length; index++)
+        {
+            if (!(char.IsLetterOrDigit(name[index]) || name[index] == '_'))
+                return false;
+        }
+
+        return true;
+    }
+
+    /// <summary>Reports whether a name is one of the shader type spellings.</summary>
+    /// <param name="name">Name to test.</param>
+    /// <returns><see langword="true"/> when the name is a type.</returns>
+    private static bool IsTypeName(string name) => ShaderParser.IsType(name);
+
+    /// <summary>Collects the samplers a shader names as the first argument of a texture call.</summary>
+    /// <param name="node">Node to walk.</param>
+    /// <param name="names">Set to fill.</param>
+    private static void CollectSamplers(ShaderNode node, SortedSet<string> names)
+    {
+        if (node.Kind == ShaderNodeKind.Call &&
+            node.Text.ToLowerInvariant() is "tex2d" or "tex2dlod" or "tex2dbias" or "tex3d" &&
+            node.Items.Count > 0 &&
+            node.Items[0].Kind == ShaderNodeKind.Identifier)
+        {
+            names.Add(node.Items[0].Text);
+        }
+
+        foreach (var child in node.Items)
+            CollectSamplers(child, names);
+        foreach (var parameter in node.ParameterList)
+            CollectSamplers(parameter, names);
+
+        if (node.Kind != ShaderNodeKind.Call && node.Left is not null)
+            CollectSamplers(node.Left, names);
+        if (node.Right is not null)
+            CollectSamplers(node.Right, names);
+        if (node.Third is not null)
+            CollectSamplers(node.Third, names);
+    }
+
+    /// <summary>Adds every identifier of a statement tree to a set.</summary>
+    /// <param name="node">Node to walk.</param>
+    /// <param name="names">Set to fill.</param>
+    private static void CollectIdentifiers(ShaderNode node, SortedSet<string> names)
+    {
+        if (node.Kind == ShaderNodeKind.Identifier && node.Text.Length > 0)
+            names.Add(node.Text);
+
+        foreach (var child in node.Items)
+            CollectIdentifiers(child, names);
+        foreach (var parameter in node.ParameterList)
+            CollectIdentifiers(parameter, names);
+
+        // A call keeps its callee in Left as well as in Text, and a function name is not a variable.
+        if (node.Kind != ShaderNodeKind.Call && node.Left is not null)
+            CollectIdentifiers(node.Left, names);
+        if (node.Right is not null)
+            CollectIdentifiers(node.Right, names);
+        if (node.Third is not null)
+            CollectIdentifiers(node.Third, names);
+    }
+
+    /// <summary>
+    /// Collects the uniforms a shader assigns to, so main can keep a writable copy of each. Only a
+    /// uniform name counts; an assignment to a declared variable or to <c>ret</c> is already writable.
+    /// </summary>
+    /// <param name="program">Root node of the shader.</param>
+    /// <returns>The assigned uniform names.</returns>
+    private static HashSet<string> CollectAssignedUniforms(ShaderNode program)
+    {
+        var assigned = new HashSet<string>(StringComparer.Ordinal);
+        CollectAssignments(program, assigned);
+        assigned.RemoveWhere(name => !UniformComponents.ContainsKey(name));
+        return assigned;
+    }
+
+    /// <summary>Adds every assignment target of a statement tree to a set.</summary>
+    /// <param name="node">Node to walk.</param>
+    /// <param name="assigned">Set to fill.</param>
+    private static void CollectAssignments(ShaderNode node, HashSet<string> assigned)
+    {
+        if (node.Kind == ShaderNodeKind.Binary &&
+            node.Text is "=" or "+=" or "-=" or "*=" or "/=" &&
+            node.Left is { Kind: ShaderNodeKind.Identifier } target)
+        {
+            assigned.Add(target.Text);
+        }
+
+        foreach (var child in node.Items)
+            CollectAssignments(child, assigned);
+        foreach (var parameter in node.ParameterList)
+            CollectAssignments(parameter, assigned);
+
+        if (node.Kind != ShaderNodeKind.Call && node.Left is not null)
+            CollectAssignments(node.Left, assigned);
+        if (node.Right is not null)
+            CollectAssignments(node.Right, assigned);
+        if (node.Third is not null)
+            CollectAssignments(node.Third, assigned);
     }
 
     /// <summary>
@@ -675,7 +980,7 @@ public static class ShaderTranspiler
             var type = parameter.Items.Count > 0 ? MapType(parameter.Items[0].Text) : "float";
             if (_types is not null)
                 _types[parameter.Text] = type;
-            parameters.Add($"{type} {parameter.Text}");
+            parameters.Add($"{type} {SafeName(parameter.Text)}");
         }
 
         _inHelper = true;
@@ -732,13 +1037,23 @@ public static class ShaderTranspiler
     /// <returns>The converted value text.</returns>
     private static string ConvertToTarget(ShaderNode expression, string right, string? valueType)
     {
-        var targetType = expression.Left is { Kind: ShaderNodeKind.Identifier } target &&
-            _types is not null &&
-            _types.TryGetValue(target.Text, out var declared)
-                ? declared
-                : null;
+        var targetType = TargetType(expression.Left);
         return targetType is null ? right : Convert(right, valueType, targetType);
     }
+
+    /// <summary>Returns the declared type an assignment target has, or nothing when it is unknown.</summary>
+    /// <param name="target">Assignment target.</param>
+    /// <returns>The type name, or <see langword="null"/>.</returns>
+    private static string? TargetType(ShaderNode? target) => target switch
+    {
+        { Kind: ShaderNodeKind.Identifier } identifier when _types is not null &&
+            _types.TryGetValue(identifier.Text, out var declared) => declared,
+        // A one-letter swizzle selects a scalar component, so the value has to become a scalar too.
+        { Kind: ShaderNodeKind.Member } member => ComponentType(member.Text.Length),
+        // An element read is a scalar in the engine's vector model.
+        { Kind: ShaderNodeKind.Index } => "float",
+        _ => null
+    };
 
     /// <summary>Emits a unary expression, keeping the preset convention that zero is false.</summary>
     /// <param name="expression">Unary node.</param>
@@ -817,6 +1132,17 @@ public static class ShaderTranspiler
         };
     }
 
+    /// <summary>
+    /// Emits a sampling coordinate as the <c>float2</c> Skia's <c>eval</c> takes. The interpreter
+    /// reads only the first two components of a coordinate, so a wider value is narrowed the same way.
+    /// </summary>
+    /// <param name="call">Call the coordinate belongs to.</param>
+    /// <param name="text">Already emitted argument text.</param>
+    /// <param name="index">Argument index of the coordinate.</param>
+    /// <returns>The coordinate text.</returns>
+    private static string Coordinate(ShaderNode call, string text, int index) =>
+        index < call.Items.Count ? Convert(text, TypeOf(call.Items[index]), "float2") : text;
+
     /// <summary>Emits a call, translating the sampler accessors and the renamed intrinsics.</summary>
     /// <param name="call">Call node.</param>
     /// <returns>The expression text.</returns>
@@ -852,13 +1178,16 @@ public static class ShaderTranspiler
         switch (name.ToLowerInvariant())
         {
             case "tex2d":
+            case "tex2dlod":
+            case "tex2dbias":
                 if (arguments.Count < 2)
                     throw new PresetExpressionException("tex2D needs a sampler and a coordinate.", call.Position);
 
                 // A Skia shader evaluates to half4, so the result is widened to the float4 the
                 // presets expect from tex2D. The coordinate is normalised, so only the size half of
-                // texsize applies to it.
-                return $"float4({arguments[0]}.eval({arguments[1]} * texsize.xy))";
+                // texsize applies to it; Skia's eval only takes a float2, so a wider coordinate is
+                // narrowed the way the interpreter reads it.
+                return $"float4({arguments[0]}.eval({Coordinate(call, arguments[1], 1)} * texsize.xy))";
             case "tex3d":
                 // Milkdrop samples a 3D noise volume. Skia's runtime effects only sample 2D
                 // shaders, so the volume travels as a slice atlas and the generated helper does the
@@ -875,13 +1204,13 @@ public static class ShaderTranspiler
             case "getpixel":
                 return arguments.Count >= 2
                     ? $"float4({MainSampler}.eval(float2({arguments[0]}, {arguments[1]}))).rgb"
-                    : $"float4({MainSampler}.eval({arguments[0]})).rgb";
+                    : $"float4({MainSampler}.eval({Coordinate(call, arguments[0], 0)})).rgb";
             case "getblur1":
-                return $"float4(sampler_blur1.eval({arguments[0]})).rgb";
+                return $"float4(sampler_blur1.eval({Coordinate(call, arguments[0], 0)})).rgb";
             case "getblur2":
-                return $"float4(sampler_blur2.eval({arguments[0]})).rgb";
+                return $"float4(sampler_blur2.eval({Coordinate(call, arguments[0], 0)})).rgb";
             case "getblur3":
-                return $"float4(sampler_blur3.eval({arguments[0]})).rgb";
+                return $"float4(sampler_blur3.eval({Coordinate(call, arguments[0], 0)})).rgb";
             case "saturate":
                 return $"clamp({arguments[0]}, 0.0, 1.0)";
             case "atan2":
@@ -891,8 +1220,10 @@ public static class ShaderTranspiler
             case "mul":
                 return arguments.Count >= 2 ? $"({arguments[0]} * {arguments[1]})" : arguments[0];
             case "lum":
-                // Milkdrop's luminance helper; the weights are the conventional Rec. 601 ones.
-                return $"dot({arguments[0]}, float3(0.299, 0.587, 0.114))";
+                // Milkdrop's luminance helper; the weights are the conventional Rec. 601 ones. The
+                // implicit float3 weight vector is a second operand, so the value is converted to
+                // float3 here rather than by the argument loop above.
+                return $"dot({Convert(arguments[0], call.Items.Count > 0 ? TypeOf(call.Items[0]) : null, "float3")}, float3(0.299, 0.587, 0.114))";
         }
 
         // A call to a function the shader defines itself keeps its name.

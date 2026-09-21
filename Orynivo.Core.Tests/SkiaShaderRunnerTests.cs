@@ -49,6 +49,33 @@ public sealed class SkiaShaderRunnerTests
         AssertMatchesInterpreter(Source);
     }
 
+    /// <summary>The GPU and the interpreter agree on a counted for loop.</summary>
+    [Fact]
+    public void Render_MatchesTheInterpreterForAForLoop()
+    {
+        const string Source = """
+            float3 sum = 0;
+            for (int n = 0; n < 3; n++) {
+                sum += tex2D(sampler_main, uv + float2(0.01, 0.0) * n).rgb;
+            }
+            ret = sum * 0.25;
+            """;
+
+        AssertMatchesInterpreter(Source);
+    }
+
+    /// <summary>The GPU and the interpreter both read an undeclared variable as zero.</summary>
+    [Fact]
+    public void Render_MatchesTheInterpreterForAnUnknownIdentifier()
+    {
+        const string Source = """
+            float3 n = float3(roam_cos.y, roam_sin.x, 0.0);
+            ret = n * 0.5 + tex2D(sampler_main, uv).rgb;
+            """;
+
+        AssertMatchesInterpreter(Source);
+    }
+
     /// <summary>The GPU and the interpreter agree on the frame helpers.</summary>
     [Fact]
     public void Render_MatchesTheInterpreterForTheFrameHelpers()

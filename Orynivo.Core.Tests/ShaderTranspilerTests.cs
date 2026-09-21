@@ -61,6 +61,71 @@ public sealed class ShaderTranspilerTests
             """);
     }
 
+    /// <summary>A variable the shader never declares compiles as a zero constant.</summary>
+    [Fact]
+    public void Transpile_CompilesAnUnknownIdentifier()
+    {
+        AssertCompiles("""
+            float3 n = float3(roam_cos.y, roam_sin.x, 0.0);
+            ret = n * 0.5;
+            """);
+    }
+
+    /// <summary>A uniform the shader writes becomes a writable local.</summary>
+    [Fact]
+    public void Transpile_CompilesAWrittenUniform()
+    {
+        AssertCompiles("""
+            q25 = q24 + 0.01;
+            ret = float3(q25);
+            """);
+    }
+
+    /// <summary>A for loop becomes a bounded counter that SkSL accepts.</summary>
+    [Fact]
+    public void Transpile_CompilesAForLoop()
+    {
+        AssertCompiles("""
+            float3 sum = 0;
+            for (int n = 0; n < 4; n++) {
+                sum += tex2D(sampler_main, uv + float2(0.01, 0.0) * n).rgb;
+            }
+            ret = sum * 0.25;
+            """);
+    }
+
+    /// <summary>A coordinate wider than float2 is narrowed for the sampler.</summary>
+    [Fact]
+    public void Transpile_CompilesAVectorCoordinate()
+    {
+        AssertCompiles("""
+            ret = tex2D(sampler_main, float3(uv, 0.5)).rgb;
+            """);
+    }
+
+    /// <summary>A vector element read uses an integer index.</summary>
+    [Fact]
+    public void Transpile_CompilesAVectorIndex()
+    {
+        AssertCompiles("""
+            float3 v = float3(0.1, 0.2, 0.3);
+            ret = float3(v[0], v[1], v[2]);
+            """);
+    }
+
+    /// <summary>A sampler the prelude does not list is declared from the shader's own call.</summary>
+    [Fact]
+    public void Transpile_DeclaresASamplerTheShaderNames()
+    {
+        var node = ShaderParser.Parse("""
+            ret = tex2D(sampler_fw_main, uv).rgb;
+            """);
+
+        var sksl = ShaderTranspiler.Transpile(node, out var samplers);
+        Assert.Contains("sampler_fw_main", samplers, StringComparer.Ordinal);
+        Assert.Contains("uniform shader sampler_fw_main;", sksl, StringComparison.Ordinal);
+    }
+
     /// <summary>An unsupported construct is reported instead of being emitted wrongly.</summary>
     [Fact]
     public void Transpile_ReportsWhatItCannotTranslate()

@@ -20,6 +20,11 @@ public static class ShaderParser
         "sampler", "sampler2D", "sampler3D", "texture"
     };
 
+    /// <summary>Reports whether a name is one of the shader type spellings.</summary>
+    /// <param name="name">Name to test.</param>
+    /// <returns><see langword="true"/> when the name is a type.</returns>
+    internal static bool IsType(string name) => Types.Contains(name);
+
     /// <summary>Parses shader source.</summary>
     /// <param name="source">Shader source text.</param>
     /// <returns>The root node, whose children are the statements of the shader body.</returns>
