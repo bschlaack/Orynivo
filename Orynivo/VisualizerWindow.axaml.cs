@@ -48,6 +48,8 @@ public partial class VisualizerWindow : Window
     private int _renderedPresetIndex = -1;
     private volatile bool _resetRequested;
     private int _presentPending;
+    private string? _renderError;
+    private int _renderErrorFrames;
     private volatile string? _pendingDiagnostics;
     private double _lastFrame;
     private double _lastDiagnostics;
@@ -245,9 +247,40 @@ public partial class VisualizerWindow : Window
         }
     }
 
-    /// <summary>Renders one frame on the render thread and hands it to the UI thread.</summary>
+    /// <summary>
+    /// Renders one frame and hands it to the UI thread. Any exception here used to end the render
+    /// thread, which froze the picture for good and left no trace of why; it is caught, reported,
+    /// and the loop continues so the next preset still works.
+    /// </summary>
     /// <param name="deltaSeconds">Seconds since the previous frame.</param>
     private void RenderOneFrame(double deltaSeconds)
+    {
+        try
+        {
+            RenderOneFrameCore(deltaSeconds);
+            _renderError = null;
+        }
+        catch (Exception exception)
+        {
+            ReportRenderError(exception);
+        }
+    }
+
+    /// <summary>Reports a render failure, logging the first one and then at most every thirtieth frame.</summary>
+    /// <param name="exception">Failure to report.</param>
+    private void ReportRenderError(Exception exception)
+    {
+        if (_renderError is not null && ++_renderErrorFrames % 30 != 0)
+            return;
+
+        _renderErrorFrames = 0;
+        _renderError = $"{exception.GetType().Name}: {exception.Message}";
+        SeekDiagnostics.Log("visualizer", $"render error preset={_renderer?.Preset.Name} {_renderError}");
+    }
+
+    /// <summary>Renders one frame on the render thread and hands it to the UI thread.</summary>
+    /// <param name="deltaSeconds">Seconds since the previous frame.</param>
+    private void RenderOneFrameCore(double deltaSeconds)
     {
         if (_renderedPresetIndex != _presetIndex)
         {
@@ -375,6 +408,7 @@ public partial class VisualizerWindow : Window
             + $"shaders=warp{_renderer.Preset.WarpShaders.Count}/comp{_renderer.Preset.CompShaders.Count} "
             + $"gridReduced={_renderer.ShaderGridReduced} "
             + (_renderer.ShaderError is { } shaderError ? $"shaderError=[{shaderError}] " : string.Empty)
+            + (_renderError is { } renderError ? $"renderError=[{renderError}] " : string.Empty)
             + $"preset={_renderer.Preset.Name} userPresets={_library.Count - VisualizerPresets.BuiltIn.Count}";
         // Start a fresh averaging window so the next line describes its own second.
         _renderer.ResetTimings();

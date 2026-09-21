@@ -907,11 +907,11 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler
         {
             RunWarpShadersCore(u, v, originalU, originalV);
         }
-        catch (PresetExpressionException exception)
+        catch (Exception exception)
         {
-            // A preset shader may call something the engine does not implement. Disabling the
-            // shaders is the only safe answer: the alternative is a dead render thread.
-            ShaderError = "warp: " + exception.Message;
+            // A preset shader may call something the engine does not implement, and an unexpected
+            // failure must not take the frame with it. Disabling the shaders is the only safe answer.
+            ShaderError = "warp: " + exception.GetType().Name + ": " + exception.Message;
             _warpShadersFailed = true;
             _warpShaders.Clear();
             _compiledWarp.Clear();
@@ -1093,11 +1093,11 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler
         {
             RunCompShaders(output, shaderWidth, shaderHeight);
         }
-        catch (PresetExpressionException exception)
+        catch (Exception exception)
         {
-            // A preset shader may call something the engine does not implement. Disabling the
-            // shaders is the only safe answer: the alternative is a dead render thread.
-            ShaderError = "comp: " + exception.Message;
+            // A preset shader may call something the engine does not implement, and an unexpected
+            // failure must not take the frame with it. Disabling the shaders is the only safe answer.
+            ShaderError = "comp: " + exception.GetType().Name + ": " + exception.Message;
             _compShadersFailed = true;
             _compShaders.Clear();
             return;
@@ -1106,25 +1106,21 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler
         if (!scaled)
             return;
 
-        // Nearest-neighbour on purpose: a bilinear pass over the whole frame costs more than the
-        // shader it scales, and the effect is a soft post-processing result anyway.
+        // Bilinear: for many presets the comp shader is the picture rather than a soft
+        // post-process, and a nearest-neighbour scale then shows the grid's blocks directly.
         var pixelsOut = _fresh.Pixels;
-        var pixelsIn = output.Pixels;
+        Span<float> sample = stackalloc float[4];
         for (var y = 0; y < height; y++)
         {
-            var sourceY = Math.Min(shaderHeight - 1, (int)((y + 0.5f) * shaderHeight / height));
-            var sourceRow = sourceY * shaderWidth;
+            var v = (y + 0.5f) / height;
             var targetRow = y * width;
             for (var x = 0; x < width; x++)
             {
-                var sourceX = (int)((x + 0.5f) * shaderWidth / width);
-                if (sourceX >= shaderWidth)
-                    sourceX = shaderWidth - 1;
-                var sourceOffset = ((sourceRow + sourceX) * 4);
+                output.SampleBilinear((x + 0.5f) / width, v, sample);
                 var offset = (targetRow + x) * 4;
-                pixelsOut[offset] = pixelsIn[sourceOffset];
-                pixelsOut[offset + 1] = pixelsIn[sourceOffset + 1];
-                pixelsOut[offset + 2] = pixelsIn[sourceOffset + 2];
+                pixelsOut[offset] = sample[0];
+                pixelsOut[offset + 1] = sample[1];
+                pixelsOut[offset + 2] = sample[2];
             }
         }
     }

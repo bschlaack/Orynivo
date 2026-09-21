@@ -7,6 +7,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Fixed
+- Fixed the comp shader grid being scaled over the frame with nearest-neighbour. For many presets
+  that pass is the picture rather than a soft post-process, so the grid's blocks were visible
+  directly; it is scaled bilinearly now, like the warp grid.
 - Fixed a shader whose body writes the output variable `ret` instead of returning a value being
   applied as black, which left the preset without any picture. Milkdrop's own shaders use that
   form, so a real preset such as `Jc - Crystal Shards` rendered nothing at all; the interpreter now
