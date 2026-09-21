@@ -40,6 +40,7 @@ internal static class ShaderRuntime
         Tan,
         Pow,
     Atan2,
+    Volume,
         Min,
         Max,
         Step,
@@ -91,6 +92,7 @@ internal static class ShaderRuntime
         ["tan"] = Opcode.Tan,
         ["pow"] = Opcode.Pow,
         ["atan2"] = Opcode.Atan2,
+        ["tex3D"] = Opcode.Volume,
         ["min"] = Opcode.Min,
         ["max"] = Opcode.Max,
         ["step"] = Opcode.Step,
@@ -226,6 +228,11 @@ internal static class ShaderRuntime
                 return ComponentWise(ComponentWise(a, b, MathF.Max), c, MathF.Min);
             case Opcode.Smoothstep:
                 return Smoothstep(a, b, c);
+            case Opcode.Volume:
+                // Milkdrop samples a 3D noise volume here. The engine ships no volume texture, so a
+                // deterministic value noise stands in: the character matches, the exact field does not,
+                // and the preset keeps its shader instead of losing it. Both execution paths use it.
+                return VolumeNoise(count >= 2 ? b : a);
             case Opcode.Sample:
                 return Sample(samplerName, count, a, b, c, sampler, position);
             case Opcode.SampleBlur1:
@@ -433,6 +440,72 @@ internal static class ShaderRuntime
             total += left.Get(index) * right.Get(index);
         return total;
     }
+
+    /// <summary>
+    /// Deterministic value noise standing in for Milkdrop's 3D noise volume. Three decorrelated
+    /// octaves give a colour, and the same formula is emitted into SkSL, so the GPU and the CPU
+    /// interpreter agree on it.
+    /// </summary>
+    /// <param name="coordinate">Volume coordinate.</param>
+    /// <returns>The sampled colour.</returns>
+    private static ShaderValue VolumeNoise(ShaderValue coordinate)
+    {
+        var x = VolumeNoiseChannel(coordinate.X, coordinate.Y, coordinate.Z);
+        var y = VolumeNoiseChannel(coordinate.X + 31.7f, coordinate.Y - 17.3f, coordinate.Z + 5.1f);
+        var z = VolumeNoiseChannel(coordinate.X - 11.9f, coordinate.Y + 23.5f, coordinate.Z - 7.7f);
+        return ShaderValue.Vector(x, y, z, 1f, 4);
+    }
+
+    /// <summary>One channel of the volume noise, smooth across the lattice.</summary>
+    /// <param name="x">X coordinate.</param>
+    /// <param name="y">Y coordinate.</param>
+    /// <param name="z">Z coordinate.</param>
+    /// <returns>The noise value in the range zero to one.</returns>
+    private static float VolumeNoiseChannel(float x, float y, float z)
+    {
+        var x0 = MathF.Floor(x);
+        var y0 = MathF.Floor(y);
+        var z0 = MathF.Floor(z);
+        var fx = Smooth(x - x0);
+        var fy = Smooth(y - y0);
+        var fz = Smooth(z - z0);
+
+        var c000 = VolumeHash(x0, y0, z0);
+        var c100 = VolumeHash(x0 + 1f, y0, z0);
+        var c010 = VolumeHash(x0, y0 + 1f, z0);
+        var c110 = VolumeHash(x0 + 1f, y0 + 1f, z0);
+        var c001 = VolumeHash(x0, y0, z0 + 1f);
+        var c101 = VolumeHash(x0 + 1f, y0, z0 + 1f);
+        var c011 = VolumeHash(x0, y0 + 1f, z0 + 1f);
+        var c111 = VolumeHash(x0 + 1f, y0 + 1f, z0 + 1f);
+
+        var bottom = Lerp(c000, c100, fx) + ((Lerp(c010, c110, fx) - Lerp(c000, c100, fx)) * fy);
+        var top = Lerp(c001, c101, fx) + ((Lerp(c011, c111, fx) - Lerp(c001, c101, fx)) * fy);
+        return bottom + ((top - bottom) * fz);
+    }
+
+    /// <summary>The smoothstep weighting used between lattice points.</summary>
+    /// <param name="value">Fractional coordinate.</param>
+    /// <returns>The weighted fraction.</returns>
+    private static float Smooth(float value) => value * value * (3f - (2f * value));
+
+    /// <summary>A deterministic hash of one lattice point.</summary>
+    /// <param name="x">Lattice x.</param>
+    /// <param name="y">Lattice y.</param>
+    /// <param name="z">Lattice z.</param>
+    /// <returns>A value in the range zero to one.</returns>
+    private static float VolumeHash(float x, float y, float z)
+    {
+        var value = MathF.Sin((x * 127.1f) + (y * 311.7f) + (z * 74.7f)) * 43758.5453f;
+        return value - MathF.Floor(value);
+    }
+
+    /// <summary>Interpolates between two values.</summary>
+    /// <param name="from">Value at zero.</param>
+    /// <param name="to">Value at one.</param>
+    /// <param name="amount">Blend amount.</param>
+    /// <returns>The interpolated value.</returns>
+    private static float Lerp(float from, float to, float amount) => from + ((to - from) * amount);
 
     /// <summary>Samples a texture through the bound sampler.</summary>
     private static ShaderValue Sample(

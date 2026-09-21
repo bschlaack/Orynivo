@@ -34,6 +34,8 @@ public sealed class PresetTranspileDiagnosticTests
             return;
         }
 
+        var sections = 0;
+        var withShaderKeys = 0;
         var shaders = 0;
         var compiled = 0;
         var failures = new Dictionary<string, int>(StringComparer.Ordinal);
@@ -45,6 +47,15 @@ public sealed class PresetTranspileDiagnosticTests
         {
             foreach (var section in VisualizerPreset.ParseSections(File.ReadAllText(file)))
             {
+                // Counting the sections that mention a shader key separates "this collection has few
+                // shaders" from "the reader loses them", which are very different answers.
+                sections++;
+                if (section.Contains("warp_", StringComparison.Ordinal) ||
+                    section.Contains("comp_", StringComparison.Ordinal))
+                {
+                    withShaderKeys++;
+                }
+
                 VisualizerPreset preset;
                 try
                 {
@@ -79,6 +90,7 @@ public sealed class PresetTranspileDiagnosticTests
             }
         }
 
+        _output.WriteLine($"sections: {sections}   sections containing shader keys: {withShaderKeys}");
         _output.WriteLine($"shaders sampled: {shaders}");
         _output.WriteLine($"translated and accepted by Skia: {compiled}");
         _output.WriteLine($"failures: {shaders - compiled}");

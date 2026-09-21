@@ -373,7 +373,13 @@ public static class ShaderTranspiler
                 // presets expect from tex2D.
                 return $"float4({arguments[0]}.eval({arguments[1]} * texsize))";
             case "tex3d":
-                throw new PresetExpressionException("tex3D has no SkSL translation yet.", call.Position);
+                // Milkdrop samples a 3D noise volume, and Skia's runtime effects only sample 2D
+                // shaders. A procedural replacement was tried and rejected: a sine-based hash is not
+                // reproducible between SkSL and the interpreter, so the two paths disagreed by 98 of
+                // 255 levels. The GPU needs a real volume texture, shared by both paths, first.
+                throw new PresetExpressionException(
+                    "tex3D needs a volume texture, which the GPU path does not have yet.",
+                    call.Position);
             case "getpixel":
                 return arguments.Count >= 2
                     ? $"float4({MainSampler}.eval(float2({arguments[0]}, {arguments[1]}))).rgb"

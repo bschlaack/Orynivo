@@ -62,6 +62,21 @@ public sealed class SkiaShaderRunnerTests
         AssertMatchesInterpreter(Source);
     }
 
+    /// <summary>The volume noise behind tex3D runs on the interpreter and is deterministic.</summary>
+    [Fact]
+    public void Render_Tex3DUsesTheVolumeNoiseOnTheInterpreter()
+    {
+        var node = ShaderParser.Parse("""
+            float3 n = tex3D(sampler_noisevol_hq, float3(uv * 3, time)).rgb;
+            ret = n * 0.5;
+            """);
+        var first = RenderOnCpu(node, new Dictionary<string, float>(StringComparer.Ordinal) { ["time"] = 0.5f });
+        var second = RenderOnCpu(node, new Dictionary<string, float>(StringComparer.Ordinal) { ["time"] = 0.5f });
+
+        Assert.Equal(first, second);
+        Assert.Contains(first, value => value > 0.01f);
+    }
+
     /// <summary>Renders both ways and asserts that the pixels agree within one byte.</summary>
     /// <param name="source">HLSL source.</param>
     private static void AssertMatchesInterpreter(string source)
