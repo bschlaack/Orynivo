@@ -82,6 +82,7 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler
 
     private bool _perPixelSuspended;
     private bool _skipPerPixelThisFrame;
+    private bool _presetProgramsFailed;
     private int _framesSinceSuspend;
 
     private readonly VisualizerTextureBank _textures = new();
@@ -265,6 +266,13 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler
     /// </summary>
     public string? ShaderError { get; private set; }
 
+    /// <summary>
+    /// Gets the reason the preset's own expression programs were stopped, or <see langword="null"/>
+    /// while they run. A preset program that throws would otherwise fail every single frame, which
+    /// looks like a frozen picture.
+    /// </summary>
+    public string? PresetError { get; private set; }
+
     /// <summary>The motion variables a per-pixel program may change for the following pixel.</summary>
     private static readonly string[] MotionVariables =
         ["zoom", "zoomexp", "rot", "cx", "cy", "dx", "dy", "sx", "sy"];
@@ -332,10 +340,19 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler
             _initialized = true;
         }
 
-        Preset.PerFrame.Execute(_slots);
-        foreach (var wave in Preset.Waves)
-            wave.PerFrame.Execute(_slots);
-
+        try
+        {
+            Preset.PerFrame.Execute(_slots);
+            foreach (var wave in Preset.Waves)
+                wave.PerFrame.Execute(_slots);
+        }
+        catch (Exception exception)
+        {
+            // A preset program that throws would fail every frame, so it is stopped once and the
+            // reason kept, instead of the picture freezing with no explanation.
+            _presetProgramsFailed = true;
+            PresetError = "per_frame: " + exception.GetType().Name + ": " + exception.Message;
+        }
         var decay = Math.Clamp(Read("decay", Preset.Decay), 0f, 1f);
         var useShaders = HasShaders;
         if (useShaders)
@@ -566,12 +583,13 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler
 
         // A per-pixel program that loops can cost seconds over a full frame. Once the stage passes
         // its ceiling the program is left out for the rest of the frame, so the window keeps
-        // drawing instead of hanging; the next frames retry it.
-        var runPerPixel = true;
+        // drawing instead of hanging; the next frames retry it. The flag has to be reset here,
+        // otherwise one slow frame would leave the program out for good.
+        _skipPerPixelThisFrame = false;
         if (_perPixelSuspended)
         {
             if (++_framesSinceSuspend < 60)
-                runPerPixel = false;
+                _skipPerPixelThisFrame = true;
             else
             {
                 _framesSinceSuspend = 0;
@@ -637,7 +655,7 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler
                 Write(slots, _slotX, warpedX);
             if (_perPixelUsesY)
                 Write(slots, _slotY, warpedY);
-            if (!_skipPerPixelThisFrame)
+            if (!_skipPerPixelThisFrame && !_presetProgramsFailed)
                 perPixel.Execute(slots);
 
             sampleX = _perPixelUsesX ? Read(slots, _slotX, warpedX) : warpedX;

@@ -7,6 +7,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Fixed
+- Fixed the missing total loop budget of a preset program. The per-loop clamp could not bound
+  nesting, so a preset with `loop(20000, loop(20000, ...))` ran hundreds of millions of iterations
+  inside one frame and froze the window with no exception to catch. One program execution now shares
+  a two-million-iteration budget across every nested loop. A preset program that still throws is
+  stopped once with its reason on `PresetError` instead of failing every frame. Covered by a test.
+- Fixed the per-pixel suspension never being cleared, which left a preset's per-pixel program out
+  for good after a single slow frame.
+- Added visualizer logging for freezes: a preset switch logs how long loading and constructing took,
+  and a frame over 250 ms logs the preset and its per-stage timings, so a freeze leaves the preset it
+  happened in as the last line of `logs/seek.log`. The overlay diagnostic line also carries
+  `presetError`.
 - Fixed the comp shader grid being scaled over the frame with nearest-neighbour. For many presets
   that pass is the picture rather than a soft post-process, so the grid's blocks were visible
   directly; it is scaled bilinearly now, like the warp grid.

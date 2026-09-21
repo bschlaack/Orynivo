@@ -284,8 +284,19 @@ public partial class VisualizerWindow : Window
     {
         if (_renderedPresetIndex != _presetIndex)
         {
+            var switchClock = System.Diagnostics.Stopwatch.StartNew();
             _renderedPresetIndex = _presetIndex;
-            _renderer = new PresetRenderer(_library.At(_presetIndex), _renderWidth, _renderHeight);
+            var preset = _library.At(_presetIndex);
+            var loadMs = switchClock.ElapsedMilliseconds;
+            _renderer = new PresetRenderer(preset, _renderWidth, _renderHeight);
+            // Parsing and compiling a preset happen here, on the render thread, so a preset that
+            // takes seconds to build looks exactly like a frozen window. Log both halves.
+            SeekDiagnostics.Log(
+                "visualizer",
+                $"preset switch index={_presetIndex} loadMs={loadMs} " +
+                $"constructMs={switchClock.ElapsedMilliseconds - loadMs} name={preset.Name} " +
+                $"shaders=warp{preset.WarpShaders.Count}/comp{preset.CompShaders.Count} " +
+                $"failedBlocks={preset.FailedBlocks.Count}");
             _resetRequested = false;
         }
 
@@ -299,10 +310,25 @@ public partial class VisualizerWindow : Window
         if (!VisualizerAudioHub.Shared.TryAnalyze(out var audio) || audio is null)
             audio = _silent;
 
+        var frameClock = System.Diagnostics.Stopwatch.StartNew();
         if (ReduceMotion)
             _renderer.RenderOverlayOnly(audio);
         else
             _renderer.RenderFrame(audio, deltaSeconds);
+        frameClock.Stop();
+
+        // A frame that takes far too long is the visible freeze, and the last line the log holds is
+        // then the preset it happened in. Only slow frames are logged, so this cannot flood.
+        if (frameClock.ElapsedMilliseconds >= 250)
+        {
+            var timings = _renderer.Timings;
+            SeekDiagnostics.Log(
+                "visualizer",
+                $"slow frame frame={_renderer.FrameCount} preset={_renderer.Preset.Name} " +
+                $"totalMs={frameClock.ElapsedMilliseconds} warpMs={timings.Warp:F0} blurMs={timings.Blur:F0} " +
+                $"postMs={timings.PostProcess:F0} overlayMs={timings.Overlay:F0} " +
+                $"compositeMs={timings.Composite:F0} compShaderMs={timings.Shader:F0}");
+        }
 
         // The preset collection is enumerated once, on a worker thread, after the first frame has
         // been shown; the built-ins keep the visualizer usable while that runs.
@@ -409,6 +435,7 @@ public partial class VisualizerWindow : Window
             + $"gridReduced={_renderer.ShaderGridReduced} "
             + (_renderer.ShaderError is { } shaderError ? $"shaderError=[{shaderError}] " : string.Empty)
             + (_renderError is { } renderError ? $"renderError=[{renderError}] " : string.Empty)
+            + (_renderer.PresetError is { } presetError ? $"presetError=[{presetError}] " : string.Empty)
             + $"preset={_renderer.Preset.Name} userPresets={_library.Count - VisualizerPresets.BuiltIn.Count}";
         // Start a fresh averaging window so the next line describes its own second.
         _renderer.ResetTimings();

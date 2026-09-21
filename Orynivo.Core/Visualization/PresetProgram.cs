@@ -89,6 +89,8 @@ public sealed class PresetProgram
         if (slots.Length < Layout.Count)
             throw new ArgumentException("The slot array is smaller than the program layout.", nameof(slots));
 
+        // The loop budget is per execution, so a nested loop cannot run for minutes in one frame.
+        PresetCompiler.ResetLoopBudget();
         _execute(slots);
     }
 }

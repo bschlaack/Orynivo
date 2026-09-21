@@ -65,6 +65,20 @@ public sealed class PresetLoopTests
         Assert.True(renderer.PerPixelSuspended);
     }
 
+    /// <summary>Nested loops are bounded in total, not only per loop.</summary>
+    [Fact]
+    public void RenderFrame_BoundsNestedLoopsInTotal()
+    {
+        // 20000 x 20000 is four hundred million iterations. The per-loop clamp cannot see that, and
+        // it used to freeze the window without an exception to catch.
+        var preset = VisualizerPreset.Parse("per_frame_1=q1 = 0;\nper_frame_2=loop(20000, loop(20000, q1 = q1 + 1));");
+        var renderer = new PresetRenderer(preset, 16, 9);
+
+        renderer.RenderFrame(new Silent(), 1d / 60d);
+
+        Assert.NotNull(renderer.PresetError);
+        Assert.Contains("looped too often", renderer.PresetError);
+    }
     /// <summary>Runs a parsed preset and returns one of its variables.</summary>
     /// <param name="preset">Preset to run.</param>
     /// <param name="variable">Variable to read back.</param>

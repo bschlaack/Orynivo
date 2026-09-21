@@ -18,6 +18,22 @@ public static class PresetCompiler
         typeof(PresetCompiler).GetMethod(nameof(Sign), BindingFlags.NonPublic | BindingFlags.Static)!;
     private static readonly MethodInfo RandomMethod =
         typeof(PresetCompiler).GetMethod(nameof(NextRandom), BindingFlags.NonPublic | BindingFlags.Static)!;
+    private static readonly FieldInfo TotalIterationsField =
+        typeof(PresetCompiler).GetField(nameof(_totalLoopIterations), BindingFlags.NonPublic | BindingFlags.Static)!;
+    private static readonly ConstructorInfo LoopOverflowConstructor =
+        typeof(PresetExpressionException).GetConstructor([typeof(string), typeof(int)])!;
+
+    /// <summary>
+    /// Upper bound on the loop iterations of one program execution, counted across every nested
+    /// loop. The per-loop clamp cannot bound nesting: <c>loop(20000, loop(20000, ...))</c> is four
+    /// hundred million iterations, which freezes the window without an exception to catch.
+    /// </summary>
+    internal const int MaxTotalLoopIterations = 2_000_000;
+
+    private static int _totalLoopIterations;
+
+    /// <summary>Restarts the loop budget for one program execution.</summary>
+    internal static void ResetLoopBudget() => _totalLoopIterations = 0;
 
     /// <summary>Compiles one expression block.</summary>
     /// <param name="source">
@@ -602,6 +618,15 @@ public static class PresetCompiler
             Expression.GreaterThan(Expression.Convert(count, typeof(int)), Expression.Constant(MaxLoopIterations)),
             Expression.Constant(MaxLoopIterations),
             Expression.Convert(count, typeof(int)));
+        body.Add(Expression.IfThen(
+            Expression.GreaterThan(
+                Expression.PreIncrementAssign(Expression.Field(null, TotalIterationsField)),
+                Expression.Constant(MaxTotalLoopIterations)),
+            Expression.Throw(
+                Expression.New(
+                    LoopOverflowConstructor,
+                    Expression.Constant("The preset looped too often."),
+                    Expression.Constant(position)))));
         body.Add(Expression.PostIncrementAssign(index));
         return Expression.Block(
             typeof(float),
