@@ -7,6 +7,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Fixed
+- Replaced the procedural sine hash behind `tex3D` with a real cubic volume texture that both
+  execution paths sample. `VisualizerTextureBank` now generates the two 32³ volume noises
+  (`sampler_noisevol_lq`/`sampler_noisevol_hq`) from a fixed seed with three dimensional smoothing and
+  eight-bit quantisation, and lays them out as a two dimensional slice atlas; the CPU interpreter
+  reads the volume through the new `IShaderSampler.SampleVolume`, and the SkSL emitter samples the
+  same atlas trilinearly in a generated helper instead of rejecting the shader. The sine hash could
+  never agree between SkSL and the interpreter because the GPU's `sin` differs in its low bits and the
+  `43758.5453` factor amplified the difference, so it is replaced rather than ported. Compound
+  assignments now convert their value to the target's declared type, which a `tex3D` result needs
+  because it is a `float4`. Over a 500-file sample the share of shaders that translate and are
+  accepted by Skia rose from 395 to 484 of 764, that is from 52 to 63 percent.
 - Added the samplers `sampler_pw_main`, `sampler_pw_noise_lq`, and `sampler_worms`, which presets
   name frequently and the prelude did not declare. Over a 500-file sample the share of shaders that
   translate and are accepted by Skia rose from 374 to 377 of 764. The remaining sampler names are

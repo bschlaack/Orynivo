@@ -39,7 +39,11 @@ This file applies to `Orynivo.Core/` and supplements `../AGENTS.md`.
   every built-in preset and the legacy `per_point` contract assume a line.
   `VisualizerTextureBank` generates the Milkdrop noise and random textures from fixed seeds
   instead of bundling third party images: keep generation deterministic and lazy, and keep the
-  sizes (32, 256, 512) so shader sampling stays comparable. The `sampler_main`,
+  sizes (32, 256, 512) so shader sampling stays comparable. It also generates the two 32³ volume
+  noises (`sampler_noisevol_lq`/`hq`) that `tex3D` samples, quantised to eight bits and laid out
+  as a slice atlas (`VolumeAtlasColumns`/`VolumeAtlasRows`); the CPU interpreter and the GPU
+  helper must read that one volume with the identical trilinear math, because a procedural hash
+  cannot be reproduced bit-exactly on the GPU. The `sampler_main`,
   `sampler_pc_main`, `sampler_fc_main`, `GetBlur1`-`GetBlur3`, and `GetPixel` constructs are
   HLSL shader features and belong to the shader runtime in phase 38d, not to the texture bank.
   The Milkdrop format has no per-preset texture block, so unknown `tex_*` keys stay ignored.

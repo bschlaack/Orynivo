@@ -704,16 +704,20 @@ affordable. This is a project of its own and must keep the CPU path as the fallb
   and the CPU/GPU comparison tests agree within one byte. A shader that cannot be translated keeps
   the CPU path for that preset.
 - 40c GPU passes - `In progress`: the comp-shader grid and the per-pixel programs run on the GPU
-  through `SKRuntimeEffect`; `tex3D` still needs a volume texture (173 of the 369 remaining
-  failures), and warp, blur, video echo, borders, and composite still need GPU passes.
+  through `SKRuntimeEffect`; the `tex3D` volume texture now exists and warp, blur, video echo,
+  borders, and composite still need GPU passes.
   The volume texture is the single source of truth for both paths, not a GPU-only addition: the
-  CPU `tex3D` currently evaluates a procedural sine hash
-  (`sin(x*127.1 + y*311.7 + z*74.7) * 43758.5453`, fractional part), and that hash cannot be
+  CPU `tex3D` used to evaluate a procedural sine hash
+  (`sin(x*127.1 + y*311.7 + z*74.7) * 43758.5453`, fractional part), and that hash could not be
   reproduced bit-exactly in SkSL because the GPU's `sin` differs in its low bits and the
-  43758.5453 factor amplifies the difference, which would break the CPU/GPU agreement the
-  comparison tests enforce. Milkdrop itself samples a 3D noise volume here, so both paths must
-  sample one generated volume (`sampler_noisevol_lq`/`sampler_noisevol_hq` are already in the
-  sampler set) and the CPU's procedural substitute is replaced rather than ported.
+  43758.5453 factor amplifies the difference. Milkdrop itself samples a 3D noise volume here, so
+  `VisualizerTextureBank` now generates the two 32³ volumes (`sampler_noisevol_lq`/`hq`) from a
+  fixed seed with 3D smoothing and eight-bit quantisation, the CPU interpreter reads them through
+  `IShaderSampler.SampleVolume`, and the SkSL emitter samples the same volume from a slice atlas
+  with a trilinear helper instead of rejecting the shader. The procedural substitute is replaced
+  rather than ported, and the CPU/GPU comparison test covers the volume. Over a 500-file sample
+  the share of shaders that translate and are accepted by Skia rose from 395 to 484 of 764
+  (52 to 63 percent); the remaining failures are unrelated type mismatches.
 - 40d Platform, packaging, and CI - `Pending`: native dependencies for Windows, Linux, and macOS,
   packaging, the signed release manifest, and the CI build matrix.
 - 40e Cutover and validation - `Pending`: the GPU path becomes the default where it is available,
