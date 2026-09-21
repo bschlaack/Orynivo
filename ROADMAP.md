@@ -668,11 +668,13 @@ affordable. This is a project of its own and must keep the CPU path as the fallb
   the CPU path stays the fallback, and a comparison harness validates both against the same
   reference frames.
 
-- 39h Remaining preset-block failures - `Pending`: against a 2000-file collection, 96 expression
-  blocks still fail, dominated by `Unexpected ';'` (57, a statement form the compiler does not
-  accept yet) and the Milkdrop memory buffers `megabuf`/`gmegabuf` (31, which need a shared buffer
-  and must then keep the parallel warp on one thread). `PresetFolderDiagnosticTests` lists the
-  current reasons; keep the diagnostic test updated as the compiler grows.
+- 39h Remaining preset-block failures - `Pending`: the numbered expression parts are now joined the
+  way Milkdrop does it (concatenation, with a separator only when the previous part is complete),
+  which removed every `Unexpected ';'` failure, and the shared `megabuf`/`gmegabuf` buffers exist
+  with serialised access. Against a 2000-file collection the skipped expression blocks fell from
+  1267 to 68; the remainder is `Expected ')'`-style syntax (57) plus a few stray operators, and it
+  needs the failing parts to be read case by case. `PresetFolderDiagnosticTests` lists the current
+  reasons with example files; keep it updated as the compiler grows.
 
 - 39i Milkdrop 2 shader templates and blur/edge keys - `Pending`: measured against a real
   2000-file collection, 1706 presets (85 percent) declare their `warp_N`/`comp_N` values as

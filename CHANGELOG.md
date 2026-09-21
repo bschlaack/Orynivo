@@ -7,6 +7,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Fixed
+- Fixed the numbered expression parts of a preset being joined with a semicolon. Milkdrop
+  concatenates them, and presets split one expression across parts, so a part may end with an
+  operator and the next part continues it; a separator is now inserted only when the previous part
+  is not waiting for more input and the next part does not bring its own. This removed the
+  `Unexpected ';'` failures entirely.
+- Added Milkdrop's shared memory buffers `megabuf` and `gmegabuf`, which presets use for lookup
+  tables. They are global state, so the accesses are serialised against the parallel warp, and the
+  arities presets use are tolerated. Measured against a real 2000-file collection, the skipped
+  expression blocks fell from 1267 to 68; the remainder is `Expected ')'`-style syntax that is
+  recorded as roadmap item 39h.
+
 - Fixed a skipped shader being invisible. When a preset's `warp_N` or `comp_N` value cannot be
   parsed the shader is dropped, which used to leave a preset that renders only the shared overlay
   looking like a rendering bug; the reason is now recorded on `VisualizerPreset.FailedBlocks`, and

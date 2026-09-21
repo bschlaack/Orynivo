@@ -289,6 +289,10 @@ public static class PresetCompiler
             "atan2" => Binary(arguments, name, position, nameof(MathF.Atan2)),
             "fmod" => Binary(arguments, name, position, null),
             "sqr" => Unary(value => Expression.Multiply(value, value)),
+            // Milkdrop's shared memory buffers. They are global state, so the accesses are
+            // serialised: the parallel warp would otherwise race on the table a preset builds.
+            "megabuf" => Unary(value => Expression.Call(typeof(PresetCompiler), nameof(ReadMegaBuffer), null, value)),
+            "gmegabuf" => WriteMegaBuffer(arguments, name, position),
             // Milkdrop's comparisons yield one or zero instead of a boolean.
             "above" => Comparison(arguments, name, position, ExpressionType.GreaterThan),
             "below" => Comparison(arguments, name, position, ExpressionType.LessThan),
@@ -428,6 +432,59 @@ public static class PresetCompiler
     /// <param name="value">Input value.</param>
     /// <returns>The sign as -1 or 1.</returns>
     private static float Sign(float value) => value < 0f ? -1f : 1f;
+
+    /// <summary>The shared Milkdrop memory buffer, one entry per slot a preset can address.</summary>
+    private static readonly float[] MegaBuffer = new float[1 << 20];
+
+    /// <summary>Guards the shared memory buffer, which presets can read and write.</summary>
+    private static readonly object MegaGate = new();
+
+    /// <summary>Reads one entry of the shared Milkdrop memory buffer.</summary>
+    /// <param name="index">Entry index.</param>
+    /// <returns>The stored value, or zero outside the buffer.</returns>
+    private static float ReadMegaBuffer(float index)
+    {
+        var slot = (int)index;
+        if (slot < 0 || slot >= MegaBuffer.Length)
+            return 0f;
+        lock (MegaGate)
+            return MegaBuffer[slot];
+    }
+
+    /// <summary>Writes one entry of the shared Milkdrop memory buffer.</summary>
+    /// <param name="index">Entry index.</param>
+    /// <param name="value">Value to store.</param>
+    /// <returns>The stored value.</returns>
+    private static float WriteMegaBufferValue(float index, float value)
+    {
+        var slot = (int)index;
+        if (slot < 0 || slot >= MegaBuffer.Length)
+            return value;
+        lock (MegaGate)
+            MegaBuffer[slot] = value;
+        return value;
+    }
+
+    /// <summary>Builds a call that writes one entry of the shared memory buffer.</summary>
+    /// <param name="arguments">Evaluated arguments.</param>
+    /// <param name="name">Function name, for the error message.</param>
+    /// <param name="position">Source position, for the error message.</param>
+    /// <returns>The call expression.</returns>
+    private static Expression WriteMegaBuffer(List<Expression> arguments, string name, int position)
+    {
+        // Presets write one entry, and a few pass extra arguments that are ignored.
+        if (arguments.Count == 0)
+            throw new PresetExpressionException("''gmegabuf'' expects 2 arguments", position);
+        if (arguments.Count == 1)
+            return Expression.Call(typeof(PresetCompiler), nameof(ReadMegaBuffer), null, arguments[0]);
+
+        return Expression.Call(
+            typeof(PresetCompiler),
+            nameof(WriteMegaBufferValue),
+            null,
+            arguments[0],
+            arguments[1]);
+    }
 
     /// <summary>Draws the next pseudo-random value in the range zero to one.</summary>
     /// <returns>A value in the range zero to one.</returns>

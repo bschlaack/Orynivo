@@ -509,8 +509,34 @@ public sealed class VisualizerPreset
         if (values.TryGetValue(prefix, out var single) && !string.IsNullOrWhiteSpace(single))
             parts.Add(single);
 
-        return parts.Count == 0 ? null : string.Join(";", parts);
+        if (parts.Count == 0)
+            return null;
+
+        // Milkdrop presets use both conventions: some split an expression across parts, so a part
+        // may end with an operator and the next one continues it, while others rely on a separator
+        // between statements. Insert a semicolon only when the previous part is not waiting for
+        // more input and the next part does not bring its own.
+        var builder = new System.Text.StringBuilder();
+        foreach (var part in parts)
+        {
+            var text = part.Trim();
+            if (text.Length == 0)
+                continue;
+
+            if (builder.Length > 0 && text[0] != ';' && !EndsWithContinuation(builder[^1]))
+                builder.Append(';');
+            builder.Append(text);
+        }
+
+        return builder.Length == 0 ? null : builder.ToString();
     }
+
+    /// <summary>Reports whether a character leaves an expression waiting for more input.</summary>
+    /// <param name="character">Last character of the previous part.</param>
+    /// <returns><see langword="true"/> when the next part continues the same expression.</returns>
+    private static bool EndsWithContinuation(char character) =>
+        character is '+' or '-' or '*' or '/' or '%' or ',' or '(' or '[' or '<' or '>' or '='
+            or '&' or '|' or '!' or '?' or '^';
 
     private static float ReadFloat(Dictionary<string, string> values, string key, float fallback) =>
         values.TryGetValue(key, out var text) &&

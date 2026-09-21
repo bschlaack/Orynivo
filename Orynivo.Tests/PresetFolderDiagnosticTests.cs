@@ -43,8 +43,10 @@ public sealed class PresetFolderDiagnosticTests
         _output.WriteLine($"files sampled: {files.Count}");
 
         var failures = new Dictionary<string, int>(StringComparer.Ordinal);
+        var examples = new Dictionary<string, List<string>>(StringComparer.Ordinal);
         var failedFiles = 0;
         var failedBlocks = 0;
+        var shaderFailures = 0;
         var parsed = 0;
         foreach (var file in files)
         {
@@ -55,8 +57,25 @@ public sealed class PresetFolderDiagnosticTests
                 failedBlocks += preset.FailedBlocks.Count;
                 foreach (var block in preset.FailedBlocks)
                 {
+                    // Shader slots are reported separately: they dominate the counts and belong to
+                    // the Milkdrop 2 template work, not to the expression language.
+                    if (block.StartsWith("warp_", StringComparison.Ordinal) ||
+                        block.StartsWith("comp_", StringComparison.Ordinal))
+                    {
+                        shaderFailures++;
+                        continue;
+                    }
+
                     var key = Normalize(block);
                     failures[key] = failures.TryGetValue(key, out var count) ? count + 1 : 1;
+                    if (!examples.TryGetValue(key, out var list))
+                    {
+                        list = [];
+                        examples[key] = list;
+                    }
+
+                    if (list.Count < 4)
+                        list.Add(Path.GetFileName(file));
                 }
             }
             catch (PresetExpressionException exception)
@@ -67,10 +86,14 @@ public sealed class PresetFolderDiagnosticTests
             }
         }
 
-        _output.WriteLine($"parsed: {parsed}   whole-file failures: {failedFiles}   failed blocks in parsed files: {failedBlocks}");
+        _output.WriteLine($"parsed: {parsed}   whole-file failures: {failedFiles}   expression-block failures: {failedBlocks}   shader-slot failures: {shaderFailures}");
         _output.WriteLine("top failure reasons:");
         foreach (var (reason, count) in failures.OrderByDescending(pair => pair.Value).Take(MaxReported))
+        {
             _output.WriteLine($"{count,6}  {reason}");
+            if (examples.TryGetValue(reason, out var list))
+                _output.WriteLine($"        e.g. {string.Join(", ", list)}");
+        }
     }
 
     /// <summary>Trims a message to its stable part so equal failures group together.</summary>

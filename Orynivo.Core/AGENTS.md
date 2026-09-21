@@ -87,7 +87,12 @@ This file applies to `Orynivo.Core/` and supplements `../AGENTS.md`.
   case-insensitive, and a block that still fails is skipped and recorded on
   `VisualizerPreset.FailedBlocks` instead of rejecting the preset, so one unsupported construct
   costs a block rather than a preset. `PresetFolderDiagnosticTests` reports what still fails
-  against a real collection; run it after touching the compiler. Keep the
+  against a real collection; run it after touching the compiler. The numbered parts of an
+  expression block are joined by concatenation, because presets split one expression across parts
+  and a part may end with an operator; a semicolon is inserted only when the previous part is
+  complete and the next does not bring its own. `megabuf` and `gmegabuf` are Milkdrop's shared
+  memory buffers and their accesses are serialised, because a preset writes lookup tables that
+  other pixels read. Keep the
   interpreter off the audio thread and bound its per-frame cost so a heavy shader degrades the
   render resolution instead of stalling playback.
 - Keep the project cross-platform `net10.0`; do not introduce Avalonia, Windows,
