@@ -7,6 +7,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Added
+- The visualizer renders on its own thread now. A frame used to be produced from a
+  `DispatcherTimer`, so a heavy preset blocked the interface for its whole duration; the loop
+  now runs on a background thread, hands a finished copy of the frame to the UI thread through a
+  presentation buffer, and queues at most one present at a time, so a busy interface can never
+  build up a backlog of frames. Preset switching, the reset key, and the overlay follow as
+  thread-safe requests, and the frame pacing lives in the tested `FramePacing` helper. Covered by
+  5 tests.
 - The visualizer now measures where its frame time goes. `PresetRenderer` reports a
   `RenderTimings` breakdown (warp, blur, post-processing, overlay, composite, comp shaders, and
   the frame total) per frame and as an average over a window, and the window's diagnostic line in
@@ -158,6 +165,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.45.0] - 2026-09-20
 
 ### Added
+- The visualizer renders on its own thread now. A frame used to be produced from a
+  `DispatcherTimer`, so a heavy preset blocked the interface for its whole duration; the loop
+  now runs on a background thread, hands a finished copy of the frame to the UI thread through a
+  presentation buffer, and queues at most one present at a time, so a busy interface can never
+  build up a backlog of frames. Preset switching, the reset key, and the overlay follow as
+  thread-safe requests, and the frame pacing lives in the tested `FramePacing` helper. Covered by
+  5 tests.
 - The visualizer now measures where its frame time goes. `PresetRenderer` reports a
   `RenderTimings` breakdown (warp, blur, post-processing, overlay, composite, comp shaders, and
   the frame total) per frame and as an average over a window, and the window's diagnostic line in
@@ -320,6 +334,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.44.0] - 2026-09-20
 
 ### Added
+- The visualizer renders on its own thread now. A frame used to be produced from a
+  `DispatcherTimer`, so a heavy preset blocked the interface for its whole duration; the loop
+  now runs on a background thread, hands a finished copy of the frame to the UI thread through a
+  presentation buffer, and queues at most one present at a time, so a busy interface can never
+  build up a backlog of frames. Preset switching, the reset key, and the overlay follow as
+  thread-safe requests, and the frame pacing lives in the tested `FramePacing` helper. Covered by
+  5 tests.
 - The visualizer now measures where its frame time goes. `PresetRenderer` reports a
   `RenderTimings` breakdown (warp, blur, post-processing, overlay, composite, comp shaders, and
   the frame total) per frame and as an average over a window, and the window's diagnostic line in
@@ -554,6 +575,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.43.1] - 2026-09-18
 
 ### Added
+- The visualizer renders on its own thread now. A frame used to be produced from a
+  `DispatcherTimer`, so a heavy preset blocked the interface for its whole duration; the loop
+  now runs on a background thread, hands a finished copy of the frame to the UI thread through a
+  presentation buffer, and queues at most one present at a time, so a busy interface can never
+  build up a backlog of frames. Preset switching, the reset key, and the overlay follow as
+  thread-safe requests, and the frame pacing lives in the tested `FramePacing` helper. Covered by
+  5 tests.
 - The visualizer now measures where its frame time goes. `PresetRenderer` reports a
   `RenderTimings` breakdown (warp, blur, post-processing, overlay, composite, comp shaders, and
   the frame total) per frame and as an average over a window, and the window's diagnostic line in
@@ -682,6 +710,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.43.0] - 2026-09-18
 
 ### Added
+- The visualizer renders on its own thread now. A frame used to be produced from a
+  `DispatcherTimer`, so a heavy preset blocked the interface for its whole duration; the loop
+  now runs on a background thread, hands a finished copy of the frame to the UI thread through a
+  presentation buffer, and queues at most one present at a time, so a busy interface can never
+  build up a backlog of frames. Preset switching, the reset key, and the overlay follow as
+  thread-safe requests, and the frame pacing lives in the tested `FramePacing` helper. Covered by
+  5 tests.
 - The visualizer now measures where its frame time goes. `PresetRenderer` reports a
   `RenderTimings` breakdown (warp, blur, post-processing, overlay, composite, comp shaders, and
   the frame total) per frame and as an average over a window, and the window's diagnostic line in
@@ -877,6 +912,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.42.0] - 2026-09-17
 
 ### Added
+- The visualizer renders on its own thread now. A frame used to be produced from a
+  `DispatcherTimer`, so a heavy preset blocked the interface for its whole duration; the loop
+  now runs on a background thread, hands a finished copy of the frame to the UI thread through a
+  presentation buffer, and queues at most one present at a time, so a busy interface can never
+  build up a backlog of frames. Preset switching, the reset key, and the overlay follow as
+  thread-safe requests, and the frame pacing lives in the tested `FramePacing` helper. Covered by
+  5 tests.
 - The visualizer now measures where its frame time goes. `PresetRenderer` reports a
   `RenderTimings` breakdown (warp, blur, post-processing, overlay, composite, comp shaders, and
   the frame total) per frame and as an average over a window, and the window's diagnostic line in
@@ -1175,6 +1217,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.41.7] - 2026-09-11
 
 ### Added
+- The visualizer renders on its own thread now. A frame used to be produced from a
+  `DispatcherTimer`, so a heavy preset blocked the interface for its whole duration; the loop
+  now runs on a background thread, hands a finished copy of the frame to the UI thread through a
+  presentation buffer, and queues at most one present at a time, so a busy interface can never
+  build up a backlog of frames. Preset switching, the reset key, and the overlay follow as
+  thread-safe requests, and the frame pacing lives in the tested `FramePacing` helper. Covered by
+  5 tests.
 - The visualizer now measures where its frame time goes. `PresetRenderer` reports a
   `RenderTimings` breakdown (warp, blur, post-processing, overlay, composite, comp shaders, and
   the frame total) per frame and as an average over a window, and the window's diagnostic line in
@@ -1297,6 +1346,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.41.5] - 2026-09-09
 
 ### Added
+- The visualizer renders on its own thread now. A frame used to be produced from a
+  `DispatcherTimer`, so a heavy preset blocked the interface for its whole duration; the loop
+  now runs on a background thread, hands a finished copy of the frame to the UI thread through a
+  presentation buffer, and queues at most one present at a time, so a busy interface can never
+  build up a backlog of frames. Preset switching, the reset key, and the overlay follow as
+  thread-safe requests, and the frame pacing lives in the tested `FramePacing` helper. Covered by
+  5 tests.
 - The visualizer now measures where its frame time goes. `PresetRenderer` reports a
   `RenderTimings` breakdown (warp, blur, post-processing, overlay, composite, comp shaders, and
   the frame total) per frame and as an average over a window, and the window's diagnostic line in
@@ -1424,6 +1480,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.41.4] - 2026-09-08
 
 ### Added
+- The visualizer renders on its own thread now. A frame used to be produced from a
+  `DispatcherTimer`, so a heavy preset blocked the interface for its whole duration; the loop
+  now runs on a background thread, hands a finished copy of the frame to the UI thread through a
+  presentation buffer, and queues at most one present at a time, so a busy interface can never
+  build up a backlog of frames. Preset switching, the reset key, and the overlay follow as
+  thread-safe requests, and the frame pacing lives in the tested `FramePacing` helper. Covered by
+  5 tests.
 - The visualizer now measures where its frame time goes. `PresetRenderer` reports a
   `RenderTimings` breakdown (warp, blur, post-processing, overlay, composite, comp shaders, and
   the frame total) per frame and as an average over a window, and the window's diagnostic line in
@@ -1650,6 +1713,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.41.0] - 2026-09-05
 
 ### Added
+- The visualizer renders on its own thread now. A frame used to be produced from a
+  `DispatcherTimer`, so a heavy preset blocked the interface for its whole duration; the loop
+  now runs on a background thread, hands a finished copy of the frame to the UI thread through a
+  presentation buffer, and queues at most one present at a time, so a busy interface can never
+  build up a backlog of frames. Preset switching, the reset key, and the overlay follow as
+  thread-safe requests, and the frame pacing lives in the tested `FramePacing` helper. Covered by
+  5 tests.
 - The visualizer now measures where its frame time goes. `PresetRenderer` reports a
   `RenderTimings` breakdown (warp, blur, post-processing, overlay, composite, comp shaders, and
   the frame total) per frame and as an average over a window, and the window's diagnostic line in
@@ -1794,6 +1864,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.40.2] - 2026-09-05
 
 ### Added
+- The visualizer renders on its own thread now. A frame used to be produced from a
+  `DispatcherTimer`, so a heavy preset blocked the interface for its whole duration; the loop
+  now runs on a background thread, hands a finished copy of the frame to the UI thread through a
+  presentation buffer, and queues at most one present at a time, so a busy interface can never
+  build up a backlog of frames. Preset switching, the reset key, and the overlay follow as
+  thread-safe requests, and the frame pacing lives in the tested `FramePacing` helper. Covered by
+  5 tests.
 - The visualizer now measures where its frame time goes. `PresetRenderer` reports a
   `RenderTimings` breakdown (warp, blur, post-processing, overlay, composite, comp shaders, and
   the frame total) per frame and as an average over a window, and the window's diagnostic line in
@@ -1944,6 +2021,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.40.0] - 2026-09-05
 
 ### Added
+- The visualizer renders on its own thread now. A frame used to be produced from a
+  `DispatcherTimer`, so a heavy preset blocked the interface for its whole duration; the loop
+  now runs on a background thread, hands a finished copy of the frame to the UI thread through a
+  presentation buffer, and queues at most one present at a time, so a busy interface can never
+  build up a backlog of frames. Preset switching, the reset key, and the overlay follow as
+  thread-safe requests, and the frame pacing lives in the tested `FramePacing` helper. Covered by
+  5 tests.
 - The visualizer now measures where its frame time goes. `PresetRenderer` reports a
   `RenderTimings` breakdown (warp, blur, post-processing, overlay, composite, comp shaders, and
   the frame total) per frame and as an average over a window, and the window's diagnostic line in
@@ -2100,6 +2184,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.39.0] - 2026-09-04
 
 ### Added
+- The visualizer renders on its own thread now. A frame used to be produced from a
+  `DispatcherTimer`, so a heavy preset blocked the interface for its whole duration; the loop
+  now runs on a background thread, hands a finished copy of the frame to the UI thread through a
+  presentation buffer, and queues at most one present at a time, so a busy interface can never
+  build up a backlog of frames. Preset switching, the reset key, and the overlay follow as
+  thread-safe requests, and the frame pacing lives in the tested `FramePacing` helper. Covered by
+  5 tests.
 - The visualizer now measures where its frame time goes. `PresetRenderer` reports a
   `RenderTimings` breakdown (warp, blur, post-processing, overlay, composite, comp shaders, and
   the frame total) per frame and as an average over a window, and the window's diagnostic line in
@@ -2216,6 +2307,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   ## [0.38.0] - 2026-09-04
 
 ### Added
+- The visualizer renders on its own thread now. A frame used to be produced from a
+  `DispatcherTimer`, so a heavy preset blocked the interface for its whole duration; the loop
+  now runs on a background thread, hands a finished copy of the frame to the UI thread through a
+  presentation buffer, and queues at most one present at a time, so a busy interface can never
+  build up a backlog of frames. Preset switching, the reset key, and the overlay follow as
+  thread-safe requests, and the frame pacing lives in the tested `FramePacing` helper. Covered by
+  5 tests.
 - The visualizer now measures where its frame time goes. `PresetRenderer` reports a
   `RenderTimings` breakdown (warp, blur, post-processing, overlay, composite, comp shaders, and
   the frame total) per frame and as an average over a window, and the window's diagnostic line in
@@ -2353,6 +2451,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.37.4] - 2026-09-04
 
 ### Added
+- The visualizer renders on its own thread now. A frame used to be produced from a
+  `DispatcherTimer`, so a heavy preset blocked the interface for its whole duration; the loop
+  now runs on a background thread, hands a finished copy of the frame to the UI thread through a
+  presentation buffer, and queues at most one present at a time, so a busy interface can never
+  build up a backlog of frames. Preset switching, the reset key, and the overlay follow as
+  thread-safe requests, and the frame pacing lives in the tested `FramePacing` helper. Covered by
+  5 tests.
 - The visualizer now measures where its frame time goes. `PresetRenderer` reports a
   `RenderTimings` breakdown (warp, blur, post-processing, overlay, composite, comp shaders, and
   the frame total) per frame and as an average over a window, and the window's diagnostic line in
@@ -2443,6 +2548,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.37.3] - 2026-09-02
 
 ### Added
+- The visualizer renders on its own thread now. A frame used to be produced from a
+  `DispatcherTimer`, so a heavy preset blocked the interface for its whole duration; the loop
+  now runs on a background thread, hands a finished copy of the frame to the UI thread through a
+  presentation buffer, and queues at most one present at a time, so a busy interface can never
+  build up a backlog of frames. Preset switching, the reset key, and the overlay follow as
+  thread-safe requests, and the frame pacing lives in the tested `FramePacing` helper. Covered by
+  5 tests.
 - The visualizer now measures where its frame time goes. `PresetRenderer` reports a
   `RenderTimings` breakdown (warp, blur, post-processing, overlay, composite, comp shaders, and
   the frame total) per frame and as an average over a window, and the window's diagnostic line in
@@ -2529,6 +2641,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.37.2] - 2026-08-27
 
 ### Added
+- The visualizer renders on its own thread now. A frame used to be produced from a
+  `DispatcherTimer`, so a heavy preset blocked the interface for its whole duration; the loop
+  now runs on a background thread, hands a finished copy of the frame to the UI thread through a
+  presentation buffer, and queues at most one present at a time, so a busy interface can never
+  build up a backlog of frames. Preset switching, the reset key, and the overlay follow as
+  thread-safe requests, and the frame pacing lives in the tested `FramePacing` helper. Covered by
+  5 tests.
 - The visualizer now measures where its frame time goes. `PresetRenderer` reports a
   `RenderTimings` breakdown (warp, blur, post-processing, overlay, composite, comp shaders, and
   the frame total) per frame and as an average over a window, and the window's diagnostic line in
@@ -2646,6 +2765,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.37.1] - 2026-08-27
 
 ### Added
+- The visualizer renders on its own thread now. A frame used to be produced from a
+  `DispatcherTimer`, so a heavy preset blocked the interface for its whole duration; the loop
+  now runs on a background thread, hands a finished copy of the frame to the UI thread through a
+  presentation buffer, and queues at most one present at a time, so a busy interface can never
+  build up a backlog of frames. Preset switching, the reset key, and the overlay follow as
+  thread-safe requests, and the frame pacing lives in the tested `FramePacing` helper. Covered by
+  5 tests.
 - The visualizer now measures where its frame time goes. `PresetRenderer` reports a
   `RenderTimings` breakdown (warp, blur, post-processing, overlay, composite, comp shaders, and
   the frame total) per frame and as an average over a window, and the window's diagnostic line in
@@ -2854,6 +2980,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   and are not exposed by the current classic RAOP backend.
 
 ### Added
+- The visualizer renders on its own thread now. A frame used to be produced from a
+  `DispatcherTimer`, so a heavy preset blocked the interface for its whole duration; the loop
+  now runs on a background thread, hands a finished copy of the frame to the UI thread through a
+  presentation buffer, and queues at most one present at a time, so a busy interface can never
+  build up a backlog of frames. Preset switching, the reset key, and the overlay follow as
+  thread-safe requests, and the frame pacing lives in the tested `FramePacing` helper. Covered by
+  5 tests.
 - The visualizer now measures where its frame time goes. `PresetRenderer` reports a
   `RenderTimings` breakdown (warp, blur, post-processing, overlay, composite, comp shaders, and
   the frame total) per frame and as an average over a window, and the window's diagnostic line in
@@ -2967,6 +3100,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.36.7] - 2026-08-25
 
 ### Added
+- The visualizer renders on its own thread now. A frame used to be produced from a
+  `DispatcherTimer`, so a heavy preset blocked the interface for its whole duration; the loop
+  now runs on a background thread, hands a finished copy of the frame to the UI thread through a
+  presentation buffer, and queues at most one present at a time, so a busy interface can never
+  build up a backlog of frames. Preset switching, the reset key, and the overlay follow as
+  thread-safe requests, and the frame pacing lives in the tested `FramePacing` helper. Covered by
+  5 tests.
 - The visualizer now measures where its frame time goes. `PresetRenderer` reports a
   `RenderTimings` breakdown (warp, blur, post-processing, overlay, composite, comp shaders, and
   the frame total) per frame and as an average over a window, and the window's diagnostic line in
@@ -3082,6 +3222,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.36.6] - 2026-08-25
 
 ### Added
+- The visualizer renders on its own thread now. A frame used to be produced from a
+  `DispatcherTimer`, so a heavy preset blocked the interface for its whole duration; the loop
+  now runs on a background thread, hands a finished copy of the frame to the UI thread through a
+  presentation buffer, and queues at most one present at a time, so a busy interface can never
+  build up a backlog of frames. Preset switching, the reset key, and the overlay follow as
+  thread-safe requests, and the frame pacing lives in the tested `FramePacing` helper. Covered by
+  5 tests.
 - The visualizer now measures where its frame time goes. `PresetRenderer` reports a
   `RenderTimings` breakdown (warp, blur, post-processing, overlay, composite, comp shaders, and
   the frame total) per frame and as an average over a window, and the window's diagnostic line in
@@ -3260,6 +3407,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.36.4] - 2026-08-12
 
 ### Added
+- The visualizer renders on its own thread now. A frame used to be produced from a
+  `DispatcherTimer`, so a heavy preset blocked the interface for its whole duration; the loop
+  now runs on a background thread, hands a finished copy of the frame to the UI thread through a
+  presentation buffer, and queues at most one present at a time, so a busy interface can never
+  build up a backlog of frames. Preset switching, the reset key, and the overlay follow as
+  thread-safe requests, and the frame pacing lives in the tested `FramePacing` helper. Covered by
+  5 tests.
 - The visualizer now measures where its frame time goes. `PresetRenderer` reports a
   `RenderTimings` breakdown (warp, blur, post-processing, overlay, composite, comp shaders, and
   the frame total) per frame and as an average over a window, and the window's diagnostic line in
@@ -3426,6 +3580,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.36.2] - 2026-08-10
 
 ### Added
+- The visualizer renders on its own thread now. A frame used to be produced from a
+  `DispatcherTimer`, so a heavy preset blocked the interface for its whole duration; the loop
+  now runs on a background thread, hands a finished copy of the frame to the UI thread through a
+  presentation buffer, and queues at most one present at a time, so a busy interface can never
+  build up a backlog of frames. Preset switching, the reset key, and the overlay follow as
+  thread-safe requests, and the frame pacing lives in the tested `FramePacing` helper. Covered by
+  5 tests.
 - The visualizer now measures where its frame time goes. `PresetRenderer` reports a
   `RenderTimings` breakdown (warp, blur, post-processing, overlay, composite, comp shaders, and
   the frame total) per frame and as an average over a window, and the window's diagnostic line in
@@ -3521,6 +3682,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.36.1] - 2026-08-10
 
 ### Added
+- The visualizer renders on its own thread now. A frame used to be produced from a
+  `DispatcherTimer`, so a heavy preset blocked the interface for its whole duration; the loop
+  now runs on a background thread, hands a finished copy of the frame to the UI thread through a
+  presentation buffer, and queues at most one present at a time, so a busy interface can never
+  build up a backlog of frames. Preset switching, the reset key, and the overlay follow as
+  thread-safe requests, and the frame pacing lives in the tested `FramePacing` helper. Covered by
+  5 tests.
 - The visualizer now measures where its frame time goes. `PresetRenderer` reports a
   `RenderTimings` breakdown (warp, blur, post-processing, overlay, composite, comp shaders, and
   the frame total) per frame and as an average over a window, and the window's diagnostic line in
@@ -3637,6 +3805,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.36.0] - 2026-08-10
 
 ### Added
+- The visualizer renders on its own thread now. A frame used to be produced from a
+  `DispatcherTimer`, so a heavy preset blocked the interface for its whole duration; the loop
+  now runs on a background thread, hands a finished copy of the frame to the UI thread through a
+  presentation buffer, and queues at most one present at a time, so a busy interface can never
+  build up a backlog of frames. Preset switching, the reset key, and the overlay follow as
+  thread-safe requests, and the frame pacing lives in the tested `FramePacing` helper. Covered by
+  5 tests.
 - The visualizer now measures where its frame time goes. `PresetRenderer` reports a
   `RenderTimings` breakdown (warp, blur, post-processing, overlay, composite, comp shaders, and
   the frame total) per frame and as an average over a window, and the window's diagnostic line in
@@ -3773,6 +3948,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.35.4] - 2026-08-10
 
 ### Added
+- The visualizer renders on its own thread now. A frame used to be produced from a
+  `DispatcherTimer`, so a heavy preset blocked the interface for its whole duration; the loop
+  now runs on a background thread, hands a finished copy of the frame to the UI thread through a
+  presentation buffer, and queues at most one present at a time, so a busy interface can never
+  build up a backlog of frames. Preset switching, the reset key, and the overlay follow as
+  thread-safe requests, and the frame pacing lives in the tested `FramePacing` helper. Covered by
+  5 tests.
 - The visualizer now measures where its frame time goes. `PresetRenderer` reports a
   `RenderTimings` breakdown (warp, blur, post-processing, overlay, composite, comp shaders, and
   the frame total) per frame and as an average over a window, and the window's diagnostic line in
@@ -3981,6 +4163,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.35.0] - 2026-08-03
 
 ### Added
+- The visualizer renders on its own thread now. A frame used to be produced from a
+  `DispatcherTimer`, so a heavy preset blocked the interface for its whole duration; the loop
+  now runs on a background thread, hands a finished copy of the frame to the UI thread through a
+  presentation buffer, and queues at most one present at a time, so a busy interface can never
+  build up a backlog of frames. Preset switching, the reset key, and the overlay follow as
+  thread-safe requests, and the frame pacing lives in the tested `FramePacing` helper. Covered by
+  5 tests.
 - The visualizer now measures where its frame time goes. `PresetRenderer` reports a
   `RenderTimings` breakdown (warp, blur, post-processing, overlay, composite, comp shaders, and
   the frame total) per frame and as an average over a window, and the window's diagnostic line in
@@ -4146,6 +4335,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.34.0] - 2026-08-02
 
 ### Added
+- The visualizer renders on its own thread now. A frame used to be produced from a
+  `DispatcherTimer`, so a heavy preset blocked the interface for its whole duration; the loop
+  now runs on a background thread, hands a finished copy of the frame to the UI thread through a
+  presentation buffer, and queues at most one present at a time, so a busy interface can never
+  build up a backlog of frames. Preset switching, the reset key, and the overlay follow as
+  thread-safe requests, and the frame pacing lives in the tested `FramePacing` helper. Covered by
+  5 tests.
 - The visualizer now measures where its frame time goes. `PresetRenderer` reports a
   `RenderTimings` breakdown (warp, blur, post-processing, overlay, composite, comp shaders, and
   the frame total) per frame and as an average over a window, and the window's diagnostic line in
@@ -4351,6 +4547,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.33.0] - 2026-08-01
 
 ### Added
+- The visualizer renders on its own thread now. A frame used to be produced from a
+  `DispatcherTimer`, so a heavy preset blocked the interface for its whole duration; the loop
+  now runs on a background thread, hands a finished copy of the frame to the UI thread through a
+  presentation buffer, and queues at most one present at a time, so a busy interface can never
+  build up a backlog of frames. Preset switching, the reset key, and the overlay follow as
+  thread-safe requests, and the frame pacing lives in the tested `FramePacing` helper. Covered by
+  5 tests.
 - The visualizer now measures where its frame time goes. `PresetRenderer` reports a
   `RenderTimings` breakdown (warp, blur, post-processing, overlay, composite, comp shaders, and
   the frame total) per frame and as an average over a window, and the window's diagnostic line in
@@ -4498,6 +4701,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.32.0] - 2026-08-01
 
 ### Added
+- The visualizer renders on its own thread now. A frame used to be produced from a
+  `DispatcherTimer`, so a heavy preset blocked the interface for its whole duration; the loop
+  now runs on a background thread, hands a finished copy of the frame to the UI thread through a
+  presentation buffer, and queues at most one present at a time, so a busy interface can never
+  build up a backlog of frames. Preset switching, the reset key, and the overlay follow as
+  thread-safe requests, and the frame pacing lives in the tested `FramePacing` helper. Covered by
+  5 tests.
 - The visualizer now measures where its frame time goes. `PresetRenderer` reports a
   `RenderTimings` breakdown (warp, blur, post-processing, overlay, composite, comp shaders, and
   the frame total) per frame and as an average over a window, and the window's diagnostic line in
@@ -4650,6 +4860,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.31.0] - 2026-08-01
 
 ### Added
+- The visualizer renders on its own thread now. A frame used to be produced from a
+  `DispatcherTimer`, so a heavy preset blocked the interface for its whole duration; the loop
+  now runs on a background thread, hands a finished copy of the frame to the UI thread through a
+  presentation buffer, and queues at most one present at a time, so a busy interface can never
+  build up a backlog of frames. Preset switching, the reset key, and the overlay follow as
+  thread-safe requests, and the frame pacing lives in the tested `FramePacing` helper. Covered by
+  5 tests.
 - The visualizer now measures where its frame time goes. `PresetRenderer` reports a
   `RenderTimings` breakdown (warp, blur, post-processing, overlay, composite, comp shaders, and
   the frame total) per frame and as an average over a window, and the window's diagnostic line in
@@ -4788,6 +5005,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.30.3] - 2026-07-30
 
 ### Added
+- The visualizer renders on its own thread now. A frame used to be produced from a
+  `DispatcherTimer`, so a heavy preset blocked the interface for its whole duration; the loop
+  now runs on a background thread, hands a finished copy of the frame to the UI thread through a
+  presentation buffer, and queues at most one present at a time, so a busy interface can never
+  build up a backlog of frames. Preset switching, the reset key, and the overlay follow as
+  thread-safe requests, and the frame pacing lives in the tested `FramePacing` helper. Covered by
+  5 tests.
 - The visualizer now measures where its frame time goes. `PresetRenderer` reports a
   `RenderTimings` breakdown (warp, blur, post-processing, overlay, composite, comp shaders, and
   the frame total) per frame and as an average over a window, and the window's diagnostic line in
@@ -4903,6 +5127,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.30.2] - 2026-07-29
 
 ### Added
+- The visualizer renders on its own thread now. A frame used to be produced from a
+  `DispatcherTimer`, so a heavy preset blocked the interface for its whole duration; the loop
+  now runs on a background thread, hands a finished copy of the frame to the UI thread through a
+  presentation buffer, and queues at most one present at a time, so a busy interface can never
+  build up a backlog of frames. Preset switching, the reset key, and the overlay follow as
+  thread-safe requests, and the frame pacing lives in the tested `FramePacing` helper. Covered by
+  5 tests.
 - The visualizer now measures where its frame time goes. `PresetRenderer` reports a
   `RenderTimings` breakdown (warp, blur, post-processing, overlay, composite, comp shaders, and
   the frame total) per frame and as an average over a window, and the window's diagnostic line in
@@ -4999,6 +5230,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.30.1] - 2026-07-28
 
 ### Added
+- The visualizer renders on its own thread now. A frame used to be produced from a
+  `DispatcherTimer`, so a heavy preset blocked the interface for its whole duration; the loop
+  now runs on a background thread, hands a finished copy of the frame to the UI thread through a
+  presentation buffer, and queues at most one present at a time, so a busy interface can never
+  build up a backlog of frames. Preset switching, the reset key, and the overlay follow as
+  thread-safe requests, and the frame pacing lives in the tested `FramePacing` helper. Covered by
+  5 tests.
 - The visualizer now measures where its frame time goes. `PresetRenderer` reports a
   `RenderTimings` breakdown (warp, blur, post-processing, overlay, composite, comp shaders, and
   the frame total) per frame and as an average over a window, and the window's diagnostic line in
@@ -5135,6 +5373,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.30.0] - 2026-07-28
 
 ### Added
+- The visualizer renders on its own thread now. A frame used to be produced from a
+  `DispatcherTimer`, so a heavy preset blocked the interface for its whole duration; the loop
+  now runs on a background thread, hands a finished copy of the frame to the UI thread through a
+  presentation buffer, and queues at most one present at a time, so a busy interface can never
+  build up a backlog of frames. Preset switching, the reset key, and the overlay follow as
+  thread-safe requests, and the frame pacing lives in the tested `FramePacing` helper. Covered by
+  5 tests.
 - The visualizer now measures where its frame time goes. `PresetRenderer` reports a
   `RenderTimings` breakdown (warp, blur, post-processing, overlay, composite, comp shaders, and
   the frame total) per frame and as an average over a window, and the window's diagnostic line in
@@ -5293,6 +5538,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.29.2] - 2026-07-27
 
 ### Added
+- The visualizer renders on its own thread now. A frame used to be produced from a
+  `DispatcherTimer`, so a heavy preset blocked the interface for its whole duration; the loop
+  now runs on a background thread, hands a finished copy of the frame to the UI thread through a
+  presentation buffer, and queues at most one present at a time, so a busy interface can never
+  build up a backlog of frames. Preset switching, the reset key, and the overlay follow as
+  thread-safe requests, and the frame pacing lives in the tested `FramePacing` helper. Covered by
+  5 tests.
 - The visualizer now measures where its frame time goes. `PresetRenderer` reports a
   `RenderTimings` breakdown (warp, blur, post-processing, overlay, composite, comp shaders, and
   the frame total) per frame and as an average over a window, and the window's diagnostic line in
@@ -5459,6 +5711,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.29.0] - 2026-07-26
 
 ### Added
+- The visualizer renders on its own thread now. A frame used to be produced from a
+  `DispatcherTimer`, so a heavy preset blocked the interface for its whole duration; the loop
+  now runs on a background thread, hands a finished copy of the frame to the UI thread through a
+  presentation buffer, and queues at most one present at a time, so a busy interface can never
+  build up a backlog of frames. Preset switching, the reset key, and the overlay follow as
+  thread-safe requests, and the frame pacing lives in the tested `FramePacing` helper. Covered by
+  5 tests.
 - The visualizer now measures where its frame time goes. `PresetRenderer` reports a
   `RenderTimings` breakdown (warp, blur, post-processing, overlay, composite, comp shaders, and
   the frame total) per frame and as an average over a window, and the window's diagnostic line in
@@ -5627,6 +5886,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.28.0] - 2026-07-25
 
 ### Added
+- The visualizer renders on its own thread now. A frame used to be produced from a
+  `DispatcherTimer`, so a heavy preset blocked the interface for its whole duration; the loop
+  now runs on a background thread, hands a finished copy of the frame to the UI thread through a
+  presentation buffer, and queues at most one present at a time, so a busy interface can never
+  build up a backlog of frames. Preset switching, the reset key, and the overlay follow as
+  thread-safe requests, and the frame pacing lives in the tested `FramePacing` helper. Covered by
+  5 tests.
 - The visualizer now measures where its frame time goes. `PresetRenderer` reports a
   `RenderTimings` breakdown (warp, blur, post-processing, overlay, composite, comp shaders, and
   the frame total) per frame and as an average over a window, and the window's diagnostic line in
@@ -5803,6 +6069,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.27.0] - 2026-07-15
 
 ### Added
+- The visualizer renders on its own thread now. A frame used to be produced from a
+  `DispatcherTimer`, so a heavy preset blocked the interface for its whole duration; the loop
+  now runs on a background thread, hands a finished copy of the frame to the UI thread through a
+  presentation buffer, and queues at most one present at a time, so a busy interface can never
+  build up a backlog of frames. Preset switching, the reset key, and the overlay follow as
+  thread-safe requests, and the frame pacing lives in the tested `FramePacing` helper. Covered by
+  5 tests.
 - The visualizer now measures where its frame time goes. `PresetRenderer` reports a
   `RenderTimings` breakdown (warp, blur, post-processing, overlay, composite, comp shaders, and
   the frame total) per frame and as an average over a window, and the window's diagnostic line in
@@ -5918,6 +6191,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.26.6] - 2026-07-15
 
 ### Added
+- The visualizer renders on its own thread now. A frame used to be produced from a
+  `DispatcherTimer`, so a heavy preset blocked the interface for its whole duration; the loop
+  now runs on a background thread, hands a finished copy of the frame to the UI thread through a
+  presentation buffer, and queues at most one present at a time, so a busy interface can never
+  build up a backlog of frames. Preset switching, the reset key, and the overlay follow as
+  thread-safe requests, and the frame pacing lives in the tested `FramePacing` helper. Covered by
+  5 tests.
 - The visualizer now measures where its frame time goes. `PresetRenderer` reports a
   `RenderTimings` breakdown (warp, blur, post-processing, overlay, composite, comp shaders, and
   the frame total) per frame and as an average over a window, and the window's diagnostic line in
@@ -6035,6 +6315,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.26.5] - 2026-07-15
 
 ### Added
+- The visualizer renders on its own thread now. A frame used to be produced from a
+  `DispatcherTimer`, so a heavy preset blocked the interface for its whole duration; the loop
+  now runs on a background thread, hands a finished copy of the frame to the UI thread through a
+  presentation buffer, and queues at most one present at a time, so a busy interface can never
+  build up a backlog of frames. Preset switching, the reset key, and the overlay follow as
+  thread-safe requests, and the frame pacing lives in the tested `FramePacing` helper. Covered by
+  5 tests.
 - The visualizer now measures where its frame time goes. `PresetRenderer` reports a
   `RenderTimings` breakdown (warp, blur, post-processing, overlay, composite, comp shaders, and
   the frame total) per frame and as an average over a window, and the window's diagnostic line in
@@ -6151,6 +6438,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.26.4] - 2026-07-15
 
 ### Added
+- The visualizer renders on its own thread now. A frame used to be produced from a
+  `DispatcherTimer`, so a heavy preset blocked the interface for its whole duration; the loop
+  now runs on a background thread, hands a finished copy of the frame to the UI thread through a
+  presentation buffer, and queues at most one present at a time, so a busy interface can never
+  build up a backlog of frames. Preset switching, the reset key, and the overlay follow as
+  thread-safe requests, and the frame pacing lives in the tested `FramePacing` helper. Covered by
+  5 tests.
 - The visualizer now measures where its frame time goes. `PresetRenderer` reports a
   `RenderTimings` breakdown (warp, blur, post-processing, overlay, composite, comp shaders, and
   the frame total) per frame and as an average over a window, and the window's diagnostic line in
@@ -6265,6 +6559,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.26.3] - 2026-07-15
 
 ### Added
+- The visualizer renders on its own thread now. A frame used to be produced from a
+  `DispatcherTimer`, so a heavy preset blocked the interface for its whole duration; the loop
+  now runs on a background thread, hands a finished copy of the frame to the UI thread through a
+  presentation buffer, and queues at most one present at a time, so a busy interface can never
+  build up a backlog of frames. Preset switching, the reset key, and the overlay follow as
+  thread-safe requests, and the frame pacing lives in the tested `FramePacing` helper. Covered by
+  5 tests.
 - The visualizer now measures where its frame time goes. `PresetRenderer` reports a
   `RenderTimings` breakdown (warp, blur, post-processing, overlay, composite, comp shaders, and
   the frame total) per frame and as an average over a window, and the window's diagnostic line in
@@ -6384,6 +6685,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.26.2] - 2026-07-15
 
 ### Added
+- The visualizer renders on its own thread now. A frame used to be produced from a
+  `DispatcherTimer`, so a heavy preset blocked the interface for its whole duration; the loop
+  now runs on a background thread, hands a finished copy of the frame to the UI thread through a
+  presentation buffer, and queues at most one present at a time, so a busy interface can never
+  build up a backlog of frames. Preset switching, the reset key, and the overlay follow as
+  thread-safe requests, and the frame pacing lives in the tested `FramePacing` helper. Covered by
+  5 tests.
 - The visualizer now measures where its frame time goes. `PresetRenderer` reports a
   `RenderTimings` breakdown (warp, blur, post-processing, overlay, composite, comp shaders, and
   the frame total) per frame and as an average over a window, and the window's diagnostic line in
@@ -6539,6 +6847,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.26.0] - 2026-07-15
 
 ### Added
+- The visualizer renders on its own thread now. A frame used to be produced from a
+  `DispatcherTimer`, so a heavy preset blocked the interface for its whole duration; the loop
+  now runs on a background thread, hands a finished copy of the frame to the UI thread through a
+  presentation buffer, and queues at most one present at a time, so a busy interface can never
+  build up a backlog of frames. Preset switching, the reset key, and the overlay follow as
+  thread-safe requests, and the frame pacing lives in the tested `FramePacing` helper. Covered by
+  5 tests.
 - The visualizer now measures where its frame time goes. `PresetRenderer` reports a
   `RenderTimings` breakdown (warp, blur, post-processing, overlay, composite, comp shaders, and
   the frame total) per frame and as an average over a window, and the window's diagnostic line in
@@ -6643,6 +6958,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.25.0] - 2026-07-15
 
 ### Added
+- The visualizer renders on its own thread now. A frame used to be produced from a
+  `DispatcherTimer`, so a heavy preset blocked the interface for its whole duration; the loop
+  now runs on a background thread, hands a finished copy of the frame to the UI thread through a
+  presentation buffer, and queues at most one present at a time, so a busy interface can never
+  build up a backlog of frames. Preset switching, the reset key, and the overlay follow as
+  thread-safe requests, and the frame pacing lives in the tested `FramePacing` helper. Covered by
+  5 tests.
 - The visualizer now measures where its frame time goes. `PresetRenderer` reports a
   `RenderTimings` breakdown (warp, blur, post-processing, overlay, composite, comp shaders, and
   the frame total) per frame and as an average over a window, and the window's diagnostic line in
@@ -6838,6 +7160,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.24.0] - 2026-07-08
 
 ### Added
+- The visualizer renders on its own thread now. A frame used to be produced from a
+  `DispatcherTimer`, so a heavy preset blocked the interface for its whole duration; the loop
+  now runs on a background thread, hands a finished copy of the frame to the UI thread through a
+  presentation buffer, and queues at most one present at a time, so a busy interface can never
+  build up a backlog of frames. Preset switching, the reset key, and the overlay follow as
+  thread-safe requests, and the frame pacing lives in the tested `FramePacing` helper. Covered by
+  5 tests.
 - The visualizer now measures where its frame time goes. `PresetRenderer` reports a
   `RenderTimings` breakdown (warp, blur, post-processing, overlay, composite, comp shaders, and
   the frame total) per frame and as an average over a window, and the window's diagnostic line in
@@ -7032,6 +7361,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.23.3] - 2026-07-05
 
 ### Added
+- The visualizer renders on its own thread now. A frame used to be produced from a
+  `DispatcherTimer`, so a heavy preset blocked the interface for its whole duration; the loop
+  now runs on a background thread, hands a finished copy of the frame to the UI thread through a
+  presentation buffer, and queues at most one present at a time, so a busy interface can never
+  build up a backlog of frames. Preset switching, the reset key, and the overlay follow as
+  thread-safe requests, and the frame pacing lives in the tested `FramePacing` helper. Covered by
+  5 tests.
 - The visualizer now measures where its frame time goes. `PresetRenderer` reports a
   `RenderTimings` breakdown (warp, blur, post-processing, overlay, composite, comp shaders, and
   the frame total) per frame and as an average over a window, and the window's diagnostic line in
@@ -7237,6 +7573,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.23.0] - 2026-07-05
 
 ### Added
+- The visualizer renders on its own thread now. A frame used to be produced from a
+  `DispatcherTimer`, so a heavy preset blocked the interface for its whole duration; the loop
+  now runs on a background thread, hands a finished copy of the frame to the UI thread through a
+  presentation buffer, and queues at most one present at a time, so a busy interface can never
+  build up a backlog of frames. Preset switching, the reset key, and the overlay follow as
+  thread-safe requests, and the frame pacing lives in the tested `FramePacing` helper. Covered by
+  5 tests.
 - The visualizer now measures where its frame time goes. `PresetRenderer` reports a
   `RenderTimings` breakdown (warp, blur, post-processing, overlay, composite, comp shaders, and
   the frame total) per frame and as an average over a window, and the window's diagnostic line in
@@ -7445,6 +7788,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.22.0] - 2026-07-04
 
 ### Added
+- The visualizer renders on its own thread now. A frame used to be produced from a
+  `DispatcherTimer`, so a heavy preset blocked the interface for its whole duration; the loop
+  now runs on a background thread, hands a finished copy of the frame to the UI thread through a
+  presentation buffer, and queues at most one present at a time, so a busy interface can never
+  build up a backlog of frames. Preset switching, the reset key, and the overlay follow as
+  thread-safe requests, and the frame pacing lives in the tested `FramePacing` helper. Covered by
+  5 tests.
 - The visualizer now measures where its frame time goes. `PresetRenderer` reports a
   `RenderTimings` breakdown (warp, blur, post-processing, overlay, composite, comp shaders, and
   the frame total) per frame and as an average over a window, and the window's diagnostic line in
@@ -7678,6 +8028,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.21.0] - 2026-07-04
 
 ### Added
+- The visualizer renders on its own thread now. A frame used to be produced from a
+  `DispatcherTimer`, so a heavy preset blocked the interface for its whole duration; the loop
+  now runs on a background thread, hands a finished copy of the frame to the UI thread through a
+  presentation buffer, and queues at most one present at a time, so a busy interface can never
+  build up a backlog of frames. Preset switching, the reset key, and the overlay follow as
+  thread-safe requests, and the frame pacing lives in the tested `FramePacing` helper. Covered by
+  5 tests.
 - The visualizer now measures where its frame time goes. `PresetRenderer` reports a
   `RenderTimings` breakdown (warp, blur, post-processing, overlay, composite, comp shaders, and
   the frame total) per frame and as an average over a window, and the window's diagnostic line in
@@ -7873,6 +8230,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.20.5] - 2026-07-01
 
 ### Added
+- The visualizer renders on its own thread now. A frame used to be produced from a
+  `DispatcherTimer`, so a heavy preset blocked the interface for its whole duration; the loop
+  now runs on a background thread, hands a finished copy of the frame to the UI thread through a
+  presentation buffer, and queues at most one present at a time, so a busy interface can never
+  build up a backlog of frames. Preset switching, the reset key, and the overlay follow as
+  thread-safe requests, and the frame pacing lives in the tested `FramePacing` helper. Covered by
+  5 tests.
 - The visualizer now measures where its frame time goes. `PresetRenderer` reports a
   `RenderTimings` breakdown (warp, blur, post-processing, overlay, composite, comp shaders, and
   the frame total) per frame and as an average over a window, and the window's diagnostic line in
@@ -8100,6 +8464,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.20.3] - 2026-06-30
 
 ### Added
+- The visualizer renders on its own thread now. A frame used to be produced from a
+  `DispatcherTimer`, so a heavy preset blocked the interface for its whole duration; the loop
+  now runs on a background thread, hands a finished copy of the frame to the UI thread through a
+  presentation buffer, and queues at most one present at a time, so a busy interface can never
+  build up a backlog of frames. Preset switching, the reset key, and the overlay follow as
+  thread-safe requests, and the frame pacing lives in the tested `FramePacing` helper. Covered by
+  5 tests.
 - The visualizer now measures where its frame time goes. `PresetRenderer` reports a
   `RenderTimings` breakdown (warp, blur, post-processing, overlay, composite, comp shaders, and
   the frame total) per frame and as an average over a window, and the window's diagnostic line in
@@ -8315,6 +8686,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.20.0] - 2026-06-29
 
 ### Added
+- The visualizer renders on its own thread now. A frame used to be produced from a
+  `DispatcherTimer`, so a heavy preset blocked the interface for its whole duration; the loop
+  now runs on a background thread, hands a finished copy of the frame to the UI thread through a
+  presentation buffer, and queues at most one present at a time, so a busy interface can never
+  build up a backlog of frames. Preset switching, the reset key, and the overlay follow as
+  thread-safe requests, and the frame pacing lives in the tested `FramePacing` helper. Covered by
+  5 tests.
 - The visualizer now measures where its frame time goes. `PresetRenderer` reports a
   `RenderTimings` breakdown (warp, blur, post-processing, overlay, composite, comp shaders, and
   the frame total) per frame and as an average over a window, and the window's diagnostic line in
@@ -8493,6 +8871,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.18.0] - 2026-06-28
 
 ### Added
+- The visualizer renders on its own thread now. A frame used to be produced from a
+  `DispatcherTimer`, so a heavy preset blocked the interface for its whole duration; the loop
+  now runs on a background thread, hands a finished copy of the frame to the UI thread through a
+  presentation buffer, and queues at most one present at a time, so a busy interface can never
+  build up a backlog of frames. Preset switching, the reset key, and the overlay follow as
+  thread-safe requests, and the frame pacing lives in the tested `FramePacing` helper. Covered by
+  5 tests.
 - The visualizer now measures where its frame time goes. `PresetRenderer` reports a
   `RenderTimings` breakdown (warp, blur, post-processing, overlay, composite, comp shaders, and
   the frame total) per frame and as an average over a window, and the window's diagnostic line in
@@ -8642,6 +9027,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.16.0] - 2026-06-28
 
 ### Added
+- The visualizer renders on its own thread now. A frame used to be produced from a
+  `DispatcherTimer`, so a heavy preset blocked the interface for its whole duration; the loop
+  now runs on a background thread, hands a finished copy of the frame to the UI thread through a
+  presentation buffer, and queues at most one present at a time, so a busy interface can never
+  build up a backlog of frames. Preset switching, the reset key, and the overlay follow as
+  thread-safe requests, and the frame pacing lives in the tested `FramePacing` helper. Covered by
+  5 tests.
 - The visualizer now measures where its frame time goes. `PresetRenderer` reports a
   `RenderTimings` breakdown (warp, blur, post-processing, overlay, composite, comp shaders, and
   the frame total) per frame and as an average over a window, and the window's diagnostic line in
@@ -8925,6 +9317,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.15.0] - 2026-06-27
 
 ### Added
+- The visualizer renders on its own thread now. A frame used to be produced from a
+  `DispatcherTimer`, so a heavy preset blocked the interface for its whole duration; the loop
+  now runs on a background thread, hands a finished copy of the frame to the UI thread through a
+  presentation buffer, and queues at most one present at a time, so a busy interface can never
+  build up a backlog of frames. Preset switching, the reset key, and the overlay follow as
+  thread-safe requests, and the frame pacing lives in the tested `FramePacing` helper. Covered by
+  5 tests.
 - The visualizer now measures where its frame time goes. `PresetRenderer` reports a
   `RenderTimings` breakdown (warp, blur, post-processing, overlay, composite, comp shaders, and
   the frame total) per frame and as an average over a window, and the window's diagnostic line in
@@ -9118,6 +9517,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.14.0] - 2026-06-26
 
 ### Added
+- The visualizer renders on its own thread now. A frame used to be produced from a
+  `DispatcherTimer`, so a heavy preset blocked the interface for its whole duration; the loop
+  now runs on a background thread, hands a finished copy of the frame to the UI thread through a
+  presentation buffer, and queues at most one present at a time, so a busy interface can never
+  build up a backlog of frames. Preset switching, the reset key, and the overlay follow as
+  thread-safe requests, and the frame pacing lives in the tested `FramePacing` helper. Covered by
+  5 tests.
 - The visualizer now measures where its frame time goes. `PresetRenderer` reports a
   `RenderTimings` breakdown (warp, blur, post-processing, overlay, composite, comp shaders, and
   the frame total) per frame and as an average over a window, and the window's diagnostic line in
@@ -9209,6 +9615,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.13.0] - 2026-06-26
 
 ### Added
+- The visualizer renders on its own thread now. A frame used to be produced from a
+  `DispatcherTimer`, so a heavy preset blocked the interface for its whole duration; the loop
+  now runs on a background thread, hands a finished copy of the frame to the UI thread through a
+  presentation buffer, and queues at most one present at a time, so a busy interface can never
+  build up a backlog of frames. Preset switching, the reset key, and the overlay follow as
+  thread-safe requests, and the frame pacing lives in the tested `FramePacing` helper. Covered by
+  5 tests.
 - The visualizer now measures where its frame time goes. `PresetRenderer` reports a
   `RenderTimings` breakdown (warp, blur, post-processing, overlay, composite, comp shaders, and
   the frame total) per frame and as an average over a window, and the window's diagnostic line in
@@ -9312,6 +9725,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.12.0] - 2026-06-26
 
 ### Added
+- The visualizer renders on its own thread now. A frame used to be produced from a
+  `DispatcherTimer`, so a heavy preset blocked the interface for its whole duration; the loop
+  now runs on a background thread, hands a finished copy of the frame to the UI thread through a
+  presentation buffer, and queues at most one present at a time, so a busy interface can never
+  build up a backlog of frames. Preset switching, the reset key, and the overlay follow as
+  thread-safe requests, and the frame pacing lives in the tested `FramePacing` helper. Covered by
+  5 tests.
 - The visualizer now measures where its frame time goes. `PresetRenderer` reports a
   `RenderTimings` breakdown (warp, blur, post-processing, overlay, composite, comp shaders, and
   the frame total) per frame and as an average over a window, and the window's diagnostic line in
@@ -9449,6 +9869,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.11.0] - 2026-06-25
 
 ### Added
+- The visualizer renders on its own thread now. A frame used to be produced from a
+  `DispatcherTimer`, so a heavy preset blocked the interface for its whole duration; the loop
+  now runs on a background thread, hands a finished copy of the frame to the UI thread through a
+  presentation buffer, and queues at most one present at a time, so a busy interface can never
+  build up a backlog of frames. Preset switching, the reset key, and the overlay follow as
+  thread-safe requests, and the frame pacing lives in the tested `FramePacing` helper. Covered by
+  5 tests.
 - The visualizer now measures where its frame time goes. `PresetRenderer` reports a
   `RenderTimings` breakdown (warp, blur, post-processing, overlay, composite, comp shaders, and
   the frame total) per frame and as an average over a window, and the window's diagnostic line in
@@ -9623,6 +10050,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.10.0] - 2026-06-22
 
 ### Added
+- The visualizer renders on its own thread now. A frame used to be produced from a
+  `DispatcherTimer`, so a heavy preset blocked the interface for its whole duration; the loop
+  now runs on a background thread, hands a finished copy of the frame to the UI thread through a
+  presentation buffer, and queues at most one present at a time, so a busy interface can never
+  build up a backlog of frames. Preset switching, the reset key, and the overlay follow as
+  thread-safe requests, and the frame pacing lives in the tested `FramePacing` helper. Covered by
+  5 tests.
 - The visualizer now measures where its frame time goes. `PresetRenderer` reports a
   `RenderTimings` breakdown (warp, blur, post-processing, overlay, composite, comp shaders, and
   the frame total) per frame and as an average over a window, and the window's diagnostic line in
@@ -9807,6 +10241,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.9.0] - 2026-06-21
 
 ### Added
+- The visualizer renders on its own thread now. A frame used to be produced from a
+  `DispatcherTimer`, so a heavy preset blocked the interface for its whole duration; the loop
+  now runs on a background thread, hands a finished copy of the frame to the UI thread through a
+  presentation buffer, and queues at most one present at a time, so a busy interface can never
+  build up a backlog of frames. Preset switching, the reset key, and the overlay follow as
+  thread-safe requests, and the frame pacing lives in the tested `FramePacing` helper. Covered by
+  5 tests.
 - The visualizer now measures where its frame time goes. `PresetRenderer` reports a
   `RenderTimings` breakdown (warp, blur, post-processing, overlay, composite, comp shaders, and
   the frame total) per frame and as an average over a window, and the window's diagnostic line in
@@ -9919,6 +10360,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.8.0] - 2026-06-21
 
 ### Added
+- The visualizer renders on its own thread now. A frame used to be produced from a
+  `DispatcherTimer`, so a heavy preset blocked the interface for its whole duration; the loop
+  now runs on a background thread, hands a finished copy of the frame to the UI thread through a
+  presentation buffer, and queues at most one present at a time, so a busy interface can never
+  build up a backlog of frames. Preset switching, the reset key, and the overlay follow as
+  thread-safe requests, and the frame pacing lives in the tested `FramePacing` helper. Covered by
+  5 tests.
 - The visualizer now measures where its frame time goes. `PresetRenderer` reports a
   `RenderTimings` breakdown (warp, blur, post-processing, overlay, composite, comp shaders, and
   the frame total) per frame and as an average over a window, and the window's diagnostic line in
@@ -10174,6 +10622,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.7.0] - 2026-06-21
 
 ### Added
+- The visualizer renders on its own thread now. A frame used to be produced from a
+  `DispatcherTimer`, so a heavy preset blocked the interface for its whole duration; the loop
+  now runs on a background thread, hands a finished copy of the frame to the UI thread through a
+  presentation buffer, and queues at most one present at a time, so a busy interface can never
+  build up a backlog of frames. Preset switching, the reset key, and the overlay follow as
+  thread-safe requests, and the frame pacing lives in the tested `FramePacing` helper. Covered by
+  5 tests.
 - The visualizer now measures where its frame time goes. `PresetRenderer` reports a
   `RenderTimings` breakdown (warp, blur, post-processing, overlay, composite, comp shaders, and
   the frame total) per frame and as an average over a window, and the window's diagnostic line in
@@ -10360,6 +10815,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.6.0] - 2026-06-19
 
 ### Added
+- The visualizer renders on its own thread now. A frame used to be produced from a
+  `DispatcherTimer`, so a heavy preset blocked the interface for its whole duration; the loop
+  now runs on a background thread, hands a finished copy of the frame to the UI thread through a
+  presentation buffer, and queues at most one present at a time, so a busy interface can never
+  build up a backlog of frames. Preset switching, the reset key, and the overlay follow as
+  thread-safe requests, and the frame pacing lives in the tested `FramePacing` helper. Covered by
+  5 tests.
 - The visualizer now measures where its frame time goes. `PresetRenderer` reports a
   `RenderTimings` breakdown (warp, blur, post-processing, overlay, composite, comp shaders, and
   the frame total) per frame and as an average over a window, and the window's diagnostic line in
@@ -10507,6 +10969,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   New NuGet packages: `Avalonia.Fonts.Inter`, `SkiaSharp`.
 
 ### Added
+- The visualizer renders on its own thread now. A frame used to be produced from a
+  `DispatcherTimer`, so a heavy preset blocked the interface for its whole duration; the loop
+  now runs on a background thread, hands a finished copy of the frame to the UI thread through a
+  presentation buffer, and queues at most one present at a time, so a busy interface can never
+  build up a backlog of frames. Preset switching, the reset key, and the overlay follow as
+  thread-safe requests, and the frame pacing lives in the tested `FramePacing` helper. Covered by
+  5 tests.
 - The visualizer now measures where its frame time goes. `PresetRenderer` reports a
   `RenderTimings` breakdown (warp, blur, post-processing, overlay, composite, comp shaders, and
   the frame total) per frame and as an average over a window, and the window's diagnostic line in
@@ -10755,6 +11224,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   automatically.
 
 ### Added
+- The visualizer renders on its own thread now. A frame used to be produced from a
+  `DispatcherTimer`, so a heavy preset blocked the interface for its whole duration; the loop
+  now runs on a background thread, hands a finished copy of the frame to the UI thread through a
+  presentation buffer, and queues at most one present at a time, so a busy interface can never
+  build up a backlog of frames. Preset switching, the reset key, and the overlay follow as
+  thread-safe requests, and the frame pacing lives in the tested `FramePacing` helper. Covered by
+  5 tests.
 - The visualizer now measures where its frame time goes. `PresetRenderer` reports a
   `RenderTimings` breakdown (warp, blur, post-processing, overlay, composite, comp shaders, and
   the frame total) per frame and as an average over a window, and the window's diagnostic line in

@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Globalization;
 using Avalonia;
 using Avalonia.Controls;
@@ -29,16 +30,25 @@ public partial class VisualizerWindow : Window
     private readonly bool _alwaysShowOverlay;
     private DateTimeOffset _lastPointerActivity = DateTimeOffset.MinValue;
 
-    private readonly DispatcherTimer _timer;
     private readonly WriteableBitmap _bitmap;
+    private readonly PixelBuffer _presentBuffer;
+    private readonly object _presentLock = new();
     private readonly VisualizerPresetLibrary _library = new();
     private readonly SilentAudioSource _silent = new();
+    private readonly Stopwatch _renderClock = new();
     private PresetRenderer _renderer;
-    private int _presetIndex;
+    private Thread? _renderThread;
+    private volatile bool _renderRunning;
+    private volatile bool _closed;
+    private volatile int _presetIndex;
+    private int _renderedPresetIndex = -1;
+    private volatile bool _resetRequested;
+    private int _presentPending;
+    private volatile string? _pendingDiagnostics;
+    private double _lastFrame;
+    private double _lastDiagnostics;
     private VisualizerTransport? _transport;
     private bool _isPlaying = true;
-    private DateTimeOffset _lastFrame = DateTimeOffset.UtcNow;
-    private DateTimeOffset _lastDiagnostics = DateTimeOffset.UtcNow;
 
     /// <summary>Initializes the window for the Avalonia designer.</summary>
     public VisualizerWindow()
@@ -70,6 +80,7 @@ public partial class VisualizerWindow : Window
             new Avalonia.Vector(96, 96),
             PixelFormat.Bgra8888,
             AlphaFormat.Premul);
+        _presentBuffer = new PixelBuffer(_renderWidth, _renderHeight);
         ReduceMotion = options.ReduceMotion;
         _alwaysShowOverlay = options.AlwaysShowOverlay;
 
@@ -78,21 +89,15 @@ public partial class VisualizerWindow : Window
         HintTextBlock.Text = LocalizationManager.Current.VisualizerHint;
         UpdatePresetLabel();
 
-        _timer = new DispatcherTimer
-        {
-            Interval = options.ReduceMotion ? ReducedMotionInterval : _frameInterval
-        };
-        _timer.Tick += (_, _) => RenderOnce();
         Opened += (_, _) =>
         {
             VisualizerAudioHub.Shared.Clear();
             VisualizerAudioHub.Shared.IsActive = true;
-            _lastFrame = DateTimeOffset.UtcNow;
-            _timer.Start();
+            StartRenderThread();
         };
         Closed += (_, _) =>
         {
-            _timer.Stop();
+            StopRenderThread();
             VisualizerAudioHub.Shared.IsActive = false;
             VisualizerAudioHub.Shared.Clear();
         };
@@ -143,14 +148,18 @@ public partial class VisualizerWindow : Window
         }
     }
 
-    /// <summary>Selects a preset by index, wrapping around the available presets.</summary>
+    /// <summary>
+    /// Selects a preset by index, wrapping around the available presets. The render thread picks
+    /// the request up on its next frame, so this stays a cheap UI-thread operation.
+    /// </summary>
     /// <param name="index">Requested preset index.</param>
     public void SelectPreset(int index)
     {
         var count = _library.Presets.Count;
+        if (count == 0)
+            return;
+
         _presetIndex = ((index % count) + count) % count;
-        var preset = _library.At(_presetIndex);
-        _renderer = new PresetRenderer(preset, _renderWidth, _renderHeight);
         VisualizerAudioHub.Shared.Clear();
         UpdatePresetLabel();
     }
@@ -169,7 +178,7 @@ public partial class VisualizerWindow : Window
                 SelectPreset(_presetIndex - 1);
                 break;
             case Key.R:
-                _renderer.Reset();
+                _resetRequested = true;
                 break;
             default:
                 return;
@@ -178,11 +187,72 @@ public partial class VisualizerWindow : Window
         e.Handled = true;
     }
 
-    private void RenderOnce()
+    /// <summary>
+    /// Starts the render thread. Rendering a frame is the expensive part of the visualizer, so it
+    /// runs away from the UI thread and only the finished frame is handed back for display.
+    /// </summary>
+    private void StartRenderThread()
     {
-        var now = DateTimeOffset.UtcNow;
-        var delta = (now - _lastFrame).TotalSeconds;
-        _lastFrame = now;
+        if (_renderThread is not null)
+            return;
+
+        _closed = false;
+        _renderRunning = true;
+        _renderClock.Restart();
+        _lastFrame = 0d;
+        _lastDiagnostics = 0d;
+        _renderThread = new Thread(RenderLoop)
+        {
+            IsBackground = true,
+            Name = "Orynivo visualizer"
+        };
+        _renderThread.Start();
+    }
+
+    /// <summary>Stops the render thread and waits briefly for the frame in flight to finish.</summary>
+    private void StopRenderThread()
+    {
+        _closed = true;
+        _renderRunning = false;
+        var thread = _renderThread;
+        _renderThread = null;
+        thread?.Join(TimeSpan.FromSeconds(2));
+    }
+
+    /// <summary>Renders frames at the configured rate until the window closes.</summary>
+    private void RenderLoop()
+    {
+        while (_renderRunning)
+        {
+            var interval = (ReduceMotion ? ReducedMotionInterval : _frameInterval).TotalSeconds;
+            var now = _renderClock.Elapsed.TotalSeconds;
+            var wait = FramePacing.NextWait(interval, now - _lastFrame);
+            if (wait > TimeSpan.Zero)
+                Thread.Sleep(wait);
+
+            var frameNow = _renderClock.Elapsed.TotalSeconds;
+            var delta = frameNow - _lastFrame;
+            _lastFrame = frameNow;
+            RenderOneFrame(delta);
+        }
+    }
+
+    /// <summary>Renders one frame on the render thread and hands it to the UI thread.</summary>
+    /// <param name="deltaSeconds">Seconds since the previous frame.</param>
+    private void RenderOneFrame(double deltaSeconds)
+    {
+        if (_renderedPresetIndex != _presetIndex)
+        {
+            _renderedPresetIndex = _presetIndex;
+            _renderer = new PresetRenderer(_library.At(_presetIndex), _renderWidth, _renderHeight);
+            _resetRequested = false;
+        }
+
+        if (_resetRequested)
+        {
+            _resetRequested = false;
+            _renderer.Reset();
+        }
 
         // Render even when nothing is playing, so the window never stays black.
         if (!VisualizerAudioHub.Shared.TryAnalyze(out var audio) || audio is null)
@@ -191,31 +261,68 @@ public partial class VisualizerWindow : Window
         if (ReduceMotion)
             _renderer.RenderOverlayOnly(audio);
         else
-            _renderer.RenderFrame(audio, delta);
+            _renderer.RenderFrame(audio, deltaSeconds);
 
-        Present();
-        UpdatePlayPauseIcon();
-        UpdateOverlayVisibility();
-        if (_transport is { } transport)
+        // Hand a finished copy to the UI thread instead of the live buffer, so the next frame can
+        // start immediately without the two threads ever touching the same pixels.
+        lock (_presentLock)
         {
-            var nowPlaying = transport.NowPlaying();
-            SetTrack(nowPlaying.Title, nowPlaying.Artist);
+            _presentBuffer.CopyFrom(_renderer.Output);
         }
-        LogDiagnostics();
+
+        PostPresent(BuildDiagnostics());
     }
 
     /// <summary>
-    /// Writes one bounded diagnostic line per second so an empty window can be told apart
-    /// from a picture that never reaches the screen, and so the render cost per stage is
-    /// measurable instead of guessed. The timings are averaged over the frames of this second.
-    /// Only counts, a brightness average, and stage timings are recorded, never media names or
-    /// paths.
+    /// Hands the finished frame to the UI thread. At most one present is queued at a time, so a
+    /// busy UI thread can never build up a backlog of frames.
     /// </summary>
-    private void LogDiagnostics()
+    /// <param name="diagnostics">Diagnostic line to write, or <see langword="null"/>.</param>
+    private void PostPresent(string? diagnostics)
     {
-        var now = DateTimeOffset.UtcNow;
-        if (now - _lastDiagnostics < TimeSpan.FromSeconds(1))
+        if (diagnostics is not null)
+            _pendingDiagnostics = diagnostics;
+
+        if (Interlocked.Exchange(ref _presentPending, 1) == 1)
             return;
+
+        Dispatcher.UIThread.Post(
+            () =>
+            {
+                Interlocked.Exchange(ref _presentPending, 0);
+                if (_closed)
+                    return;
+
+                Present();
+                UpdatePlayPauseIcon();
+                UpdateOverlayVisibility();
+                if (_transport is { } transport)
+                {
+                    var nowPlaying = transport.NowPlaying();
+                    SetTrack(nowPlaying.Title, nowPlaying.Artist);
+                }
+
+                if (_pendingDiagnostics is { } message)
+                {
+                    _pendingDiagnostics = null;
+                    SeekDiagnostics.Log("visualizer", message);
+                }
+            },
+            DispatcherPriority.Normal);
+    }
+
+    /// <summary>
+    /// Builds the once-per-second diagnostic line so an empty window can be told apart from a
+    /// picture that never reaches the screen, and so the render cost per stage is measurable
+    /// instead of guessed. The timings are averaged over the frames of this second. Only counts,
+    /// a brightness average, and stage timings are recorded, never media names or paths.
+    /// </summary>
+    /// <returns>The line, or <see langword="null"/> when a second has not passed yet.</returns>
+    private string? BuildDiagnostics()
+    {
+        var now = _renderClock.Elapsed.TotalSeconds;
+        if (now - _lastDiagnostics < 1d)
+            return null;
 
         _lastDiagnostics = now;
         var pixels = _renderer.Output.Pixels;
@@ -238,34 +345,39 @@ public partial class VisualizerWindow : Window
             + $"shaders=warp{_renderer.Preset.WarpShaders.Count}/comp{_renderer.Preset.CompShaders.Count} "
             + $"skipped={_renderer.ShadersSkipped} "
             + $"preset={_renderer.Preset.Name} userPresets={_library.Presets.Count - VisualizerPresets.BuiltIn.Count}";
-        SeekDiagnostics.Log("visualizer", message);
         // Start a fresh averaging window so the next line describes its own second.
         _renderer.ResetTimings();
+        return message;
     }
 
     private void Present()
     {
         using var buffer = _bitmap.Lock();
         var stride = _renderWidth * 4;
-        if (buffer.RowBytes == stride)
+        // The render thread keeps working on its own buffers, so this thread reads the finished
+        // presentation copy. The lock is held for the copy only, never for a whole frame.
+        lock (_presentLock)
         {
-            unsafe
+            if (buffer.RowBytes == stride)
             {
-                _renderer.Output.WriteBgra(new Span<byte>((void*)buffer.Address, stride * _renderHeight));
+                unsafe
+                {
+                    _presentBuffer.WriteBgra(new Span<byte>((void*)buffer.Address, stride * _renderHeight));
+                }
             }
-        }
-        else
-        {
-            // Padded rows: copy one row at a time so the padding stays untouched.
-            var row = new byte[stride];
-            for (var y = 0; y < _renderHeight; y++)
+            else
             {
-                _renderer.Output.WriteRowBgra(y, row);
-                System.Runtime.InteropServices.Marshal.Copy(
-                    row,
-                    0,
-                    buffer.Address + (y * buffer.RowBytes),
-                    stride);
+                // Padded rows: copy one row at a time so the padding stays untouched.
+                var row = new byte[stride];
+                for (var y = 0; y < _renderHeight; y++)
+                {
+                    _presentBuffer.WriteRowBgra(y, row);
+                    System.Runtime.InteropServices.Marshal.Copy(
+                        row,
+                        0,
+                        buffer.Address + (y * buffer.RowBytes),
+                        stride);
+                }
             }
         }
 

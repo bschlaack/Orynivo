@@ -513,6 +513,15 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
   overlay, composite, comp shader) plus the render size and whether the shaders are being
   skipped, so render cost is measured rather than guessed; keep it bounded and free of media
   names and paths.
+  The render loop runs on a background thread (`RenderLoop`, `RenderOneFrame`) because a frame
+  can cost tens of milliseconds; never move it back onto the Avalonia dispatcher. The UI thread
+  only ever reads the presentation buffer, never the renderer's live buffers, and the short copy
+  under `_presentLock` is the only shared state between the two threads: keep it that way, and
+  keep `PostPresent` coalescing to one queued present so a busy UI thread cannot build a backlog.
+  Preset switching (`_presetIndex`), the reset key (`_resetRequested`), and shutdown
+  (`_renderRunning`, `_closed`) travel as flags that the render thread applies, so UI event
+  handlers must never touch the renderer directly. Frame pacing lives in the pure, tested
+  `Orynivo.Visualization.FramePacing`.
   `VisualizerPresetLibrary` loads the built-in presets plus `.oryvis` and `.milk` files from
   `AppSettings.VisualizerPresetDirectory` (default: a `visualizer-presets` folder below the
   data root); every `[presetNN]` section of a `.milk` file becomes its own preset, a file that

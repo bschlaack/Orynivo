@@ -612,10 +612,15 @@ to a `WriteableBitmap` that Skia scales up.
   together with the render size and the skip state. A warp shader stays part of `Warp` because
   timing it per pixel would cost more than the measurement; the frame budget now compares the
   complete frame. Covered by 8 tests, all asserting ratios rather than absolute times.
-- 39b Off the UI thread - `Pending`: move the render loop off the Avalonia dispatcher into a
+- 39b Off the UI thread - `Done`: move the render loop off the Avalonia dispatcher into a
   background loop that presents by marshalling only the bitmap invalidation, so a heavy frame can
   no longer stall the interface. Keep shutdown, preset switching, reduce-motion, and the overlay
-  idle timer correct.
+  idle timer correct. The loop runs on a background thread and hands a finished copy of the frame
+  to the UI thread through a presentation buffer, with at most one present queued at a time, so
+  the interface can neither be blocked by a frame nor build a backlog. Preset switching, the
+  reset key, and shutdown travel as flags the render thread applies, and the pacing arithmetic
+  lives in the pure, tested `FramePacing`. Covered by 5 tests; the loop itself is verified by
+  running the window.
 - 39c Parallel full-frame passes - `Pending`: split warp, blur, decay, gamma, darken, echo, and
   composite across cores by row ranges with no order dependence, a bounded worker count, and
   results that do not depend on the split.
