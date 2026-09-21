@@ -51,6 +51,20 @@ public sealed class PresetLoopTests
         Assert.Equal(100000f, Run(preset, "i"));
     }
 
+    /// <summary>A per-pixel loop that overruns the warp budget is left out instead of hanging.</summary>
+    [Fact]
+    public void RenderFrame_SuspendsAPerPixelLoopThatOverrunsTheWarpBudget()
+    {
+        // A loop inside per_pixel runs once per screen pixel, which is what made a single frame
+        // take seconds and froze the window; the stage budget drops the program instead.
+        var preset = VisualizerPreset.Parse("decay=1\nper_pixel_1=loop(200000, q1 = q1 + 1);");
+        var renderer = new PresetRenderer(preset, 64, 36) { WarpStageBudgetMilliseconds = 0.001d };
+
+        renderer.RenderFrame(new Silent(), 1d / 60d);
+
+        Assert.True(renderer.PerPixelSuspended);
+    }
+
     /// <summary>Runs a parsed preset and returns one of its variables.</summary>
     /// <param name="preset">Preset to run.</param>
     /// <param name="variable">Variable to read back.</param>

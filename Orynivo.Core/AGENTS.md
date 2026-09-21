@@ -64,7 +64,14 @@ This file applies to `Orynivo.Core/` and supplements `../AGENTS.md`.
   but visible picture. Never reintroduce a mechanism that switches the shaders off for a frame, and
   never let the budget compare the whole frame against the shader threshold: that combination is
   what made a real preset collection render nothing but the shared overlay. `ShaderGridReduced`
-  reports the reduced grid for diagnostics. The interpreter
+  reports the reduced grid for diagnostics. The warp shader grid is scaled back with
+  `PixelBuffer.SampleBilinear`, because it is the base picture; only the comp pass may scale with
+  nearest-neighbour. `WarpStageBudgetMilliseconds` is the warp stage's own ceiling: the per-pixel
+  program runs once per screen pixel, so a preset that loops inside it can cost seconds for a single
+  frame. When the stage passes that ceiling the program is left out for the rest of the frame and
+  retried a moment later, so the frame still draws with the per-frame motion values. Never let that
+  path become a per-frame hang, and never make a frame wait for a per-pixel program that cannot
+  finish. The interpreter
   walks the tree per pixel, which is the known cost limit; a JIT compiler for shaders is the
   documented follow-up if the CPU cost proves too high.
   `PresetRenderer.Timings` and `AverageTimings` carry the `RenderTimings` breakdown per frame and

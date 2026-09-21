@@ -177,7 +177,9 @@ public sealed class MilkdropCompatibilityTests
     /// <returns>The rendered pixels.</returns>
     private static float[] RenderFeedback(string perFrame)
     {
-        var text = "decay = 1;\nper_frame_1=wave_a = 0;\n" +
+        // The wave is what the feedback loop carries, so these tests need it visible; hiding it used
+        // to leave the spectrum as the only content, which made them measure the overlay instead.
+        var text = "decay = 1;\nper_frame_1=wave_a = 1;\n" +
                    (perFrame.Length == 0 ? string.Empty : "per_frame_2=" + perFrame + "\n");
         var renderer = new PresetRenderer(VisualizerPreset.Parse(text), 40, 40);
         for (var frame = 0; frame < 4; frame++)

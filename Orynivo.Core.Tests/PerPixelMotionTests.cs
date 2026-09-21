@@ -14,8 +14,8 @@ public sealed class PerPixelMotionTests
     [Fact]
     public void RenderFrame_PerPixelZoomTakesEffect()
     {
-        var plain = Render("fDecay=1\nwave_a=0\nper_pixel_1=x = x + 0.001;");
-        var zoomed = Render("fDecay=1\nwave_a=0\nper_pixel_1=zoom = 1.4;\nper_pixel_2=x = x + 0.001;");
+        var plain = Render("fDecay=1\nwave_a=1\nper_pixel_1=x = x + 0.001;");
+        var zoomed = Render("fDecay=1\nwave_a=1\nper_pixel_1=zoom = 1.4;\nper_pixel_2=x = x + 0.001;");
 
         Assert.True(MeanDifference(plain, zoomed) > 0.001f);
     }
@@ -24,8 +24,8 @@ public sealed class PerPixelMotionTests
     [Fact]
     public void RenderFrame_PerPixelRotationTakesEffect()
     {
-        var plain = Render("fDecay=1\nwave_a=0\nper_pixel_1=x = x + 0.001;");
-        var rotated = Render("fDecay=1\nwave_a=0\nper_pixel_1=rot = 0.5;\nper_pixel_2=x = x + 0.001;");
+        var plain = Render("fDecay=1\nwave_a=1\nper_pixel_1=x = x + 0.001;");
+        var rotated = Render("fDecay=1\nwave_a=1\nper_pixel_1=rot = 0.5;\nper_pixel_2=x = x + 0.001;");
 
         Assert.True(MeanDifference(plain, rotated) > 0.001f);
     }
@@ -34,8 +34,8 @@ public sealed class PerPixelMotionTests
     [Fact]
     public void RenderFrame_PerFrameZoomStillWorks()
     {
-        var plain = Render("fDecay=1\nwave_a=0\nper_pixel_1=x = x + 0.001;");
-        var zoomed = Render("fDecay=1\nwave_a=0\nper_frame_1=zoom = 1.4;\nper_pixel_1=x = x + 0.001;");
+        var plain = Render("fDecay=1\nwave_a=1\nper_pixel_1=x = x + 0.001;");
+        var zoomed = Render("fDecay=1\nwave_a=1\nper_frame_1=zoom = 1.4;\nper_pixel_1=x = x + 0.001;");
 
         Assert.True(MeanDifference(plain, zoomed) > 0.001f);
     }

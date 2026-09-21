@@ -43,6 +43,7 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler
     private readonly PixelBuffer _blurred;
     private readonly Stopwatch _shaderClock = new();
     private readonly Stopwatch _warpShaderClock = new();
+    private readonly Stopwatch _warpClock = new();
     private double _warpShaderMilliseconds;
     private readonly Stopwatch _clock = new();
     private double _mark;
@@ -78,6 +79,10 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler
 
     /// <summary>Pixels the shader grid used on the last frame that ran shaders.</summary>
     private int _shaderPixelsUsed;
+
+    private bool _perPixelSuspended;
+    private bool _skipPerPixelThisFrame;
+    private int _framesSinceSuspend;
 
     private readonly VisualizerTextureBank _textures = new();
     private readonly float[] _randFrame = new float[4];
@@ -233,6 +238,21 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler
     }
 
     /// <summary>
+    /// Gets or sets the wall-clock ceiling for the warp stage. A per-pixel program runs once per
+    /// screen pixel, so a preset that loops inside it can cost seconds for a single frame and
+    /// freeze the picture; when the stage passes this ceiling the per-pixel program is left out for
+    /// the rest of the frame and retried a moment later. The frame still renders with the per-frame
+    /// motion values, so the preset stays visible instead of the window hanging.
+    /// </summary>
+    public double WarpStageBudgetMilliseconds { get; set; } = 1000d;
+
+    /// <summary>
+    /// Gets a value indicating whether the per-pixel program was left out of the last frame because
+    /// the warp stage passed <see cref="WarpStageBudgetMilliseconds"/>.
+    /// </summary>
+    public bool PerPixelSuspended => _perPixelSuspended;
+
+    /// <summary>
     /// Gets a value indicating whether the shader grid is below its full size because the shaders
     /// were too slow. The shaders keep running either way; only their resolution drops.
     /// </summary>
@@ -381,6 +401,9 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler
         _shaderPixelTarget = ShaderPixelBudget;
         _shaderPixelsUsed = 0;
         _shaderGridReduced = false;
+        _perPixelSuspended = false;
+        _skipPerPixelThisFrame = false;
+        _framesSinceSuspend = 0;
         Array.Clear(_slots);
         _audio = null;
         _initialized = false;
@@ -530,6 +553,25 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler
 
         var perPixelMotion = _perPixelWritesMotion && !recordMotion;
 
+        // Measured from here, not from the frame start: the ceiling guards a runaway per-pixel
+        // program, and it must not trip on the one-off JIT cost of the earlier stages.
+        _warpClock.Restart();
+
+        // A per-pixel program that loops can cost seconds over a full frame. Once the stage passes
+        // its ceiling the program is left out for the rest of the frame, so the window keeps
+        // drawing instead of hanging; the next frames retry it.
+        var runPerPixel = true;
+        if (_perPixelSuspended)
+        {
+            if (++_framesSinceSuspend < 60)
+                runPerPixel = false;
+            else
+            {
+                _framesSinceSuspend = 0;
+                _perPixelSuspended = false;
+            }
+        }
+
         // Centre, stretch, rotate, and zoom the sampling position of one point. A preset that
         // changes one of these inside per_pixel sees the change here, on the next point, the way
         // Milkdrop does it. Both the per-pixel fill and the shader grid go through this, so the
@@ -588,7 +630,8 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler
                 Write(slots, _slotX, warpedX);
             if (_perPixelUsesY)
                 Write(slots, _slotY, warpedY);
-            perPixel.Execute(slots);
+            if (!_skipPerPixelThisFrame)
+                perPixel.Execute(slots);
 
             sampleX = _perPixelUsesX ? Read(slots, _slotX, warpedX) : warpedX;
             sampleY = _perPixelUsesY ? Read(slots, _slotY, warpedY) : warpedY;
@@ -606,6 +649,13 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler
             var sample = worker < 0 ? _sample : _workerSample[worker];
             for (var y = from; y < to; y++)
             {
+                if (!_perPixelSuspended && _warpClock.Elapsed.TotalMilliseconds > WarpStageBudgetMilliseconds)
+                {
+                    // The program is the expensive part of the stage, so it is what gives way.
+                    _perPixelSuspended = true;
+                    _skipPerPixelThisFrame = true;
+                }
+
                 var normalizedY = height > 1 ? (y / (float)(height - 1) * 2f) - 1f : 0f;
                 for (var x = 0; x < width; x++)
                 {
@@ -666,6 +716,12 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler
         var output = _shaderOutput.Pixels;
         for (var gridY = 0; gridY < gridHeight; gridY++)
         {
+            if (!_perPixelSuspended && _warpClock.Elapsed.TotalMilliseconds > WarpStageBudgetMilliseconds)
+            {
+                _perPixelSuspended = true;
+                _skipPerPixelThisFrame = true;
+            }
+
             var normalizedY = gridHeight > 1 ? (gridY / (float)(gridHeight - 1) * 2f) - 1f : 0f;
             for (var gridX = 0; gridX < gridWidth; gridX++)
             {
@@ -700,28 +756,23 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler
             return;
         }
 
-        // Nearest-neighbour on purpose: a bilinear pass over the whole frame costs more than the
-        // shader it scales, and the shader's own sampling already smoothed the result.
+        // Bilinear on purpose: this grid is the base picture, so a nearest-neighbour scale would
+        // show its blocks directly. The comp pass below can afford nearest because it is a soft
+        // post-process result.
         var target = _warped.Pixels;
-        var input = source.Pixels;
-        var sourceWidth = source.Width;
-        var sourceHeight = source.Height;
+        Span<float> sample = stackalloc float[4];
         for (var y = 0; y < height; y++)
         {
-            var sourceY = Math.Min(sourceHeight - 1, (int)((y + 0.5f) * sourceHeight / height));
-            var sourceRow = sourceY * sourceWidth;
-            var targetRow = y * width;
+            var v = (y + 0.5f) / height;
+            var row = y * width;
             for (var x = 0; x < width; x++)
             {
-                var sourceX = (int)((x + 0.5f) * sourceWidth / width);
-                if (sourceX >= sourceWidth)
-                    sourceX = sourceWidth - 1;
-                var sourceOffset = ((sourceRow + sourceX) * 4);
-                var offset = (targetRow + x) * 4;
-                target[offset] = input[sourceOffset];
-                target[offset + 1] = input[sourceOffset + 1];
-                target[offset + 2] = input[sourceOffset + 2];
-                target[offset + 3] = input[sourceOffset + 3];
+                source.SampleBilinear((x + 0.5f) / width, v, sample);
+                var offset = (row + x) * 4;
+                target[offset] = sample[0];
+                target[offset + 1] = sample[1];
+                target[offset + 2] = sample[2];
+                target[offset + 3] = sample[3];
             }
         }
     }
@@ -1560,7 +1611,17 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler
 
         var width = _fresh.Width;
         var height = _fresh.Height;
-        var alpha = Preset.WaveAlpha;
+
+        // The spectrum belongs to the wave overlay, so it follows the same live variables: a preset
+        // that hides its waves or colours them must not get a hard-coded bar chart on top. Reading
+        // the static preset default here left stray bars on presets that set wave_a to zero.
+        var alpha = Math.Clamp(Read("wave_a", Preset.WaveAlpha), 0f, 1f);
+        if (alpha <= 0f)
+            return;
+
+        var red = Math.Clamp(Read("wave_r", 1f), 0f, 1f);
+        var green = Math.Clamp(Read("wave_g", 1f), 0f, 1f);
+        var blue = Math.Clamp(Read("wave_b", 1f), 0f, 1f);
         var barWidth = Math.Max(1, width / bands.Length);
         for (var band = 0; band < bands.Length; band++)
         {
@@ -1572,7 +1633,7 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler
                 {
                     var x = (band * barWidth) + column;
                     if (x < width)
-                        _fresh.AddPixel(x, y, alpha * 0.25f, alpha * 0.6f, alpha);
+                        _fresh.AddPixel(x, y, red * alpha * 0.25f, green * alpha * 0.6f, blue * alpha);
                 }
             }
         }

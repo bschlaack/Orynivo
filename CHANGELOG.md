@@ -7,6 +7,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Fixed
+- Fixed the visualizer window hanging on a preset whose per-pixel program loops. That program runs
+  once per screen pixel, so a loop multiplied by 129,600 pixels made a single frame take seconds and
+  froze the picture until the window was closed. The warp stage now has its own ceiling
+  (`WarpStageBudgetMilliseconds`, 150 ms) and leaves the per-pixel program out for the rest of that
+  frame when it overruns, retrying shortly after, so the frame still draws with the per-frame motion
+  values instead of the window becoming unresponsive. Covered by a test.
+- Fixed the warp shader grid being scaled over the frame with nearest-neighbour, which showed the
+  grid's blocks directly because that grid is the base picture. It is scaled bilinearly now; the
+  comp pass keeps nearest-neighbour because it is a soft post-process result.
 - Fixed the visualizer dropping a preset's shaders whenever the frame exceeded the time budget,
   which left most of a real collection showing nothing but the shared overlay. A shader that costs
   too much now loses grid resolution instead of being switched off: the warp shader runs on the
