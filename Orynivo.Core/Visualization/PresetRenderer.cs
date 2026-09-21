@@ -274,6 +274,13 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler
     public string? PresetError { get; private set; }
 
     /// <summary>
+    /// Gets or sets the wall-clock ceiling for one shader pass. A shader that costs milliseconds per
+    /// pixel needs minutes for a whole grid, and the adaptive grid can only react once a frame has
+    /// finished, so a pass that overruns is abandoned here and the grid shrinks immediately.
+    /// </summary>
+    public double ShaderPassBudgetMilliseconds { get; set; } = 150d;
+
+    /// <summary>
     /// Gets or sets the sink for the stage trace of a preset's first frames. A stage that never
     /// returns leaves its own line as the last one, which is how a frozen frame is located.
     /// </summary>
@@ -757,6 +764,15 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler
         var output = _shaderOutput.Pixels;
         for (var gridY = 0; gridY < gridHeight; gridY++)
         {
+            if (_warpShaderClock.Elapsed.TotalMilliseconds > ShaderPassBudgetMilliseconds)
+            {
+                // Same reason as the comp pass: an overrunning warp shader is abandoned and the
+                // grid shrinks, so the frame keeps drawing.
+                _shaderPixelTarget = Math.Max(ShaderPixelFloor, _shaderPixelTarget / 4);
+                _shaderGridReduced = true;
+                break;
+            }
+
             if (!_perPixelSuspended && _warpClock.Elapsed.TotalMilliseconds > WarpStageBudgetMilliseconds)
             {
                 _perPixelSuspended = true;
@@ -1056,10 +1072,17 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler
     /// <param name="output">Buffer the shaders write into.</param>
     /// <param name="shaderWidth">Shader grid width.</param>
     /// <param name="shaderHeight">Shader grid height.</param>
-    private void RunCompShaders(PixelBuffer output, int shaderWidth, int shaderHeight)
+    private bool RunCompShaders(PixelBuffer output, int shaderWidth, int shaderHeight)
     {
         for (var y = 0; y < shaderHeight; y++)
         {
+            if (_shaderClock.Elapsed.TotalMilliseconds > ShaderPassBudgetMilliseconds)
+            {
+                // The grid can only shrink once a frame finishes, so an overrunning pass is
+                // abandoned instead of freezing the picture for minutes.
+                return false;
+            }
+
             var v = (y + 0.5f) / shaderHeight;
             for (var x = 0; x < shaderWidth; x++)
             {
@@ -1095,11 +1118,14 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler
                     if (trace)
                         StageLogger!($"stage=comp sampled frame={_frame}");
                     var offset = (((y * shaderWidth) + x) * 4);
-                    output.Pixels[offset] = Math.Clamp(colour.X, 0f, 1f);                    output.Pixels[offset + 1] = Math.Clamp(colour.Y, 0f, 1f);
+                    output.Pixels[offset] = Math.Clamp(colour.X, 0f, 1f);
+                    output.Pixels[offset + 1] = Math.Clamp(colour.Y, 0f, 1f);
                     output.Pixels[offset + 2] = Math.Clamp(colour.Z, 0f, 1f);
                 }
             }
         }
+
+        return true;
     }
 
     /// <summary>Runs the comp shaders over the composited frame.</summary>
@@ -1133,7 +1159,14 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler
             return;
         try
         {
-            RunCompShaders(output, shaderWidth, shaderHeight);
+            if (!RunCompShaders(output, shaderWidth, shaderHeight))
+            {
+                // The pass did not finish, so its partial result is dropped: the frame keeps the
+                // pre-comp picture and the grid shrinks for the next frame.
+                _shaderPixelTarget = Math.Max(ShaderPixelFloor, _shaderPixelTarget / 4);
+                _shaderGridReduced = true;
+                return;
+            }
         }
         catch (Exception exception)
         {

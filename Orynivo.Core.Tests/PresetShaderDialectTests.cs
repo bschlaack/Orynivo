@@ -155,6 +155,28 @@ public sealed class PresetShaderDialectTests
         Assert.Equal(0.5f, renderer.Output.Pixels[1], 3);
         Assert.Equal(0.75f, renderer.Output.Pixels[2], 3);
     }
+    /// <summary>A shader pass that cannot finish is abandoned instead of freezing the frame.</summary>
+    [Fact]
+    public void RenderFrame_AbandonsAShaderPassThatOverruns()
+    {
+        var preset = VisualizerPreset.Parse("""
+            fDecay=1
+            wave_a=0
+            PSVERSION_COMP=2
+            comp_1=`shader_body
+            comp_2=`{
+            comp_3=`    ret = tex2D(sampler_main, uv) * 1.01;
+            comp_4=`}
+            """);
+        var renderer = new PresetRenderer(preset, 64, 36) { ShaderPassBudgetMilliseconds = 0d };
+
+        renderer.RenderFrame(new Silent(), 1d / 60d);
+
+        // A shader that costs milliseconds per pixel needs minutes for a whole grid, and the
+        // adaptive grid can only react once a frame finishes.
+        Assert.True(renderer.ShaderGridReduced);
+        Assert.False(renderer.ShaderGridReduced && renderer.LastShaderMilliseconds <= 0d);
+    }
     /// <summary>An audio source that reports silence.</summary>
     private sealed class Silent : IVisualizerAudioSource
     {
