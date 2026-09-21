@@ -31,7 +31,7 @@ public static class ShaderTranspiler
     private static readonly HashSet<string> LiteralUniforms = new(StringComparer.Ordinal)
     {
         "texsize", "time", "frame", "fps", "bass", "mid", "treb", "vol",
-        "bass_att", "mid_att", "treb_att", "aspect", "rand_frame"
+        "bass_att", "mid_att", "treb_att", "aspect", "rand_frame", "rand_preset"
     };
 
     /// <summary>Builds the uniform table.</summary>
@@ -52,7 +52,8 @@ public static class ShaderTranspiler
             ["mid_att"] = 1,
             ["treb_att"] = 1,
             ["aspect"] = 2,
-            ["rand_frame"] = 4
+            ["rand_frame"] = 4,
+            ["rand_preset"] = 4
         };
         foreach (var name in new[]
         {
@@ -123,6 +124,7 @@ public static class ShaderTranspiler
         uniform float treb_att;
         uniform float2 aspect;
         uniform float4 rand_frame;
+        uniform float4 rand_preset;
         uniform shader sampler_main;
         uniform shader sampler_blur1;
         uniform shader sampler_blur2;
@@ -130,6 +132,10 @@ public static class ShaderTranspiler
         uniform shader sampler_noise_lq;
         uniform shader sampler_noise_mq;
         uniform shader sampler_noise_hq;
+        uniform shader sampler_fc_main;
+        uniform shader sampler_pc_main;
+        uniform shader sampler_noisevol_lq;
+        uniform shader sampler_noisevol_hq;
         float4 toColour(float3 c) { return float4(c, 1.0); }
         float4 toColour(float4 c) { return c; }
         float4 toColour(float c) { return float4(c, c, c, 1.0); }

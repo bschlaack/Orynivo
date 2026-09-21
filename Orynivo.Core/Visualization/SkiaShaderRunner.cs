@@ -78,7 +78,8 @@ public static class SkiaShaderRunner
     private static readonly string[] SamplerNames =
     [
         "sampler_main", "sampler_blur1", "sampler_blur2", "sampler_blur3",
-        "sampler_noise_lq", "sampler_noise_mq", "sampler_noise_hq"
+        "sampler_noise_lq", "sampler_noise_mq", "sampler_noise_hq",
+        "sampler_fc_main", "sampler_pc_main", "sampler_noisevol_lq", "sampler_noisevol_hq"
     ];
 
     /// <summary>Creates an eight-bit bitmap from a frame of zero-to-one components.</summary>

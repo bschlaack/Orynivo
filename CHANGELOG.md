@@ -7,6 +7,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Fixed
+- Added the samplers and the random vector Milkdrop shaders expect but the prelude did not declare:
+  `sampler_fc_main`, `sampler_pc_main`, `sampler_noisevol_lq`, `sampler_noisevol_hq`, and
+  `rand_preset`. A shader that named one of them failed on an unknown identifier. Over a 500-file
+  sample the share of shaders that translate and are accepted by Skia rose from 300 to 332 of 764,
+  that is from 39 to 43 percent.
 - Extended the SkSL emitter's type handling from single variables to whole expressions: a binary
   expression, an intrinsic call, a swizzle, an index, and a ternary all report their type, so a
   declaration or assignment between a scalar and a vector is converted instead of being rejected.
