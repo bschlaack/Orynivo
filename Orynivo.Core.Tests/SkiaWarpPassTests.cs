@@ -96,6 +96,25 @@ public sealed class SkiaWarpPassTests
         Assert.InRange(difference, 0.0001f, 0.02f);
     }
 
+    /// <summary>The first frame reports a finite fps, so a preset cannot accumulate an infinity.</summary>
+    [Fact]
+    public void RenderFrame_FirstFrameFpsIsFinite()
+    {
+        var renderer = new PresetRenderer(
+            VisualizerPreset.Parse("fDecay=1\nwave_a=0\nper_frame_1=accumulator = accumulator + (1 / fps);"),
+            8,
+            8);
+        try
+        {
+            renderer.RenderFrame(new Silent(), 1d / 60d);
+            Assert.True(float.IsFinite(renderer.ReadVariable("accumulator")));
+        }
+        finally
+        {
+            renderer.Dispose();
+        }
+    }
+
     /// <summary>A warp shader runs on the Skia path and matches the interpreter.</summary>
     [Fact]
     public void RenderFrame_SkiaWarpShaderMatchesTheInterpreter()

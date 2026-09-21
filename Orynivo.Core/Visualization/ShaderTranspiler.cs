@@ -843,6 +843,7 @@ public static class ShaderTranspiler
                 return "float3";
             case "length":
             case "dot":
+            case "distance":
             case "lum":
                 return "float";
         }

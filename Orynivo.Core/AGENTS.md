@@ -90,7 +90,14 @@ This file applies to `Orynivo.Core/` and supplements `../AGENTS.md`.
   `Shader` is the comp stage.
   `ShaderRuntime` owns every shader operation and both execution paths call it, so the interpreter
   stays the reference implementation and `ShaderCompiler` can only be correct if it produces the
-  same values; `ShaderCompilerTests` asserts exactly that and must keep passing. `ShaderTranspiler`
+  same values; `ShaderCompilerTests` asserts exactly that and must keep passing. Keep its function
+  set aligned with `ShaderTranspiler`'s vocabulary: a function the emitter can translate but the
+  runtime does not know makes the CPU silently disable a shader the GPU renders, and `lum` alone
+  appears in a third of a real collection. `PresetRenderer.SeedFrameVariables` must keep `fps`
+  finite on the first frame, because a preset that divides by it otherwise accumulates an infinity
+  that then reaches the sampler. `PresetSkiaComparisonDiagnosticTests` is the harness that compares
+  both execution paths over a real collection and reports their drift.
+  `ShaderTranspiler`
   is the SkSL back end for the GPU path and must stay honest against the same reference: the GPU and
   the interpreter have to agree on one variable universe, so the emitter knows the engine-bound
     per-pixel variables (`uv`, `uv_orig`, `rad`, `ang`), infers an intrinsic's return type from its

@@ -7,6 +7,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Added
+- Added `PresetSkiaComparisonDiagnosticTests`, which renders a sample of a real collection with and
+  without `PresetRenderer.UseSkiaPasses` and reports how far the two pictures drift, grouped by
+  whether the preset has a warp shader, a comp shader, a per-pixel block, or none. It is the
+  validation harness the cutover needs. Against a 200-preset sample the frame passes and the
+  per-pixel block agree, while most presets with a warp shader still diverge: the GPU warp pass
+  binds `sampler_blur1`-`sampler_blur3` to the unblurred frame instead of the CPU's blurred copy, so
+  a shader that uses `GetBlur1`-`GetBlur3` renders differently.
 - Moved the comp shader's own per-pixel expression block onto the GPU. `ShaderTranspiler.TranspileComp`
   emits `comp_N_per_pixel` into the same runtime effect as the comp shader, seeding its `x`, `y`,
   `rad`, and `ang` from the pixel position, and `SkiaShaderRunner.CompPass` seeds the block's
@@ -61,6 +68,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   stays the fallback, and the CPU/GPU tests keep the two within a level.
 
 ### Fixed
+- Added the missing Milkdrop shader functions to the CPU interpreter. `ShaderRuntime` now carries
+  `lum`, `asin`, `acos`, `atan`, `cross`, `rsqrt`, `log2`, `exp2`, `degrees`, `radians`, `distance`,
+  `reflect`, and `refract`, which the SkSL emitter already supported. Without them a warp or comp
+  shader that used one was silently disabled on the CPU while the GPU rendered it; `lum` alone
+  appears in 3580 of 9795 presets in a real collection.
+- Made `fps` finite on the first frame. It was zero, so a preset that divides by it
+  (`movx = movx + .1/fps*q1`) produced an infinity that stuck in its accumulators and then reached
+  the sampler.
 - Seeded the shared `q1`-`q32` and `t1`-`t8` variables from the preset slots on both CPU shader
   paths. Milkdrop keeps one variable universe for the expression blocks and the shader, so a shader
   now reads the values the per-frame block computed instead of zero; the GPU path already seeded

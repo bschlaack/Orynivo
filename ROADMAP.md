@@ -752,9 +752,17 @@ affordable. This is a project of its own and must keep the CPU path as the fallb
   variable, and a couple of vector comparisons.
 - 40d Platform, packaging, and CI - `Pending`: native dependencies for Windows, Linux, and macOS,
   packaging, the signed release manifest, and the CI build matrix.
-- 40e Cutover and validation - `Pending`: the GPU path becomes the default where it is available,
+- 40e Cutover and validation - `In progress`: the GPU path becomes the default where it is available,
   the CPU path stays the fallback, and a comparison harness validates both against the same
-  reference frames.
+  reference frames. `PresetSkiaComparisonDiagnosticTests` is that harness; against a 200-preset
+  sample it found that the frame passes and the per-pixel block agree within the eight-bit
+  quantisation, while most presets with a warp shader still diverge. The CPU-side causes it also
+  surfaced are fixed: the interpreter was missing the shader functions the SkSL emitter already had
+  (`lum`, `asin`, `acos`, `atan`, `cross`, `rsqrt`, `log2`, `exp2`, and others), which silently
+  disabled those shaders, and `fps` was zero on the first frame, which made a preset that divides by
+  it accumulate an infinity. What remains is the GPU side: the warp pass binds
+  `sampler_blur1`-`sampler_blur3` to the unblurred frame instead of the CPU's blurred copy, and an
+  `inf` sampling coordinate is handled differently by the two paths.
 
 - 39h Remaining preset-block failures - `Done`: the numbered expression parts are joined the
   way Milkdrop does it (concatenation, with a separator only when the previous part is complete),

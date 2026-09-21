@@ -505,7 +505,9 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
         var width = _previous.Width;
         var height = _previous.Height;
         Write("time", (float)_elapsed);
-        Write("fps", _frame > 0 ? 1f / Math.Max(0.001f, (float)(_elapsed / Math.Max(1, _frame))) : 0f);
+        // A first-frame fps of zero makes a preset that divides by fps produce an infinity that
+        // sticks in its accumulators, so the measured rate is used from the first frame.
+        Write("fps", _elapsed > 0.0001d ? (float)(Math.Max(1, _frame) / _elapsed) : 0f);
         Write("frame", _frame);
         Write("monitor", 1f);
         Write("bass", Bass);

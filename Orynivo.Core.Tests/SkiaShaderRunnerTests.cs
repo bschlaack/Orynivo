@@ -17,6 +17,22 @@ public sealed class SkiaShaderRunnerTests
     /// <summary>A constant source keeps the comparison about the math, not about sampling.</summary>
     private static readonly float[] GreySource = CreateConstantSource(0.5f, 0.25f, 0.75f);
 
+    /// <summary>The GPU and the interpreter agree on the extended Milkdrop vocabulary.</summary>
+    [Fact]
+    public void Render_MatchesTheInterpreterForTheExtendedVocabulary()
+    {
+        const string Source = """
+            float3 c = tex2D(sampler_main, uv).rgb;
+            float3 a = cross(c, float3(1.0, 0.0, 0.0));
+            float l = lum(c);
+            float s = (asin(clamp(c.x, -1.0, 1.0)) + atan(c.y) + acos(clamp(c.z, -1.0, 1.0))) * 0.4;
+            float r = (rsqrt(max(c.x, 0.01)) + log2(max(c.y, 0.01)) + exp2(c.z * 0.1)) * 0.25;
+            ret = float3(l, s, r) + a * 0.1;
+            """;
+
+        AssertMatchesInterpreter(Source);
+    }
+
     /// <summary>The GPU and the interpreter agree on a sampled, scaled shader.</summary>
     [Fact]
     public void Render_MatchesTheInterpreterForASampledShader()

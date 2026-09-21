@@ -54,6 +54,21 @@ internal static class ShaderRuntime
         Clamp,
         Smoothstep,
 
+        /// <summary>Intrinsics the SkSL emitter already carries; the CPU has to match them.</summary>
+        Acos,
+        Asin,
+        Atan,
+        Log2,
+        Exp2,
+        Rsqrt,
+        Cross,
+        Degrees,
+        Radians,
+        Distance,
+        Reflect,
+        Refract,
+        Lum,
+
         /// <summary>Texture reads.</summary>
         Sample,
         SampleBlur1,
@@ -104,6 +119,19 @@ internal static class ShaderRuntime
         ["mix"] = Opcode.Lerp,
         ["clamp"] = Opcode.Clamp,
         ["smoothstep"] = Opcode.Smoothstep,
+        ["acos"] = Opcode.Acos,
+        ["asin"] = Opcode.Asin,
+        ["atan"] = Opcode.Atan,
+        ["log2"] = Opcode.Log2,
+        ["exp2"] = Opcode.Exp2,
+        ["rsqrt"] = Opcode.Rsqrt,
+        ["cross"] = Opcode.Cross,
+        ["degrees"] = Opcode.Degrees,
+        ["radians"] = Opcode.Radians,
+        ["distance"] = Opcode.Distance,
+        ["reflect"] = Opcode.Reflect,
+        ["refract"] = Opcode.Refract,
+        ["lum"] = Opcode.Lum,
         ["tex2D"] = Opcode.Sample,
         ["tex2Dlod"] = Opcode.Sample,
         ["GetBlur1"] = Opcode.SampleBlur1,
@@ -228,6 +256,33 @@ internal static class ShaderRuntime
                 return ComponentWise(ComponentWise(a, b, MathF.Max), c, MathF.Min);
             case Opcode.Smoothstep:
                 return Smoothstep(a, b, c);
+            case Opcode.Acos:
+                return Unary(count, a, MathF.Acos);
+            case Opcode.Asin:
+                return Unary(count, a, MathF.Asin);
+            case Opcode.Atan:
+                return Unary(count, a, MathF.Atan);
+            case Opcode.Log2:
+                return Unary(count, a, value => value <= 0f ? 0f : MathF.Log2(value));
+            case Opcode.Exp2:
+                return Unary(count, a, value => MathF.Pow(2f, value));
+            case Opcode.Rsqrt:
+                return Unary(count, a, value => value <= 0f ? 0f : 1f / MathF.Sqrt(value));
+            case Opcode.Cross:
+                return Cross(a, b);
+            case Opcode.Degrees:
+                return Unary(count, a, value => value * (180f / MathF.PI));
+            case Opcode.Radians:
+                return Unary(count, a, value => value * (MathF.PI / 180f));
+            case Opcode.Distance:
+                return ShaderValue.Scalar(Length(ComponentWise(a, b, (left, right) => left - right)));
+            case Opcode.Reflect:
+                return Reflect(a, b);
+            case Opcode.Refract:
+                return Refract(a, b, c);
+            case Opcode.Lum:
+                // Milkdrop's luminance helper; the weights are the conventional Rec. 601 ones.
+                return ShaderValue.Scalar(Dot(ToFloat3(a), LumWeights));
             case Opcode.Volume:
                 {
                     // Milkdrop samples a 3D noise volume here. Both execution paths read the same
@@ -449,6 +504,69 @@ internal static class ShaderRuntime
         for (var index = 0; index < Math.Max(left.Count, right.Count); index++)
             total += left.Get(index) * right.Get(index);
         return total;
+    }
+
+    /// <summary>The Rec. 601 luminance weights Milkdrop's <c>lum</c> uses.</summary>
+    private static readonly ShaderValue LumWeights = ShaderValue.Vector(0.299f, 0.587f, 0.114f, 0f, 3);
+
+    /// <summary>
+    /// Widens a value to a <c>float3</c> the way the SkSL emitter does: a scalar broadcasts, a
+    /// <c>float2</c> pads with a zero, and a <c>float4</c> drops its last component.
+    /// </summary>
+    /// <param name="value">Value to widen.</param>
+    /// <returns>The value as three components.</returns>
+    private static ShaderValue ToFloat3(ShaderValue value) => value.Count switch
+    {
+        1 => ShaderValue.Vector(value.X, value.X, value.X, 0f, 3),
+        2 => ShaderValue.Vector(value.X, value.Y, 0f, 0f, 3),
+        _ => ShaderValue.Vector(value.X, value.Y, value.Z, 0f, 3)
+    };
+
+    /// <summary>Reflects an incident vector around a normal.</summary>
+    /// <param name="incident">Incident vector.</param>
+    /// <param name="normal">Normal vector.</param>
+    /// <returns>The reflected vector.</returns>
+    private static ShaderValue Reflect(ShaderValue incident, ShaderValue normal)
+    {
+        var i = ToFloat3(incident);
+        var n = ToFloat3(normal);
+        var scale = 2f * Dot(n, i);
+        return ComponentWise(i, n, (left, right) => left - (scale * right));
+    }
+
+    /// <summary>Refracts an incident vector through a surface, yielding zero on total reflection.</summary>
+    /// <param name="incident">Incident vector.</param>
+    /// <param name="normal">Normal vector.</param>
+    /// <param name="eta">Ratio of the two indices of refraction.</param>
+    /// <returns>The refracted vector, or zero.</returns>
+    private static ShaderValue Refract(ShaderValue incident, ShaderValue normal, ShaderValue eta)
+    {
+        var i = ToFloat3(incident);
+        var n = ToFloat3(normal);
+        var ratio = eta.X;
+        var cosine = Dot(n, i);
+        var k = 1f - (ratio * ratio * (1f - (cosine * cosine)));
+        if (k < 0f)
+            return ShaderValue.Vector(0f, 0f, 0f, 0f, 3);
+
+        var factor = (ratio * cosine) + MathF.Sqrt(k);
+        return ComponentWise(Map(i, value => value * ratio), n, (left, right) => left - (factor * right));
+    }
+
+    /// <summary>Computes the cross product of two vectors.</summary>
+    /// <param name="left">Left vector.</param>
+    /// <param name="right">Right vector.</param>
+    /// <returns>The cross product.</returns>
+    private static ShaderValue Cross(ShaderValue left, ShaderValue right)
+    {
+        var a = ToFloat3(left);
+        var b = ToFloat3(right);
+        return ShaderValue.Vector(
+            (a.Y * b.Z) - (a.Z * b.Y),
+            (a.Z * b.X) - (a.X * b.Z),
+            (a.X * b.Y) - (a.Y * b.X),
+            0f,
+            3);
     }
 
     /// <summary>Samples a texture through the bound sampler.</summary>
