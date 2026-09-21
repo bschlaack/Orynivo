@@ -59,7 +59,15 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler
     private bool _shadersSkipped;
     private int _framesSinceSkip;
     private int _blurLevel;
+    /// <summary>
+    /// Upper bound on the pixels a comp shader pass may cost. The pass runs on a grid at or below
+    /// this size and is scaled back up, because a per-pixel shader on the CPU cannot afford the
+    /// full frame at a high resolution.
+    /// </summary>
+    private const int ShaderPixelBudget = 40_000;
+
     private bool _samplerMainIsWarped;
+    private PixelBuffer? _shaderOutput;
     private readonly float[] _slots;
     // Resolved once so the per-pixel loop never looks a name up in the layout again.
     private readonly int _slotX;
@@ -713,14 +721,32 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler
         var height = _fresh.Height;
         _frameCopy.CopyFrom(_fresh);
         _samplerMainIsWarped = true;
-        for (var y = 0; y < height; y++)
+
+        // A comp shader is a post-processing pass, so it may run on a smaller grid than the frame
+        // and be scaled back up afterwards. That is what keeps a per-pixel shader inside the frame
+        // budget on the CPU; sampling still reads the full-resolution frame, so the effect stays
+        // where the preset put it.
+        var pixels = (long)width * height;
+        var scale = pixels > ShaderPixelBudget ? MathF.Sqrt(ShaderPixelBudget / (float)pixels) : 1f;
+        var shaderWidth = Math.Max(1, (int)(width * scale));
+        var shaderHeight = Math.Max(1, (int)(height * scale));
+        if (_shaderOutput is null ||
+            _shaderOutput.Width != shaderWidth ||
+            _shaderOutput.Height != shaderHeight)
         {
-            var normalizedY = height > 1 ? (y / (float)(height - 1) * 2f) - 1f : 0f;
-            var v = (y + 0.5f) / height;
-            for (var x = 0; x < width; x++)
+            _shaderOutput = new PixelBuffer(shaderWidth, shaderHeight);
+        }
+
+        // When the grid matches the frame the shader writes into it directly, which keeps the
+        // picture exact instead of resampling it through an identical-size copy.
+        var scaled = shaderWidth != width || shaderHeight != height;
+        var output = scaled ? _shaderOutput : _fresh;
+        for (var y = 0; y < shaderHeight; y++)
+        {
+            var v = (y + 0.5f) / shaderHeight;
+            for (var x = 0; x < shaderWidth; x++)
             {
-                var normalizedX = width > 1 ? (x / (float)(width - 1) * 2f) - 1f : 0f;
-                var u = (x + 0.5f) / width;
+                var u = (x + 0.5f) / shaderWidth;
                 for (var index = 0; index < _compShaders.Count; index++)
                 {
                     var (interpreter, shader) = _compShaders[index];
@@ -739,11 +765,28 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler
                         BindShaderVariables(interpreter, u, v, u, v);
                         colour = interpreter.Run();
                     }
-                    var offset = (((y * width) + x) * 4);
-                    _fresh.Pixels[offset] = Math.Clamp(colour.X, 0f, 1f);
-                    _fresh.Pixels[offset + 1] = Math.Clamp(colour.Y, 0f, 1f);
-                    _fresh.Pixels[offset + 2] = Math.Clamp(colour.Z, 0f, 1f);
+
+                    var offset = (((y * shaderWidth) + x) * 4);
+                    output.Pixels[offset] = Math.Clamp(colour.X, 0f, 1f);
+                    output.Pixels[offset + 1] = Math.Clamp(colour.Y, 0f, 1f);
+                    output.Pixels[offset + 2] = Math.Clamp(colour.Z, 0f, 1f);
                 }
+            }
+        }
+
+        if (!scaled)
+            return;
+
+        for (var y = 0; y < height; y++)
+        {
+            var v = (y + 0.5f) / height;
+            for (var x = 0; x < width; x++)
+            {
+                output.SampleBilinear((x + 0.5f) / width, v, _sample);
+                var offset = (((y * width) + x) * 4);
+                _fresh.Pixels[offset] = _sample[0];
+                _fresh.Pixels[offset + 1] = _sample[1];
+                _fresh.Pixels[offset + 2] = _sample[2];
             }
         }
     }

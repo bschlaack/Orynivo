@@ -72,7 +72,10 @@ This file applies to `Orynivo.Core/` and supplements `../AGENTS.md`.
   bodies (declarations and one return) are compiled — branches, loops, and swizzle assignments stay
   on the interpreter, because a wrong picture is worse than a slow one — and the compiled path must
   seed the frame-constant variables once per frame and only `uv`, `uv_orig`, `rad`, and `ang` per
-  pixel.
+  pixel. A comp shader is a post-processing pass, so it runs on a grid bounded to
+  `ShaderPixelBudget` pixels and is scaled back over the frame; keep that, because it is what makes
+  the pass affordable on the CPU, and keep the direct-to-frame write when the grid matches so the
+  picture is not resampled through an identical-size copy.
   The per-pixel path is the measured bottleneck, so it must stay free of avoidable work:
   `PresetProgram.ReferencedVariables` (filled by the compiler as it resolves each variable) is
   the conservative usage set, and the warp stage resolves its slots once in the constructor and

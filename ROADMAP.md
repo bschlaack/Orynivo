@@ -652,6 +652,12 @@ to a `WriteableBitmap` that Skia scales up.
   and the budget skips it. The remaining cost is helper overhead — a string dispatch per call, a
   delegate indirection per component, and a loop per swizzle — so the next step is to emit the
   arithmetic inline instead of calling helpers, which is what the 10 ns target requires.
+  A comp shader is also a post-processing pass, so it now runs on a grid bounded to 40,000 pixels
+  and is scaled back over the frame, which made its cost independent of the render size: at
+  1280 x 720 the same pass fell from 232 ms to 43 ms. That is still above the budget, so the
+  remaining steps are, in order, emitting the arithmetic inline (the ~240 to ~40 ns step), a
+  cheaper upscale than the bilinear one, and only then a decision about the default budget or the
+  GPU phase 40, which is the real answer for full resolution.
 - 39f Sharper defaults - `Pending`: raise the default render resolution and frame rate to what
   the measured cost allows, keep the existing settings ranges, and document the recommended
   values in README and the wiki.
