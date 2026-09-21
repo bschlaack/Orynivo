@@ -198,6 +198,47 @@ verify the Linux packages still ship the native library.
 **Checks before merging:** `scripts/verify-all.ps1` green; a manual pass over
 album/artist artwork generation, thumbnails, and the year-in-review PNG and PDF
 export on Windows and Linux.
+## Visualizer GPU shading surface
+
+**Trigger:** the visualizer's GPU phase (roadmap 40a). Fullscreen resolution and
+high frame rates are not affordable on the CPU, so the preset engine needs a
+GPU path.
+
+**Decision:** Avalonia's own Skia surface through `SKRuntimeEffect` and SkSL, not
+an own OpenGL or Vulkan surface.
+
+**Why:** `SkiaSharp` is already referenced by `Orynivo.Core` (and by
+`Orynivo.Server`), so the GPU path adds no dependency to any platform, needs no
+second windowing integration, and stays testable headlessly because the same
+code runs in the test projects. An own surface such as Silk.NET was rejected for
+now: it would add a native dependency to every platform, require its own
+context and swapchain handling next to Avalonia's, and could not be verified
+without a GPU in CI.
+
+**Risks:**
+
+1. SkSL is stricter than the HLSL the presets are written in. Measured: `while`
+   is rejected and must become a counted `for` with `break`, loops are unrolled
+   so a translated loop is bounded (`MaxTranslatedIterations`), typing is strict
+   with no implicit scalar-to-vector conversion, and there is a program-size
+   limit. Only presets that translate and compile take the GPU path; the
+   measured share is recorded in `CHANGELOG.md`.
+2. A future Skia major line may change the dialect. The emitter is therefore
+   kept emitter-agnostic: `ShaderTranspiler` builds an intermediate text from the
+   parsed tree, so a GLSL emitter can replace the SkSL emitter without touching
+   the parser, the interpreter, or the renderer.
+3. GPU availability and driver quality vary. The CPU interpreter remains the
+   reference implementation and the fallback, and every translation change is
+   checked against it by the CPU/GPU comparison tests.
+
+**Fallback rule:** a preset whose shader cannot be translated, fails to compile,
+or exceeds a pass budget keeps the CPU path for that preset. The CPU path is
+never removed. A coverage change is only accepted while the CPU/GPU comparison
+tests stay green, so the two paths cannot silently diverge.
+
+**Checks before merging:** the CPU/GPU comparison tests green; `verify-all.ps1`
+green in Debug and Release; the translation coverage measured against the
+preset collection and recorded in `CHANGELOG.md`.
 ## `Microsoft.Data.Sqlite` and the test SDK
 
 **Trigger:** a deliberate decision to move the toolchain forward. Both lines

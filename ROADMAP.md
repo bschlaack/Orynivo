@@ -694,14 +694,18 @@ affordable. This is a project of its own and must keep the CPU path as the fallb
 
 **Phases**
 
-- 40a Render-surface decision - `Pending`: evaluate Avalonia's Skia surface (SKSL and
-  `SKRuntimeEffect`) against an own OpenGL/Vulkan surface (for example Silk.NET), pick one, and
-  record the decision, its risks, and the fallback rule in `DEPENDENCY-MIGRATION.md`.
-- 40b Shader translation - `Pending`: translate the HLSL subset, or the preset expressions, into
-  the chosen GPU shading language, reusing `ShaderParser`; a shader that cannot be translated
-  keeps the CPU path for that preset instead of failing.
-- 40c GPU passes - `Pending`: warp, blur, video echo, borders, and composite as GPU passes with
-  the waveform and spectrum uploaded as small textures and no per-frame readback.
+- 40a Render-surface decision - `Done`: Avalonia's own Skia surface through `SKRuntimeEffect`
+  (SkSL) was chosen over an own OpenGL/Vulkan surface, because SkiaSharp is already referenced by
+  `Orynivo.Core` and the path stays testable headlessly. The decision, its three risks, and the
+  fallback rule are recorded in `DEPENDENCY-MIGRATION.md`.
+- 40b Shader translation - `Done`: `ShaderTranspiler` emits SkSL from the parsed tree and
+  `SkiaShaderRunner` executes it. Skia accepts the emitted program for 395 of 764 shaders in a
+  500-file sample of the preset collection (52 percent, up from 25 percent at the phase start),
+  and the CPU/GPU comparison tests agree within one byte. A shader that cannot be translated keeps
+  the CPU path for that preset.
+- 40c GPU passes - `In progress`: the comp-shader grid and the per-pixel programs run on the GPU
+  through `SKRuntimeEffect`; `tex3D` still needs a volume texture (173 of the 369 remaining
+  failures), and warp, blur, video echo, borders, and composite still need GPU passes.
 - 40d Platform, packaging, and CI - `Pending`: native dependencies for Windows, Linux, and macOS,
   packaging, the signed release manifest, and the CI build matrix.
 - 40e Cutover and validation - `Pending`: the GPU path becomes the default where it is available,
