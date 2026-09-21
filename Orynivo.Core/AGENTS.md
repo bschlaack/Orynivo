@@ -65,7 +65,14 @@ This file applies to `Orynivo.Core/` and supplements `../AGENTS.md`.
   per averaging window, and `ResetTimings` restarts that window; keep the measurement cheap (one
   stopwatch and a handful of marks per frame) and never time a per-pixel shader call, because the
   measurement would cost more than the work. A warp shader is therefore part of `Warp`, while
-  `Shader` is the comp stage. Keep the
+  `Shader` is the comp stage.
+  The per-pixel path is the measured bottleneck, so it must stay free of avoidable work:
+  `PresetProgram.ReferencedVariables` (filled by the compiler as it resolves each variable) is
+  the conservative usage set, and the warp stage resolves its slots once in the constructor and
+  only computes `rad`, `ang`, the motion grid, and the seeded sampling position when the preset's
+  per-pixel code references them. Keep that set conservative — reporting a variable a program
+  does not really use only costs a little work, while missing one changes the picture — and keep a
+  rendered frame allocation-free, which `RenderTimingTests` asserts. Keep the
   interpreter off the audio thread and bound its per-frame cost so a heavy shader degrades the
   render resolution instead of stalling playback.
 - Keep the project cross-platform `net10.0`; do not introduce Avalonia, Windows,

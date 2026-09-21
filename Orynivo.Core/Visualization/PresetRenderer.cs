@@ -59,6 +59,15 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler
     private int _blurLevel;
     private bool _samplerMainIsWarped;
     private readonly float[] _slots;
+    // Resolved once so the per-pixel loop never looks a name up in the layout again.
+    private readonly int _slotX;
+    private readonly int _slotY;
+    private readonly int _slotRad;
+    private readonly int _slotAng;
+    private readonly bool _perPixelUsesX;
+    private readonly bool _perPixelUsesY;
+    private readonly bool _perPixelUsesRadius;
+    private readonly bool _perPixelUsesAngle;
     private readonly float[] _sample = new float[4];
     private IVisualizerAudioSource? _audio;
     private bool _initialized;
@@ -92,6 +101,14 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler
         _frameCopy = new PixelBuffer(width, height);
         _blurred = new PixelBuffer(width, height);
         _slots = new float[preset.Layout.Count];
+        _slotX = preset.Layout.IndexOf("x");
+        _slotY = preset.Layout.IndexOf("y");
+        _slotRad = preset.Layout.IndexOf("rad");
+        _slotAng = preset.Layout.IndexOf("ang");
+        _perPixelUsesX = preset.PerPixel.Uses("x");
+        _perPixelUsesY = preset.PerPixel.Uses("y");
+        _perPixelUsesRadius = preset.PerPixel.Uses("rad");
+        _perPixelUsesAngle = preset.PerPixel.Uses("ang");
         foreach (var shader in preset.WarpShaders)
             _warpShaders.Add((new ShaderInterpreter(shader.Program, this), shader));
         foreach (var shader in preset.CompShaders)
@@ -387,9 +404,22 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler
         var stretchY = Read("sy", 1f);
         var cosRotation = MathF.Cos(rotation);
         var sinRotation = MathF.Sin(rotation);
+        // The polar pair costs a square root and an arctangent per pixel, so it is only computed
+        // when the preset's own code or the zoom exponent actually needs it.
+        var needsRadius = _perPixelUsesRadius || zoomExp != 1f;
+        var needsAngle = _perPixelUsesAngle;
+        var recordMotion = Read("mv_l", 0f) > 0f;
+        if (!recordMotion)
+        {
+            // Stale samples would otherwise survive into the next time the grid is drawn.
+            Array.Clear(_motionX);
+            Array.Clear(_motionY);
+            Array.Clear(_motionCount);
+        }
 
         var width = _warped.Width;
         var height = _warped.Height;
+        var target = _warped.Pixels;
         for (var y = 0; y < height; y++)
         {
             var normalizedY = height > 1 ? (y / (float)(height - 1) * 2f) - 1f : 0f;
@@ -402,22 +432,36 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler
                 var warpedY = (normalizedY - centreY) * stretchY;
                 var rotatedX = (warpedX * cosRotation) - (warpedY * sinRotation);
                 var rotatedY = (warpedX * sinRotation) + (warpedY * cosRotation);
-                var radius = MathF.Sqrt((rotatedX * rotatedX) + (rotatedY * rotatedY));
-                var pixelZoom = zoomExp == 1f
-                    ? zoom
-                    : MathF.Pow(zoom, 1f + (zoomExp * radius * 2f));
-                warpedX = (rotatedX * pixelZoom) + centreX + offsetX;
-                warpedY = (rotatedY * pixelZoom) + centreY + offsetY;
+                if (needsRadius || needsAngle)
+                {
+                    var radius = MathF.Sqrt((rotatedX * rotatedX) + (rotatedY * rotatedY));
+                    var pixelZoom = needsRadius && zoomExp != 1f
+                        ? MathF.Pow(zoom, 1f + (zoomExp * radius * 2f))
+                        : zoom;
+                    warpedX = (rotatedX * pixelZoom) + centreX + offsetX;
+                    warpedY = (rotatedY * pixelZoom) + centreY + offsetY;
+                    if (needsRadius)
+                        Write(_slotRad, radius);
+                    if (needsAngle)
+                        Write(_slotAng, MathF.Atan2(rotatedY, rotatedX));
+                }
+                else
+                {
+                    warpedX = (rotatedX * zoom) + centreX + offsetX;
+                    warpedY = (rotatedY * zoom) + centreY + offsetY;
+                }
 
-                Write("x", warpedX);
-                Write("y", warpedY);
-                Write("rad", radius);
-                Write("ang", MathF.Atan2(rotatedY, rotatedX));
+                if (_perPixelUsesX)
+                    Write(_slotX, warpedX);
+                if (_perPixelUsesY)
+                    Write(_slotY, warpedY);
                 Preset.PerPixel.Execute(_slots);
 
-                var sampleX = Read("x", warpedX);
-                var sampleY = Read("y", warpedY);
-                RecordMotion(normalizedX, normalizedY, sampleX, sampleY);
+                var sampleX = _perPixelUsesX ? Read(_slotX, warpedX) : warpedX;
+                var sampleY = _perPixelUsesY ? Read(_slotY, warpedY) : warpedY;
+                if (recordMotion)
+                    RecordMotion(normalizedX, normalizedY, sampleX, sampleY);
+
                 var sampleU = (sampleX * 0.5f) + 0.5f;
                 var sampleV = (sampleY * 0.5f) + 0.5f;
                 if (useShaders)
@@ -430,10 +474,10 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler
                 }
 
                 var offset = (((y * width) + x) * 4);
-                _warped.Pixels[offset] = _sample[0];
-                _warped.Pixels[offset + 1] = _sample[1];
-                _warped.Pixels[offset + 2] = _sample[2];
-                _warped.Pixels[offset + 3] = _sample[3];
+                target[offset] = _sample[0];
+                target[offset + 1] = _sample[1];
+                target[offset + 2] = _sample[2];
+                target[offset + 3] = _sample[3];
             }
         }
     }
@@ -1226,4 +1270,19 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler
         if (slot >= 0)
             _slots[slot] = value;
     }
+
+    /// <summary>Writes a slot that was resolved once, instead of looking the name up per pixel.</summary>
+    /// <param name="slot">Slot index, or a negative value when the layout lacks the variable.</param>
+    /// <param name="value">Value to store.</param>
+    private void Write(int slot, float value)
+    {
+        if (slot >= 0)
+            _slots[slot] = value;
+    }
+
+    /// <summary>Reads a slot that was resolved once, instead of looking the name up per pixel.</summary>
+    /// <param name="slot">Slot index, or a negative value when the layout lacks the variable.</param>
+    /// <param name="fallback">Value used when the layout lacks the variable.</param>
+    /// <returns>The stored value.</returns>
+    private float Read(int slot, float fallback) => slot < 0 ? fallback : _slots[slot];
 }

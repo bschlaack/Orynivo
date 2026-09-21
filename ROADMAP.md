@@ -624,9 +624,13 @@ to a `WriteableBitmap` that Skia scales up.
 - 39c Parallel full-frame passes - `Pending`: split warp, blur, decay, gamma, darken, echo, and
   composite across cores by row ranges with no order dependence, a bounded worker count, and
   results that do not depend on the split.
-- 39d Allocation-free hot path - `Pending`: reuse every frame buffer and temporary, remove
+- 39d Allocation-free hot path - `Done`: reuse every frame buffer and temporary, remove
   per-frame allocations and delegate churn from the pixel loops, and prove it with an allocation
-  check around a rendered frame.
+  check around a rendered frame. Done before 39c because the measurement showed the per-pixel
+  path is the bottleneck: the compiler now reports the variables a program references, the warp
+  stage resolves its slots once instead of looking each name up per pixel, and it skips the polar
+  pair, the motion grid, and the seeded sampling position when the preset never reads them. A
+  rendered frame allocates nothing. Covered by 5 tests, including the allocation check.
 - 39e JIT-compiled shaders - `Pending`: compile the parsed shader tree to
   `System.Linq.Expressions` through the existing preset compiler machinery instead of walking it
   per pixel, keep the interpreter as the validation and fallback path, and compare both against

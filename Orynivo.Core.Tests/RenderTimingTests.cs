@@ -143,6 +143,26 @@ public sealed class RenderTimingTests
         Assert.Equal(renderer.Timings.Total, renderer.AverageTimings.Total);
     }
 
+    /// <summary>A rendered frame allocates nothing, so it cannot add garbage-collection pauses.</summary>
+    [Fact]
+    public void RenderFrame_DoesNotAllocateOnTheHotPath()
+    {
+        var renderer = new PresetRenderer(
+            VisualizerPreset.Parse("fDecay=0.95\nper_pixel_1=x = x + 0.001;"),
+            Width,
+            Height);
+        var audio = new TimingAudio();
+        // Warm up first so the measurement only covers steady-state frames.
+        renderer.RenderFrame(audio, 1d / 60d);
+
+        var before = GC.GetAllocatedBytesForCurrentThread();
+        for (var frame = 0; frame < 5; frame++)
+            renderer.RenderFrame(audio, 1d / 60d);
+        var allocated = GC.GetAllocatedBytesForCurrentThread() - before;
+
+        Assert.True(allocated < 1024, $"five frames allocated {allocated} bytes");
+    }
+
     /// <summary>An audio source with content on every band and a waveform.</summary>
     private sealed class TimingAudio : IVisualizerAudioSource
     {

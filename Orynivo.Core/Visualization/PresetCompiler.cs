@@ -35,7 +35,7 @@ public static class PresetCompiler
         if (string.IsNullOrWhiteSpace(source))
             return layout is null
                 ? PresetProgram.Empty
-                : new PresetProgram(layout, null);
+                : new PresetProgram(layout, null, []);
 
         var state = new CompileState(layout);
         var body = new List<Expression>();
@@ -65,7 +65,7 @@ public static class PresetCompiler
 
         var block = Expression.Block(body);
         var lambda = Expression.Lambda<Action<float[]>>(block, state.Slots);
-        return new PresetProgram(state.Layout, lambda.Compile());
+        return new PresetProgram(state.Layout, lambda.Compile(), state.ReferencedNames);
     }
 
     /// <summary>Parses one statement, which is either an assignment or a bare expression.</summary>
@@ -381,10 +381,21 @@ public static class PresetCompiler
         /// <summary>Gets the slot layout this program compiles against.</summary>
         public PresetVariableLayout Layout { get; }
 
+        /// <summary>
+        /// Gets the variable names the parsed statements mention, whether they read or write them.
+        /// This is the conservative set the renderer uses to skip values a preset never looks at.
+        /// </summary>
+        public IReadOnlyCollection<string> ReferencedNames => _referencedNames;
+
         /// <summary>Returns the slot expression for a variable, adding the slot on first use.</summary>
         /// <param name="name">Variable name.</param>
         /// <returns>An array access expression for the variable's slot.</returns>
-        public Expression Slot(string name) =>
-            Expression.ArrayAccess(Slots, Expression.Constant(Layout.GetOrAdd(name)));
+        public Expression Slot(string name)
+        {
+            _referencedNames.Add(name);
+            return Expression.ArrayAccess(Slots, Expression.Constant(Layout.GetOrAdd(name)));
+        }
+
+        private readonly HashSet<string> _referencedNames = new(StringComparer.Ordinal);
     }
 }

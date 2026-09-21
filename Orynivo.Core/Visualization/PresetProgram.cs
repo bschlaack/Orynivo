@@ -9,14 +9,22 @@ namespace Orynivo.Visualization;
 public sealed class PresetProgram
 {
     private readonly Action<float[]>? _execute;
+    private readonly HashSet<string> _referenced;
 
     /// <summary>Creates a program over a slot layout.</summary>
     /// <param name="layout">Shared layout of the owning preset.</param>
     /// <param name="execute">Compiled statements, or <see langword="null"/> when empty.</param>
-    internal PresetProgram(PresetVariableLayout layout, Action<float[]>? execute)
+    /// <param name="referenced">Variable names the statements mention, or <see langword="null"/>.</param>
+    internal PresetProgram(
+        PresetVariableLayout layout,
+        Action<float[]>? execute,
+        IReadOnlyCollection<string>? referenced = null)
     {
         Layout = layout;
         _execute = execute;
+        _referenced = referenced is null
+            ? new HashSet<string>(StringComparer.Ordinal)
+            : new HashSet<string>(referenced, StringComparer.Ordinal);
     }
 
     /// <summary>Gets an empty program that runs no statements.</summary>
@@ -30,6 +38,19 @@ public sealed class PresetProgram
 
     /// <summary>Gets a value indicating whether the program has no statements.</summary>
     public bool IsEmpty => _execute is null;
+
+    /// <summary>
+    /// Gets the variable names this program references, whether it reads or writes them. The
+    /// render pipeline uses it to skip values a preset never looks at, so the set must stay
+    /// conservative: reporting a variable the program does not actually use only costs a little
+    /// work, while missing one would change the picture.
+    /// </summary>
+    public IReadOnlyCollection<string> ReferencedVariables => _referenced;
+
+    /// <summary>Reports whether this program references a variable.</summary>
+    /// <param name="name">Variable name.</param>
+    /// <returns><see langword="true"/> when the compiled statements mention the variable.</returns>
+    public bool Uses(string name) => _referenced.Contains(name);
 
     /// <summary>Returns the slot of a variable.</summary>
     /// <param name="name">Variable name.</param>
