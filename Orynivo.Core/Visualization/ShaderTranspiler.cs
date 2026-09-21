@@ -115,7 +115,14 @@ public static class ShaderTranspiler
                     if (name is null)
                         return;
 
-                    builder.Append(indent).Append(MapType(statement.Text)).Append(' ').Append(name);
+                    var declared = MapType(statement.Text);
+
+                    // The samplers are already declared in the prelude, and SkSL requires a shader
+                    // variable to be global, so a sampler declaration inside the body is dropped.
+                    if (declared == "shader")
+                        return;
+
+                    builder.Append(indent).Append(declared).Append(' ').Append(name);
                     if (statement.Left is not null)
                         builder.Append(" = ").Append(EmitInitializer(statement.Text, statement.Left));
                     builder.Append(";\n");
@@ -269,6 +276,28 @@ public static class ShaderTranspiler
             expression.Position)
     };
 
+    /// <summary>
+    /// Emits an assignment. The engine stores every value as a float and lets a scalar stand in for
+    /// a colour, so <c>ret = 0;</c> is normal for presets while SkSL refuses to assign a float to a
+    /// float3; the shader's own output variable is therefore widened.
+    /// </summary>
+    /// <param name="left">Target text.</param>
+    /// <param name="right">Value text.</param>
+    /// <param name="expression">Assignment node, used for its source position.</param>
+    /// <returns>The assignment text.</returns>
+    private static string EmitAssignment(string left, string right, ShaderNode expression)
+    {
+        // A vector constructor accepts a vector of the same size and truncates a larger one, so
+        // widening ret unconditionally covers both "ret = 0;" and "ret = tex2D(...).rgb".
+        if (expression.Left is { Kind: ShaderNodeKind.Identifier } target &&
+            string.Equals(target.Text, "ret", StringComparison.Ordinal))
+        {
+            return $"{left} = float3({right})";
+        }
+
+        return $"{left} = {right}";
+    }
+
     /// <summary>Emits a unary expression, keeping the preset convention that zero is false.</summary>
     /// <param name="expression">Unary node.</param>
     /// <returns>The expression text.</returns>
@@ -302,7 +331,7 @@ public static class ShaderTranspiler
             "*" => $"({left} * {right})",
             "/" => $"({left} / {right})",
             "%" => $"mod({left}, {right})",
-            "=" => $"{left} = {right}",
+            "=" => EmitAssignment(left, right, expression),
             "+=" => $"{left} += {right}",
             "-=" => $"{left} -= {right}",
             "*=" => $"{left} *= {right}",
@@ -363,6 +392,9 @@ public static class ShaderTranspiler
                 return $"mix({arguments[0]}, {arguments[1]}, {arguments[2]})";
             case "mul":
                 return arguments.Count >= 2 ? $"({arguments[0]} * {arguments[1]})" : arguments[0];
+            case "lum":
+                // Milkdrop's luminance helper; the weights are the conventional Rec. 601 ones.
+                return $"dot({arguments[0]}, float3(0.299, 0.587, 0.114))";
         }
 
         if (RenamedFunctions.TryGetValue(name, out var renamed))
