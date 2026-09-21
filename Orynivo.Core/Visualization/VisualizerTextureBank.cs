@@ -52,6 +52,38 @@ public sealed class VisualizerTextureBank
     private readonly Dictionary<VisualizerTexture, float[]> _textures = [];
     private readonly float[] _sample = new float[4];
 
+    /// <summary>Resolves a Milkdrop sampler name to one of the generated textures.</summary>
+    /// <param name="sampler">Sampler name, for example <c>sampler_noise_lq</c>.</param>
+    /// <param name="texture">The resolved texture.</param>
+    /// <returns><see langword="true"/> when the name refers to a generated texture.</returns>
+    public static bool TryResolve(string sampler, out VisualizerTexture texture)
+    {
+        texture = VisualizerTexture.NoiseLow;
+        switch (sampler)
+        {
+            case "sampler_noise_lq":
+                texture = VisualizerTexture.NoiseLow;
+                return true;
+            case "sampler_noise_mq":
+                texture = VisualizerTexture.NoiseMedium;
+                return true;
+            case "sampler_noise_hq":
+                texture = VisualizerTexture.NoiseHigh;
+                return true;
+        }
+
+        if (sampler.Length == "sampler_rand00".Length &&
+            sampler.StartsWith("sampler_rand", StringComparison.Ordinal) &&
+            int.TryParse(sampler.AsSpan("sampler_rand".Length), out var index) &&
+            index is >= 0 and <= 15)
+        {
+            texture = VisualizerTexture.Random00 + index;
+            return true;
+        }
+
+        return false;
+    }
+
     /// <summary>Returns the edge length of one texture.</summary>
     /// <param name="texture">Texture to describe.</param>
     /// <returns>The edge length in pixels.</returns>

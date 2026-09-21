@@ -66,6 +66,7 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler
     /// </summary>
     private const int ShaderPixelBudget = 10_000;
 
+    private readonly VisualizerTextureBank _textures = new();
     private bool _samplerMainIsWarped;
     private PixelBuffer? _shaderOutput;
     private bool _warpShadersFailed;
@@ -1013,6 +1014,14 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler
     /// <inheritdoc/>
     public ShaderValue Sample(string sampler, float u, float v)
     {
+        // Milkdrop shaders sample the noise and random textures it ships. We generate those, so a
+        // referenced sampler is resolved against the bank instead of falling back to the frame.
+        if (VisualizerTextureBank.TryResolve(sampler, out var texture))
+        {
+            _textures.Sample(texture, u, v, VisualizerTextureWrap.Repeat).CopyTo(_sample);
+            return ShaderValue.Vector(_sample[0], _sample[1], _sample[2], _sample[3], 4);
+        }
+
         var source = sampler switch
         {
             // During a comp shader the frame copy holds the composited picture, which is what

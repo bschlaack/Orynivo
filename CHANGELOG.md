@@ -7,6 +7,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Fixed
+- Fixed shaders sampling Milkdrop's noise and random textures getting the frame instead.
+  Unknown sampler names fell back to `sampler_main`, so `sampler_noise_lq`, `sampler_noise_mq`,
+  `sampler_noise_hq`, and `sampler_rand00`-`sampler_rand15` rendered as if they sampled the
+  picture; they now resolve against the generated texture bank, which finally puts the bank
+  from phase 38c to use. Covered by 2 tests.
 - Fixed the per-pixel motion variables having no effect. Milkdrop treats `zoom`, `zoomexp`,
   `rot`, `cx`, `cy`, `dx`, `dy`, `sx`, and `sy` as per-vertex values that a per-pixel
   program may change, and the change carries into the following pixel; the warp used to read

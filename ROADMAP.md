@@ -761,6 +761,14 @@ affordable. This is a project of its own and must keep the CPU path as the fallb
   `WrittenVariables` — so a preset that changes them sees the change on the following pixel while
   every other preset keeps the cheaper per-frame path. `PerPixelMotionTests` covers a per-pixel
   zoom, a per-pixel rotation, and the unchanged per-frame path.
+  The reference implementation's shader header also settled two more points. First, it transpiles
+  HLSL to GLSL and runs it on the GPU, which confirms that phase 40 is the natural home for full
+  fidelity and that our CPU path is the harder route. Second, it resolves the sampler names a
+  shader references, which we now do as well: `sampler_noise_lq`, `sampler_noise_mq`,
+  `sampler_noise_hq`, and `sampler_rand00`-`sampler_rand15` sample the generated texture bank
+  instead of falling back to the frame, so the bank built in 38c is in use. What remains is the
+  preprocessor and the macro vocabulary from `MilkdropShader.cpp` plus the per-frame random
+  variables it keeps (`rand_frame` and the random translation and rotation vectors).
 **Tests**: each phase adds its own; 39a is the prerequisite for claiming any speed-up.
 
 **Commit**: `perf(visualizer): add render measurement` (39a), then one commit per phase
