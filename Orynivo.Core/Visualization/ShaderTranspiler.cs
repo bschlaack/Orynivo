@@ -535,17 +535,19 @@ public static class ShaderTranspiler
         var target = ComponentCount(to);
         if (source == target)
             return text;
+
         if (target > source)
         {
-            // Padding a smaller vector is deliberately not done: for a division it would create
-            // "0.0 / 0.0", which SkSL rejects at compile time. A widening that cannot be expressed
-            // safely is left alone so the shader falls back to the interpreter.
+            // Widening a smaller vector is deliberately not done. Padding it with zeros was tried
+            // three times and rejected every time: the engine does not read a missing component as
+            // zero, so the padded shader and the interpreter disagree, which the CPU/GPU comparison
+            // test catches. The widening is left unexpressed instead, so that shader keeps its
+            // fallback to the interpreter rather than rendering something else.
             return $"{to}({text})";
         }
 
         return $"{text}.{"xyzw"[..target]}";
     }
-
     /// <summary>
     /// Emits a helper function as SkSL, with the parameter types the parser kept. Its return type is
     /// read from its own return statement, because the engine does not track declared return types.
