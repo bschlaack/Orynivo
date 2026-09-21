@@ -18,6 +18,10 @@ public static class SkiaShaderRunner
     /// <param name="width">Frame width.</param>
     /// <param name="height">Frame height.</param>
     /// <param name="uniforms">Extra scalar uniforms the shader reads, for example <c>bass</c>.</param>
+    /// <param name="textures">
+    /// Texture bank that supplies the cubic volumes <c>tex3D</c> reads. The caller shares it with the
+    /// CPU interpreter so both paths sample the same volume; a new bank is created when omitted.
+    /// </param>
     /// <returns>The rendered frame as RGBA components in the range zero to one.</returns>
     /// <exception cref="PresetExpressionException">The shader cannot be translated or Skia rejects it.</exception>
     public static float[] Render(
@@ -25,7 +29,8 @@ public static class SkiaShaderRunner
         float[] source,
         int width,
         int height,
-        IReadOnlyDictionary<string, float>? uniforms = null)
+        IReadOnlyDictionary<string, float>? uniforms = null,
+        VisualizerTextureBank? textures = null)
     {
         ArgumentNullException.ThrowIfNull(program);
         ArgumentNullException.ThrowIfNull(source);
@@ -36,6 +41,9 @@ public static class SkiaShaderRunner
 
         using var sourceBitmap = CreateBitmap(source, width, height);
         using var sourceShader = sourceBitmap.ToShader(SKShaderTileMode.Clamp, SKShaderTileMode.Clamp);
+        textures ??= new VisualizerTextureBank();
+        using var volumeLow = CreateVolumeShader(textures, VisualizerTexture.NoiseVolumeLow);
+        using var volumeHigh = CreateVolumeShader(textures, VisualizerTexture.NoiseVolumeHigh);
 
         var effectUniforms = new SKRuntimeEffectUniforms(effect);
 
@@ -57,10 +65,18 @@ public static class SkiaShaderRunner
         }
 
         // Every sampler the prelude declares needs a child shader, even when the body only reads
-        // sampler_main; the frame stands in for the blur levels and the texture bank here.
+        // sampler_main; the frame stands in for the blur levels and the noise textures, while the
+        // two volumes get their own slice atlas.
         var children = new SKRuntimeEffectChildren(effect);
         foreach (var name in SamplerNames)
-            children[name] = new SKRuntimeEffectChild(sourceShader);
+        {
+            children[name] = name switch
+            {
+                "sampler_noisevol_lq" => new SKRuntimeEffectChild(volumeLow),
+                "sampler_noisevol_hq" => new SKRuntimeEffectChild(volumeHigh),
+                _ => new SKRuntimeEffectChild(sourceShader)
+            };
+        }
 
         using var shader = effect.ToShader(effectUniforms, children);
         using var target = CreateBitmap(new float[width * height * 4], width, height);
@@ -88,7 +104,7 @@ public static class SkiaShaderRunner
     /// <param name="width">Frame width.</param>
     /// <param name="height">Frame height.</param>
     /// <returns>The bitmap.</returns>
-    private static SKBitmap CreateBitmap(float[] pixels, int width, int height)
+    private static SKBitmap CreateBitmap(ReadOnlySpan<float> pixels, int width, int height)
     {
         var bitmap = new SKBitmap(new SKImageInfo(width, height, SKColorType.Rgba8888, SKAlphaType.Premul));
         for (var y = 0; y < height; y++)
@@ -108,6 +124,21 @@ public static class SkiaShaderRunner
         }
 
         return bitmap;
+    }
+
+    /// <summary>Builds the slice-atlas shader that carries one cubic volume for the GPU.</summary>
+    /// <param name="textures">Texture bank holding the volume.</param>
+    /// <param name="texture">Volume texture to lay out.</param>
+    /// <returns>The atlas shader, owned by the caller.</returns>
+    private static SKShader CreateVolumeShader(VisualizerTextureBank textures, VisualizerTexture texture)
+    {
+        var atlas = CreateBitmap(
+            textures.GetVolumeAtlasPixels(texture),
+            VisualizerTextureBank.VolumeAtlasWidth,
+            VisualizerTextureBank.VolumeAtlasHeight);
+        var shader = atlas.ToShader(SKShaderTileMode.Clamp, SKShaderTileMode.Clamp);
+        atlas.Dispose();
+        return shader;
     }
 
     /// <summary>Reads a bitmap back into a frame of zero-to-one components.</summary>
