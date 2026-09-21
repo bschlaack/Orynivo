@@ -218,6 +218,10 @@ public static class ShaderTranspiler
         float4 toColour(float3 c) { return float4(c, 1.0); }
         float4 toColour(float4 c) { return c; }
         float4 toColour(float c) { return float4(c, c, c, 1.0); }
+        float orynivoSafeDiv(float a, float b) { return b == 0.0 ? 0.0 : a / b; }
+        float2 orynivoSafeDiv(float2 a, float2 b) { return float2(b.x == 0.0 ? 0.0 : a.x / b.x, b.y == 0.0 ? 0.0 : a.y / b.y); }
+        float3 orynivoSafeDiv(float3 a, float3 b) { return float3(b.x == 0.0 ? 0.0 : a.x / b.x, b.y == 0.0 ? 0.0 : a.y / b.y, b.z == 0.0 ? 0.0 : a.z / b.z); }
+        float4 orynivoSafeDiv(float4 a, float4 b) { return float4(b.x == 0.0 ? 0.0 : a.x / b.x, b.y == 0.0 ? 0.0 : a.y / b.y, b.z == 0.0 ? 0.0 : a.z / b.z, b.w == 0.0 ? 0.0 : a.w / b.w); }
         """;
 
     /// <summary>
@@ -1208,13 +1212,13 @@ public static class ShaderTranspiler
             "+" => $"({left} + {right})",
             "-" => $"({left} - {right})",
             "*" => $"({left} * {right})",
-            "/" => $"({left} / {right})",
+            "/" => $"orynivoSafeDiv({left}, {right})",
             "%" => $"mod({left}, {right})",
             "=" => EmitAssignment(left, right, expression),
             "+=" => $"{left} += {right}",
             "-=" => $"{left} -= {right}",
             "*=" => $"{left} *= {right}",
-            "/=" => $"{left} /= {right}",
+            "/=" => $"{left} = orynivoSafeDiv({left}, {right})",
             "==" => $"(({left} == {right}) ? 1.0 : 0.0)",
             "!=" => $"(({left} != {right}) ? 1.0 : 0.0)",
             "<" => $"(({left} < {right}) ? 1.0 : 0.0)",

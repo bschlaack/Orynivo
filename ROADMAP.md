@@ -754,15 +754,17 @@ affordable. This is a project of its own and must keep the CPU path as the fallb
   packaging, the signed release manifest, and the CI build matrix.
 - 40e Cutover and validation - `In progress`: the GPU path becomes the default where it is available,
   the CPU path stays the fallback, and a comparison harness validates both against the same
-  reference frames. `PresetSkiaComparisonDiagnosticTests` is that harness; against a 200-preset
-  sample it found that the frame passes and the per-pixel block agree within the eight-bit
-  quantisation, while most presets with a warp shader still diverge. The CPU-side causes it also
+  reference frames. `PresetSkiaComparisonDiagnosticTests` is that harness. The CPU-side causes it
   surfaced are fixed: the interpreter was missing the shader functions the SkSL emitter already had
   (`lum`, `asin`, `acos`, `atan`, `cross`, `rsqrt`, `log2`, `exp2`, and others), which silently
-  disabled those shaders, and `fps` was zero on the first frame, which made a preset that divides by
-  it accumulate an infinity. What remains is the GPU side: the warp pass binds
-  `sampler_blur1`-`sampler_blur3` to the unblurred frame instead of the CPU's blurred copy, and an
-  `inf` sampling coordinate is handled differently by the two paths.
+  disabled those shaders; `fps` was zero on the first frame, which made a preset that divides by it
+  accumulate an infinity; and declarations kept the initializer's component count instead of the
+  declared type, so a `float z = float4(...)` differed from the GPU. The GPU-side causes are fixed
+  too: the warp pass now builds `sampler_blur1`-`sampler_blur3` from the previous frame, and the
+  shader's `/` uses `orynivoSafeDiv` so a zero divisor yields zero as it does on the CPU. The
+  harness still reports divergences for many warp and comp presets, which are the remaining 40e
+  work: an assignment to an already-declared variable is not coerced on the CPU, and `inf`/`NaN`
+  values are handled differently by the two paths.
 
 - 39h Remaining preset-block failures - `Done`: the numbered expression parts are joined the
   way Milkdrop does it (concatenation, with a separator only when the previous part is complete),

@@ -50,6 +50,10 @@ internal static class ShaderCompiler
 {
     private static readonly Func<float, float> Negate = value => -value;
 
+    /// <summary>The <see cref="ShaderRuntime.Coerce(ShaderValue, string)"/> overload used for declarations.</summary>
+    private static readonly System.Reflection.MethodInfo CoerceMethod =
+        typeof(ShaderRuntime).GetMethod(nameof(ShaderRuntime.Coerce), [typeof(ShaderValue), typeof(string)])!;
+
     /// <summary>The constructor of <see cref="ShaderValue"/> used to build results inline.</summary>
     private static readonly System.Reflection.ConstructorInfo ShaderValueConstructor =
         typeof(ShaderValue).GetConstructor([typeof(float), typeof(float), typeof(float), typeof(float), typeof(int)])!;
@@ -137,7 +141,12 @@ internal static class ShaderCompiler
         var value = statement.Left is null
             ? Expression.Constant(ShaderRuntime.DefaultFor(statement.Text))
             : BuildExpression(slots, slotsParameter, samplerParameter, statement.Left);
-        return Expression.Assign(Expression.ArrayAccess(slotsParameter, Expression.Constant(slot)), value);
+        // The value is coerced to the declared type, matching the interpreter and HLSL.
+        var coerced = Expression.Call(
+            CoerceMethod,
+            value,
+            Expression.Constant(statement.Text));
+        return Expression.Assign(Expression.ArrayAccess(slotsParameter, Expression.Constant(slot)), coerced);
     }
 
     /// <summary>Builds one expression.</summary>

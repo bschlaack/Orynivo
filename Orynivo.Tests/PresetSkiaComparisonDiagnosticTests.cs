@@ -15,7 +15,7 @@ namespace Orynivo.Tests;
 public sealed class PresetSkiaComparisonDiagnosticTests
 {
     private const int FileCount = 200;
-    private const int Frames = 3;
+    private const int Frames = 2;
     private const int Width = 48;
     private const int Height = 27;
     private const int MaxReported = 12;

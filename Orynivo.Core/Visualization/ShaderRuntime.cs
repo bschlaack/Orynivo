@@ -459,6 +459,44 @@ internal static class ShaderRuntime
         _ => ShaderValue.Scalar(0f)
     };
 
+    /// <summary>Returns the component count a declared type has.</summary>
+    /// <param name="type">Type name.</param>
+    /// <returns>The component count.</returns>
+    public static int CountFor(string type) => type switch
+    {
+        "float2" or "half2" or "int2" or "uint2" or "bool2" => 2,
+        "float3" or "half3" or "int3" or "uint3" or "bool3" => 3,
+        "float4" or "half4" or "int4" or "uint4" or "bool4" => 4,
+        _ => 1
+    };
+
+    /// <summary>
+    /// Coerces a value to a declared type the way HLSL does: a scalar broadcasts, a shorter vector
+    /// pads with zeros, and a narrower type takes the leading components. The SkSL emitter performs
+    /// the same conversion, so the interpreter and the GPU produce the same value.
+    /// </summary>
+    /// <param name="value">Value to coerce.</param>
+    /// <param name="type">Declared type name.</param>
+    /// <returns>The coerced value.</returns>
+    public static ShaderValue Coerce(ShaderValue value, string type) => Coerce(value, CountFor(type));
+
+    /// <summary>Coerces a value to a component count.</summary>
+    /// <param name="value">Value to coerce.</param>
+    /// <param name="count">Target component count.</param>
+    /// <returns>The coerced value.</returns>
+    public static ShaderValue Coerce(ShaderValue value, int count)
+    {
+        if (count <= 0 || count == value.Count)
+            return value;
+
+        var broadcast = count > value.Count && value.Count == 1;
+        Span<float> components = stackalloc float[4];
+        for (var index = 0; index < 4; index++)
+            components[index] = broadcast ? value.X : value.Get(index);
+
+        return new ShaderValue(components[0], components[1], components[2], components[3], count);
+    }
+
     /// <summary>Applies one function to the first argument.</summary>
     private static ShaderValue Unary(int count, ShaderValue value, Func<float, float> map) =>
         count > 0 ? Map(value, map) : ShaderValue.Scalar(0f);

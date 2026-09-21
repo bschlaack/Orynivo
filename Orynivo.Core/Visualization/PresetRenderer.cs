@@ -597,6 +597,9 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
     /// </summary>
     private void Warp(bool useShaders)
     {
+        // A warp shader's blur levels are rebuilt for this frame; the cached buffer would otherwise
+        // keep the previous frame's picture, because the buffer object is reused.
+        _blurLevel = 0;
         var zoom = Math.Max(0.01f, Read("zoom", Preset.Zoom));
         var zoomExp = Read("zoomexp", 1f);
         var rotation = Read("rot", 0f);
@@ -1304,6 +1307,8 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
         var height = _fresh.Height;
         _frameCopy.CopyFrom(_fresh);
         _samplerMainIsWarped = true;
+        // The comp pass blurs a different source than the warp, so its blur levels are rebuilt.
+        _blurLevel = 0;
 
         // A comp shader whose per-pixel block is empty is a pure post-process, so it can run as a
         // Skia runtime effect over the frame instead of the interpreter.
@@ -1621,12 +1626,15 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
         level = Math.Clamp(level, 1, 3);
         if (_blurLevel != level)
         {
-            // Blur the same picture sampler_main currently refers to, so a comp shader blurs the
-            // composited frame instead of the pre-warp one.
-            _blurred.CopyFrom(_samplerMainIsWarped ? _frameCopy : _warped);
+            // Blur the same picture sampler_main currently refers to: the previous frame during the
+            // warp and the composited frame during the comp pass. The GPU warp and comp passes build
+            // their blur levels from the same source, so the two execution paths agree. The cache is
+            // invalidated once per stage, because the buffer's contents change every frame while the
+            // object stays the same.
+            _blurLevel = level;
+            _blurred.CopyFrom(_samplerMainIsWarped ? _frameCopy : _previous);
             for (var pass = 0; pass < level; pass++)
                 _blurred.Blur();
-            _blurLevel = level;
         }
 
         _blurred.SampleBilinear(u, v, _sample);

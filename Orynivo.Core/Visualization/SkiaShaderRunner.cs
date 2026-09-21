@@ -657,6 +657,7 @@ public static class SkiaShaderRunner
         private readonly SKRuntimeEffect _effect;
         private readonly IReadOnlyList<string> _samplers;
         private readonly IReadOnlyList<string> _perPixelUniforms;
+        private readonly SKRuntimeEffect? _blurEffect;
         private readonly Dictionary<string, SKShader> _static = new(StringComparer.Ordinal);
         private readonly List<SKBitmap> _bitmaps = [];
         private readonly List<SKShader> _shaders = [];
@@ -675,6 +676,7 @@ public static class SkiaShaderRunner
             _effect = effect;
             _samplers = samplers;
             _perPixelUniforms = perPixelUniforms;
+            _blurEffect = SKRuntimeEffect.CreateShader(CompPass.BlurSkSL, out _);
 
             foreach (var name in samplers)
             {
@@ -761,57 +763,111 @@ public static class SkiaShaderRunner
             var height = target.Height;
             using var sourceBitmap = CreateBitmap(previous.Pixels, width, height);
             using var sourceShader = sourceBitmap.ToShader(SKShaderTileMode.Clamp, SKShaderTileMode.Clamp, LinearSampling);
-            var children = new SKRuntimeEffectChildren(_effect);
-            foreach (var name in _samplers)
+            var ownedShaders = new List<SKShader>();
+            try
             {
-                // A static noise or volume texture keeps its own shader; every frame sampler reads
-                // the previous frame, which is what the CPU warp samples for sampler_main.
-                children[name] = new SKRuntimeEffectChild(
-                    _static.TryGetValue(name, out var cached) ? cached : sourceShader);
-            }
+                var children = new SKRuntimeEffectChildren(_effect);
+                var blurCache = new Dictionary<int, SKShader>();
+                foreach (var name in _samplers)
+                {
+                    // A static noise or volume texture keeps its own shader, the blur levels are
+                    // built from the previous frame, and every other frame sampler reads it directly.
+                    if (_static.TryGetValue(name, out var cached))
+                    {
+                        children[name] = new SKRuntimeEffectChild(cached);
+                        continue;
+                    }
 
-            var uniforms = new SKRuntimeEffectUniforms(_effect);
-            foreach (var (name, count) in ShaderTranspiler.UniformComponents)
+                    if (_blurEffect is not null &&
+                        name.StartsWith("sampler_blur", StringComparison.Ordinal) &&
+                        int.TryParse(name.AsSpan("sampler_blur".Length), out var level) &&
+                        level is >= 1 and <= 3)
+                    {
+                        children[name] = new SKRuntimeEffectChild(
+                            BuildBlurShader(blurCache, sourceShader, width, height, level, ownedShaders));
+                        continue;
+                    }
+
+                    children[name] = new SKRuntimeEffectChild(sourceShader);
+                }
+
+                var uniforms = new SKRuntimeEffectUniforms(_effect);
+                foreach (var (name, count) in ShaderTranspiler.UniformComponents)
+                {
+                    if (count == 1)
+                        uniforms[name] = 0f;
+                    else
+                        uniforms[name] = new float[count];
+                }
+
+                uniforms["texsize"] = TexSize(width, height);
+                SetSamplerSizes(uniforms, width, height);
+                uniforms[SizeUniform] = new float[] { width, height };
+                uniforms[ZoomUniform] = parameters.Zoom;
+                uniforms[ZoomExpUniform] = parameters.ZoomExp;
+                uniforms[RotationUniform] = parameters.Rotation;
+                uniforms[CentreUniform] = new float[] { parameters.CentreX, parameters.CentreY };
+                uniforms[OffsetUniform] = new float[] { parameters.OffsetX, parameters.OffsetY };
+                uniforms[StretchUniform] = new float[] { parameters.StretchX, parameters.StretchY };
+
+                // Every declared uniform has to be set, so the per-pixel variables default to zero
+                // and the caller fills in the slots it knows.
+                foreach (var name in _perPixelUniforms)
+                {
+                    var emitted = PresetExpressionTranspiler.UniformName(name);
+                    uniforms[emitted] = scalars.TryGetValue(emitted, out var value) ? value : 0f;
+                }
+
+                foreach (var (name, value) in scalars)
+                    uniforms[name] = value;
+                foreach (var (name, value) in vectors)
+                    uniforms[name] = value;
+
+                using var shader = _effect.ToShader(uniforms, children);
+                using var result = CreateBitmap(new float[width * height * 4], width, height);
+                using var surface = SKSurface.Create(result.Info, result.GetPixels(), result.RowBytes);
+                var canvas = surface.Canvas;
+                canvas.Clear(SKColors.Black);
+                using (var paint = new SKPaint { Shader = shader })
+                    canvas.DrawRect(new SKRect(0, 0, width, height), paint);
+
+                canvas.Flush();
+                ReadPixels(result, width, height).AsSpan().CopyTo(target.Pixels);
+            }
+            finally
             {
-                if (count == 1)
-                    uniforms[name] = 0f;
-                else
-                    uniforms[name] = new float[count];
+                foreach (var shader in ownedShaders)
+                    shader.Dispose();
             }
+        }
 
-            uniforms["texsize"] = TexSize(width, height);
-            SetSamplerSizes(uniforms, width, height);
-            uniforms[SizeUniform] = new float[] { width, height };
-            uniforms[ZoomUniform] = parameters.Zoom;
-            uniforms[ZoomExpUniform] = parameters.ZoomExp;
-            uniforms[RotationUniform] = parameters.Rotation;
-            uniforms[CentreUniform] = new float[] { parameters.CentreX, parameters.CentreY };
-            uniforms[OffsetUniform] = new float[] { parameters.OffsetX, parameters.OffsetY };
-            uniforms[StretchUniform] = new float[] { parameters.StretchX, parameters.StretchY };
+        /// <summary>Builds the blur shader for one level, reusing the previous level as its input.</summary>
+        /// <param name="cache">Blur shaders built for this draw, by level.</param>
+        /// <param name="source">Unblurred frame shader.</param>
+        /// <param name="width">Frame width.</param>
+        /// <param name="height">Frame height.</param>
+        /// <param name="level">Blur level from one to three.</param>
+        /// <param name="owned">Receives the shaders the caller has to dispose.</param>
+        /// <returns>The blurred shader.</returns>
+        private SKShader BuildBlurShader(
+            Dictionary<int, SKShader> cache,
+            SKShader source,
+            int width,
+            int height,
+            int level,
+            List<SKShader> owned)
+        {
+            if (cache.TryGetValue(level, out var existing))
+                return existing;
 
-            // Every declared uniform has to be set, so the per-pixel variables default to zero
-            // and the caller fills in the slots it knows.
-            foreach (var name in _perPixelUniforms)
-            {
-                var emitted = PresetExpressionTranspiler.UniformName(name);
-                uniforms[emitted] = scalars.TryGetValue(emitted, out var value) ? value : 0f;
-            }
-
-            foreach (var (name, value) in scalars)
-                uniforms[name] = value;
-            foreach (var (name, value) in vectors)
-                uniforms[name] = value;
-
-            using var shader = _effect.ToShader(uniforms, children);
-            using var result = CreateBitmap(new float[width * height * 4], width, height);
-            using var surface = SKSurface.Create(result.Info, result.GetPixels(), result.RowBytes);
-            var canvas = surface.Canvas;
-            canvas.Clear(SKColors.Black);
-            using (var paint = new SKPaint { Shader = shader })
-                canvas.DrawRect(new SKRect(0, 0, width, height), paint);
-
-            canvas.Flush();
-            ReadPixels(result, width, height).AsSpan().CopyTo(target.Pixels);
+            var input = level == 1 ? source : BuildBlurShader(cache, source, width, height, level - 1, owned);
+            var uniforms = new SKRuntimeEffectUniforms(_blurEffect!);
+            uniforms["size"] = new float[] { width, height };
+            var children = new SKRuntimeEffectChildren(_blurEffect!) { ["source"] = input };
+            var blurred = _blurEffect!.ToShader(uniforms, children);
+            owned.Add(blurred);
+            cache[level] = blurred;
+            return blurred;
         }
 
         /// <inheritdoc/>
@@ -824,6 +880,7 @@ public static class SkiaShaderRunner
             _static.Clear();
             _shaders.Clear();
             _bitmaps.Clear();
+            _blurEffect?.Dispose();
             _effect.Dispose();
         }
     }

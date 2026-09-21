@@ -17,6 +17,18 @@ public sealed class SkiaShaderRunnerTests
     /// <summary>A constant source keeps the comparison about the math, not about sampling.</summary>
     private static readonly float[] GreySource = CreateConstantSource(0.5f, 0.25f, 0.75f);
 
+    /// <summary>A value assigned to a narrower declared type takes its leading components.</summary>
+    [Fact]
+    public void Render_MatchesTheInterpreterForANarrowingDeclaration()
+    {
+        const string Source = """
+            float z = float4(0.5, 0.25, 0.75, 0.1);
+            ret = float3(tan(z), z * 0.1, 0.0);
+            """;
+
+        AssertMatchesInterpreter(Source);
+    }
+
     /// <summary>The GPU and the interpreter agree on the extended Milkdrop vocabulary.</summary>
     [Fact]
     public void Render_MatchesTheInterpreterForTheExtendedVocabulary()

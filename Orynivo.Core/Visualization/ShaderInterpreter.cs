@@ -150,16 +150,20 @@ public sealed class ShaderInterpreter
                 // the behaviour this refactor deliberately preserves.
                 return ExecuteBlock(statement.Items, depth);
             case ShaderNodeKind.Declaration:
-                // Every declared name exists; only the first may carry the initializer.
+                // Every declared name exists; only the first may carry the initializer. The value is
+                // coerced to the declared type, because HLSL truncates a wider value and the SkSL
+                // emitter does the same, so a "float z = float4(...)" has to agree on both paths.
                 for (var index = 0; index < statement.Items.Count; index++)
                 {
                     var declared = statement.Items[index].Text;
                     if (declared.Length == 0)
                         continue;
 
-                    _variables[declared] = index == 0 && statement.Left is not null
-                        ? Evaluate(statement.Left, depth)
-                        : ShaderRuntime.DefaultFor(statement.Text);
+                    _variables[declared] = ShaderRuntime.Coerce(
+                        index == 0 && statement.Left is not null
+                            ? Evaluate(statement.Left, depth)
+                            : ShaderRuntime.DefaultFor(statement.Text),
+                        statement.Text);
                 }
 
                 return null;
