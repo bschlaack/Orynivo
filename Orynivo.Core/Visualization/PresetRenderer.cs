@@ -2054,6 +2054,19 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
     /// <summary>Adds the freshly drawn overlay on top of the faded feedback image.</summary>
     private void Composite()
     {
+        if (UseSkiaPasses)
+        {
+            try
+            {
+                SkiaShaderRunner.Composite(_fresh, _warped);
+                return;
+            }
+            catch (Exception exception)
+            {
+                ShaderError = "composite (skia): " + exception.GetType().Name + ": " + exception.Message;
+            }
+        }
+
         var pixels = _fresh.Pixels;
         for (var index = 0; index < pixels.Length; index += 4)
         {

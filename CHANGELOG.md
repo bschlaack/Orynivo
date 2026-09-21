@@ -7,6 +7,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Added
+- Moved the composite onto the GPU. `SkiaShaderRunner.Composite` adds the warped frame onto the
+  overlay frame with the same clamp the CPU pass applies, and the renderer uses it when the pass flag
+  is enabled.
 - Moved the video echo onto the GPU. `SkiaShaderRunner.VideoEcho` reproduces the zoom, the optional
   horizontal or vertical flip, the alpha blend, and the leave-untouched rule of
   `PresetRenderer.ApplyVideoEcho` as a Skia runtime effect, and the renderer uses it when the pass

@@ -403,6 +403,53 @@ public static class SkiaShaderRunner
         }
         """;
 
+    /// <summary>
+    /// Adds a frame onto another in place, the way Milkdrop composites the warped frame with the
+    /// overlay: <paramref name="target"/> becomes <c>clamp(target + overlay, 0, 1)</c> per channel.
+    /// </summary>
+    /// <param name="target">Frame to add into and write.</param>
+    /// <param name="overlay">Frame to add.</param>
+    /// <exception cref="ArgumentException">The frames have different sizes.</exception>
+    /// <exception cref="PresetExpressionException">Skia rejects the composite effect.</exception>
+    public static void Composite(PixelBuffer target, PixelBuffer overlay)
+    {
+        ArgumentNullException.ThrowIfNull(target);
+        ArgumentNullException.ThrowIfNull(overlay);
+        if (target.Width != overlay.Width || target.Height != overlay.Height)
+            throw new ArgumentException("The frames have different sizes.", nameof(overlay));
+
+        using var effect = SKRuntimeEffect.CreateShader(CompositeSkSL, out var errors)
+            ?? throw new PresetExpressionException($"SkSL was rejected: {errors}", 0);
+        using var targetBitmap = CreateBitmap(target.Pixels, target.Width, target.Height);
+        using var targetShader = targetBitmap.ToShader(SKShaderTileMode.Clamp, SKShaderTileMode.Clamp, LinearSampling);
+        using var overlayBitmap = CreateBitmap(overlay.Pixels, overlay.Width, overlay.Height);
+        using var overlayShader = overlayBitmap.ToShader(SKShaderTileMode.Clamp, SKShaderTileMode.Clamp, LinearSampling);
+        var children = new SKRuntimeEffectChildren(effect)
+        {
+            ["base"] = targetShader,
+            ["overlay"] = overlayShader
+        };
+        using var shader = effect.ToShader(new SKRuntimeEffectUniforms(effect), children);
+        using var result = CreateBitmap(new float[target.Width * target.Height * 4], target.Width, target.Height);
+        using var surface = SKSurface.Create(result.Info, result.GetPixels(), result.RowBytes);
+        var canvas = surface.Canvas;
+        canvas.Clear(SKColors.Black);
+        using (var paint = new SKPaint { Shader = shader })
+            canvas.DrawRect(new SKRect(0, 0, target.Width, target.Height), paint);
+
+        canvas.Flush();
+        ReadPixels(result, target.Width, target.Height).AsSpan().CopyTo(target.Pixels);
+    }
+
+    /// <summary>The SkSL of the additive composite.</summary>
+    private const string CompositeSkSL = """
+        uniform shader base;
+        uniform shader overlay;
+        half4 main(float2 coord) {
+            return half4(clamp(float4(base.eval(coord)) + float4(overlay.eval(coord)), 0.0, 1.0));
+        }
+        """;
+
     /// <summary>Converts a zero-to-one component into a byte.</summary>
     /// <param name="value">Component value.</param>
     /// <returns>The byte value.</returns>

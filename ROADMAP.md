@@ -707,7 +707,8 @@ affordable. This is a project of its own and must keep the CPU path as the fallb
   effect over the renderer's frames when `PresetRenderer.UseSkiaPasses` is enabled, with the
   interpreter as the fallback, and its blur levels are built on the GPU as a chain of box-blur passes
   (`SkiaShaderRunner.BlurFrame` reproduces `PixelBuffer.Blur`); the video echo also runs on the Skia
-  path (`SkiaShaderRunner.VideoEcho`). Warp, borders, and composite still need GPU passes.
+  path (`SkiaShaderRunner.VideoEcho`), and so does the final additive composite
+  (`SkiaShaderRunner.Composite`). Warp and borders still need GPU passes.
   The comp pass binds the composited frame, its blur levels, and the previous frame per sampler, and
   scales each sampler by its own `texsize_*`, so the noise textures are sampled at their real size.
   It stays opt-in because the Skia path carries the frame through eight-bit textures and differs

@@ -114,9 +114,35 @@ public sealed class SkiaCompPassTests
         }
     }
 
+    /// <summary>The Skia composite matches the CPU additive composite within one level.</summary>
+    [Fact]
+    public void Composite_MatchesTheCpuComposite()
+    {
+        var baseFrame = CreatePattern();
+        var overlay = CreatePattern(5);
+        var gpu = new PixelBuffer(baseFrame.Width, baseFrame.Height);
+        gpu.CopyFrom(baseFrame);
+        SkiaShaderRunner.Composite(gpu, overlay);
+
+        var cpu = new PixelBuffer(baseFrame.Width, baseFrame.Height);
+        cpu.CopyFrom(baseFrame);
+        var cpuPixels = cpu.Pixels;
+        var overlayPixels = overlay.Pixels;
+        for (var index = 0; index < cpuPixels.Length; index += 4)
+        {
+            cpuPixels[index] = Math.Clamp(cpuPixels[index] + overlayPixels[index], 0f, 1f);
+            cpuPixels[index + 1] = Math.Clamp(cpuPixels[index + 1] + overlayPixels[index + 1], 0f, 1f);
+            cpuPixels[index + 2] = Math.Clamp(cpuPixels[index + 2] + overlayPixels[index + 2], 0f, 1f);
+        }
+
+        var difference = MeanAbsoluteDifference(cpuPixels.ToArray(), gpu.Pixels.ToArray());
+        Assert.InRange(difference, 0.0001f, 0.005f);
+    }
+
     /// <summary>Builds a frame with structure, so a blur visibly changes it.</summary>
+    /// <param name="shift">Value that makes one pattern differ from another.</param>
     /// <returns>The frame.</returns>
-    private static PixelBuffer CreatePattern()
+    private static PixelBuffer CreatePattern(int shift = 0)
     {
         var buffer = new PixelBuffer(32, 18);
         var pixels = buffer.Pixels;
@@ -125,7 +151,7 @@ public sealed class SkiaCompPassTests
             for (var x = 0; x < buffer.Width; x++)
             {
                 var offset = ((y * buffer.Width) + x) * 4;
-                var value = ((x * 7) + (y * 13)) % 17 / 16f;
+                var value = (((x + shift) * 7) + (y * 13)) % 17 / 16f;
                 pixels[offset] = value;
                 pixels[offset + 1] = 1f - value;
                 pixels[offset + 2] = value * 0.5f;

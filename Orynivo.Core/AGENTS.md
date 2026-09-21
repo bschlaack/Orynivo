@@ -107,7 +107,8 @@ This file applies to `Orynivo.Core/` and supplements `../AGENTS.md`.
   nine-tap clamped filter; the comp pass builds its blur levels from it, and the frame helpers
   (`GetBlur1`-`GetBlur3`) must keep scaling their normalised coordinate by `texsize`.
   `SkiaShaderRunner.VideoEcho` is the GPU video-echo pass and must keep the CPU pass's zoom, flip,
-  alpha blend, and leave-untouched rule. `PresetRenderer.UseSkiaPasses` gates the comp shader and
+  alpha blend, and leave-untouched rule. `SkiaShaderRunner.Composite` is the GPU additive composite
+  and must keep the CPU pass's clamp. `PresetRenderer.UseSkiaPasses` gates the comp shader and
   these frame passes together. Only
   straight-line
   bodies (declarations and one return) are compiled — branches, loops, and swizzle assignments stay
