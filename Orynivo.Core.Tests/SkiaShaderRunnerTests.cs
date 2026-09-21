@@ -103,6 +103,25 @@ public sealed class SkiaShaderRunnerTests
         Assert.Equal(0.375f, ret.Z, 3);
     }
 
+    /// <summary>The GPU and the interpreter agree on a shader that calls its own helper.</summary>
+    [Fact]
+    public void Render_MatchesTheInterpreterForAHelperFunction()
+    {
+        const string Source = """
+            float3 tint (float3 c, float amount) : COLOR
+            {
+                return c * amount;
+            }
+
+            float4 main(float2 uv : TEXCOORD0) : COLOR
+            {
+                ret = tint(tex2D(sampler_main, uv).rgb, 0.5);
+            }
+            """;
+
+        AssertMatchesInterpreter(Source);
+    }
+
     /// <summary>Renders both ways and asserts that the pixels agree within one byte.</summary>
     /// <param name="source">HLSL source.</param>
     private static void AssertMatchesInterpreter(string source)

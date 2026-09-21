@@ -157,6 +157,31 @@ public static class ShaderTranspiler
         ArgumentNullException.ThrowIfNull(program);
         var builder = new StringBuilder();
         builder.Append(Prelude).Append(GeneratedUniforms()).Append('\n');
+
+        // The type table has to stand before the helpers are emitted, because their parameter types
+        // are recorded as they are written out.
+        _types = new Dictionary<string, string>(StringComparer.Ordinal) { ["ret"] = "float3" };
+        foreach (var (uniform, count) in UniformComponents)
+            _types[uniform] = count switch { 1 => "float", 2 => "float2", 4 => "float4", _ => "float" };
+
+        // A helper is emitted as a function before the entry point, so a call resolves to it instead
+        // of running its body where it is defined. Their return types are collected first, because a
+        // helper may be called from another helper that is emitted before it.
+        _helperReturns = new Dictionary<string, string>(StringComparer.Ordinal);
+        var helpers = new List<ShaderNode>();
+        foreach (var statement in program.Items)
+        {
+            if (statement.Kind == ShaderNodeKind.Function &&
+                !string.Equals(statement.Text, "main", StringComparison.Ordinal))
+            {
+                helpers.Add(statement);
+                _helperReturns[statement.Text] = HelperReturnType(statement);
+            }
+        }
+
+        foreach (var helper in helpers)
+            EmitFunction(builder, helper);
+
         builder.Append("half4 main(float2 fragCoord) {\n");
         builder.Append("    float2 uv_orig = fragCoord / texsize.xy;\n");
         builder.Append("    float2 uv = uv_orig;\n");
@@ -164,17 +189,17 @@ public static class ShaderTranspiler
         builder.Append("    float rad = length(centred);\n");
         builder.Append("    float ang = atan(centred.y, centred.x);\n");
         builder.Append("    float3 ret = float3(0.0);\n");
-        // The output variable is declared by the prelude, so it is the one entry the type table
-        // starts with; every other variable is recorded as it is declared.
-        _types = new Dictionary<string, string>(StringComparer.Ordinal) { ["ret"] = "float3" };
-        // The prelude uniforms are part of the vocabulary a body may read, so their types are
-        // known too: that is what narrows "rand_frame * 64.0" into a scalar context.
-        foreach (var (uniform, count) in UniformComponents)
-        {
-            _types[uniform] = count switch { 1 => "float", 2 => "float2", 4 => "float4", _ => "float" };
-        }
         foreach (var statement in program.Items)
-            EmitStatement(builder, statement, 1);
+        {
+            // A helper was already emitted before main; emitting it here would run its body at
+            // the wrong place and reference parameters that do not exist in this scope. The entry
+            // point keeps its own name, so it is the one definition that is still emitted here.
+            if (statement.Kind != ShaderNodeKind.Function ||
+                string.Equals(statement.Text, "main", StringComparison.Ordinal))
+            {
+                EmitStatement(builder, statement, 1);
+            }
+        }
         builder.Append("    return half4(toColour(ret));\n");
         builder.Append("}\n");
         return builder.ToString();
@@ -265,6 +290,15 @@ public static class ShaderTranspiler
                 }
             case ShaderNodeKind.Return:
                 // Every return becomes the shader's colour, so the ret convention holds either way.
+                // A helper returns its own type; only the entry point becomes the shader colour.
+                if (_inHelper)
+                {
+                    builder.Append(indent).Append("return ")
+                        .Append(statement.Left is null ? "ret" : EmitExpression(statement.Left))
+                        .Append(";\n");
+                    return;
+                }
+
                 builder.Append(indent).Append("return half4(toColour(")
                     .Append(statement.Left is null ? "ret" : EmitExpression(statement.Left))
                     .Append("));\n");
@@ -371,6 +405,14 @@ public static class ShaderTranspiler
     [ThreadStatic]
     private static Dictionary<string, string>? _types;
 
+    /// <summary>The return type of every helper function of the shader being translated.</summary>
+    [ThreadStatic]
+    private static Dictionary<string, string>? _helperReturns;
+
+    /// <summary>Whether the statement being emitted belongs to a helper rather than the entry.</summary>
+    [ThreadStatic]
+    private static bool _inHelper;
+
     /// <summary>Infers the SkSL type of an expression, or nothing when it cannot be known.</summary>
     /// <param name="expression">Expression node.</param>
     /// <returns>The type name, or <see langword="null"/>.</returns>
@@ -447,6 +489,9 @@ public static class ShaderTranspiler
                 return "float";
         }
 
+        if (_helperReturns is not null && _helperReturns.TryGetValue(call.Text, out var helperReturn))
+            return helperReturn;
+
         if (IsVectorConstructor(call.Text))
             return MapType(call.Text);
 
@@ -495,6 +540,51 @@ public static class ShaderTranspiler
         }
 
         return $"{text}.{"xyzw"[..target]}";
+    }
+
+    /// <summary>
+    /// Emits a helper function as SkSL, with the parameter types the parser kept. Its return type is
+    /// read from its own return statement, because the engine does not track declared return types.
+    /// </summary>
+    /// <param name="builder">Output.</param>
+    /// <param name="function">Function definition node.</param>
+    private static void EmitFunction(StringBuilder builder, ShaderNode function)
+    {
+        var parameters = new List<string>(function.ParameterList.Count);
+        foreach (var parameter in function.ParameterList)
+        {
+            var type = parameter.Items.Count > 0 ? MapType(parameter.Items[0].Text) : "float";
+            if (_types is not null)
+                _types[parameter.Text] = type;
+            parameters.Add($"{type} {parameter.Text}");
+        }
+
+        _inHelper = true;
+        var returnType = _helperReturns is not null && _helperReturns.TryGetValue(function.Text, out var known) ? known : HelperReturnType(function);
+        builder.Append(returnType).Append(' ').Append(function.Text)
+            .Append('(').Append(string.Join(", ", parameters)).Append(") {\n");
+        foreach (var statement in function.Items)
+            EmitStatement(builder, statement, 1);
+        builder.Append("}\n");
+        _inHelper = false;
+    }
+
+    /// <summary>Reads a helper's return type from its own return statement.</summary>
+    /// <param name="function">Function definition node.</param>
+    /// <returns>The SkSL type name.</returns>
+    private static string HelperReturnType(ShaderNode function)
+    {
+        foreach (var statement in function.Items)
+        {
+            if (statement.Kind == ShaderNodeKind.Return &&
+                statement.Left is not null &&
+                TypeOf(statement.Left) is { } type)
+            {
+                return type;
+            }
+        }
+
+        return "float3";
     }
 
     /// <summary>
@@ -664,6 +754,10 @@ public static class ShaderTranspiler
                 // Milkdrop's luminance helper; the weights are the conventional Rec. 601 ones.
                 return $"dot({arguments[0]}, float3(0.299, 0.587, 0.114))";
         }
+
+        // A call to a function the shader defines itself keeps its name.
+        if (_helperReturns is not null && _helperReturns.ContainsKey(name))
+            return $"{name}({string.Join(", ", arguments)})";
 
         if (RenamedFunctions.TryGetValue(name, out var renamed))
             return $"{renamed}({string.Join(", ", arguments)})";

@@ -282,7 +282,20 @@ public static class ShaderParser
                 {
                     var next = _tokens[Math.Min(_index + 1, _tokens.Count - 1)];
                     if (next.Text is "," or ")" && !IsType(Current))
-                        parameters.Add(new ShaderNode(ShaderNodeKind.Identifier, Current.Position, Current.Text));
+                    {
+                        // The type stands in front of the name and is kept with it, because the SkSL
+                        // emitter has to declare the parameter with its real type.
+                        var typeToken = _tokens[Math.Max(0, _index - 1)];
+                        parameters.Add(new ShaderNode(
+                            ShaderNodeKind.Identifier,
+                            Current.Position,
+                            Current.Text,
+                            0f,
+                            null,
+                            null,
+                            null,
+                            [new ShaderNode(ShaderNodeKind.Identifier, typeToken.Position, typeToken.Text)]));
+                    }
                 }
 
                 Advance();

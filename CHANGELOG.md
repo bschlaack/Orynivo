@@ -173,6 +173,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   rather than in the file, which is recorded as roadmap item 39i.
 
 ### Fixed
+- Emitted a shader's helper functions as SkSL functions before the entry point. The emitter used to
+  inline a definition, which ran its body at the wrong place and referenced parameters that do not
+  exist in that scope; a call now resolves to the function, and its parameter types come from the
+  parser. The entry point is decided by the name `main`, the same rule the interpreter uses. A test
+  proves the GPU and the interpreter produce the same pixels for a shader that calls its own helper.
+  The share of shaders that translate did not change, because the remaining `rs` and `hue_shader`
+  failures use those names as variables rather than as calls, which is a different shape.
 - Made a shader's helper functions callable in the interpreter. A definition used to be executed
   where it stood, so a helper ran at the wrong time and produced a wrong picture; the interpreter
   now registers every definition that is not the entry point — Milkdrop names it `main`, and its

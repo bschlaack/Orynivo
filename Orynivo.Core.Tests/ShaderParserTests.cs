@@ -158,4 +158,7 @@ public sealed class ShaderParserTests
         Assert.Equal(
             ["uv", "amount"],
             function.ParameterList.Select(parameter => parameter.Text));
+        Assert.Equal(
+            ["float2", "float"],
+            function.ParameterList.Select(parameter => parameter.Items[0].Text));
     }}
