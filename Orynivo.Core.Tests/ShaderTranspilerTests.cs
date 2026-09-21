@@ -51,17 +51,27 @@ public sealed class ShaderTranspilerTests
             """);
     }
 
+    /// <summary>The volume sample maps onto the generated atlas sampler.</summary>
+    [Fact]
+    public void Transpile_CompilesATex3DVolumeSample()
+    {
+        AssertCompiles("""
+            float3 n = tex3D(sampler_noisevol_hq, float3(uv * 3, time)).rgb;
+            ret = n * 0.5;
+            """);
+    }
+
     /// <summary>An unsupported construct is reported instead of being emitted wrongly.</summary>
     [Fact]
     public void Transpile_ReportsWhatItCannotTranslate()
     {
         var node = ShaderParser.Parse("""
-            float3 c = tex3D(sampler_noisevol_hq, float3(uv, 0.5)).rgb;
+            float3 c = noSuchFunction(uv);
             ret = c;
             """);
 
         var exception = Assert.Throws<PresetExpressionException>(() => ShaderTranspiler.Transpile(node));
-        Assert.Contains("tex3D", exception.Message, StringComparison.Ordinal);
+        Assert.Contains("noSuchFunction", exception.Message, StringComparison.Ordinal);
     }
 
     /// <summary>Transpiles a shader and asserts that Skia accepts the result.</summary>

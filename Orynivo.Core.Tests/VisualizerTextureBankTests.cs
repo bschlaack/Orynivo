@@ -19,6 +19,95 @@ public sealed class VisualizerTextureBankTests
         Assert.Equal(512, VisualizerTextureBank.GetSize(VisualizerTexture.NoiseHigh));
         Assert.Equal(32, VisualizerTextureBank.GetSize(VisualizerTexture.Random00));
         Assert.Equal(32, VisualizerTextureBank.GetSize(VisualizerTexture.Random15));
+        Assert.Equal(32, VisualizerTextureBank.GetSize(VisualizerTexture.NoiseVolumeLow));
+        Assert.Equal(32, VisualizerTextureBank.GetSize(VisualizerTexture.NoiseVolumeHigh));
+    }
+
+    /// <summary>The volume samplers resolve to the cubic volume textures.</summary>
+    [Fact]
+    public void TryResolve_ResolvesTheVolumeSamplers()
+    {
+        Assert.True(VisualizerTextureBank.TryResolve("sampler_noisevol_lq", out var low));
+        Assert.Equal(VisualizerTexture.NoiseVolumeLow, low);
+        Assert.True(VisualizerTextureBank.TryResolve("sampler_noisevol_hq", out var high));
+        Assert.Equal(VisualizerTexture.NoiseVolumeHigh, high);
+    }
+
+    /// <summary>Two banks generate exactly the same volume and it stays in range.</summary>
+    [Fact]
+    public void GetVolumePixels_IsDeterministicAndInRange()
+    {
+        var first = new VisualizerTextureBank().GetVolumePixels(VisualizerTexture.NoiseVolumeHigh).ToArray();
+        var second = new VisualizerTextureBank().GetVolumePixels(VisualizerTexture.NoiseVolumeHigh).ToArray();
+
+        Assert.Equal(first, second);
+        Assert.Equal(32 * 32 * 32 * 4, first.Length);
+        for (var index = 0; index < first.Length; index += 4)
+        {
+            Assert.InRange(first[index], 0f, 1f);
+            Assert.InRange(first[index + 1], 0f, 1f);
+            Assert.InRange(first[index + 2], 0f, 1f);
+            Assert.Equal(1f, first[index + 3]);
+        }
+    }
+
+    /// <summary>The atlas carries every voxel at its documented slice position.</summary>
+    [Fact]
+    public void GetVolumeAtlasPixels_PlacesTheSlices()
+    {
+        var bank = new VisualizerTextureBank();
+        var volume = bank.GetVolumePixels(VisualizerTexture.NoiseVolumeLow);
+        var atlas = bank.GetVolumeAtlasPixels(VisualizerTexture.NoiseVolumeLow);
+
+        Assert.Equal(
+            VisualizerTextureBank.VolumeAtlasWidth * VisualizerTextureBank.VolumeAtlasHeight * 4,
+            atlas.Length);
+
+        const int size = 32;
+        const int x = 3;
+        const int y = 5;
+        const int z = 11;
+        var voxel = (((((z * size) + y) * size) + x) * 4);
+        var column = z % VisualizerTextureBank.VolumeAtlasColumns;
+        var row = z / VisualizerTextureBank.VolumeAtlasColumns;
+        var atlasIndex = (((((row * size) + y) * VisualizerTextureBank.VolumeAtlasWidth) + (column * size) + x) * 4);
+
+        Assert.Equal(volume[voxel], atlas[atlasIndex]);
+        Assert.Equal(volume[voxel + 1], atlas[atlasIndex + 1]);
+        Assert.Equal(volume[voxel + 2], atlas[atlasIndex + 2]);
+    }
+
+    /// <summary>Sampling a voxel centre returns that voxel unchanged.</summary>
+    [Fact]
+    public void SampleVolume_ReturnsTheVoxelAtItsCentre()
+    {
+        var bank = new VisualizerTextureBank();
+        var volume = bank.GetVolumePixels(VisualizerTexture.NoiseVolumeLow);
+        const int size = 32;
+        const int x = 4;
+        const int y = 6;
+        const int z = 9;
+        var expected = volume[(((((z * size) + y) * size) + x) * 4) + 1];
+
+        var sampled = bank.SampleVolume(
+            VisualizerTexture.NoiseVolumeLow,
+            (x + 0.5f) / size,
+            (y + 0.5f) / size,
+            (z + 0.5f) / size,
+            VisualizerTextureWrap.Repeat);
+
+        Assert.Equal(expected, sampled[1], 4);
+    }
+
+    /// <summary>Repeat wraps a volume coordinate back into the volume.</summary>
+    [Fact]
+    public void SampleVolume_RepeatsOutsideTheRange()
+    {
+        var bank = new VisualizerTextureBank();
+        var direct = bank.SampleVolume(VisualizerTexture.NoiseVolumeHigh, 0.25f, 0.25f, 0.25f, VisualizerTextureWrap.Repeat).ToArray();
+        var wrapped = bank.SampleVolume(VisualizerTexture.NoiseVolumeHigh, 1.25f, 0.25f, 2.25f, VisualizerTextureWrap.Repeat).ToArray();
+
+        Assert.Equal(direct, wrapped);
     }
 
     /// <summary>Two banks generate exactly the same textures.</summary>

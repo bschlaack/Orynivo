@@ -201,6 +201,15 @@ public sealed class ShaderInterpreterTests
             ShaderValue.Vector(0.1f * level, 0f, 0f, 1f, 4);
 
         /// <inheritdoc/>
+        public ShaderValue SampleVolume(string sampler, float x, float y, float z)
+        {
+            LastSampler = sampler;
+            LastU = x;
+            LastV = y;
+            return ShaderValue.Vector(x, y, z, 1f, 4);
+        }
+
+        /// <inheritdoc/>
         public ShaderValue SamplePixel(int x, int y) =>
             ShaderValue.Vector(x, y, 0f, 1f, 4);
     }

@@ -62,7 +62,7 @@ public sealed class SkiaShaderRunnerTests
         AssertMatchesInterpreter(Source);
     }
 
-    /// <summary>The volume noise behind tex3D runs on the interpreter and is deterministic.</summary>
+    /// <summary>The volume behind tex3D runs on the interpreter and is deterministic.</summary>
     [Fact]
     public void Render_Tex3DUsesTheVolumeNoiseOnTheInterpreter()
     {
@@ -70,11 +70,25 @@ public sealed class SkiaShaderRunnerTests
             float3 n = tex3D(sampler_noisevol_hq, float3(uv * 3, time)).rgb;
             ret = n * 0.5;
             """);
-        var first = RenderOnCpu(node, new Dictionary<string, float>(StringComparer.Ordinal) { ["time"] = 0.5f });
-        var second = RenderOnCpu(node, new Dictionary<string, float>(StringComparer.Ordinal) { ["time"] = 0.5f });
+        var sampler = new BankSampler(new VisualizerTextureBank(), 0.5f, 0.25f, 0.75f);
+        var uniforms = new Dictionary<string, float>(StringComparer.Ordinal) { ["time"] = 0.5f };
+        var first = RenderOnCpu(node, uniforms, sampler);
+        var second = RenderOnCpu(node, uniforms, sampler);
 
         Assert.Equal(first, second);
         Assert.Contains(first, value => value > 0.01f);
+    }
+
+    /// <summary>The GPU samples the same volume atlas the interpreter samples.</summary>
+    [Fact]
+    public void Render_MatchesTheInterpreterForATex3DVolumeSample()
+    {
+        const string Source = """
+            float3 n = tex3D(sampler_noisevol_hq, float3(uv * 3, time)).rgb;
+            ret = n * 0.5;
+            """;
+
+        AssertMatchesInterpreter(Source, new VisualizerTextureBank());
     }
 
     /// <summary>A helper function is called with its arguments, not run where it is defined.</summary>
@@ -124,7 +138,8 @@ public sealed class SkiaShaderRunnerTests
 
     /// <summary>Renders both ways and asserts that the pixels agree within one byte.</summary>
     /// <param name="source">HLSL source.</param>
-    private static void AssertMatchesInterpreter(string source)
+    /// <param name="textures">Texture bank to share between the two paths, or <see langword="null"/>.</param>
+    private static void AssertMatchesInterpreter(string source, VisualizerTextureBank? textures = null)
     {
         var node = ShaderParser.Parse(source);
         var uniforms = new Dictionary<string, float>(StringComparer.Ordinal)
@@ -137,8 +152,11 @@ public sealed class SkiaShaderRunnerTests
             ["fps"] = 60f
         };
 
-        var gpu = SkiaShaderRunner.Render(node, GreySource, Width, Height, uniforms);
-        var cpu = RenderOnCpu(node, uniforms);
+        var gpu = SkiaShaderRunner.Render(node, GreySource, Width, Height, uniforms, textures);
+        var cpu = RenderOnCpu(
+            node,
+            uniforms,
+            textures is null ? null : new BankSampler(textures, 0.5f, 0.25f, 0.75f));
 
         var worst = 0f;
         for (var index = 0; index < gpu.Length; index += 4)
@@ -153,10 +171,14 @@ public sealed class SkiaShaderRunnerTests
     /// <summary>Renders the shader through the CPU interpreter over the same source.</summary>
     /// <param name="node">Parsed shader.</param>
     /// <param name="uniforms">Scalar variables to seed.</param>
+    /// <param name="sampler">Sampler to use, or <see langword="null"/> for the constant frame.</param>
     /// <returns>The frame components.</returns>
-    private static float[] RenderOnCpu(ShaderNode node, IReadOnlyDictionary<string, float> uniforms)
+    private static float[] RenderOnCpu(
+        ShaderNode node,
+        IReadOnlyDictionary<string, float> uniforms,
+        IShaderSampler? sampler = null)
     {
-        var sampler = new ConstantSampler(0.5f, 0.25f, 0.75f);
+        sampler ??= new ConstantSampler(0.5f, 0.25f, 0.75f);
         var pixels = new float[Width * Height * 4];
         for (var y = 0; y < Height; y++)
         {
@@ -226,6 +248,53 @@ public sealed class SkiaShaderRunnerTests
 
         /// <inheritdoc/>
         public ShaderValue SampleBlur(int level, float u, float v) => _colour;
+
+        /// <inheritdoc/>
+        public ShaderValue SampleVolume(string sampler, float x, float y, float z) => _colour;
+
+        /// <inheritdoc/>
+        public ShaderValue SamplePixel(int x, int y) => _colour;
+    }
+
+    /// <summary>
+    /// A sampler that returns one constant frame colour and reads cubic volumes from a shared texture
+    /// bank, mirroring how the GPU atlas is built from the same bank.
+    /// </summary>
+    private sealed class BankSampler : IShaderSampler
+    {
+        private readonly VisualizerTextureBank _bank;
+        private readonly ShaderValue _colour;
+        private readonly float[] _sample = new float[4];
+
+        /// <summary>Creates the sampler.</summary>
+        /// <param name="bank">Texture bank to read volumes from.</param>
+        /// <param name="red">Red component of the constant frame colour.</param>
+        /// <param name="green">Green component of the constant frame colour.</param>
+        /// <param name="blue">Blue component of the constant frame colour.</param>
+        public BankSampler(VisualizerTextureBank bank, float red, float green, float blue)
+        {
+            _bank = bank;
+            _colour = ShaderValue.Vector(red, green, blue, 1f, 4);
+        }
+
+        /// <inheritdoc/>
+        public ShaderValue Sample(string sampler, float u, float v) => _colour;
+
+        /// <inheritdoc/>
+        public ShaderValue SampleBlur(int level, float u, float v) => _colour;
+
+        /// <inheritdoc/>
+        public ShaderValue SampleVolume(string sampler, float x, float y, float z)
+        {
+            if (VisualizerTextureBank.TryResolve(sampler, out var texture) &&
+                VisualizerTextureBank.IsVolume(texture))
+            {
+                _bank.SampleVolume(texture, x, y, z, VisualizerTextureWrap.Repeat).CopyTo(_sample);
+                return ShaderValue.Vector(_sample[0], _sample[1], _sample[2], _sample[3], 4);
+            }
+
+            return _colour;
+        }
 
         /// <inheritdoc/>
         public ShaderValue SamplePixel(int x, int y) => _colour;
