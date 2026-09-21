@@ -68,6 +68,8 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler
 
     private bool _samplerMainIsWarped;
     private PixelBuffer? _shaderOutput;
+    private bool _warpShadersFailed;
+    private bool _compShadersFailed;
     private readonly float[] _slots;
     // Resolved once so the per-pixel loop never looks a name up in the layout again.
     private readonly int _slotX;
@@ -631,6 +633,34 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler
     /// <param name="originalV">Row of the pixel itself.</param>
     private void RunWarpShaders(float u, float v, float originalU, float originalV)
     {
+        if (_warpShadersFailed)
+        {
+            _previous.SampleBilinear(u, v, _sample);
+            return;
+        }
+
+        try
+        {
+            RunWarpShadersCore(u, v, originalU, originalV);
+        }
+        catch (PresetExpressionException)
+        {
+            // A preset shader may call something the engine does not implement. Disabling the
+            // shaders is the only safe answer: the alternative is a dead render thread.
+            _warpShadersFailed = true;
+            _warpShaders.Clear();
+            _compiledWarp.Clear();
+            _previous.SampleBilinear(u, v, _sample);
+        }
+    }
+
+    /// <summary>Runs the enabled warp shaders for one pixel.</summary>
+    /// <param name="u">Sampling coordinate.</param>
+    /// <param name="v">Sampling row.</param>
+    /// <param name="originalU">Coordinate of the pixel itself.</param>
+    /// <param name="originalV">Row of the pixel itself.</param>
+    private void RunWarpShadersCore(float u, float v, float originalU, float originalV)
+    {
         _samplerMainIsWarped = false;
         for (var index = 0; index < _warpShaders.Count; index++)
         {
@@ -711,36 +741,12 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler
         }
     }
 
-    /// <summary>Runs the comp shaders over the composited frame.</summary>
-    private void ApplyCompShaders()
+    /// <summary>Runs every comp shader over the shader grid.</summary>
+    /// <param name="output">Buffer the shaders write into.</param>
+    /// <param name="shaderWidth">Shader grid width.</param>
+    /// <param name="shaderHeight">Shader grid height.</param>
+    private void RunCompShaders(PixelBuffer output, int shaderWidth, int shaderHeight)
     {
-        if (_compShaders.Count == 0)
-            return;
-
-        var width = _fresh.Width;
-        var height = _fresh.Height;
-        _frameCopy.CopyFrom(_fresh);
-        _samplerMainIsWarped = true;
-
-        // A comp shader is a post-processing pass, so it may run on a smaller grid than the frame
-        // and be scaled back up afterwards. That is what keeps a per-pixel shader inside the frame
-        // budget on the CPU; sampling still reads the full-resolution frame, so the effect stays
-        // where the preset put it.
-        var pixels = (long)width * height;
-        var scale = pixels > ShaderPixelBudget ? MathF.Sqrt(ShaderPixelBudget / (float)pixels) : 1f;
-        var shaderWidth = Math.Max(1, (int)(width * scale));
-        var shaderHeight = Math.Max(1, (int)(height * scale));
-        if (_shaderOutput is null ||
-            _shaderOutput.Width != shaderWidth ||
-            _shaderOutput.Height != shaderHeight)
-        {
-            _shaderOutput = new PixelBuffer(shaderWidth, shaderHeight);
-        }
-
-        // When the grid matches the frame the shader writes into it directly, which keeps the
-        // picture exact instead of resampling it through an identical-size copy.
-        var scaled = shaderWidth != width || shaderHeight != height;
-        var output = scaled ? _shaderOutput : _fresh;
         for (var y = 0; y < shaderHeight; y++)
         {
             var v = (y + 0.5f) / shaderHeight;
@@ -772,6 +778,52 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler
                     output.Pixels[offset + 2] = Math.Clamp(colour.Z, 0f, 1f);
                 }
             }
+        }
+    }
+
+    /// <summary>Runs the comp shaders over the composited frame.</summary>
+    private void ApplyCompShaders()
+    {
+        if (_compShaders.Count == 0)
+            return;
+
+        var width = _fresh.Width;
+        var height = _fresh.Height;
+        _frameCopy.CopyFrom(_fresh);
+        _samplerMainIsWarped = true;
+
+        // A comp shader is a post-processing pass, so it may run on a smaller grid than the frame
+        // and be scaled back up afterwards. That is what keeps a per-pixel shader inside the frame
+        // budget on the CPU; sampling still reads the full-resolution frame, so the effect stays
+        // where the preset put it.
+        var pixels = (long)width * height;
+        var scale = pixels > ShaderPixelBudget ? MathF.Sqrt(ShaderPixelBudget / (float)pixels) : 1f;
+        var shaderWidth = Math.Max(1, (int)(width * scale));
+        var shaderHeight = Math.Max(1, (int)(height * scale));
+        if (_shaderOutput is null ||
+            _shaderOutput.Width != shaderWidth ||
+            _shaderOutput.Height != shaderHeight)
+        {
+            _shaderOutput = new PixelBuffer(shaderWidth, shaderHeight);
+        }
+
+        // When the grid matches the frame the shader writes into it directly, which keeps the
+        // picture exact instead of resampling it through an identical-size copy.
+        var scaled = shaderWidth != width || shaderHeight != height;
+        var output = scaled ? _shaderOutput : _fresh;
+        if (_compShadersFailed)
+            return;
+        try
+        {
+            RunCompShaders(output, shaderWidth, shaderHeight);
+        }
+        catch (PresetExpressionException)
+        {
+            // A preset shader may call something the engine does not implement. Disabling the
+            // shaders is the only safe answer: the alternative is a dead render thread.
+            _compShadersFailed = true;
+            _compShaders.Clear();
+            return;
         }
 
         if (!scaled)

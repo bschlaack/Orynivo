@@ -57,13 +57,10 @@ public sealed class PresetFolderDiagnosticTests
                 failedBlocks += preset.FailedBlocks.Count;
                 foreach (var block in preset.FailedBlocks)
                 {
-                    // Shader slots are reported separately: they dominate the counts and belong to
-                    // the Milkdrop 2 template work, not to the expression language.
                     if (block.StartsWith("warp_", StringComparison.Ordinal) ||
                         block.StartsWith("comp_", StringComparison.Ordinal))
                     {
                         shaderFailures++;
-                        continue;
                     }
 
                     var key = Normalize(block);

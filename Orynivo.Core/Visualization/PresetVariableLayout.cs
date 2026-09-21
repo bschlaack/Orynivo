@@ -55,6 +55,9 @@ public sealed class PresetVariableLayout
             layout.GetOrAdd("q" + index.ToString(System.Globalization.CultureInfo.InvariantCulture));
         for (var index = 1; index <= 8; index++)
             layout.GetOrAdd("b" + index.ToString(System.Globalization.CultureInfo.InvariantCulture));
+        // Milkdrop provides eight general-purpose "T" variables next to the 32 Q ones.
+        for (var index = 1; index <= 8; index++)
+            layout.GetOrAdd("t" + index.ToString(System.Globalization.CultureInfo.InvariantCulture));
 
         return layout;
     }

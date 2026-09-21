@@ -285,7 +285,7 @@ public sealed class VisualizerPreset
                 {
                     shaders.Add(new VisualizerShader(
                         1,
-                        ShaderParser.Parse(source),
+                        ShaderParser.Parse(TranslateShaderDialect(source)),
                         PresetCompiler.Compile(Join(values, prefix + "_1_per_frame"), layout),
                         PresetCompiler.Compile(Join(values, prefix + "_1_per_pixel"), layout)));
                 }
@@ -310,7 +310,7 @@ public sealed class VisualizerPreset
             ShaderNode program;
             try
             {
-                program = ShaderParser.Parse(source);
+                program = ShaderParser.Parse(TranslateShaderDialect(source));
             }
             catch (PresetExpressionException exception)
             {
@@ -328,6 +328,119 @@ public sealed class VisualizerPreset
         }
 
         return shaders;
+    }
+
+    /// <summary>
+    /// The math constants Milkdrop provides to shaders. Presets use them without defining them, so
+    /// they have to be substituted before the source can be parsed.
+    /// </summary>
+    private static readonly Dictionary<string, string> ShaderConstants = new(StringComparer.Ordinal)
+    {
+        ["M_PI"] = "3.14159265",
+        ["M_PI_2"] = "1.57079633",
+        ["M_2PI"] = "6.28318531",
+        ["M_INV_PI"] = "0.31830989",
+        ["M_INV_PI_2"] = "0.63661977",
+        ["M_E"] = "2.71828183"
+    };
+
+    /// <summary>
+    /// Translates the parts of Milkdrop's shader source that are not HLSL: its preprocessor
+    /// conditionals (which it writes with trailing comments) and its built-in math constants. The
+    /// result is plain HLSL that <see cref="ShaderParser"/> can read.
+    /// </summary>
+    /// <param name="source">Shader source as stored in the preset.</param>
+    /// <returns>The translated source.</returns>
+    private static string TranslateShaderDialect(string source)
+    {
+        var builder = new System.Text.StringBuilder();
+        var constants = new Dictionary<string, string>(ShaderConstants, StringComparer.Ordinal);
+        var enclosing = new Stack<bool>();
+        var active = true;
+        foreach (var raw in source.Split('\n'))
+        {
+            var line = raw.TrimEnd();
+            var trimmed = line.TrimStart();
+            if (trimmed.StartsWith('#'))
+            {
+                var directive = trimmed[1..].TrimStart();
+                if (directive.StartsWith("define", StringComparison.Ordinal))
+                {
+                    var rest = directive[6..].Trim();
+                    var separator = rest.IndexOfAny([' ', '\t']);
+                    if (separator > 0)
+                        constants[rest[..separator]] = rest[separator..].Trim();
+                    continue;
+                }
+
+                if (directive.StartsWith("ifdef", StringComparison.Ordinal))
+                {
+                    enclosing.Push(active);
+                    active = active && constants.ContainsKey(FirstWord(directive[5..]));
+                    continue;
+                }
+
+                if (directive.StartsWith("ifndef", StringComparison.Ordinal))
+                {
+                    enclosing.Push(active);
+                    active = active && !constants.ContainsKey(FirstWord(directive[6..]));
+                    continue;
+                }
+
+                if (directive.StartsWith("if", StringComparison.Ordinal))
+                {
+                    enclosing.Push(active);
+                    active = active && FirstWord(directive[2..]) != "0";
+                    continue;
+                }
+
+                if (directive.StartsWith("else", StringComparison.Ordinal))
+                {
+                    if (enclosing.Count > 0)
+                        active = enclosing.Peek() && !active;
+                    continue;
+                }
+
+                if (directive.StartsWith("endif", StringComparison.Ordinal))
+                {
+                    if (enclosing.Count > 0)
+                        active = enclosing.Pop();
+                    continue;
+                }
+
+                continue;
+            }
+
+            if (!active)
+                continue;
+
+            foreach (var (name, value) in constants)
+            {
+                if (line.Contains(name, StringComparison.Ordinal))
+                {
+                    line = System.Text.RegularExpressions.Regex.Replace(
+                        line,
+                        $@"\b{System.Text.RegularExpressions.Regex.Escape(name)}\b",
+                        value);
+                }
+            }
+
+            builder.Append(line).Append('\n');
+        }
+
+        return builder.ToString();
+    }
+
+    /// <summary>Returns the first word of a preprocessor expression.</summary>
+    /// <param name="text">Text after the directive name.</param>
+    /// <returns>The first word, or an empty string.</returns>
+    private static string FirstWord(string text)
+    {
+        var trimmed = text.TrimStart();
+        var end = 0;
+        while (end < trimmed.Length && !char.IsWhiteSpace(trimmed[end]))
+            end++;
+        return end == 0 ? string.Empty : trimmed[..end];
     }
 
     /// <summary>Reports whether a shader is stored one source line per numbered key.</summary>
@@ -356,9 +469,11 @@ public sealed class VisualizerPreset
             if (text.StartsWith('`'))
                 text = text[1..];
 
-            // The body marker only says where the shader starts.
-            if (string.Equals(text.Trim(), "shader_body", StringComparison.OrdinalIgnoreCase))
-                continue;
+            // The body marker only says where the shader starts, and it shares its line with the
+            // opening brace in many presets, so it is removed wherever it appears.
+            var marker = text.IndexOf("shader_body", StringComparison.OrdinalIgnoreCase);
+            if (marker >= 0)
+                text = text.Remove(marker, "shader_body".Length);
 
             builder.Append(text).Append('\n');
         }
