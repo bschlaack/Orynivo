@@ -7,6 +7,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Added
+- Moved the borders onto the GPU. `SkiaShaderRunner.Borders` draws the outer and inner Milkdrop
+  border bands as a Skia runtime effect, computing each pixel's distance to the inset rectangle the
+  way `PresetRenderer.DrawBorderFrame` does, and the renderer uses it when the pass flag is enabled.
 - Moved the composite onto the GPU. `SkiaShaderRunner.Composite` adds the warped frame onto the
   overlay frame with the same clamp the CPU pass applies, and the renderer uses it when the pass flag
   is enabled.

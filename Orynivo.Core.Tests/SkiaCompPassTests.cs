@@ -139,6 +139,78 @@ public sealed class SkiaCompPassTests
         Assert.InRange(difference, 0.0001f, 0.005f);
     }
 
+    /// <summary>The Skia border pass matches the CPU border pass within one level.</summary>
+    [Fact]
+    public void Borders_MatchesTheCpuBorders()
+    {
+        var source = CreatePattern();
+        var outer = new SkiaShaderRunner.BorderBand(0f, 0.06f, 1f, 0.5f, 0f, 0.7f);
+        var inner = new SkiaShaderRunner.BorderBand(0.1f, 0.05f, 0f, 0.2f, 1f, 0.4f);
+
+        var gpu = new PixelBuffer(source.Width, source.Height);
+        gpu.CopyFrom(source);
+        SkiaShaderRunner.Borders(gpu, outer, inner);
+
+        var cpu = new PixelBuffer(source.Width, source.Height);
+        cpu.CopyFrom(source);
+        CpuBorderBand(cpu, outer);
+        CpuBorderBand(cpu, inner);
+
+        var difference = MeanAbsoluteDifference(cpu.Pixels.ToArray(), gpu.Pixels.ToArray());
+        Assert.InRange(difference, 0.0001f, 0.01f);
+    }
+
+    /// <summary>Draws one border band, mirroring <c>PresetRenderer.DrawBorderFrame</c>.</summary>
+    /// <param name="frame">Frame to draw on.</param>
+    /// <param name="band">Band to draw.</param>
+    private static void CpuBorderBand(PixelBuffer frame, SkiaShaderRunner.BorderBand band)
+    {
+        if (band.Alpha <= 0f)
+            return;
+
+        var width = frame.Width;
+        var height = frame.Height;
+        var smallest = Math.Min(width, height);
+        var thickness = Math.Max(1, (int)(smallest * band.Thickness));
+        var margin = (int)(smallest * band.Inset);
+        var pixels = frame.Pixels;
+        for (var offset = 0; offset < thickness; offset++)
+        {
+            var left = margin + offset;
+            var top = margin + offset;
+            var right = width - 1 - margin - offset;
+            var bottom = height - 1 - margin - offset;
+            if (left > right || top > bottom)
+                break;
+
+            for (var x = left; x <= right; x++)
+            {
+                Paint(pixels, width, x, top, band);
+                Paint(pixels, width, x, bottom, band);
+            }
+
+            for (var y = top; y <= bottom; y++)
+            {
+                Paint(pixels, width, left, y, band);
+                Paint(pixels, width, right, y, band);
+            }
+        }
+    }
+
+    /// <summary>Blends one border pixel, mirroring <c>PresetRenderer.PaintWarped</c>.</summary>
+    /// <param name="pixels">Frame pixels.</param>
+    /// <param name="width">Frame width.</param>
+    /// <param name="x">Column.</param>
+    /// <param name="y">Row.</param>
+    /// <param name="band">Band colour.</param>
+    private static void Paint(Span<float> pixels, int width, int x, int y, SkiaShaderRunner.BorderBand band)
+    {
+        var offset = (((y * width) + x) * 4);
+        pixels[offset] = Math.Clamp((pixels[offset] * (1f - band.Alpha)) + (band.Red * band.Alpha), 0f, 1f);
+        pixels[offset + 1] = Math.Clamp((pixels[offset + 1] * (1f - band.Alpha)) + (band.Green * band.Alpha), 0f, 1f);
+        pixels[offset + 2] = Math.Clamp((pixels[offset + 2] * (1f - band.Alpha)) + (band.Blue * band.Alpha), 0f, 1f);
+    }
+
     /// <summary>Builds a frame with structure, so a blur visibly changes it.</summary>
     /// <param name="shift">Value that makes one pattern differ from another.</param>
     /// <returns>The frame.</returns>

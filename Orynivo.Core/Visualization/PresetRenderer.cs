@@ -1707,9 +1707,36 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
     /// <summary>Draws the outer and inner Milkdrop borders over the warped frame.</summary>
     private void DrawBorders()
     {
+        if (UseSkiaPasses)
+        {
+            try
+            {
+                SkiaShaderRunner.Borders(_warped, ReadBand("ob_", 0f, 0.02f), ReadBand("ib_", 0.06f, 0.02f));
+                return;
+            }
+            catch (Exception exception)
+            {
+                ShaderError = "borders (skia): " + exception.GetType().Name + ": " + exception.Message;
+            }
+        }
+
         DrawBorderFrame(0f, 0.02f);
         DrawBorderFrame(0.06f, 0.02f);
     }
+
+    /// <summary>Reads one border band's colour keys.</summary>
+    /// <param name="prefix">Key prefix, <c>ob_</c> or <c>ib_</c>.</param>
+    /// <param name="inset">Inset as a fraction of the smaller dimension.</param>
+    /// <param name="thickness">Band thickness as a fraction of the smaller dimension.</param>
+    /// <returns>The band.</returns>
+    private SkiaShaderRunner.BorderBand ReadBand(string prefix, float inset, float thickness) =>
+        new(
+            inset,
+            thickness,
+            Math.Clamp(Read(prefix + "r", 1f), 0f, 1f),
+            Math.Clamp(Read(prefix + "g", 1f), 0f, 1f),
+            Math.Clamp(Read(prefix + "b", 1f), 0f, 1f),
+            Math.Clamp(Read(prefix + "a", 0f), 0f, 1f));
 
     /// <summary>Draws one border frame with its own colour keys.</summary>
     /// <param name="inset">Inset as a fraction of the smaller dimension.</param>

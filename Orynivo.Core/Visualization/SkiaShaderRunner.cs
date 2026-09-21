@@ -450,6 +450,87 @@ public static class SkiaShaderRunner
         }
         """;
 
+    /// <summary>One rectangular border band of the Milkdrop border pass.</summary>
+    /// <param name="Inset">Inset as a fraction of the smaller dimension.</param>
+    /// <param name="Thickness">Band thickness as a fraction of the smaller dimension.</param>
+    /// <param name="Red">Red component.</param>
+    /// <param name="Green">Green component.</param>
+    /// <param name="Blue">Blue component.</param>
+    /// <param name="Alpha">Blend amount from zero to one.</param>
+    public readonly record struct BorderBand(
+        float Inset,
+        float Thickness,
+        float Red,
+        float Green,
+        float Blue,
+        float Alpha);
+
+    /// <summary>
+    /// Draws Milkdrop's outer and inner border bands over a frame in place, reproducing
+    /// <c>PresetRenderer.DrawBorderFrame</c>: a band is the ring whose distance from the inset
+    /// rectangle is below the band width, and a pixel on it is blended towards the band colour.
+    /// </summary>
+    /// <param name="frame">Frame to draw on in place.</param>
+    /// <param name="outer">Outer band.</param>
+    /// <param name="inner">Inner band.</param>
+    /// <exception cref="PresetExpressionException">Skia rejects the border effect.</exception>
+    public static void Borders(PixelBuffer frame, BorderBand outer, BorderBand inner)
+    {
+        ArgumentNullException.ThrowIfNull(frame);
+        using var effect = SKRuntimeEffect.CreateShader(BorderSkSL, out var errors)
+            ?? throw new PresetExpressionException($"SkSL was rejected: {errors}", 0);
+        using var bitmap = CreateBitmap(frame.Pixels, frame.Width, frame.Height);
+        using var source = bitmap.ToShader(SKShaderTileMode.Clamp, SKShaderTileMode.Clamp, LinearSampling);
+        var uniforms = new SKRuntimeEffectUniforms(effect)
+        {
+            ["size"] = new float[] { frame.Width, frame.Height },
+            ["outerShape"] = new float[] { outer.Inset, outer.Thickness },
+            ["outerColor"] = new float[] { outer.Red, outer.Green, outer.Blue, outer.Alpha },
+            ["innerShape"] = new float[] { inner.Inset, inner.Thickness },
+            ["innerColor"] = new float[] { inner.Red, inner.Green, inner.Blue, inner.Alpha }
+        };
+        var children = new SKRuntimeEffectChildren(effect) { ["frame"] = source };
+        using var shader = effect.ToShader(uniforms, children);
+        using var target = CreateBitmap(new float[frame.Width * frame.Height * 4], frame.Width, frame.Height);
+        using var surface = SKSurface.Create(target.Info, target.GetPixels(), target.RowBytes);
+        var canvas = surface.Canvas;
+        canvas.Clear(SKColors.Black);
+        using (var paint = new SKPaint { Shader = shader })
+            canvas.DrawRect(new SKRect(0, 0, frame.Width, frame.Height), paint);
+
+        canvas.Flush();
+        ReadPixels(target, frame.Width, frame.Height).AsSpan().CopyTo(frame.Pixels);
+    }
+
+    /// <summary>
+    /// The SkSL of the border pass. A pixel is on a band when its distance to the inset rectangle is
+    /// inside the band width, which is exactly the ring <c>DrawBorderFrame</c> paints.
+    /// </summary>
+    private const string BorderSkSL = """
+        uniform shader frame;
+        uniform float2 size;
+        uniform float2 outerShape;
+        uniform float4 outerColor;
+        uniform float2 innerShape;
+        uniform float4 innerColor;
+        float4 applyBorder(float4 c, float2 coord, float2 shape, float4 colour) {
+            float smallest = min(size.x, size.y);
+            float margin = floor(smallest * shape.x);
+            float band = max(1.0, floor(smallest * shape.y));
+            float x = floor(coord.x);
+            float y = floor(coord.y);
+            float ring = min(min(x - margin, y - margin), min((size.x - 1.0 - margin) - x, (size.y - 1.0 - margin) - y));
+            float painted = ((ring >= 0.0) && (ring < band)) ? 1.0 : 0.0;
+            return float4(mix(c.rgb, colour.rgb, painted * colour.a), c.a);
+        }
+        half4 main(float2 coord) {
+            float4 c = float4(frame.eval(coord));
+            c = applyBorder(c, coord, outerShape, outerColor);
+            c = applyBorder(c, coord, innerShape, innerColor);
+            return half4(c);
+        }
+        """;
+
     /// <summary>Converts a zero-to-one component into a byte.</summary>
     /// <param name="value">Component value.</param>
     /// <returns>The byte value.</returns>
