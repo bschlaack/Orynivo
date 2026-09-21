@@ -533,8 +533,24 @@ public static class ShaderTranspiler
     /// <returns>The expression text.</returns>
     private static string EmitBinary(ShaderNode expression)
     {
-        var left = EmitExpression(expression.Left!);
-        var right = EmitExpression(expression.Right!);
+        var leftNode = expression.Left!;
+        var rightNode = expression.Right!;
+        var leftType = TypeOf(leftNode);
+        var rightType = TypeOf(rightNode);
+        var left = EmitExpression(leftNode);
+        var right = EmitExpression(rightNode);
+
+        // SkSL wants matching component counts, while a preset mixes them freely: "float3 * float2"
+        // and "float4 + float3" both occur. Both operands are brought to the wider type, which is
+        // what the engine's component-wise arithmetic already does.
+        if (leftType is not null && rightType is not null &&
+            ComponentCount(leftType) != ComponentCount(rightType) &&
+            Wider(leftType, rightType) is { } common)
+        {
+            left = Convert(left, leftType, common);
+            right = Convert(right, rightType, common);
+        }
+
         return expression.Text switch
         {
             "+" => $"({left} + {right})",
@@ -571,6 +587,26 @@ public static class ShaderTranspiler
         var arguments = new List<string>(call.Items.Count);
         foreach (var argument in call.Items)
             arguments.Add(EmitExpression(argument));
+
+        // An intrinsic takes matching component counts, while a preset may hand it a float4 where a
+        // float3 is meant, as in "max(ret, tex2D(...) * 0.97)". Every argument is brought to the
+        // smallest vector count among them; widening a scalar is harmless because it is uniform.
+        if (DirectFunctions.Contains(name) || name is "saturate" or "lerp" or "atan2" or "mul" or "lum")
+        {
+            var smallest = int.MaxValue;
+            foreach (var argument in call.Items)
+            {
+                if (TypeOf(argument) is { } argumentType && ComponentCount(argumentType) > 1)
+                    smallest = Math.Min(smallest, ComponentCount(argumentType));
+            }
+
+            if (smallest is > 1 and < int.MaxValue)
+            {
+                for (var index = 0; index < arguments.Count; index++)
+                    arguments[index] = Convert(arguments[index], TypeOf(call.Items[index]), ComponentType(smallest));
+            }
+        }
+
 
         // Milkdrop samples the frame and its blur levels through these helpers. A Skia runtime
         // effect samples a shader in pixel coordinates, so a normalised coordinate is scaled back.

@@ -7,6 +7,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Fixed
+- Converted the operands of a binary expression and the arguments of an intrinsic to matching
+  component counts in the SkSL emitter. Presets mix them freely (`float3 * float2`,
+  `max(float3, float4)`), which the engine's component-wise arithmetic allows and SkSL rejects. Over
+  a 500-file sample the share of shaders that translate and are accepted by Skia rose from 332 to
+  365 of 764, that is from 43 to 48 percent.
 - Added the samplers and the random vector Milkdrop shaders expect but the prelude did not declare:
   `sampler_fc_main`, `sampler_pc_main`, `sampler_noisevol_lq`, `sampler_noisevol_hq`, and
   `rand_preset`. A shader that named one of them failed on an unknown identifier. Over a 500-file
