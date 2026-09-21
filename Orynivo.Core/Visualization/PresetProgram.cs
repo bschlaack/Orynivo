@@ -10,21 +10,27 @@ public sealed class PresetProgram
 {
     private readonly Action<float[]>? _execute;
     private readonly HashSet<string> _referenced;
+    private readonly HashSet<string> _written;
 
     /// <summary>Creates a program over a slot layout.</summary>
     /// <param name="layout">Shared layout of the owning preset.</param>
     /// <param name="execute">Compiled statements, or <see langword="null"/> when empty.</param>
     /// <param name="referenced">Variable names the statements mention, or <see langword="null"/>.</param>
+    /// <param name="written">Variable names the statements assign to, or <see langword="null"/>.</param>
     internal PresetProgram(
         PresetVariableLayout layout,
         Action<float[]>? execute,
-        IReadOnlyCollection<string>? referenced = null)
+        IReadOnlyCollection<string>? referenced = null,
+        IReadOnlyCollection<string>? written = null)
     {
         Layout = layout;
         _execute = execute;
         _referenced = referenced is null
             ? new HashSet<string>(StringComparer.Ordinal)
             : new HashSet<string>(referenced, StringComparer.Ordinal);
+        _written = written is null
+            ? new HashSet<string>(StringComparer.Ordinal)
+            : new HashSet<string>(written, StringComparer.Ordinal);
     }
 
     /// <summary>Gets an empty program that runs no statements.</summary>
@@ -51,6 +57,18 @@ public sealed class PresetProgram
     /// <param name="name">Variable name.</param>
     /// <returns><see langword="true"/> when the compiled statements mention the variable.</returns>
     public bool Uses(string name) => _referenced.Contains(name);
+
+    /// <summary>
+    /// Gets the variable names this program assigns to. A per-pixel pass may only run in parallel
+    /// when the values it writes are re-seeded for every pixel, because a value written by one
+    /// pixel and read by another would make the picture depend on the split.
+    /// </summary>
+    public IReadOnlyCollection<string> WrittenVariables => _written;
+
+    /// <summary>Reports whether this program assigns to a variable.</summary>
+    /// <param name="name">Variable name.</param>
+    /// <returns><see langword="true"/> when the compiled statements write the variable.</returns>
+    public bool Writes(string name) => _written.Contains(name);
 
     /// <summary>Returns the slot of a variable.</summary>
     /// <param name="name">Variable name.</param>

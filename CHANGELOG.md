@@ -7,6 +7,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Added
+- The visualizer's warp stage now runs on several threads. A pass may only be
+  parallelised when everything the per-pixel code writes is re-seeded for every pixel,
+  so `x = x + ...` and `rad = ...` run in parallel while a preset that accumulates in
+  `q1` stays on one thread; a warp shader or a motion-vector grid also keeps it
+  sequential. Each worker gets its own slot array, and a test proves that both paths
+  render byte-identical frames. Covered by 16 tests.
 - The visualizer's preset folder is now searched recursively, so a collection that is sorted into
   subfolders (for example a downloaded preset pack) can be used as it is. Presets are discovered
   eagerly but parsed only when they are first shown, because compiling one preset costs

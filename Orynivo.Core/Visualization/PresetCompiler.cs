@@ -35,7 +35,7 @@ public static class PresetCompiler
         if (string.IsNullOrWhiteSpace(source))
             return layout is null
                 ? PresetProgram.Empty
-                : new PresetProgram(layout, null, []);
+                : new PresetProgram(layout, null, [], []);
 
         var state = new CompileState(layout);
         var body = new List<Expression>();
@@ -65,7 +65,7 @@ public static class PresetCompiler
 
         var block = Expression.Block(body);
         var lambda = Expression.Lambda<Action<float[]>>(block, state.Slots);
-        return new PresetProgram(state.Layout, lambda.Compile(), state.ReferencedNames);
+        return new PresetProgram(state.Layout, lambda.Compile(), state.ReferencedNames, state.WrittenNames);
     }
 
     /// <summary>Parses one statement, which is either an assignment or a bare expression.</summary>
@@ -80,7 +80,7 @@ public static class PresetCompiler
             {
                 current = lexer.Next();
                 var value = ParseExpression(state, lexer, ref current);
-                return Expression.Assign(state.Slot(name), value);
+                return Expression.Assign(state.WriteSlot(name), value);
             }
 
             // Not an assignment: rewind by re-parsing the identifier as a primary expression.
@@ -387,6 +387,13 @@ public static class PresetCompiler
         /// </summary>
         public IReadOnlyCollection<string> ReferencedNames => _referencedNames;
 
+        /// <summary>
+        /// Gets the names this program assigns to. The renderer uses them to decide whether a
+        /// per-pixel pass may run in parallel, because a value written by one pixel and read by
+        /// another would make the result depend on the split.
+        /// </summary>
+        public IReadOnlyCollection<string> WrittenNames => _writtenNames;
+
         /// <summary>Returns the slot expression for a variable, adding the slot on first use.</summary>
         /// <param name="name">Variable name.</param>
         /// <returns>An array access expression for the variable's slot.</returns>
@@ -396,6 +403,16 @@ public static class PresetCompiler
             return Expression.ArrayAccess(Slots, Expression.Constant(Layout.GetOrAdd(name)));
         }
 
+        /// <summary>Returns the slot expression for an assignment target.</summary>
+        /// <param name="name">Variable name.</param>
+        /// <returns>An array access expression for the variable's slot.</returns>
+        public Expression WriteSlot(string name)
+        {
+            _writtenNames.Add(name);
+            return Slot(name);
+        }
+
         private readonly HashSet<string> _referencedNames = new(StringComparer.Ordinal);
+        private readonly HashSet<string> _writtenNames = new(StringComparer.Ordinal);
     }
 }

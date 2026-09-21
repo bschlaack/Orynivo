@@ -621,9 +621,13 @@ to a `WriteableBitmap` that Skia scales up.
   reset key, and shutdown travel as flags the render thread applies, and the pacing arithmetic
   lives in the pure, tested `FramePacing`. Covered by 5 tests; the loop itself is verified by
   running the window.
-- 39c Parallel full-frame passes - `Pending`: split warp, blur, decay, gamma, darken, echo, and
-  composite across cores by row ranges with no order dependence, a bounded worker count, and
-  results that do not depend on the split.
+- 39c Parallel warp - `Done`: `ParallelRows.For` splits a frame into whole-row ranges across a
+  bounded worker count and keeps small frames on the calling thread. The warp runs in parallel
+  only when the per-pixel program writes nothing but the values the engine re-seeds per pixel
+  (`x`, `y`, `rad`, `ang`), because a value written by one pixel and read by another would make
+  the picture depend on the split; a warp shader or an active motion grid keeps it sequential.
+  Each worker owns its slot array and sample scratch, and `ParallelWarpTests` proves that both
+  paths render byte-identical frames. Covered by 16 tests.
 - 39d Allocation-free hot path - `Done`: reuse every frame buffer and temporary, remove
   per-frame allocations and delegate churn from the pixel loops, and prove it with an allocation
   check around a rendered frame. Done before 39c because the measurement showed the per-pixel
@@ -638,6 +642,10 @@ to a `WriteableBitmap` that Skia scales up.
 - 39f Sharper defaults - `Pending`: raise the default render resolution and frame rate to what
   the measured cost allows, keep the existing settings ranges, and document the recommended
   values in README and the wiki.
+- 39g Parallel remaining passes - `Pending`: the blur, decay, gamma, darken, echo, and composite
+  passes still run on one thread even though they are row-independent. Give `PixelBuffer` a
+  reusable blur scratch (it allocates one array per pass today), split those passes through
+  `ParallelRows.For`, and extend the identical-frame comparison to cover them.
 
 ## 40 Visualizer GPU pipeline
 

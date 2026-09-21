@@ -72,7 +72,15 @@ This file applies to `Orynivo.Core/` and supplements `../AGENTS.md`.
   only computes `rad`, `ang`, the motion grid, and the seeded sampling position when the preset's
   per-pixel code references them. Keep that set conservative — reporting a variable a program
   does not really use only costs a little work, while missing one changes the picture — and keep a
-  rendered frame allocation-free, which `RenderTimingTests` asserts. Keep the
+  rendered frame allocation-free, which `RenderTimingTests` asserts.
+  Full-frame passes may run in parallel only when they are row-independent: a pixel reads the
+  source buffer and writes its own pixel, nothing else. `ParallelRows.For` owns the split and
+  keeps small frames on the calling thread. The warp is parallel only when the per-pixel program
+  writes nothing but the values the engine re-seeds per pixel (`x`, `y`, `rad`, `ang`), because a
+  value written by one pixel and read by another would make the picture depend on the split; a
+  warp shader or an active motion grid keeps it sequential for the same reason. Never give two
+  workers the same slot array, and never claim a speed-up without the identical-frame test in
+  `ParallelWarpTests`. Keep the
   interpreter off the audio thread and bound its per-frame cost so a heavy shader degrades the
   render resolution instead of stalling playback.
 - Keep the project cross-platform `net10.0`; do not introduce Avalonia, Windows,

@@ -68,6 +68,9 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler
     private readonly bool _perPixelUsesY;
     private readonly bool _perPixelUsesRadius;
     private readonly bool _perPixelUsesAngle;
+    private readonly float[][] _workerSlots;
+    private readonly float[][] _workerSample;
+    private readonly bool _canParallelizeWarp;
     private readonly float[] _sample = new float[4];
     private IVisualizerAudioSource? _audio;
     private bool _initialized;
@@ -109,6 +112,20 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler
         _perPixelUsesY = preset.PerPixel.Uses("y");
         _perPixelUsesRadius = preset.PerPixel.Uses("rad");
         _perPixelUsesAngle = preset.PerPixel.Uses("ang");
+        // A per-pixel pass may only run in parallel when everything it writes is re-seeded for
+        // every pixel and no shader interpreter state is involved; otherwise one pixel could see
+        // what another pixel wrote and the picture would depend on the split.
+        _canParallelizeWarp = preset.WarpShaders.Count == 0 &&
+                              preset.PerPixel.WrittenVariables.All(IsSeededPerPixel);
+        var workers = ParallelRows.WorkerCount;
+        _workerSlots = new float[workers][];
+        _workerSample = new float[workers][];
+        for (var worker = 0; worker < workers; worker++)
+        {
+            _workerSlots[worker] = new float[preset.Layout.Count];
+            _workerSample[worker] = new float[4];
+        }
+
         foreach (var shader in preset.WarpShaders)
             _warpShaders.Add((new ShaderInterpreter(shader.Program, this), shader));
         foreach (var shader in preset.CompShaders)
@@ -163,6 +180,20 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler
 
     /// <summary>Gets a value indicating whether the preset carries any shader.</summary>
     public bool HasShaders => _warpShaders.Count > 0 || _compShaders.Count > 0;
+
+    /// <summary>
+    /// Gets or sets a value indicating whether full-frame passes may use more than one thread.
+    /// It exists so a test can compare both paths and prove they render identical frames.
+    /// </summary>
+    public bool ParallelismEnabled { get; set; } = true;
+
+    /// <summary>
+    /// Gets a value indicating whether this preset's warp stage may run in parallel at all. It is
+    /// <see langword="false"/> when the per-pixel code writes a value another pixel could read, or
+    /// when a warp shader keeps interpreter state, so callers can report why a preset stays on one
+    /// thread.
+    /// </summary>
+    public bool WarpParallelismAvailable => _canParallelizeWarp;
 
     /// <summary>Gets the band levels of the last rendered frame.</summary>
     public ReadOnlySpan<float> Bands => _audio is null ? default : _audio.Bands;
@@ -419,66 +450,89 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler
 
         var width = _warped.Width;
         var height = _warped.Height;
-        var target = _warped.Pixels;
-        for (var y = 0; y < height; y++)
+        var perPixel = Preset.PerPixel;
+
+        void WarpRows(int worker, int from, int to)
         {
-            var normalizedY = height > 1 ? (y / (float)(height - 1) * 2f) - 1f : 0f;
-            for (var x = 0; x < width; x++)
+            // The span is taken inside the body, because a local function cannot capture one.
+            var target = _warped.Pixels;
+            // A parallel worker gets its own slots and its own sample scratch, because the shared
+            // ones would let two pixels race on the value a per-pixel program just wrote.
+            var slots = worker < 0 ? _slots : _workerSlots[worker];
+            var sample = worker < 0 ? _sample : _workerSample[worker];
+            for (var y = from; y < to; y++)
             {
-                var normalizedX = width > 1 ? (x / (float)(width - 1) * 2f) - 1f : 0f;
-
-                // Centre, stretch, rotate, and zoom the sampling position.
-                var warpedX = (normalizedX - centreX) * stretchX;
-                var warpedY = (normalizedY - centreY) * stretchY;
-                var rotatedX = (warpedX * cosRotation) - (warpedY * sinRotation);
-                var rotatedY = (warpedX * sinRotation) + (warpedY * cosRotation);
-                if (needsRadius || needsAngle)
+                var normalizedY = height > 1 ? (y / (float)(height - 1) * 2f) - 1f : 0f;
+                for (var x = 0; x < width; x++)
                 {
-                    var radius = MathF.Sqrt((rotatedX * rotatedX) + (rotatedY * rotatedY));
-                    var pixelZoom = needsRadius && zoomExp != 1f
-                        ? MathF.Pow(zoom, 1f + (zoomExp * radius * 2f))
-                        : zoom;
-                    warpedX = (rotatedX * pixelZoom) + centreX + offsetX;
-                    warpedY = (rotatedY * pixelZoom) + centreY + offsetY;
-                    if (needsRadius)
-                        Write(_slotRad, radius);
-                    if (needsAngle)
-                        Write(_slotAng, MathF.Atan2(rotatedY, rotatedX));
-                }
-                else
-                {
-                    warpedX = (rotatedX * zoom) + centreX + offsetX;
-                    warpedY = (rotatedY * zoom) + centreY + offsetY;
-                }
+                    var normalizedX = width > 1 ? (x / (float)(width - 1) * 2f) - 1f : 0f;
 
-                if (_perPixelUsesX)
-                    Write(_slotX, warpedX);
-                if (_perPixelUsesY)
-                    Write(_slotY, warpedY);
-                Preset.PerPixel.Execute(_slots);
+                    // Centre, stretch, rotate, and zoom the sampling position.
+                    var warpedX = (normalizedX - centreX) * stretchX;
+                    var warpedY = (normalizedY - centreY) * stretchY;
+                    var rotatedX = (warpedX * cosRotation) - (warpedY * sinRotation);
+                    var rotatedY = (warpedX * sinRotation) + (warpedY * cosRotation);
+                    if (needsRadius || needsAngle)
+                    {
+                        var radius = MathF.Sqrt((rotatedX * rotatedX) + (rotatedY * rotatedY));
+                        var pixelZoom = needsRadius && zoomExp != 1f
+                            ? MathF.Pow(zoom, 1f + (zoomExp * radius * 2f))
+                            : zoom;
+                        warpedX = (rotatedX * pixelZoom) + centreX + offsetX;
+                        warpedY = (rotatedY * pixelZoom) + centreY + offsetY;
+                        if (needsRadius)
+                            Write(slots, _slotRad, radius);
+                        if (needsAngle)
+                            Write(slots, _slotAng, MathF.Atan2(rotatedY, rotatedX));
+                    }
+                    else
+                    {
+                        warpedX = (rotatedX * zoom) + centreX + offsetX;
+                        warpedY = (rotatedY * zoom) + centreY + offsetY;
+                    }
 
-                var sampleX = _perPixelUsesX ? Read(_slotX, warpedX) : warpedX;
-                var sampleY = _perPixelUsesY ? Read(_slotY, warpedY) : warpedY;
-                if (recordMotion)
-                    RecordMotion(normalizedX, normalizedY, sampleX, sampleY);
+                    if (_perPixelUsesX)
+                        Write(slots, _slotX, warpedX);
+                    if (_perPixelUsesY)
+                        Write(slots, _slotY, warpedY);
+                    perPixel.Execute(slots);
 
-                var sampleU = (sampleX * 0.5f) + 0.5f;
-                var sampleV = (sampleY * 0.5f) + 0.5f;
-                if (useShaders)
-                {
-                    RunWarpShaders(sampleU, sampleV, (normalizedX * 0.5f) + 0.5f, (normalizedY * 0.5f) + 0.5f);
+                    var sampleX = _perPixelUsesX ? Read(slots, _slotX, warpedX) : warpedX;
+                    var sampleY = _perPixelUsesY ? Read(slots, _slotY, warpedY) : warpedY;
+                    if (recordMotion)
+                        RecordMotion(normalizedX, normalizedY, sampleX, sampleY);
+
+                    var sampleU = (sampleX * 0.5f) + 0.5f;
+                    var sampleV = (sampleY * 0.5f) + 0.5f;
+                    if (useShaders)
+                    {
+                        RunWarpShaders(sampleU, sampleV, (normalizedX * 0.5f) + 0.5f, (normalizedY * 0.5f) + 0.5f);
+                    }
+                    else
+                    {
+                        _previous.SampleBilinear(sampleU, sampleV, sample);
+                    }
+
+                    var offset = (((y * width) + x) * 4);
+                    target[offset] = sample[0];
+                    target[offset + 1] = sample[1];
+                    target[offset + 2] = sample[2];
+                    target[offset + 3] = sample[3];
                 }
-                else
-                {
-                    _previous.SampleBilinear(sampleU, sampleV, _sample);
-                }
-
-                var offset = (((y * width) + x) * 4);
-                target[offset] = _sample[0];
-                target[offset + 1] = _sample[1];
-                target[offset + 2] = _sample[2];
-                target[offset + 3] = _sample[3];
             }
+        }
+
+        if (ParallelismEnabled && _canParallelizeWarp && !useShaders && !recordMotion)
+        {
+            // Each worker starts from the per-frame values, so a per-pixel program sees the same
+            // frame variables it would on a single thread.
+            for (var worker = 0; worker < _workerSlots.Length; worker++)
+                Array.Copy(_slots, _workerSlots[worker], _slots.Length);
+            ParallelRows.For(height, WarpRows);
+        }
+        else
+        {
+            WarpRows(-1, 0, height);
         }
     }
 
@@ -1274,15 +1328,33 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler
     /// <summary>Writes a slot that was resolved once, instead of looking the name up per pixel.</summary>
     /// <param name="slot">Slot index, or a negative value when the layout lacks the variable.</param>
     /// <param name="value">Value to store.</param>
-    private void Write(int slot, float value)
+    private void Write(int slot, float value) => Write(_slots, slot, value);
+
+    /// <summary>Writes a slot of a specific slot array, used by the parallel workers.</summary>
+    /// <param name="slots">Slot array to write to.</param>
+    /// <param name="slot">Slot index, or a negative value when the layout lacks the variable.</param>
+    /// <param name="value">Value to store.</param>
+    private static void Write(float[] slots, int slot, float value)
     {
         if (slot >= 0)
-            _slots[slot] = value;
+            slots[slot] = value;
     }
 
     /// <summary>Reads a slot that was resolved once, instead of looking the name up per pixel.</summary>
     /// <param name="slot">Slot index, or a negative value when the layout lacks the variable.</param>
     /// <param name="fallback">Value used when the layout lacks the variable.</param>
     /// <returns>The stored value.</returns>
-    private float Read(int slot, float fallback) => slot < 0 ? fallback : _slots[slot];
+    private float Read(int slot, float fallback) => Read(_slots, slot, fallback);
+
+    /// <summary>Reads a slot of a specific slot array, used by the parallel workers.</summary>
+    /// <param name="slots">Slot array to read from.</param>
+    /// <param name="slot">Slot index, or a negative value when the layout lacks the variable.</param>
+    /// <param name="fallback">Value used when the layout lacks the variable.</param>
+    /// <returns>The stored value.</returns>
+    private static float Read(float[] slots, int slot, float fallback) => slot < 0 ? fallback : slots[slot];
+
+    /// <summary>Reports whether the engine re-seeds a variable for every pixel.</summary>
+    /// <param name="name">Variable name.</param>
+    /// <returns><see langword="true"/> when the warp stage writes the variable before each pixel.</returns>
+    private static bool IsSeededPerPixel(string name) => name is "x" or "y" or "rad" or "ang";
 }
