@@ -39,6 +39,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   stays the fallback, and the CPU/GPU tests keep the two within a level.
 
 ### Fixed
+- Matched the SkSL frame-sampler coordinate convention to the renderer's. `PixelBuffer.SampleBilinear`
+  maps a normalised coordinate to `zero..size-1`, while the generated textures map it to
+  `zero..size`, so a `tex2D`, `GetBlur1`-`GetBlur3`, or `GetPixel` on a frame now scales by
+  `texsize - 1` (plus the half-texel shift, or the integer truncation for `GetPixel`) instead of by
+  `texsize`. The mismatch made the GPU read a texel next to the intended one, which a constant test
+  frame had hidden.
 - Made the SkSL emitter carry the whole Milkdrop variable and function vocabulary. A call's return
   type is now inferred from its arguments instead of staying unknown, which had left an intrinsic
   such as `saturate(...)` untyped and let a later operation fail on mismatched component counts;

@@ -1159,6 +1159,26 @@ public static class ShaderTranspiler
         _ => "texsize"
     };
 
+    /// <summary>
+    /// Converts a normalised coordinate into the pixel coordinate a sampler's <c>eval</c> takes. A
+    /// generated texture is sampled the way <see cref="VisualizerTextureBank.Sample"/> does
+    /// (<c>u * size - 0.5</c>), while a frame is sampled the way
+    /// <see cref="PixelBuffer.SampleBilinear"/> does (<c>u * (size - 1)</c>), so their scales differ
+    /// by one and the frame's texel centre needs the extra half.
+    /// </summary>
+    /// <param name="sampler">Emitted sampler name.</param>
+    /// <param name="coordinate">Emitted normalised coordinate.</param>
+    /// <returns>The pixel coordinate text.</returns>
+    private static string SamplerCoordinate(string sampler, string coordinate) =>
+        IsFrameSampler(sampler)
+            ? $"({coordinate} * ({TexSizeUniform(sampler)}.xy - 1.0) + 0.5)"
+            : $"({coordinate} * {TexSizeUniform(sampler)}.xy)";
+
+    /// <summary>Reports whether a sampler reads a frame rather than a generated texture.</summary>
+    /// <param name="sampler">Emitted sampler name.</param>
+    /// <returns><see langword="true"/> when the sampler is not one of the generated textures.</returns>
+    private static bool IsFrameSampler(string sampler) => !VisualizerTextureBank.TryResolve(sampler, out _);
+
     /// <summary>Emits a call, translating the sampler accessors and the renamed intrinsics.</summary>
     /// <param name="call">Call node.</param>
     /// <returns>The expression text.</returns>
@@ -1202,8 +1222,10 @@ public static class ShaderTranspiler
                 // A Skia shader evaluates to half4, so the result is widened to the float4 the
                 // presets expect from tex2D. The coordinate is normalised, so it is scaled back by the
                 // sampler's own size; the noise and volume textures are not frame-sized, and using the
-                // frame size for them would sample the wrong texels.
-                return $"float4({arguments[0]}.eval({Coordinate(call, arguments[1], 1)} * {TexSizeUniform(arguments[0])}.xy))";
+                // frame size for them would sample the wrong texels. The frame textures use
+                // PixelBuffer.SampleBilinear's convention, which maps a normalised coordinate to
+                // zero..size-1, so their scale is one less and their texel centres shift by half.
+                return $"float4({arguments[0]}.eval({SamplerCoordinate(arguments[0], Coordinate(call, arguments[1], 1))}))";
             case "tex3d":
                 // Milkdrop samples a 3D noise volume. Skia's runtime effects only sample 2D
                 // shaders, so the volume travels as a slice atlas and the generated helper does the
@@ -1218,15 +1240,17 @@ public static class ShaderTranspiler
                     : "orynivoTex3DLq";
                 return $"{volumeHelper}({arguments[1]})";
             case "getpixel":
+                // The interpreter reads the texel at the truncated integer coordinate, so the pixel
+                // centre is the coordinate plus half.
                 return arguments.Count >= 2
-                    ? $"float4({MainSampler}.eval(float2({arguments[0]}, {arguments[1]}))).rgb"
-                    : $"float4({MainSampler}.eval({Coordinate(call, arguments[0], 0)})).rgb";
+                    ? $"float4({MainSampler}.eval(float2(float(int({arguments[0]})), float(int({arguments[1]}))) + 0.5)).rgb"
+                    : $"float4({MainSampler}.eval(float2(float(int({arguments[0]}.x)), float(int({arguments[0]}.y))) + 0.5)).rgb";
             case "getblur1":
-                return $"float4(sampler_blur1.eval({Coordinate(call, arguments[0], 0)} * texsize.xy)).rgb";
+                return $"float4(sampler_blur1.eval({Coordinate(call, arguments[0], 0)} * (texsize.xy - 1.0) + 0.5)).rgb";
             case "getblur2":
-                return $"float4(sampler_blur2.eval({Coordinate(call, arguments[0], 0)} * texsize.xy)).rgb";
+                return $"float4(sampler_blur2.eval({Coordinate(call, arguments[0], 0)} * (texsize.xy - 1.0) + 0.5)).rgb";
             case "getblur3":
-                return $"float4(sampler_blur3.eval({Coordinate(call, arguments[0], 0)} * texsize.xy)).rgb";
+                return $"float4(sampler_blur3.eval({Coordinate(call, arguments[0], 0)} * (texsize.xy - 1.0) + 0.5)).rgb";
             case "saturate":
                 return $"clamp({arguments[0]}, 0.0, 1.0)";
             case "atan2":

@@ -711,7 +711,9 @@ affordable. This is a project of its own and must keep the CPU path as the fallb
   (`SkiaShaderRunner.Composite`). The borders also run on the Skia path
   (`SkiaShaderRunner.Borders`), and so does the geometric warp (`SkiaShaderRunner.Warp`) for a preset
   whose per-pixel block and warp shader are empty. What remains is the per-pixel expression block and
-  the warp shader on the GPU, which needs the expression language emitted as SkSL.
+  the warp shader on the GPU, which needs the expression language emitted as SkSL. The SkSL frame
+  samplers already follow the renderer's coordinate convention (`PixelBuffer.SampleBilinear` maps to
+  `zero..size-1`), which the warp shader needs.
   The comp pass binds the composited frame, its blur levels, and the previous frame per sampler, and
   scales each sampler by its own `texsize_*`, so the noise textures are sampled at their real size.
   It stays opt-in because the Skia path carries the frame through eight-bit textures and differs

@@ -112,6 +112,10 @@ This file applies to `Orynivo.Core/` and supplements `../AGENTS.md`.
   keep the CPU ring geometry and blend. `SkiaShaderRunner.Warp` is the GPU geometric warp and must
   keep the CPU motion transform and the black-outside-the-frame rule; it runs only when the preset's
   per-pixel block and warp shader are empty, because those expressions stay on the interpreter.
+  A frame sampler must keep the renderer's coordinate convention: `PixelBuffer.SampleBilinear` maps a
+  normalised coordinate to `zero..size-1`, while a generated texture maps it to `zero..size`, so
+  `tex2D`, `GetBlur1`-`GetBlur3`, and `GetPixel` on a frame scale by `texsize - 1` with a half-texel
+  shift (or an integer truncation for `GetPixel`).
   `PresetRenderer.UseSkiaPasses` gates the comp shader and
   these frame passes together. Only
   straight-line

@@ -130,6 +130,51 @@ public sealed class SkiaShaderRunnerTests
         AssertMatchesInterpreter(Source, new VisualizerTextureBank());
     }
 
+    /// <summary>A frame sample uses PixelBuffer.SampleBilinear's coordinate convention.</summary>
+    [Fact]
+    public void Render_MatchesTheInterpreterForAFrameSample()
+    {
+        const string Source = """
+            float3 a = tex2D(sampler_main, uv).rgb;
+            ret = a * 0.5;
+            """;
+
+        var frame = CreateGradient();
+        var node = ShaderParser.Parse(Source);
+        var gpu = SkiaShaderRunner.Render(
+            node,
+            new SkiaShaderRunner.SamplerSource(frame.Pixels.ToArray(), Width, Height),
+            Width,
+            Height);
+        var cpu = RenderOnCpu(
+            node,
+            new Dictionary<string, float>(StringComparer.Ordinal),
+            new PixelBufferSampler(frame));
+
+        AssertWithinOneByte(gpu, cpu, Source);
+    }
+
+    /// <summary>Builds a frame whose colour varies across the frame.</summary>
+    /// <returns>The frame.</returns>
+    private static PixelBuffer CreateGradient()
+    {
+        var buffer = new PixelBuffer(Width, Height);
+        var pixels = buffer.Pixels;
+        for (var y = 0; y < Height; y++)
+        {
+            for (var x = 0; x < Width; x++)
+            {
+                var offset = ((y * Width) + x) * 4;
+                pixels[offset] = x / (float)(Width - 1);
+                pixels[offset + 1] = y / (float)(Height - 1);
+                pixels[offset + 2] = 0.5f;
+                pixels[offset + 3] = 1f;
+            }
+        }
+
+        return buffer;
+    }
+
     /// <summary>Each sampler reads its own frame, which is what a comp pass needs.</summary>
     [Fact]
     public void Render_MatchesTheInterpreterForSamplerSources()
@@ -387,6 +432,44 @@ public sealed class SkiaShaderRunnerTests
 
         /// <inheritdoc/>
         public ShaderValue SamplePixel(int x, int y) => _colour;
+    }
+
+    /// <summary>A sampler that reads a <see cref="PixelBuffer"/> the way the renderer does.</summary>
+    private sealed class PixelBufferSampler : IShaderSampler
+    {
+        private readonly PixelBuffer _buffer;
+        private readonly float[] _sample = new float[4];
+
+        /// <summary>Creates the sampler.</summary>
+        /// <param name="buffer">Frame to sample.</param>
+        public PixelBufferSampler(PixelBuffer buffer) => _buffer = buffer;
+
+        /// <inheritdoc/>
+        public ShaderValue Sample(string sampler, float u, float v)
+        {
+            _buffer.SampleBilinear(u, v, _sample);
+            return ShaderValue.Vector(_sample[0], _sample[1], _sample[2], _sample[3], 4);
+        }
+
+        /// <inheritdoc/>
+        public ShaderValue SampleBlur(int level, float u, float v) => Sample("sampler_blur", u, v);
+
+        /// <inheritdoc/>
+        public ShaderValue SampleVolume(string sampler, float x, float y, float z) => Sample(sampler, x, y);
+
+        /// <inheritdoc/>
+        public ShaderValue SamplePixel(int x, int y)
+        {
+            var column = Math.Clamp(x, 0, _buffer.Width - 1);
+            var row = Math.Clamp(y, 0, _buffer.Height - 1);
+            var offset = (((row * _buffer.Width) + column) * 4);
+            return ShaderValue.Vector(
+                _buffer.Pixels[offset],
+                _buffer.Pixels[offset + 1],
+                _buffer.Pixels[offset + 2],
+                _buffer.Pixels[offset + 3],
+                4);
+        }
     }
 
     /// <summary>A sampler that returns a different colour per sampler name.</summary>
