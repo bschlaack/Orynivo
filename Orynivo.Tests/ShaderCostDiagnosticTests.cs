@@ -32,7 +32,8 @@ public sealed class ShaderCostDiagnosticTests
             }
             """;
         (int Width, int Height)[] sizes = [(320, 180), (640, 360), (1280, 720)];
-        _output.WriteLine("size        plain ms   comp ms   per pixel ns   would run in a 20 ms budget");
+        var budget = new PresetRenderer(VisualizerPreset.Create("probe", null, null)).ShaderTimeBudgetMilliseconds;
+        _output.WriteLine($"size        plain ms   comp ms   per pixel ns   would run in the {budget:F0} ms budget");
         foreach (var size in sizes)
         {
             var plain = Measure("fDecay=0.95\nwave_a=0;", size.Width, size.Height);
@@ -41,7 +42,7 @@ public sealed class ShaderCostDiagnosticTests
             var perPixel = (shaded - plain) * 1_000_000d / pixels;
             _output.WriteLine(
                 $"{size.Width}x{size.Height,-6} {plain,7:F2}   {shaded,7:F2}   {perPixel,12:F1}   "
-                + (shaded <= 20d ? "yes" : "no"));
+                + (shaded <= budget ? "yes" : "no"));
         }
     }
 

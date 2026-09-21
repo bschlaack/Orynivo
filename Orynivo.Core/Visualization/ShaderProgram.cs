@@ -204,6 +204,12 @@ internal static class ShaderCompiler
                 : Expression.Constant(default(ShaderValue));
         }
 
+        // The function is known here, so the compiled path dispatches on an opcode instead of
+        // comparing names for every pixel.
+        var opcode = ShaderRuntime.OpcodeOf(node.Text);
+        if (opcode == ShaderRuntime.Opcode.Unknown)
+            throw new PresetExpressionException($"Unknown shader function '{node.Text}'.", node.Position);
+
         var samplerName = count > 0 && node.Items[0].Kind == ShaderNodeKind.Identifier
             ? node.Items[0].Text
             : string.Empty;
@@ -211,7 +217,7 @@ internal static class ShaderCompiler
             typeof(ShaderRuntime),
             nameof(ShaderRuntime.Call),
             null,
-            Expression.Constant(node.Text),
+            Expression.Constant(opcode),
             Expression.Constant(samplerName),
             Expression.Constant(node.Position),
             Expression.Convert(samplerParameter, typeof(IShaderSampler)),

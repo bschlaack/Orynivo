@@ -43,6 +43,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   above the frame budget, so no shader runs at full resolution yet. Arithmetic in a compiled shader
   now calls one runtime method per operator instead of a delegate, and a swizzle has its components
   selected at compile time; measured, that bought about ten percent, and the remaining work is
+  recorded in the roadmap under phase 39e. A shader call now dispatches on a numeric opcode
+  instead of comparing function names per pixel, a comp shader runs on a grid bounded to
+  10,000 pixels, and that grid is scaled back with nearest-neighbour sampling because the
+  full-frame upscale cost more than the shader it scaled. Measured, a comp shader fits the
+  frame budget at 320 x 180 (8.6 ms) and 640 x 360 (18 ms), so preset shaders finally run at
+  those render resolutions; at 1280 x 720 the frame is still too slow on the CPU and the
+  shaders stay skipped. The default frame budget was raised from 20 to 30 milliseconds.
   recorded in the roadmap under phase 39e.
 - Added the Milkdrop functions real presets rely on: `above`, `below`, and `equal`
   (which yield one or zero, not a boolean), `sqr`, `sigmoid`, and the bitwise `band`,

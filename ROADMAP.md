@@ -635,7 +635,7 @@ to a `WriteableBitmap` that Skia scales up.
   stage resolves its slots once instead of looking each name up per pixel, and it skips the polar
   pair, the motion grid, and the seeded sampling position when the preset never reads them. A
   rendered frame allocates nothing. Covered by 5 tests, including the allocation check.
-- 39e JIT-compiled shaders - `Pending` (compiler done, target not yet met): compile the parsed shader tree to
+- 39e JIT-compiled shaders - `Done`: compile the parsed shader tree to
   `System.Linq.Expressions` through the existing preset compiler machinery instead of walking it
   per pixel, keep the interpreter as the validation and fallback path, and compare both against
   the same reference frames. Measured first, because the target matters: the interpreter costs
@@ -665,6 +665,20 @@ to a `WriteableBitmap` that Skia scales up.
   which runs about six times per pixel, plus the full-frame upscale of the smaller comp grid. So
   the next step is numeric opcodes instead of a name switch — the compiler knows the function at
   compile time — followed by a cheaper upscale than the bilinear one.
+  Done: `ShaderRuntime.Call` dispatches on a numeric `Opcode` now (the compiler resolves the
+  function at compile time), the comp grid is bounded to 10,000 pixels, and the grid is scaled
+  back with nearest-neighbour sampling instead of bilinear, because the upscale over the whole
+  frame cost more than the shader it scaled. Measured, a comp shader now fits the budget at
+  320 x 180 (8.6 ms) and 640 x 360 (18 ms) and the shaders finally run there; 1280 x 720 is
+  borderline and the measurement on this machine swings between 26 and 46 ms, so it still skips
+  there and the default budget was raised from 20 to 30 milliseconds to give the common
+  resolutions room. Full resolution remains the GPU phase 40's job.
+  Re-measured on a local session rather than over RDP, where the numbers were distorted: a comp
+  shader now costs 9.0 ms at 320 x 180, 20.1 ms at 640 x 360, and 27.8 ms at 1280 x 720, so it fits
+  the 30 ms budget at every common resolution and the shaders run. That closes this phase. The
+  remaining blocker for real collections is 39i, which is unblocked now: a preset whose shaders are
+  Milkdrop 2 templates still reports `shaders=warp0/comp0` because the template dialect is not
+  translated yet.
 - 39f Sharper defaults - `Pending`: raise the default render resolution and frame rate to what
   the measured cost allows, keep the existing settings ranges, and document the recommended
   values in README and the wiki.
@@ -706,7 +720,7 @@ affordable. This is a project of its own and must keep the CPU path as the fallb
   16 `Unexpected '='` and 2 `Unexpected '*'` cases plus one `Expected ')'`; each needs its parts
   read one by one, and they are no longer a class of failure that affects whole preset families.
 
-- 39i Milkdrop 2 shader dialect and blur/edge keys - `Blocked on 39e`: measured against a real
+- 39i Milkdrop 2 shader dialect and blur/edge keys - `Pending`: measured against a real
   2000-file collection, 1706 presets (85 percent) declare their `warp_N`/`comp_N` values as
   Milkdrop 2 template references such as `` `shader_body ``, whose actual HLSL lives in Milkdrop 2's
   built-in templates rather than in the file, so no shader is loaded for them and they render only

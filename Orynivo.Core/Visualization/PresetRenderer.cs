@@ -64,7 +64,7 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler
     /// this size and is scaled back up, because a per-pixel shader on the CPU cannot afford the
     /// full frame at a high resolution.
     /// </summary>
-    private const int ShaderPixelBudget = 40_000;
+    private const int ShaderPixelBudget = 10_000;
 
     private bool _samplerMainIsWarped;
     private PixelBuffer? _shaderOutput;
@@ -163,7 +163,7 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler
     /// treated as the optional work and skipped for a while. Skipping them keeps a heavy preset
     /// smooth instead of stalling playback.
     /// </summary>
-    public double ShaderTimeBudgetMilliseconds { get; set; } = 20d;
+    public double ShaderTimeBudgetMilliseconds { get; set; } = 30d;
 
     /// <summary>Gets how long the comp shaders took on the last rendered frame, in milliseconds.</summary>
     public double LastShaderMilliseconds { get; private set; }
@@ -777,16 +777,25 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler
         if (!scaled)
             return;
 
+        // Nearest-neighbour on purpose: a bilinear pass over the whole frame costs more than the
+        // shader it scales, and the effect is a soft post-processing result anyway.
+        var pixelsOut = _fresh.Pixels;
+        var pixelsIn = output.Pixels;
         for (var y = 0; y < height; y++)
         {
-            var v = (y + 0.5f) / height;
+            var sourceY = Math.Min(shaderHeight - 1, (int)((y + 0.5f) * shaderHeight / height));
+            var sourceRow = sourceY * shaderWidth;
+            var targetRow = y * width;
             for (var x = 0; x < width; x++)
             {
-                output.SampleBilinear((x + 0.5f) / width, v, _sample);
-                var offset = (((y * width) + x) * 4);
-                _fresh.Pixels[offset] = _sample[0];
-                _fresh.Pixels[offset + 1] = _sample[1];
-                _fresh.Pixels[offset + 2] = _sample[2];
+                var sourceX = (int)((x + 0.5f) * shaderWidth / width);
+                if (sourceX >= shaderWidth)
+                    sourceX = shaderWidth - 1;
+                var sourceOffset = ((sourceRow + sourceX) * 4);
+                var offset = (targetRow + x) * 4;
+                pixelsOut[offset] = pixelsIn[sourceOffset];
+                pixelsOut[offset + 1] = pixelsIn[sourceOffset + 1];
+                pixelsOut[offset + 2] = pixelsIn[sourceOffset + 2];
             }
         }
     }

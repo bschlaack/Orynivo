@@ -8,7 +8,111 @@ namespace Orynivo.Visualization;
 /// </summary>
 internal static class ShaderRuntime
 {
-    /// <summary>Applies a call, which is an intrinsic, a constructor, or a texture sample.</summary>
+    /// <summary>
+    /// The operations a call can be, as numbers. The compiler knows the function at compile time,
+    /// so the compiled path dispatches on an integer instead of comparing names for every pixel.
+    /// </summary>
+    public enum Opcode
+    {
+        /// <summary>Not a known operation.</summary>
+        Unknown = 0,
+
+        /// <summary>A scalar or vector cast.</summary>
+        Cast,
+
+        /// <summary>A two, three, or four component constructor.</summary>
+        Construct2,
+        Construct3,
+        Construct4,
+
+        /// <summary>Component-wise intrinsics.</summary>
+        Abs,
+        Ceil,
+        Cos,
+        Exp,
+        Floor,
+        Frac,
+        Log,
+        Saturate,
+        Sign,
+        Sin,
+        Sqrt,
+        Tan,
+        Pow,
+        Min,
+        Max,
+        Step,
+        Mul,
+
+        /// <summary>Whole-value intrinsics.</summary>
+        Length,
+        Normalize,
+        Dot,
+        Lerp,
+        Clamp,
+        Smoothstep,
+
+        /// <summary>Texture reads.</summary>
+        Sample,
+        SampleBlur1,
+        SampleBlur2,
+        SampleBlur3,
+        SamplePixel
+    }
+
+    /// <summary>Maps the function names a shader may use to their opcodes.</summary>
+    private static readonly Dictionary<string, Opcode> Opcodes = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["float"] = Opcode.Cast,
+        ["half"] = Opcode.Cast,
+        ["int"] = Opcode.Cast,
+        ["uint"] = Opcode.Cast,
+        ["bool"] = Opcode.Cast,
+        ["float2"] = Opcode.Construct2,
+        ["half2"] = Opcode.Construct2,
+        ["float3"] = Opcode.Construct3,
+        ["half3"] = Opcode.Construct3,
+        ["float4"] = Opcode.Construct4,
+        ["half4"] = Opcode.Construct4,
+        ["abs"] = Opcode.Abs,
+        ["ceil"] = Opcode.Ceil,
+        ["cos"] = Opcode.Cos,
+        ["exp"] = Opcode.Exp,
+        ["floor"] = Opcode.Floor,
+        ["frac"] = Opcode.Frac,
+        ["log"] = Opcode.Log,
+        ["saturate"] = Opcode.Saturate,
+        ["sign"] = Opcode.Sign,
+        ["sin"] = Opcode.Sin,
+        ["sqrt"] = Opcode.Sqrt,
+        ["tan"] = Opcode.Tan,
+        ["pow"] = Opcode.Pow,
+        ["min"] = Opcode.Min,
+        ["max"] = Opcode.Max,
+        ["step"] = Opcode.Step,
+        ["mul"] = Opcode.Mul,
+        ["length"] = Opcode.Length,
+        ["normalize"] = Opcode.Normalize,
+        ["dot"] = Opcode.Dot,
+        ["lerp"] = Opcode.Lerp,
+        ["mix"] = Opcode.Lerp,
+        ["clamp"] = Opcode.Clamp,
+        ["smoothstep"] = Opcode.Smoothstep,
+        ["tex2D"] = Opcode.Sample,
+        ["tex2Dlod"] = Opcode.Sample,
+        ["GetBlur1"] = Opcode.SampleBlur1,
+        ["GetBlur2"] = Opcode.SampleBlur2,
+        ["GetBlur3"] = Opcode.SampleBlur3,
+        ["GetPixel"] = Opcode.SamplePixel
+    };
+
+    /// <summary>Returns the opcode of a function name.</summary>
+    /// <param name="name">Function name.</param>
+    /// <returns>The opcode, or <see cref="Opcode.Unknown"/> when the name is not known.</returns>
+    public static Opcode OpcodeOf(string name) =>
+        Opcodes.TryGetValue(name, out var opcode) ? opcode : Opcode.Unknown;
+
+    /// <summary>Applies a call by name, which is what the interpreter uses.</summary>
     /// <param name="name">Function name.</param>
     /// <param name="samplerName">Sampler a texture call reads, or an empty string.</param>
     /// <param name="position">Source position, for error messages.</param>
@@ -30,45 +134,104 @@ internal static class ShaderRuntime
         ShaderValue d,
         int count)
     {
-        if (name is "float" or "half")
-            return ShaderValue.Scalar(count > 0 ? a.X : 0f);
-        if (name is "int" or "uint" or "bool")
-            return ShaderValue.Scalar(count > 0 ? (float)(int)a.X : 0f);
-        if (TryConstruct(name, a, b, c, d, count, out var constructed))
-            return constructed;
+        var opcode = OpcodeOf(name);
+        if (opcode == Opcode.Unknown)
+            throw new PresetExpressionException($"Unknown shader function '{name}'.", position);
 
-        return name switch
+        return Call(opcode, samplerName, position, sampler, a, b, c, d, count);
+    }
+
+    /// <summary>Applies a call by opcode, which is what a compiled shader uses.</summary>
+    /// <param name="opcode">Operation to apply.</param>
+    /// <param name="samplerName">Sampler a texture call reads, or an empty string.</param>
+    /// <param name="position">Source position, for error messages.</param>
+    /// <param name="sampler">Bound sampler, or <see langword="null"/>.</param>
+    /// <param name="a">First evaluated argument.</param>
+    /// <param name="b">Second evaluated argument.</param>
+    /// <param name="c">Third evaluated argument.</param>
+    /// <param name="d">Fourth evaluated argument.</param>
+    /// <param name="count">Number of evaluated arguments.</param>
+    /// <returns>The resulting value.</returns>
+    public static ShaderValue Call(
+        Opcode opcode,
+        string samplerName,
+        int position,
+        IShaderSampler? sampler,
+        ShaderValue a,
+        ShaderValue b,
+        ShaderValue c,
+        ShaderValue d,
+        int count)
+    {
+        switch (opcode)
         {
-            "abs" => Unary(count, a, MathF.Abs),
-            "ceil" => Unary(count, a, MathF.Ceiling),
-            "cos" => Unary(count, a, MathF.Cos),
-            "exp" => Unary(count, a, MathF.Exp),
-            "floor" => Unary(count, a, MathF.Floor),
-            "frac" => Unary(count, a, value => value - MathF.Floor(value)),
-            "log" => Unary(count, a, value => value <= 0f ? 0f : MathF.Log(value)),
-            "saturate" => Unary(count, a, value => Math.Clamp(value, 0f, 1f)),
-            "sign" => Unary(count, a, value => MathF.Sign(value)),
-            "sin" => Unary(count, a, MathF.Sin),
-            "sqrt" => Unary(count, a, value => value <= 0f ? 0f : MathF.Sqrt(value)),
-            "tan" => Unary(count, a, MathF.Tan),
-            "length" => ShaderValue.Scalar(Length(count > 0 ? a : ShaderValue.Scalar(0f))),
-            "normalize" => Normalize(count > 0 ? a : ShaderValue.Scalar(0f)),
-            "dot" => ShaderValue.Scalar(Dot(a, b)),
-            "pow" => ComponentWise(a, b, (left, right) => MathF.Pow(left, right)),
-            "min" => ComponentWise(a, b, MathF.Min),
-            "max" => ComponentWise(a, b, MathF.Max),
-            "step" => ComponentWise(b, a, (edge, value) => value >= edge ? 1f : 0f),
-            "lerp" or "mix" => Lerp(a, b, c),
-            "clamp" => ComponentWise(ComponentWise(a, b, MathF.Max), c, MathF.Min),
-            "mul" => ComponentWise(a, b, (left, right) => left * right),
-            "smoothstep" => Smoothstep(a, b, c),
-            "tex2D" or "tex2Dlod" => Sample(samplerName, count, a, b, c, sampler, position),
-            "GetBlur1" => SampleBlur(1, count, a, sampler, position),
-            "GetBlur2" => SampleBlur(2, count, a, sampler, position),
-            "GetBlur3" => SampleBlur(3, count, a, sampler, position),
-            "GetPixel" => SamplePixel(count, a, b, sampler, position),
-            _ => throw new PresetExpressionException($"Unknown shader function '{name}'.", position)
-        };
+            case Opcode.Cast:
+                return ShaderValue.Scalar(count > 0 ? a.X : 0f);
+            case Opcode.Construct2:
+                return Construct(2, a, b, c, d, count);
+            case Opcode.Construct3:
+                return Construct(3, a, b, c, d, count);
+            case Opcode.Construct4:
+                return Construct(4, a, b, c, d, count);
+            case Opcode.Abs:
+                return Unary(count, a, MathF.Abs);
+            case Opcode.Ceil:
+                return Unary(count, a, MathF.Ceiling);
+            case Opcode.Cos:
+                return Unary(count, a, MathF.Cos);
+            case Opcode.Exp:
+                return Unary(count, a, MathF.Exp);
+            case Opcode.Floor:
+                return Unary(count, a, MathF.Floor);
+            case Opcode.Frac:
+                return Unary(count, a, value => value - MathF.Floor(value));
+            case Opcode.Log:
+                return Unary(count, a, value => value <= 0f ? 0f : MathF.Log(value));
+            case Opcode.Saturate:
+                return Unary(count, a, value => Math.Clamp(value, 0f, 1f));
+            case Opcode.Sign:
+                return Unary(count, a, value => MathF.Sign(value));
+            case Opcode.Sin:
+                return Unary(count, a, MathF.Sin);
+            case Opcode.Sqrt:
+                return Unary(count, a, value => value <= 0f ? 0f : MathF.Sqrt(value));
+            case Opcode.Tan:
+                return Unary(count, a, MathF.Tan);
+            case Opcode.Pow:
+                return ComponentWise(a, b, (left, right) => MathF.Pow(left, right));
+            case Opcode.Min:
+                return ComponentWise(a, b, MathF.Min);
+            case Opcode.Max:
+                return ComponentWise(a, b, MathF.Max);
+            case Opcode.Step:
+                return ComponentWise(b, a, (edge, value) => value >= edge ? 1f : 0f);
+            case Opcode.Mul:
+                return ComponentWise(a, b, (left, right) => left * right);
+            case Opcode.Length:
+                return ShaderValue.Scalar(Length(count > 0 ? a : ShaderValue.Scalar(0f)));
+            case Opcode.Normalize:
+                return Normalize(count > 0 ? a : ShaderValue.Scalar(0f));
+            case Opcode.Dot:
+                return ShaderValue.Scalar(Dot(a, b));
+            case Opcode.Lerp:
+                return Lerp(a, b, c);
+            case Opcode.Clamp:
+                return ComponentWise(ComponentWise(a, b, MathF.Max), c, MathF.Min);
+            case Opcode.Smoothstep:
+                return Smoothstep(a, b, c);
+            case Opcode.Sample:
+                return Sample(samplerName, count, a, b, c, sampler, position);
+            case Opcode.SampleBlur1:
+                return SampleBlur(1, count, a, sampler, position);
+            case Opcode.SampleBlur2:
+                return SampleBlur(2, count, a, sampler, position);
+            case Opcode.SampleBlur3:
+                return SampleBlur(3, count, a, sampler, position);
+            case Opcode.SamplePixel:
+                return SamplePixel(count, a, b, sampler, position);
+            default:
+                throw new PresetExpressionException("Unknown shader operation.", position);
+        }
     }
 
     /// <summary>Applies a swizzle to a value.</summary>
@@ -311,31 +474,16 @@ internal static class ShaderRuntime
     }
 
     /// <summary>Builds a vector from a constructor call.</summary>
-    private static bool TryConstruct(
-        string name,
+    private static ShaderValue Construct(
+        int size,
         ShaderValue a,
         ShaderValue b,
         ShaderValue c,
         ShaderValue d,
-        int count,
-        out ShaderValue value)
+        int count)
     {
-        value = ShaderValue.Scalar(0f);
-        var size = name switch
-        {
-            "float2" or "half2" => 2,
-            "float3" or "half3" => 3,
-            "float4" or "half4" => 4,
-            _ => 0
-        };
-        if (size == 0)
-            return false;
-
         if (count == 0)
-        {
-            value = ShaderValue.Scalar(0f);
-            return true;
-        }
+            return ShaderValue.Scalar(0f);
 
         Span<float> flattened = stackalloc float[4];
         if (count == 1)
@@ -357,8 +505,7 @@ internal static class ShaderRuntime
                 Append(flattened, ref filled, size, d);
         }
 
-        value = new ShaderValue(flattened[0], flattened[1], flattened[2], flattened[3], size);
-        return true;
+        return new ShaderValue(flattened[0], flattened[1], flattened[2], flattened[3], size);
     }
 
     /// <summary>Appends the components of one argument to a flattened vector.</summary>
