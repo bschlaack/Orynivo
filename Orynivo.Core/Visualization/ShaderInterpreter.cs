@@ -47,6 +47,9 @@ public sealed class ShaderInterpreter
     private readonly ShaderNode _program;
     private readonly IShaderSampler? _sampler;
     private readonly Dictionary<string, ShaderValue> _variables = new(StringComparer.Ordinal);
+
+    /// <summary>The helper functions the shader defines, by name, ready to be called.</summary>
+    private readonly Dictionary<string, ShaderNode> _functions = new(StringComparer.Ordinal);
     private int _iterations;
 
     /// <summary>Creates an interpreter for a parsed shader.</summary>
@@ -77,7 +80,24 @@ public sealed class ShaderInterpreter
     public ShaderValue Run()
     {
         _iterations = 0;
-        var result = ExecuteBlock(_program.Items, 0);
+        ShaderValue? result = null;
+        foreach (var statement in _program.Items)
+        {
+            // A definition is a helper unless it is the entry point, which Milkdrop names main; its
+            // bare shader_body form has no definition at all. Order cannot decide it, because a
+            // preset may declare its helpers before main.
+            if (statement.Kind == ShaderNodeKind.Function &&
+                !string.Equals(statement.Text, "main", StringComparison.Ordinal))
+            {
+                _functions[statement.Text] = statement;
+                continue;
+            }
+
+            result = ExecuteStatement(statement, 0);
+            if (result is not null)
+                break;
+        }
+
         ReturnedValue = result is not null;
         return result ?? ShaderValue.Scalar(0f);
     }
@@ -371,6 +391,39 @@ public sealed class ShaderInterpreter
     {
         var name = call.Text;
         var count = call.Items.Count;
+
+        // A call to a function the shader defines itself is bound to its parameters and run with a
+        // fresh scope; the caller's values are put back afterwards so a local never leaks out.
+        if (_functions.TryGetValue(name, out var function))
+        {
+            if (depth >= MaxDepth)
+                throw new PresetExpressionException("The shader recursed too deeply.", call.Position);
+
+            Span<ShaderValue?> previous = function.ParameterList.Count <= 8
+                ? stackalloc ShaderValue?[8]
+                : new ShaderValue?[function.ParameterList.Count];
+            for (var index = 0; index < function.ParameterList.Count; index++)
+            {
+                var parameter = function.ParameterList[index].Text;
+                previous[index] = _variables.TryGetValue(parameter, out var existing) ? existing : null;
+                _variables[parameter] = index < count
+                    ? Evaluate(call.Items[index], depth)
+                    : ShaderValue.Scalar(0f);
+            }
+
+            var returned = ExecuteBlock(function.Items, depth + 1);
+            for (var index = 0; index < function.ParameterList.Count; index++)
+            {
+                var parameter = function.ParameterList[index].Text;
+                if (previous[index] is { } value)
+                    _variables[parameter] = value;
+                else
+                    _variables.Remove(parameter);
+            }
+
+            return returned ?? ShaderValue.Scalar(0f);
+        }
+
         Span<ShaderValue> arguments = stackalloc ShaderValue[4];
         for (var index = 0; index < count && index < 4; index++)
             arguments[index] = Evaluate(call.Items[index], depth);

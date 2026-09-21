@@ -172,7 +172,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   references such as `` `shader_body `` whose actual HLSL lives in Milkdrop 2's built-in templates
   rather than in the file, which is recorded as roadmap item 39i.
 
-### Added
+### Fixed
+- Made a shader's helper functions callable in the interpreter. A definition used to be executed
+  where it stood, so a helper ran at the wrong time and produced a wrong picture; the interpreter
+  now registers every definition that is not the entry point — Milkdrop names it `main`, and its
+  bare `shader_body` form has no definition at all — resolves a call against it, binds the
+  arguments, and restores the caller's values afterwards. Order cannot decide the entry point,
+  because a preset may declare its helpers before `main`. Covered by a test. The SkSL emitter still
+  inlines a helper, so the GPU path diverges from the interpreter for such a shader until it emits
+  them as functions too.
 - Added the parameter list to the parsed function node. `ShaderParser` used to skip a function's
   parameters, so a call could never be bound to them; the names are now kept (the types are dropped
   because the engine stores every value as a float) and a test pins them. This is the first step of

@@ -77,6 +77,32 @@ public sealed class SkiaShaderRunnerTests
         Assert.Contains(first, value => value > 0.01f);
     }
 
+    /// <summary>A helper function is called with its arguments, not run where it is defined.</summary>
+    [Fact]
+    public void Render_CallsAHelperFunction()
+    {
+        var node = ShaderParser.Parse("""
+            float3 tint (float3 c, float amount) : COLOR
+            {
+                return c * amount;
+            }
+
+            float4 main(float2 uv : TEXCOORD0) : COLOR
+            {
+                ret = tint(tex2D(sampler_main, uv).rgb, 0.5);
+            }
+            """);
+        var interpreter = new ShaderInterpreter(node, new ConstantSampler(0.5f, 0.25f, 0.75f));
+        interpreter.SetVariable("uv", ShaderValue.Vector(0.5f, 0.5f, 0f, 0f, 2));
+        interpreter.Run();
+
+        // The constant sampler returns (0.5, 0.25, 0.75), and the helper halves it.
+        var ret = interpreter.Variables["ret"];
+        Assert.Equal(0.25f, ret.X, 3);
+        Assert.Equal(0.125f, ret.Y, 3);
+        Assert.Equal(0.375f, ret.Z, 3);
+    }
+
     /// <summary>Renders both ways and asserts that the pixels agree within one byte.</summary>
     /// <param name="source">HLSL source.</param>
     private static void AssertMatchesInterpreter(string source)
