@@ -7,6 +7,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Fixed
+- Fixed the visualizer freezing on a preset whose comp shader costs milliseconds per pixel. The
+  adaptive shader grid could only shrink once a frame had finished, so a pass over a 10,000-pixel
+  grid needed minutes and no frame ever completed; a pass that exceeds
+  `ShaderPassBudgetMilliseconds` (150 ms) is now abandoned, the frame keeps its picture from before
+  the pass, and the grid shrinks to a quarter immediately. The same guard covers the warp shader.
+  Covered by a test.
+- Added `atan2` to the shader function set, which Milkdrop shaders use for their polar coordinates.
 - Fixed the missing total loop budget of a preset program. The per-loop clamp could not bound
   nesting, so a preset with `loop(20000, loop(20000, ...))` ran hundreds of millions of iterations
   inside one frame and froze the window with no exception to catch. One program execution now shares
