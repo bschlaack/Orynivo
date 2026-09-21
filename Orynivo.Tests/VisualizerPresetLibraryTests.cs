@@ -4,13 +4,16 @@ using Xunit;
 namespace Orynivo.Tests;
 
 /// <summary>
-/// Verifies that user presets are loaded from a folder and that a broken file never costs
-/// the user the visualizer.
+/// Verifies that user presets are discovered below a folder, including its subfolders, that they
+/// are parsed only when they are shown, and that a broken file never costs the user the
+/// visualizer.
 /// </summary>
 public sealed class VisualizerPresetLibraryTests : IDisposable
 {
     private readonly string _directory =
         Directory.CreateDirectory(Path.Combine(Path.GetTempPath(), "orynivo-presets-" + Guid.NewGuid().ToString("N"))).FullName;
+
+    private static int BuiltInCount => VisualizerPresets.BuiltIn.Count;
 
     /// <inheritdoc/>
     public void Dispose()
@@ -24,6 +27,23 @@ public sealed class VisualizerPresetLibraryTests : IDisposable
         }
     }
 
+    /// <summary>Presets in subfolders are found, because collections are sorted into folders.</summary>
+    [Fact]
+    public void Reload_DiscoversPresetsInSubfolders()
+    {
+        var nested = Directory.CreateDirectory(Path.Combine(_directory, "pack", "warp"));
+        File.WriteAllText(Path.Combine(nested.FullName, "deep.milk"), "name=Deep");
+        File.WriteAllText(Path.Combine(_directory, "top.oryvis"), "name=Top");
+        var library = new VisualizerPresetLibrary();
+
+        library.Reload(_directory);
+
+        Assert.Equal(BuiltInCount + 2, library.Count);
+        Assert.Equal("Deep", library.At(BuiltInCount).Name);
+        Assert.Equal("Top", library.At(BuiltInCount + 1).Name);
+        Assert.Empty(library.RejectedFiles);
+    }
+
     /// <summary>Every section of a multi-preset .milk file becomes its own preset.</summary>
     [Fact]
     public void Reload_LoadsEverySectionOfAMilkFile()
@@ -35,25 +55,46 @@ public sealed class VisualizerPresetLibraryTests : IDisposable
 
         library.Reload(_directory);
 
-        var names = library.Presets.Select(preset => preset.Name).ToList();
-        Assert.Contains("First", names);
-        Assert.Contains("Second", names);
+        Assert.Equal(BuiltInCount + 2, library.Count);
+        Assert.Equal("First", library.At(BuiltInCount).Name);
+        Assert.Equal("Second", library.At(BuiltInCount + 1).Name);
         Assert.Empty(library.RejectedFiles);
     }
 
-    /// <summary>A broken preset is skipped with the reason that made it fail.</summary>
+    /// <summary>A preset is compiled on first use and then reused, not recompiled.</summary>
     [Fact]
-    public void Reload_ReportsWhyAPresetWasSkipped()
+    public void At_ParsesOnDemandAndCachesTheResult()
+    {
+        File.WriteAllText(Path.Combine(_directory, "mine.oryvis"), "name=Mine");
+        var library = new VisualizerPresetLibrary();
+        library.Reload(_directory);
+
+        Assert.Same(library.At(BuiltInCount), library.At(BuiltInCount));
+    }
+
+    /// <summary>
+    /// A broken preset is only reported once it is shown, which is what keeps a large collection
+    /// from being compiled when the window opens.
+    /// </summary>
+    [Fact]
+    public void At_ReportsWhyAPresetWasSkipped()
     {
         File.WriteAllText(Path.Combine(_directory, "broken.oryvis"), "name=Broken\nper_pixel_1=x = ;");
         var library = new VisualizerPresetLibrary();
-
         library.Reload(_directory);
+
+        Assert.Empty(library.RejectedReasons);
+        var preset = library.At(BuiltInCount);
 
         Assert.Contains("broken.oryvis", library.RejectedFiles);
         var reason = Assert.Single(library.RejectedReasons);
         Assert.Contains("broken.oryvis", reason, StringComparison.Ordinal);
         Assert.Contains("position", reason, StringComparison.OrdinalIgnoreCase);
+        // The window keeps working: a broken preset falls back to the first built-in.
+        Assert.Equal(VisualizerPresets.BuiltIn[0].Name, preset.Name);
+        // A second visit does not report the same failure again.
+        library.At(BuiltInCount);
+        Assert.Single(library.RejectedReasons);
     }
 
     /// <summary>Preset files are added after the built-ins.</summary>
@@ -65,8 +106,8 @@ public sealed class VisualizerPresetLibraryTests : IDisposable
 
         library.Reload(_directory);
 
-        Assert.Equal(VisualizerPresets.BuiltIn.Count + 1, library.Presets.Count);
-        Assert.Equal("Mine", library.Presets[^1].Name);
+        Assert.Equal(BuiltInCount + 1, library.Count);
+        Assert.Equal("Mine", library.At(BuiltInCount).Name);
         Assert.Empty(library.RejectedFiles);
     }
 
@@ -81,8 +122,8 @@ public sealed class VisualizerPresetLibraryTests : IDisposable
 
         library.Reload(_directory);
 
-        Assert.Equal(VisualizerPresets.BuiltIn.Count + 2, library.Presets.Count);
-        Assert.DoesNotContain(library.Presets, preset => preset.Name == "Ignored");
+        Assert.Equal(BuiltInCount + 2, library.Count);
+        Assert.DoesNotContain("Ignored", new[] { library.At(BuiltInCount).Name, library.At(BuiltInCount + 1).Name });
     }
 
     /// <summary>A file with an invalid expression is skipped and reported.</summary>
@@ -94,8 +135,9 @@ public sealed class VisualizerPresetLibraryTests : IDisposable
         var library = new VisualizerPresetLibrary();
 
         library.Reload(_directory);
+        library.At(BuiltInCount);
 
-        Assert.Equal(VisualizerPresets.BuiltIn.Count + 1, library.Presets.Count);
+        Assert.Equal(BuiltInCount + 2, library.Count);
         Assert.Contains("broken.oryvis", library.RejectedFiles);
     }
 
@@ -107,7 +149,7 @@ public sealed class VisualizerPresetLibraryTests : IDisposable
 
         library.Reload(Path.Combine(_directory, "does-not-exist"));
 
-        Assert.Equal(VisualizerPresets.BuiltIn.Count, library.Presets.Count);
+        Assert.Equal(BuiltInCount, library.Count);
     }
 
     /// <summary>Indexing wraps around the combined list.</summary>
@@ -118,8 +160,9 @@ public sealed class VisualizerPresetLibraryTests : IDisposable
         var library = new VisualizerPresetLibrary();
         library.Reload(_directory);
 
-        var count = library.Presets.Count;
-        Assert.Equal(library.Presets[0].Name, library.At(count).Name);
-        Assert.Equal(library.Presets[^1].Name, library.At(-1).Name);
+        var count = library.Count;
+        Assert.Equal(VisualizerPresets.BuiltIn[0].Name, library.At(0).Name);
+        Assert.Equal(VisualizerPresets.BuiltIn[0].Name, library.At(count).Name);
+        Assert.Equal("Mine", library.At(-1).Name);
     }
 }

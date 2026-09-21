@@ -155,7 +155,7 @@ public partial class VisualizerWindow : Window
     /// <param name="index">Requested preset index.</param>
     public void SelectPreset(int index)
     {
-        var count = _library.Presets.Count;
+        var count = _library.Count;
         if (count == 0)
             return;
 
@@ -344,7 +344,7 @@ public partial class VisualizerWindow : Window
             + $"compositeMs={timings.Composite:F2} compShaderMs={timings.Shader:F2} "
             + $"shaders=warp{_renderer.Preset.WarpShaders.Count}/comp{_renderer.Preset.CompShaders.Count} "
             + $"skipped={_renderer.ShadersSkipped} "
-            + $"preset={_renderer.Preset.Name} userPresets={_library.Presets.Count - VisualizerPresets.BuiltIn.Count}";
+            + $"preset={_renderer.Preset.Name} userPresets={_library.Count - VisualizerPresets.BuiltIn.Count}";
         // Start a fresh averaging window so the next line describes its own second.
         _renderer.ResetTimings();
         return message;

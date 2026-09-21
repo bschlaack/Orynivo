@@ -7,6 +7,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Added
+- The visualizer's preset folder is now searched recursively, so a collection that is sorted into
+  subfolders (for example a downloaded preset pack) can be used as it is. Presets are discovered
+  eagerly but parsed only when they are first shown, because compiling one preset costs
+  milliseconds and a collection of several hundred must not be compiled when the window opens.
+  A preset that fails to parse is reported on first use and replaced by the first built-in, so a
+  broken file can never stop the visualizer. Covered by 2 new and 9 updated tests.
 - The visualizer's per-pixel path no longer does work the preset never asked for. The compiled
   programs now report the variables they reference (`PresetProgram.ReferencedVariables` and
   `Uses`), the warp stage resolves the `x`, `y`, `rad`, and `ang` slots once instead of looking
@@ -143,6 +149,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 
 ### Fixed
+- Fixed scalar preset values keeping the trailing newline of their section, which made a
+  preset's `name` end with a line break.
 - The visualizer writes one bounded diagnostic line per second to the seek log (rendered
   frames, analysed audio frames, reduce-motion state, average brightness, and the preset
   name). It contains only counts, so an empty window can be told apart from a picture that
@@ -171,97 +179,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.45.0] - 2026-09-20
 
 ### Added
-- The visualizer's per-pixel path no longer does work the preset never asked for. The compiled
-  programs now report the variables they reference (`PresetProgram.ReferencedVariables` and
-  `Uses`), the warp stage resolves the `x`, `y`, `rad`, and `ang` slots once instead of looking
-  each name up in the layout for every pixel, and it only computes the polar pair, the motion
-  grid, and the seeded sampling position when the preset's own code needs them. A rendered frame
-  is allocation-free, which is now asserted by a test. Covered by 5 tests.
-- The visualizer renders on its own thread now. A frame used to be produced from a
-  `DispatcherTimer`, so a heavy preset blocked the interface for its whole duration; the loop
-  now runs on a background thread, hands a finished copy of the frame to the UI thread through a
-  presentation buffer, and queues at most one present at a time, so a busy interface can never
-  build up a backlog of frames. Preset switching, the reset key, and the overlay follow as
-  thread-safe requests, and the frame pacing lives in the tested `FramePacing` helper. Covered by
-  5 tests.
-- The visualizer now measures where its frame time goes. `PresetRenderer` reports a
-  `RenderTimings` breakdown (warp, blur, post-processing, overlay, composite, comp shaders, and
-  the frame total) per frame and as an average over a window, and the window's diagnostic line in
-  `logs/seek.log` carries those averages once per second, so the cost per stage can be read
-  instead of guessed. A warp shader runs inside the per-pixel loop, so its cost stays part of
-  `warp`; timing it per pixel would cost more than the measurement is worth. The frame budget now
-  compares the complete frame rather than only the shaders. Covered by 8 tests.
-- Milkdrop `.milk` files are read as the multi-preset files they are: `VisualizerPreset.ParseSections`
-  splits the text at its `[presetNN]` headers and the preset folder loads every section as its
-  own preset instead of only the last one surviving. The declared format version
-  (`MILKDROP_PRESET_VERSION`, `PSVERSION`, or `preset_version`) is reported on
-  `VisualizerPreset.Version`; every version is accepted. Skipped presets now carry a reason
-  through `VisualizerPresetLibrary.RejectedReasons`, naming the file or section and the parse
-  error. A hand-written corpus of presets in the real format, including a multi-section file and
-  shader source, guards the format handling; third-party presets stay unbundled because they are
-  licensed by their authors. Covered by 13 tests.
-- The visualizer now runs preset shaders. The numbered `warp_N` and `comp_N` keys are parsed
-  together with their optional `_enabled`, `_per_frame`, and `_per_pixel` companions, and the
-  preset reader keeps the newlines inside a shader's source, because Milkdrop stores the code
-  as a multi-line value. A shader that does not parse is skipped so one broken shader degrades a
-  preset instead of rejecting it. The renderer implements `IShaderSampler`, so shaders can
-  sample `sampler_main`, `sampler_pc_main`, `sampler_fc_main`, `GetBlur1`-`GetBlur3`, and
-  `GetPixel`, and it binds `uv`, `uv_orig`, `texsize`, the audio bands, the smoothed bands, the
-  frame counters, and the aspect ratio. A per-frame time budget (20 ms by default) skips the
-  shaders for a while when they cost too much, so a heavy preset keeps a smooth picture instead
-  of stalling playback. Covered by 11 tests.
-- Added the HLSL interpreter for the shader runtime: `ShaderInterpreter` evaluates the parsed
-  `ps_2_0` tree with scalar and `float2`/`float3`/`float4` values (`ShaderValue`), covering
-  arithmetic with the C precedence, variables and the assignment operators, swizzles read and
-  written, vector constructors with concatenation and broadcast, the ternary operator,
-  `if`/`else`, `for`, and the usual intrinsics (`abs`, `ceil`, `clamp`, `cos`, `dot`, `exp`,
-  `floor`, `frac`, `length`, `lerp`, `log`, `max`, `min`, `mul`, `normalize`, `pow`, `saturate`,
-  `sign`, `sin`, `smoothstep`, `sqrt`, `step`, `tan`). Sampling goes through the
-  `IShaderSampler` contract, so the interpreter carries no render state, and division by zero
-  yields zero instead of an infinity. A loop budget of 4096 iterations and a call depth limit of
-  32 keep a runaway shader from stalling a frame. Covered by 14 tests.
-- Added the HLSL parser and its syntax tree: `ShaderParser` and `ShaderNode` turn the
-  `ps_2_0` subset into a tagged-union tree covering declarations, expression statements,
-  `if`/`else`, `for`, `return`, swizzles, calls, the ternary operator, and the C operator
-  precedence. Function signatures and bare statement bodies are both accepted, and a sampler
-  declaration without a type is tolerated. Covered by 10 tests.
-- Added the HLSL front end for the upcoming shader runtime: `ShaderLexer` tokenizes the
-  `ps_2_0` subset Milkdrop shaders use, covering identifiers and keywords, numbers with their
-  `f`/`h` suffixes, single- and multi-character operators, swizzles, line and block comments,
-  and source positions, and reports an unexpected character with its offset. Covered by
-  10 tests.
-- Added the generated visualizer texture bank. The `noise_lq` (32 x 32), `noise_mq`
-  (256 x 256), and `noise_hq` (512 x 512) textures and the sixteen `rand00`-`rand15` (32 x 32)
-  textures are produced deterministically from fixed seeds, so no third party image is
-  bundled and every run yields the same textures. Sampling is bilinear with repeat, clamp, and
-  mirror wrap modes, and generation is lazy so a session that never opens the visualizer
-  allocates nothing. Covered by 10 tests.
-- Milkdrop preset keys now act as the per-frame starting values: every numeric key (including
-  the `nWaveMode`, `bWaveDots`, `bWaveThick`, `bAdditiveWaves`, `bDarkenCenter`,
-  `bMotionVectors`, and `nMotionVectorsX/Y` spellings) seeds the matching variable, so real
-  presets that carry their settings as keys instead of code work as written.
-- The visualizer draws the full Milkdrop wave and post-processing set: the circular, doubled,
-  and single-line wave modes with dots, thick, additive, mystery, and colour/position keys,
-  the four declared waveform slots, the outer and inner borders, a motion-vector grid derived
-  from the actual motion field, and the video echo with its zoom, alpha, and orientation.
-  Covered by 11 tests.
-- The preset engine now runs the full Milkdrop stage order. It parses the `per_frame_init`,
-  `per_pixel_init`, `wave_0`-`wave_3` and `shape_N_init` blocks, registers the complete
-  standard variable set (`bass_att`/`mid_att`/`treb_att`, `aspectx`/`aspecty`,
-  `pixelsx`/`pixelsy`, `monitor`, `zoomexp`, `rot`, `cx`/`cy`, `dx`/`dy`, `sx`/`sy`,
-  `blur1`-`blur3`, `darken_center`, `fGammaAdj`, the wave, border, motion-vector and echo
-  groups, `q1`-`q32`, and `b1`-`b8`), and applies the motion parameters, the blur passes, the
-  centre darkening, and the gamma adjustment. The per-pixel block now sees the already warped
-  sampling position in `x`/`y`/`rad`/`ang`, so a real preset can offset or replace it.
-  Covered by 16 tests.
-- The **Visualisierung** settings section gained an **Always show text and controls** toggle.
-  When it is off, the title, hint, and playback buttons appear only while the mouse moves
-  over the visualizer and hide again after three idle seconds; pointer movement is tracked
-  through the window's own events, so moving the mouse on another monitor never reveals them.
-- Added a **Visualisierung** settings section with the render resolution (320 x 180 up to
-  1280 x 720), the target frame rate (24, 30, 60, or 120), and the user preset folder that
-  previously lived under the output device. The window renders at the configured size and
-  lets the image control scale the frame up, so a lower resolution keeps the CPU cost down.
 
 - Added a **Maximum output sample rate** option under Playback. It caps the PCM output
   rate for exclusive WASAPI and ASIO/cwASIO (Automatic keeps the previous behaviour of
@@ -346,97 +263,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.44.0] - 2026-09-20
 
 ### Added
-- The visualizer's per-pixel path no longer does work the preset never asked for. The compiled
-  programs now report the variables they reference (`PresetProgram.ReferencedVariables` and
-  `Uses`), the warp stage resolves the `x`, `y`, `rad`, and `ang` slots once instead of looking
-  each name up in the layout for every pixel, and it only computes the polar pair, the motion
-  grid, and the seeded sampling position when the preset's own code needs them. A rendered frame
-  is allocation-free, which is now asserted by a test. Covered by 5 tests.
-- The visualizer renders on its own thread now. A frame used to be produced from a
-  `DispatcherTimer`, so a heavy preset blocked the interface for its whole duration; the loop
-  now runs on a background thread, hands a finished copy of the frame to the UI thread through a
-  presentation buffer, and queues at most one present at a time, so a busy interface can never
-  build up a backlog of frames. Preset switching, the reset key, and the overlay follow as
-  thread-safe requests, and the frame pacing lives in the tested `FramePacing` helper. Covered by
-  5 tests.
-- The visualizer now measures where its frame time goes. `PresetRenderer` reports a
-  `RenderTimings` breakdown (warp, blur, post-processing, overlay, composite, comp shaders, and
-  the frame total) per frame and as an average over a window, and the window's diagnostic line in
-  `logs/seek.log` carries those averages once per second, so the cost per stage can be read
-  instead of guessed. A warp shader runs inside the per-pixel loop, so its cost stays part of
-  `warp`; timing it per pixel would cost more than the measurement is worth. The frame budget now
-  compares the complete frame rather than only the shaders. Covered by 8 tests.
-- Milkdrop `.milk` files are read as the multi-preset files they are: `VisualizerPreset.ParseSections`
-  splits the text at its `[presetNN]` headers and the preset folder loads every section as its
-  own preset instead of only the last one surviving. The declared format version
-  (`MILKDROP_PRESET_VERSION`, `PSVERSION`, or `preset_version`) is reported on
-  `VisualizerPreset.Version`; every version is accepted. Skipped presets now carry a reason
-  through `VisualizerPresetLibrary.RejectedReasons`, naming the file or section and the parse
-  error. A hand-written corpus of presets in the real format, including a multi-section file and
-  shader source, guards the format handling; third-party presets stay unbundled because they are
-  licensed by their authors. Covered by 13 tests.
-- The visualizer now runs preset shaders. The numbered `warp_N` and `comp_N` keys are parsed
-  together with their optional `_enabled`, `_per_frame`, and `_per_pixel` companions, and the
-  preset reader keeps the newlines inside a shader's source, because Milkdrop stores the code
-  as a multi-line value. A shader that does not parse is skipped so one broken shader degrades a
-  preset instead of rejecting it. The renderer implements `IShaderSampler`, so shaders can
-  sample `sampler_main`, `sampler_pc_main`, `sampler_fc_main`, `GetBlur1`-`GetBlur3`, and
-  `GetPixel`, and it binds `uv`, `uv_orig`, `texsize`, the audio bands, the smoothed bands, the
-  frame counters, and the aspect ratio. A per-frame time budget (20 ms by default) skips the
-  shaders for a while when they cost too much, so a heavy preset keeps a smooth picture instead
-  of stalling playback. Covered by 11 tests.
-- Added the HLSL interpreter for the shader runtime: `ShaderInterpreter` evaluates the parsed
-  `ps_2_0` tree with scalar and `float2`/`float3`/`float4` values (`ShaderValue`), covering
-  arithmetic with the C precedence, variables and the assignment operators, swizzles read and
-  written, vector constructors with concatenation and broadcast, the ternary operator,
-  `if`/`else`, `for`, and the usual intrinsics (`abs`, `ceil`, `clamp`, `cos`, `dot`, `exp`,
-  `floor`, `frac`, `length`, `lerp`, `log`, `max`, `min`, `mul`, `normalize`, `pow`, `saturate`,
-  `sign`, `sin`, `smoothstep`, `sqrt`, `step`, `tan`). Sampling goes through the
-  `IShaderSampler` contract, so the interpreter carries no render state, and division by zero
-  yields zero instead of an infinity. A loop budget of 4096 iterations and a call depth limit of
-  32 keep a runaway shader from stalling a frame. Covered by 14 tests.
-- Added the HLSL parser and its syntax tree: `ShaderParser` and `ShaderNode` turn the
-  `ps_2_0` subset into a tagged-union tree covering declarations, expression statements,
-  `if`/`else`, `for`, `return`, swizzles, calls, the ternary operator, and the C operator
-  precedence. Function signatures and bare statement bodies are both accepted, and a sampler
-  declaration without a type is tolerated. Covered by 10 tests.
-- Added the HLSL front end for the upcoming shader runtime: `ShaderLexer` tokenizes the
-  `ps_2_0` subset Milkdrop shaders use, covering identifiers and keywords, numbers with their
-  `f`/`h` suffixes, single- and multi-character operators, swizzles, line and block comments,
-  and source positions, and reports an unexpected character with its offset. Covered by
-  10 tests.
-- Added the generated visualizer texture bank. The `noise_lq` (32 x 32), `noise_mq`
-  (256 x 256), and `noise_hq` (512 x 512) textures and the sixteen `rand00`-`rand15` (32 x 32)
-  textures are produced deterministically from fixed seeds, so no third party image is
-  bundled and every run yields the same textures. Sampling is bilinear with repeat, clamp, and
-  mirror wrap modes, and generation is lazy so a session that never opens the visualizer
-  allocates nothing. Covered by 10 tests.
-- Milkdrop preset keys now act as the per-frame starting values: every numeric key (including
-  the `nWaveMode`, `bWaveDots`, `bWaveThick`, `bAdditiveWaves`, `bDarkenCenter`,
-  `bMotionVectors`, and `nMotionVectorsX/Y` spellings) seeds the matching variable, so real
-  presets that carry their settings as keys instead of code work as written.
-- The visualizer draws the full Milkdrop wave and post-processing set: the circular, doubled,
-  and single-line wave modes with dots, thick, additive, mystery, and colour/position keys,
-  the four declared waveform slots, the outer and inner borders, a motion-vector grid derived
-  from the actual motion field, and the video echo with its zoom, alpha, and orientation.
-  Covered by 11 tests.
-- The preset engine now runs the full Milkdrop stage order. It parses the `per_frame_init`,
-  `per_pixel_init`, `wave_0`-`wave_3` and `shape_N_init` blocks, registers the complete
-  standard variable set (`bass_att`/`mid_att`/`treb_att`, `aspectx`/`aspecty`,
-  `pixelsx`/`pixelsy`, `monitor`, `zoomexp`, `rot`, `cx`/`cy`, `dx`/`dy`, `sx`/`sy`,
-  `blur1`-`blur3`, `darken_center`, `fGammaAdj`, the wave, border, motion-vector and echo
-  groups, `q1`-`q32`, and `b1`-`b8`), and applies the motion parameters, the blur passes, the
-  centre darkening, and the gamma adjustment. The per-pixel block now sees the already warped
-  sampling position in `x`/`y`/`rad`/`ang`, so a real preset can offset or replace it.
-  Covered by 16 tests.
-- The **Visualisierung** settings section gained an **Always show text and controls** toggle.
-  When it is off, the title, hint, and playback buttons appear only while the mouse moves
-  over the visualizer and hide again after three idle seconds; pointer movement is tracked
-  through the window's own events, so moving the mouse on another monitor never reveals them.
-- Added a **Visualisierung** settings section with the render resolution (320 x 180 up to
-  1280 x 720), the target frame rate (24, 30, 60, or 120), and the user preset folder that
-  previously lived under the output device. The window renders at the configured size and
-  lets the image control scale the frame up, so a lower resolution keeps the CPU cost down.
 
 - The year-in-review summary can now also be exported as a single-page A4 PDF.
   The on-screen card and the PDF share the new pure
@@ -593,97 +419,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.43.1] - 2026-09-18
 
 ### Added
-- The visualizer's per-pixel path no longer does work the preset never asked for. The compiled
-  programs now report the variables they reference (`PresetProgram.ReferencedVariables` and
-  `Uses`), the warp stage resolves the `x`, `y`, `rad`, and `ang` slots once instead of looking
-  each name up in the layout for every pixel, and it only computes the polar pair, the motion
-  grid, and the seeded sampling position when the preset's own code needs them. A rendered frame
-  is allocation-free, which is now asserted by a test. Covered by 5 tests.
-- The visualizer renders on its own thread now. A frame used to be produced from a
-  `DispatcherTimer`, so a heavy preset blocked the interface for its whole duration; the loop
-  now runs on a background thread, hands a finished copy of the frame to the UI thread through a
-  presentation buffer, and queues at most one present at a time, so a busy interface can never
-  build up a backlog of frames. Preset switching, the reset key, and the overlay follow as
-  thread-safe requests, and the frame pacing lives in the tested `FramePacing` helper. Covered by
-  5 tests.
-- The visualizer now measures where its frame time goes. `PresetRenderer` reports a
-  `RenderTimings` breakdown (warp, blur, post-processing, overlay, composite, comp shaders, and
-  the frame total) per frame and as an average over a window, and the window's diagnostic line in
-  `logs/seek.log` carries those averages once per second, so the cost per stage can be read
-  instead of guessed. A warp shader runs inside the per-pixel loop, so its cost stays part of
-  `warp`; timing it per pixel would cost more than the measurement is worth. The frame budget now
-  compares the complete frame rather than only the shaders. Covered by 8 tests.
-- Milkdrop `.milk` files are read as the multi-preset files they are: `VisualizerPreset.ParseSections`
-  splits the text at its `[presetNN]` headers and the preset folder loads every section as its
-  own preset instead of only the last one surviving. The declared format version
-  (`MILKDROP_PRESET_VERSION`, `PSVERSION`, or `preset_version`) is reported on
-  `VisualizerPreset.Version`; every version is accepted. Skipped presets now carry a reason
-  through `VisualizerPresetLibrary.RejectedReasons`, naming the file or section and the parse
-  error. A hand-written corpus of presets in the real format, including a multi-section file and
-  shader source, guards the format handling; third-party presets stay unbundled because they are
-  licensed by their authors. Covered by 13 tests.
-- The visualizer now runs preset shaders. The numbered `warp_N` and `comp_N` keys are parsed
-  together with their optional `_enabled`, `_per_frame`, and `_per_pixel` companions, and the
-  preset reader keeps the newlines inside a shader's source, because Milkdrop stores the code
-  as a multi-line value. A shader that does not parse is skipped so one broken shader degrades a
-  preset instead of rejecting it. The renderer implements `IShaderSampler`, so shaders can
-  sample `sampler_main`, `sampler_pc_main`, `sampler_fc_main`, `GetBlur1`-`GetBlur3`, and
-  `GetPixel`, and it binds `uv`, `uv_orig`, `texsize`, the audio bands, the smoothed bands, the
-  frame counters, and the aspect ratio. A per-frame time budget (20 ms by default) skips the
-  shaders for a while when they cost too much, so a heavy preset keeps a smooth picture instead
-  of stalling playback. Covered by 11 tests.
-- Added the HLSL interpreter for the shader runtime: `ShaderInterpreter` evaluates the parsed
-  `ps_2_0` tree with scalar and `float2`/`float3`/`float4` values (`ShaderValue`), covering
-  arithmetic with the C precedence, variables and the assignment operators, swizzles read and
-  written, vector constructors with concatenation and broadcast, the ternary operator,
-  `if`/`else`, `for`, and the usual intrinsics (`abs`, `ceil`, `clamp`, `cos`, `dot`, `exp`,
-  `floor`, `frac`, `length`, `lerp`, `log`, `max`, `min`, `mul`, `normalize`, `pow`, `saturate`,
-  `sign`, `sin`, `smoothstep`, `sqrt`, `step`, `tan`). Sampling goes through the
-  `IShaderSampler` contract, so the interpreter carries no render state, and division by zero
-  yields zero instead of an infinity. A loop budget of 4096 iterations and a call depth limit of
-  32 keep a runaway shader from stalling a frame. Covered by 14 tests.
-- Added the HLSL parser and its syntax tree: `ShaderParser` and `ShaderNode` turn the
-  `ps_2_0` subset into a tagged-union tree covering declarations, expression statements,
-  `if`/`else`, `for`, `return`, swizzles, calls, the ternary operator, and the C operator
-  precedence. Function signatures and bare statement bodies are both accepted, and a sampler
-  declaration without a type is tolerated. Covered by 10 tests.
-- Added the HLSL front end for the upcoming shader runtime: `ShaderLexer` tokenizes the
-  `ps_2_0` subset Milkdrop shaders use, covering identifiers and keywords, numbers with their
-  `f`/`h` suffixes, single- and multi-character operators, swizzles, line and block comments,
-  and source positions, and reports an unexpected character with its offset. Covered by
-  10 tests.
-- Added the generated visualizer texture bank. The `noise_lq` (32 x 32), `noise_mq`
-  (256 x 256), and `noise_hq` (512 x 512) textures and the sixteen `rand00`-`rand15` (32 x 32)
-  textures are produced deterministically from fixed seeds, so no third party image is
-  bundled and every run yields the same textures. Sampling is bilinear with repeat, clamp, and
-  mirror wrap modes, and generation is lazy so a session that never opens the visualizer
-  allocates nothing. Covered by 10 tests.
-- Milkdrop preset keys now act as the per-frame starting values: every numeric key (including
-  the `nWaveMode`, `bWaveDots`, `bWaveThick`, `bAdditiveWaves`, `bDarkenCenter`,
-  `bMotionVectors`, and `nMotionVectorsX/Y` spellings) seeds the matching variable, so real
-  presets that carry their settings as keys instead of code work as written.
-- The visualizer draws the full Milkdrop wave and post-processing set: the circular, doubled,
-  and single-line wave modes with dots, thick, additive, mystery, and colour/position keys,
-  the four declared waveform slots, the outer and inner borders, a motion-vector grid derived
-  from the actual motion field, and the video echo with its zoom, alpha, and orientation.
-  Covered by 11 tests.
-- The preset engine now runs the full Milkdrop stage order. It parses the `per_frame_init`,
-  `per_pixel_init`, `wave_0`-`wave_3` and `shape_N_init` blocks, registers the complete
-  standard variable set (`bass_att`/`mid_att`/`treb_att`, `aspectx`/`aspecty`,
-  `pixelsx`/`pixelsy`, `monitor`, `zoomexp`, `rot`, `cx`/`cy`, `dx`/`dy`, `sx`/`sy`,
-  `blur1`-`blur3`, `darken_center`, `fGammaAdj`, the wave, border, motion-vector and echo
-  groups, `q1`-`q32`, and `b1`-`b8`), and applies the motion parameters, the blur passes, the
-  centre darkening, and the gamma adjustment. The per-pixel block now sees the already warped
-  sampling position in `x`/`y`/`rad`/`ang`, so a real preset can offset or replace it.
-  Covered by 16 tests.
-- The **Visualisierung** settings section gained an **Always show text and controls** toggle.
-  When it is off, the title, hint, and playback buttons appear only while the mouse moves
-  over the visualizer and hide again after three idle seconds; pointer movement is tracked
-  through the window's own events, so moving the mouse on another monitor never reveals them.
-- Added a **Visualisierung** settings section with the render resolution (320 x 180 up to
-  1280 x 720), the target frame rate (24, 30, 60, or 120), and the user preset folder that
-  previously lived under the output device. The window renders at the configured size and
-  lets the image control scale the frame up, so a lower resolution keeps the CPU cost down.
 
 - Linux desktop builds now expose the full MPRIS 2 media player interface
   (`org.mpris.MediaPlayer2.orynivo`) on the session bus, giving desktop media
@@ -695,28 +430,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   tokens) are never exposed; only local files and credential-free URLs are
   published. macOS remains unaffected.
 
-- The karaoke view now highlights the active word of enhanced-LRC lyrics.
-  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
-  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
-  already-sung words keep the accent colour. Plain synchronized lines keep the
-  line-level highlight, so nothing changes for ordinary LRC files.
-- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
-  now stripped from the line text instead of appearing as literal `<00:12.00>`
-  fragments.
-- Added bulk genre editing for the shared Tracks table. The bulk action bar gained
-  a genre field that stores the value for every selected **local** track through
-  `AudioDatabase.SetTrackGenres`, which writes the library-only
-  `track_genre_overrides` table in one transaction and reapplies it on every later
-  scan. Source media files are never modified, and an empty value removes the
-  override so the next scan restores the embedded genre. Selected Orynivo Server
-  tracks are updated on their owning server through the new authenticated
-  `PUT /api/tracks/{id}/genre`, which records the same library-only override.
-- Podcast episodes can be downloaded for offline playback. Episode rows gained a
-  **Download episode** / **Delete download** context menu and a download marker in
-  the status column, playback prefers the cached file, and Settings > Library sets
-  the cache size limit in megabytes. Eviction removes the least recently used
-  downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
-  the most recently used episode is always kept.
 ### Fixed
 
 - Fixed a .NET 8 build break in `GenreCloudService` and
@@ -734,97 +447,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.43.0] - 2026-09-18
 
 ### Added
-- The visualizer's per-pixel path no longer does work the preset never asked for. The compiled
-  programs now report the variables they reference (`PresetProgram.ReferencedVariables` and
-  `Uses`), the warp stage resolves the `x`, `y`, `rad`, and `ang` slots once instead of looking
-  each name up in the layout for every pixel, and it only computes the polar pair, the motion
-  grid, and the seeded sampling position when the preset's own code needs them. A rendered frame
-  is allocation-free, which is now asserted by a test. Covered by 5 tests.
-- The visualizer renders on its own thread now. A frame used to be produced from a
-  `DispatcherTimer`, so a heavy preset blocked the interface for its whole duration; the loop
-  now runs on a background thread, hands a finished copy of the frame to the UI thread through a
-  presentation buffer, and queues at most one present at a time, so a busy interface can never
-  build up a backlog of frames. Preset switching, the reset key, and the overlay follow as
-  thread-safe requests, and the frame pacing lives in the tested `FramePacing` helper. Covered by
-  5 tests.
-- The visualizer now measures where its frame time goes. `PresetRenderer` reports a
-  `RenderTimings` breakdown (warp, blur, post-processing, overlay, composite, comp shaders, and
-  the frame total) per frame and as an average over a window, and the window's diagnostic line in
-  `logs/seek.log` carries those averages once per second, so the cost per stage can be read
-  instead of guessed. A warp shader runs inside the per-pixel loop, so its cost stays part of
-  `warp`; timing it per pixel would cost more than the measurement is worth. The frame budget now
-  compares the complete frame rather than only the shaders. Covered by 8 tests.
-- Milkdrop `.milk` files are read as the multi-preset files they are: `VisualizerPreset.ParseSections`
-  splits the text at its `[presetNN]` headers and the preset folder loads every section as its
-  own preset instead of only the last one surviving. The declared format version
-  (`MILKDROP_PRESET_VERSION`, `PSVERSION`, or `preset_version`) is reported on
-  `VisualizerPreset.Version`; every version is accepted. Skipped presets now carry a reason
-  through `VisualizerPresetLibrary.RejectedReasons`, naming the file or section and the parse
-  error. A hand-written corpus of presets in the real format, including a multi-section file and
-  shader source, guards the format handling; third-party presets stay unbundled because they are
-  licensed by their authors. Covered by 13 tests.
-- The visualizer now runs preset shaders. The numbered `warp_N` and `comp_N` keys are parsed
-  together with their optional `_enabled`, `_per_frame`, and `_per_pixel` companions, and the
-  preset reader keeps the newlines inside a shader's source, because Milkdrop stores the code
-  as a multi-line value. A shader that does not parse is skipped so one broken shader degrades a
-  preset instead of rejecting it. The renderer implements `IShaderSampler`, so shaders can
-  sample `sampler_main`, `sampler_pc_main`, `sampler_fc_main`, `GetBlur1`-`GetBlur3`, and
-  `GetPixel`, and it binds `uv`, `uv_orig`, `texsize`, the audio bands, the smoothed bands, the
-  frame counters, and the aspect ratio. A per-frame time budget (20 ms by default) skips the
-  shaders for a while when they cost too much, so a heavy preset keeps a smooth picture instead
-  of stalling playback. Covered by 11 tests.
-- Added the HLSL interpreter for the shader runtime: `ShaderInterpreter` evaluates the parsed
-  `ps_2_0` tree with scalar and `float2`/`float3`/`float4` values (`ShaderValue`), covering
-  arithmetic with the C precedence, variables and the assignment operators, swizzles read and
-  written, vector constructors with concatenation and broadcast, the ternary operator,
-  `if`/`else`, `for`, and the usual intrinsics (`abs`, `ceil`, `clamp`, `cos`, `dot`, `exp`,
-  `floor`, `frac`, `length`, `lerp`, `log`, `max`, `min`, `mul`, `normalize`, `pow`, `saturate`,
-  `sign`, `sin`, `smoothstep`, `sqrt`, `step`, `tan`). Sampling goes through the
-  `IShaderSampler` contract, so the interpreter carries no render state, and division by zero
-  yields zero instead of an infinity. A loop budget of 4096 iterations and a call depth limit of
-  32 keep a runaway shader from stalling a frame. Covered by 14 tests.
-- Added the HLSL parser and its syntax tree: `ShaderParser` and `ShaderNode` turn the
-  `ps_2_0` subset into a tagged-union tree covering declarations, expression statements,
-  `if`/`else`, `for`, `return`, swizzles, calls, the ternary operator, and the C operator
-  precedence. Function signatures and bare statement bodies are both accepted, and a sampler
-  declaration without a type is tolerated. Covered by 10 tests.
-- Added the HLSL front end for the upcoming shader runtime: `ShaderLexer` tokenizes the
-  `ps_2_0` subset Milkdrop shaders use, covering identifiers and keywords, numbers with their
-  `f`/`h` suffixes, single- and multi-character operators, swizzles, line and block comments,
-  and source positions, and reports an unexpected character with its offset. Covered by
-  10 tests.
-- Added the generated visualizer texture bank. The `noise_lq` (32 x 32), `noise_mq`
-  (256 x 256), and `noise_hq` (512 x 512) textures and the sixteen `rand00`-`rand15` (32 x 32)
-  textures are produced deterministically from fixed seeds, so no third party image is
-  bundled and every run yields the same textures. Sampling is bilinear with repeat, clamp, and
-  mirror wrap modes, and generation is lazy so a session that never opens the visualizer
-  allocates nothing. Covered by 10 tests.
-- Milkdrop preset keys now act as the per-frame starting values: every numeric key (including
-  the `nWaveMode`, `bWaveDots`, `bWaveThick`, `bAdditiveWaves`, `bDarkenCenter`,
-  `bMotionVectors`, and `nMotionVectorsX/Y` spellings) seeds the matching variable, so real
-  presets that carry their settings as keys instead of code work as written.
-- The visualizer draws the full Milkdrop wave and post-processing set: the circular, doubled,
-  and single-line wave modes with dots, thick, additive, mystery, and colour/position keys,
-  the four declared waveform slots, the outer and inner borders, a motion-vector grid derived
-  from the actual motion field, and the video echo with its zoom, alpha, and orientation.
-  Covered by 11 tests.
-- The preset engine now runs the full Milkdrop stage order. It parses the `per_frame_init`,
-  `per_pixel_init`, `wave_0`-`wave_3` and `shape_N_init` blocks, registers the complete
-  standard variable set (`bass_att`/`mid_att`/`treb_att`, `aspectx`/`aspecty`,
-  `pixelsx`/`pixelsy`, `monitor`, `zoomexp`, `rot`, `cx`/`cy`, `dx`/`dy`, `sx`/`sy`,
-  `blur1`-`blur3`, `darken_center`, `fGammaAdj`, the wave, border, motion-vector and echo
-  groups, `q1`-`q32`, and `b1`-`b8`), and applies the motion parameters, the blur passes, the
-  centre darkening, and the gamma adjustment. The per-pixel block now sees the already warped
-  sampling position in `x`/`y`/`rad`/`ang`, so a real preset can offset or replace it.
-  Covered by 16 tests.
-- The **Visualisierung** settings section gained an **Always show text and controls** toggle.
-  When it is off, the title, hint, and playback buttons appear only while the mouse moves
-  over the visualizer and hide again after three idle seconds; pointer movement is tracked
-  through the window's own events, so moving the mouse on another monitor never reveals them.
-- Added a **Visualisierung** settings section with the render resolution (320 x 180 up to
-  1280 x 720), the target frame rate (24, 30, 60, or 120), and the user preset folder that
-  previously lived under the output device. The window renders at the configured size and
-  lets the image control scale the frame up, so a lower resolution keeps the CPU cost down.
 
 - Migrated queue drag-and-drop to the modern Avalonia data-transfer API
   (`DataTransfer`, `DataTransferItem`, `IDataTransfer`, `DataFormat<string>`, and
@@ -910,28 +532,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   favorite state into the client-side profile container and update their rating
   through the server API. All seven interface languages are included.
 
-- The karaoke view now highlights the active word of enhanced-LRC lyrics.
-  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
-  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
-  already-sung words keep the accent colour. Plain synchronized lines keep the
-  line-level highlight, so nothing changes for ordinary LRC files.
-- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
-  now stripped from the line text instead of appearing as literal `<00:12.00>`
-  fragments.
-- Added bulk genre editing for the shared Tracks table. The bulk action bar gained
-  a genre field that stores the value for every selected **local** track through
-  `AudioDatabase.SetTrackGenres`, which writes the library-only
-  `track_genre_overrides` table in one transaction and reapplies it on every later
-  scan. Source media files are never modified, and an empty value removes the
-  override so the next scan restores the embedded genre. Selected Orynivo Server
-  tracks are updated on their owning server through the new authenticated
-  `PUT /api/tracks/{id}/genre`, which records the same library-only override.
-- Podcast episodes can be downloaded for offline playback. Episode rows gained a
-  **Download episode** / **Delete download** context menu and a download marker in
-  the status column, playback prefers the cached file, and Settings > Library sets
-  the cache size limit in megabytes. Eviction removes the least recently used
-  downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
-  the most recently used episode is always kept.
 ### Fixed
 
 - Editing a similarity smart playlist no longer drops its reference track. The
@@ -942,97 +542,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.42.0] - 2026-09-17
 
 ### Added
-- The visualizer's per-pixel path no longer does work the preset never asked for. The compiled
-  programs now report the variables they reference (`PresetProgram.ReferencedVariables` and
-  `Uses`), the warp stage resolves the `x`, `y`, `rad`, and `ang` slots once instead of looking
-  each name up in the layout for every pixel, and it only computes the polar pair, the motion
-  grid, and the seeded sampling position when the preset's own code needs them. A rendered frame
-  is allocation-free, which is now asserted by a test. Covered by 5 tests.
-- The visualizer renders on its own thread now. A frame used to be produced from a
-  `DispatcherTimer`, so a heavy preset blocked the interface for its whole duration; the loop
-  now runs on a background thread, hands a finished copy of the frame to the UI thread through a
-  presentation buffer, and queues at most one present at a time, so a busy interface can never
-  build up a backlog of frames. Preset switching, the reset key, and the overlay follow as
-  thread-safe requests, and the frame pacing lives in the tested `FramePacing` helper. Covered by
-  5 tests.
-- The visualizer now measures where its frame time goes. `PresetRenderer` reports a
-  `RenderTimings` breakdown (warp, blur, post-processing, overlay, composite, comp shaders, and
-  the frame total) per frame and as an average over a window, and the window's diagnostic line in
-  `logs/seek.log` carries those averages once per second, so the cost per stage can be read
-  instead of guessed. A warp shader runs inside the per-pixel loop, so its cost stays part of
-  `warp`; timing it per pixel would cost more than the measurement is worth. The frame budget now
-  compares the complete frame rather than only the shaders. Covered by 8 tests.
-- Milkdrop `.milk` files are read as the multi-preset files they are: `VisualizerPreset.ParseSections`
-  splits the text at its `[presetNN]` headers and the preset folder loads every section as its
-  own preset instead of only the last one surviving. The declared format version
-  (`MILKDROP_PRESET_VERSION`, `PSVERSION`, or `preset_version`) is reported on
-  `VisualizerPreset.Version`; every version is accepted. Skipped presets now carry a reason
-  through `VisualizerPresetLibrary.RejectedReasons`, naming the file or section and the parse
-  error. A hand-written corpus of presets in the real format, including a multi-section file and
-  shader source, guards the format handling; third-party presets stay unbundled because they are
-  licensed by their authors. Covered by 13 tests.
-- The visualizer now runs preset shaders. The numbered `warp_N` and `comp_N` keys are parsed
-  together with their optional `_enabled`, `_per_frame`, and `_per_pixel` companions, and the
-  preset reader keeps the newlines inside a shader's source, because Milkdrop stores the code
-  as a multi-line value. A shader that does not parse is skipped so one broken shader degrades a
-  preset instead of rejecting it. The renderer implements `IShaderSampler`, so shaders can
-  sample `sampler_main`, `sampler_pc_main`, `sampler_fc_main`, `GetBlur1`-`GetBlur3`, and
-  `GetPixel`, and it binds `uv`, `uv_orig`, `texsize`, the audio bands, the smoothed bands, the
-  frame counters, and the aspect ratio. A per-frame time budget (20 ms by default) skips the
-  shaders for a while when they cost too much, so a heavy preset keeps a smooth picture instead
-  of stalling playback. Covered by 11 tests.
-- Added the HLSL interpreter for the shader runtime: `ShaderInterpreter` evaluates the parsed
-  `ps_2_0` tree with scalar and `float2`/`float3`/`float4` values (`ShaderValue`), covering
-  arithmetic with the C precedence, variables and the assignment operators, swizzles read and
-  written, vector constructors with concatenation and broadcast, the ternary operator,
-  `if`/`else`, `for`, and the usual intrinsics (`abs`, `ceil`, `clamp`, `cos`, `dot`, `exp`,
-  `floor`, `frac`, `length`, `lerp`, `log`, `max`, `min`, `mul`, `normalize`, `pow`, `saturate`,
-  `sign`, `sin`, `smoothstep`, `sqrt`, `step`, `tan`). Sampling goes through the
-  `IShaderSampler` contract, so the interpreter carries no render state, and division by zero
-  yields zero instead of an infinity. A loop budget of 4096 iterations and a call depth limit of
-  32 keep a runaway shader from stalling a frame. Covered by 14 tests.
-- Added the HLSL parser and its syntax tree: `ShaderParser` and `ShaderNode` turn the
-  `ps_2_0` subset into a tagged-union tree covering declarations, expression statements,
-  `if`/`else`, `for`, `return`, swizzles, calls, the ternary operator, and the C operator
-  precedence. Function signatures and bare statement bodies are both accepted, and a sampler
-  declaration without a type is tolerated. Covered by 10 tests.
-- Added the HLSL front end for the upcoming shader runtime: `ShaderLexer` tokenizes the
-  `ps_2_0` subset Milkdrop shaders use, covering identifiers and keywords, numbers with their
-  `f`/`h` suffixes, single- and multi-character operators, swizzles, line and block comments,
-  and source positions, and reports an unexpected character with its offset. Covered by
-  10 tests.
-- Added the generated visualizer texture bank. The `noise_lq` (32 x 32), `noise_mq`
-  (256 x 256), and `noise_hq` (512 x 512) textures and the sixteen `rand00`-`rand15` (32 x 32)
-  textures are produced deterministically from fixed seeds, so no third party image is
-  bundled and every run yields the same textures. Sampling is bilinear with repeat, clamp, and
-  mirror wrap modes, and generation is lazy so a session that never opens the visualizer
-  allocates nothing. Covered by 10 tests.
-- Milkdrop preset keys now act as the per-frame starting values: every numeric key (including
-  the `nWaveMode`, `bWaveDots`, `bWaveThick`, `bAdditiveWaves`, `bDarkenCenter`,
-  `bMotionVectors`, and `nMotionVectorsX/Y` spellings) seeds the matching variable, so real
-  presets that carry their settings as keys instead of code work as written.
-- The visualizer draws the full Milkdrop wave and post-processing set: the circular, doubled,
-  and single-line wave modes with dots, thick, additive, mystery, and colour/position keys,
-  the four declared waveform slots, the outer and inner borders, a motion-vector grid derived
-  from the actual motion field, and the video echo with its zoom, alpha, and orientation.
-  Covered by 11 tests.
-- The preset engine now runs the full Milkdrop stage order. It parses the `per_frame_init`,
-  `per_pixel_init`, `wave_0`-`wave_3` and `shape_N_init` blocks, registers the complete
-  standard variable set (`bass_att`/`mid_att`/`treb_att`, `aspectx`/`aspecty`,
-  `pixelsx`/`pixelsy`, `monitor`, `zoomexp`, `rot`, `cx`/`cy`, `dx`/`dy`, `sx`/`sy`,
-  `blur1`-`blur3`, `darken_center`, `fGammaAdj`, the wave, border, motion-vector and echo
-  groups, `q1`-`q32`, and `b1`-`b8`), and applies the motion parameters, the blur passes, the
-  centre darkening, and the gamma adjustment. The per-pixel block now sees the already warped
-  sampling position in `x`/`y`/`rad`/`ang`, so a real preset can offset or replace it.
-  Covered by 16 tests.
-- The **Visualisierung** settings section gained an **Always show text and controls** toggle.
-  When it is off, the title, hint, and playback buttons appear only while the mouse moves
-  over the visualizer and hide again after three idle seconds; pointer movement is tracked
-  through the window's own events, so moving the mouse on another monitor never reveals them.
-- Added a **Visualisierung** settings section with the render resolution (320 x 180 up to
-  1280 x 720), the target frame rate (24, 30, 60, or 120), and the user preset folder that
-  previously lived under the output device. The window renders at the configured size and
-  lets the image control scale the frame up, so a lower resolution keeps the CPU cost down.
 
 - Added `Orynivo.Library.QueuePathPolicy` in `Orynivo.Core` as the single,
   unit-tested decision for whether a playback or queue path may be persisted
@@ -1171,28 +680,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   rounding, invariant point formatting, the clamped-control-point smoothing
   invariant, and the fingerprint's average-threshold bit selection.
 
-- The karaoke view now highlights the active word of enhanced-LRC lyrics.
-  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
-  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
-  already-sung words keep the accent colour. Plain synchronized lines keep the
-  line-level highlight, so nothing changes for ordinary LRC files.
-- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
-  now stripped from the line text instead of appearing as literal `<00:12.00>`
-  fragments.
-- Added bulk genre editing for the shared Tracks table. The bulk action bar gained
-  a genre field that stores the value for every selected **local** track through
-  `AudioDatabase.SetTrackGenres`, which writes the library-only
-  `track_genre_overrides` table in one transaction and reapplies it on every later
-  scan. Source media files are never modified, and an empty value removes the
-  override so the next scan restores the embedded genre. Selected Orynivo Server
-  tracks are updated on their owning server through the new authenticated
-  `PUT /api/tracks/{id}/genre`, which records the same library-only override.
-- Podcast episodes can be downloaded for offline playback. Episode rows gained a
-  **Download episode** / **Delete download** context menu and a download marker in
-  the status column, playback prefers the cached file, and Settings > Library sets
-  the cache size limit in megabytes. Eviction removes the least recently used
-  downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
-  the most recently used episode is always kept.
 ### Fixed
 
 - The genre-cloud recommendation tie-break is now deterministic. It previously
@@ -1214,28 +701,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [0.41.8] - 2026-09-16
 
-- The karaoke view now highlights the active word of enhanced-LRC lyrics.
-  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
-  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
-  already-sung words keep the accent colour. Plain synchronized lines keep the
-  line-level highlight, so nothing changes for ordinary LRC files.
-- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
-  now stripped from the line text instead of appearing as literal `<00:12.00>`
-  fragments.
-- Added bulk genre editing for the shared Tracks table. The bulk action bar gained
-  a genre field that stores the value for every selected **local** track through
-  `AudioDatabase.SetTrackGenres`, which writes the library-only
-  `track_genre_overrides` table in one transaction and reapplies it on every later
-  scan. Source media files are never modified, and an empty value removes the
-  override so the next scan restores the embedded genre. Selected Orynivo Server
-  tracks are updated on their owning server through the new authenticated
-  `PUT /api/tracks/{id}/genre`, which records the same library-only override.
-- Podcast episodes can be downloaded for offline playback. Episode rows gained a
-  **Download episode** / **Delete download** context menu and a download marker in
-  the status column, playback prefers the cached file, and Settings > Library sets
-  the cache size limit in megabytes. Eviction removes the least recently used
-  downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
-  the most recently used episode is always kept.
 ### Fixed
 
 - Assigning local or remote album artwork now preserves the Dashboard's
@@ -1253,97 +718,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.41.7] - 2026-09-11
 
 ### Added
-- The visualizer's per-pixel path no longer does work the preset never asked for. The compiled
-  programs now report the variables they reference (`PresetProgram.ReferencedVariables` and
-  `Uses`), the warp stage resolves the `x`, `y`, `rad`, and `ang` slots once instead of looking
-  each name up in the layout for every pixel, and it only computes the polar pair, the motion
-  grid, and the seeded sampling position when the preset's own code needs them. A rendered frame
-  is allocation-free, which is now asserted by a test. Covered by 5 tests.
-- The visualizer renders on its own thread now. A frame used to be produced from a
-  `DispatcherTimer`, so a heavy preset blocked the interface for its whole duration; the loop
-  now runs on a background thread, hands a finished copy of the frame to the UI thread through a
-  presentation buffer, and queues at most one present at a time, so a busy interface can never
-  build up a backlog of frames. Preset switching, the reset key, and the overlay follow as
-  thread-safe requests, and the frame pacing lives in the tested `FramePacing` helper. Covered by
-  5 tests.
-- The visualizer now measures where its frame time goes. `PresetRenderer` reports a
-  `RenderTimings` breakdown (warp, blur, post-processing, overlay, composite, comp shaders, and
-  the frame total) per frame and as an average over a window, and the window's diagnostic line in
-  `logs/seek.log` carries those averages once per second, so the cost per stage can be read
-  instead of guessed. A warp shader runs inside the per-pixel loop, so its cost stays part of
-  `warp`; timing it per pixel would cost more than the measurement is worth. The frame budget now
-  compares the complete frame rather than only the shaders. Covered by 8 tests.
-- Milkdrop `.milk` files are read as the multi-preset files they are: `VisualizerPreset.ParseSections`
-  splits the text at its `[presetNN]` headers and the preset folder loads every section as its
-  own preset instead of only the last one surviving. The declared format version
-  (`MILKDROP_PRESET_VERSION`, `PSVERSION`, or `preset_version`) is reported on
-  `VisualizerPreset.Version`; every version is accepted. Skipped presets now carry a reason
-  through `VisualizerPresetLibrary.RejectedReasons`, naming the file or section and the parse
-  error. A hand-written corpus of presets in the real format, including a multi-section file and
-  shader source, guards the format handling; third-party presets stay unbundled because they are
-  licensed by their authors. Covered by 13 tests.
-- The visualizer now runs preset shaders. The numbered `warp_N` and `comp_N` keys are parsed
-  together with their optional `_enabled`, `_per_frame`, and `_per_pixel` companions, and the
-  preset reader keeps the newlines inside a shader's source, because Milkdrop stores the code
-  as a multi-line value. A shader that does not parse is skipped so one broken shader degrades a
-  preset instead of rejecting it. The renderer implements `IShaderSampler`, so shaders can
-  sample `sampler_main`, `sampler_pc_main`, `sampler_fc_main`, `GetBlur1`-`GetBlur3`, and
-  `GetPixel`, and it binds `uv`, `uv_orig`, `texsize`, the audio bands, the smoothed bands, the
-  frame counters, and the aspect ratio. A per-frame time budget (20 ms by default) skips the
-  shaders for a while when they cost too much, so a heavy preset keeps a smooth picture instead
-  of stalling playback. Covered by 11 tests.
-- Added the HLSL interpreter for the shader runtime: `ShaderInterpreter` evaluates the parsed
-  `ps_2_0` tree with scalar and `float2`/`float3`/`float4` values (`ShaderValue`), covering
-  arithmetic with the C precedence, variables and the assignment operators, swizzles read and
-  written, vector constructors with concatenation and broadcast, the ternary operator,
-  `if`/`else`, `for`, and the usual intrinsics (`abs`, `ceil`, `clamp`, `cos`, `dot`, `exp`,
-  `floor`, `frac`, `length`, `lerp`, `log`, `max`, `min`, `mul`, `normalize`, `pow`, `saturate`,
-  `sign`, `sin`, `smoothstep`, `sqrt`, `step`, `tan`). Sampling goes through the
-  `IShaderSampler` contract, so the interpreter carries no render state, and division by zero
-  yields zero instead of an infinity. A loop budget of 4096 iterations and a call depth limit of
-  32 keep a runaway shader from stalling a frame. Covered by 14 tests.
-- Added the HLSL parser and its syntax tree: `ShaderParser` and `ShaderNode` turn the
-  `ps_2_0` subset into a tagged-union tree covering declarations, expression statements,
-  `if`/`else`, `for`, `return`, swizzles, calls, the ternary operator, and the C operator
-  precedence. Function signatures and bare statement bodies are both accepted, and a sampler
-  declaration without a type is tolerated. Covered by 10 tests.
-- Added the HLSL front end for the upcoming shader runtime: `ShaderLexer` tokenizes the
-  `ps_2_0` subset Milkdrop shaders use, covering identifiers and keywords, numbers with their
-  `f`/`h` suffixes, single- and multi-character operators, swizzles, line and block comments,
-  and source positions, and reports an unexpected character with its offset. Covered by
-  10 tests.
-- Added the generated visualizer texture bank. The `noise_lq` (32 x 32), `noise_mq`
-  (256 x 256), and `noise_hq` (512 x 512) textures and the sixteen `rand00`-`rand15` (32 x 32)
-  textures are produced deterministically from fixed seeds, so no third party image is
-  bundled and every run yields the same textures. Sampling is bilinear with repeat, clamp, and
-  mirror wrap modes, and generation is lazy so a session that never opens the visualizer
-  allocates nothing. Covered by 10 tests.
-- Milkdrop preset keys now act as the per-frame starting values: every numeric key (including
-  the `nWaveMode`, `bWaveDots`, `bWaveThick`, `bAdditiveWaves`, `bDarkenCenter`,
-  `bMotionVectors`, and `nMotionVectorsX/Y` spellings) seeds the matching variable, so real
-  presets that carry their settings as keys instead of code work as written.
-- The visualizer draws the full Milkdrop wave and post-processing set: the circular, doubled,
-  and single-line wave modes with dots, thick, additive, mystery, and colour/position keys,
-  the four declared waveform slots, the outer and inner borders, a motion-vector grid derived
-  from the actual motion field, and the video echo with its zoom, alpha, and orientation.
-  Covered by 11 tests.
-- The preset engine now runs the full Milkdrop stage order. It parses the `per_frame_init`,
-  `per_pixel_init`, `wave_0`-`wave_3` and `shape_N_init` blocks, registers the complete
-  standard variable set (`bass_att`/`mid_att`/`treb_att`, `aspectx`/`aspecty`,
-  `pixelsx`/`pixelsy`, `monitor`, `zoomexp`, `rot`, `cx`/`cy`, `dx`/`dy`, `sx`/`sy`,
-  `blur1`-`blur3`, `darken_center`, `fGammaAdj`, the wave, border, motion-vector and echo
-  groups, `q1`-`q32`, and `b1`-`b8`), and applies the motion parameters, the blur passes, the
-  centre darkening, and the gamma adjustment. The per-pixel block now sees the already warped
-  sampling position in `x`/`y`/`rad`/`ang`, so a real preset can offset or replace it.
-  Covered by 16 tests.
-- The **Visualisierung** settings section gained an **Always show text and controls** toggle.
-  When it is off, the title, hint, and playback buttons appear only while the mouse moves
-  over the visualizer and hide again after three idle seconds; pointer movement is tracked
-  through the window's own events, so moving the mouse on another monitor never reveals them.
-- Added a **Visualisierung** settings section with the render resolution (320 x 180 up to
-  1280 x 720), the target frame rate (24, 30, 60, or 120), and the user preset folder that
-  previously lived under the output device. The window renders at the configured size and
-  lets the image control scale the frame up, so a lower resolution keeps the CPU cost down.
 
 - Added Hindi (हिन्दी, hi-IN) as a complete built-in desktop language and a
   static website locale with language selection, metadata, gallery and sitemap
@@ -1354,28 +728,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [0.41.6] - 2026-09-10
 
-- The karaoke view now highlights the active word of enhanced-LRC lyrics.
-  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
-  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
-  already-sung words keep the accent colour. Plain synchronized lines keep the
-  line-level highlight, so nothing changes for ordinary LRC files.
-- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
-  now stripped from the line text instead of appearing as literal `<00:12.00>`
-  fragments.
-- Added bulk genre editing for the shared Tracks table. The bulk action bar gained
-  a genre field that stores the value for every selected **local** track through
-  `AudioDatabase.SetTrackGenres`, which writes the library-only
-  `track_genre_overrides` table in one transaction and reapplies it on every later
-  scan. Source media files are never modified, and an empty value removes the
-  override so the next scan restores the embedded genre. Selected Orynivo Server
-  tracks are updated on their owning server through the new authenticated
-  `PUT /api/tracks/{id}/genre`, which records the same library-only override.
-- Podcast episodes can be downloaded for offline playback. Episode rows gained a
-  **Download episode** / **Delete download** context menu and a download marker in
-  the status column, playback prefers the cached file, and Settings > Library sets
-  the cache size limit in megabytes. Eviction removes the least recently used
-  downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
-  the most recently used episode is always kept.
 ### Fixed
 
 - Unified all six desktop languages as complete built-in resources (853 keys
@@ -1388,97 +740,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.41.5] - 2026-09-09
 
 ### Added
-- The visualizer's per-pixel path no longer does work the preset never asked for. The compiled
-  programs now report the variables they reference (`PresetProgram.ReferencedVariables` and
-  `Uses`), the warp stage resolves the `x`, `y`, `rad`, and `ang` slots once instead of looking
-  each name up in the layout for every pixel, and it only computes the polar pair, the motion
-  grid, and the seeded sampling position when the preset's own code needs them. A rendered frame
-  is allocation-free, which is now asserted by a test. Covered by 5 tests.
-- The visualizer renders on its own thread now. A frame used to be produced from a
-  `DispatcherTimer`, so a heavy preset blocked the interface for its whole duration; the loop
-  now runs on a background thread, hands a finished copy of the frame to the UI thread through a
-  presentation buffer, and queues at most one present at a time, so a busy interface can never
-  build up a backlog of frames. Preset switching, the reset key, and the overlay follow as
-  thread-safe requests, and the frame pacing lives in the tested `FramePacing` helper. Covered by
-  5 tests.
-- The visualizer now measures where its frame time goes. `PresetRenderer` reports a
-  `RenderTimings` breakdown (warp, blur, post-processing, overlay, composite, comp shaders, and
-  the frame total) per frame and as an average over a window, and the window's diagnostic line in
-  `logs/seek.log` carries those averages once per second, so the cost per stage can be read
-  instead of guessed. A warp shader runs inside the per-pixel loop, so its cost stays part of
-  `warp`; timing it per pixel would cost more than the measurement is worth. The frame budget now
-  compares the complete frame rather than only the shaders. Covered by 8 tests.
-- Milkdrop `.milk` files are read as the multi-preset files they are: `VisualizerPreset.ParseSections`
-  splits the text at its `[presetNN]` headers and the preset folder loads every section as its
-  own preset instead of only the last one surviving. The declared format version
-  (`MILKDROP_PRESET_VERSION`, `PSVERSION`, or `preset_version`) is reported on
-  `VisualizerPreset.Version`; every version is accepted. Skipped presets now carry a reason
-  through `VisualizerPresetLibrary.RejectedReasons`, naming the file or section and the parse
-  error. A hand-written corpus of presets in the real format, including a multi-section file and
-  shader source, guards the format handling; third-party presets stay unbundled because they are
-  licensed by their authors. Covered by 13 tests.
-- The visualizer now runs preset shaders. The numbered `warp_N` and `comp_N` keys are parsed
-  together with their optional `_enabled`, `_per_frame`, and `_per_pixel` companions, and the
-  preset reader keeps the newlines inside a shader's source, because Milkdrop stores the code
-  as a multi-line value. A shader that does not parse is skipped so one broken shader degrades a
-  preset instead of rejecting it. The renderer implements `IShaderSampler`, so shaders can
-  sample `sampler_main`, `sampler_pc_main`, `sampler_fc_main`, `GetBlur1`-`GetBlur3`, and
-  `GetPixel`, and it binds `uv`, `uv_orig`, `texsize`, the audio bands, the smoothed bands, the
-  frame counters, and the aspect ratio. A per-frame time budget (20 ms by default) skips the
-  shaders for a while when they cost too much, so a heavy preset keeps a smooth picture instead
-  of stalling playback. Covered by 11 tests.
-- Added the HLSL interpreter for the shader runtime: `ShaderInterpreter` evaluates the parsed
-  `ps_2_0` tree with scalar and `float2`/`float3`/`float4` values (`ShaderValue`), covering
-  arithmetic with the C precedence, variables and the assignment operators, swizzles read and
-  written, vector constructors with concatenation and broadcast, the ternary operator,
-  `if`/`else`, `for`, and the usual intrinsics (`abs`, `ceil`, `clamp`, `cos`, `dot`, `exp`,
-  `floor`, `frac`, `length`, `lerp`, `log`, `max`, `min`, `mul`, `normalize`, `pow`, `saturate`,
-  `sign`, `sin`, `smoothstep`, `sqrt`, `step`, `tan`). Sampling goes through the
-  `IShaderSampler` contract, so the interpreter carries no render state, and division by zero
-  yields zero instead of an infinity. A loop budget of 4096 iterations and a call depth limit of
-  32 keep a runaway shader from stalling a frame. Covered by 14 tests.
-- Added the HLSL parser and its syntax tree: `ShaderParser` and `ShaderNode` turn the
-  `ps_2_0` subset into a tagged-union tree covering declarations, expression statements,
-  `if`/`else`, `for`, `return`, swizzles, calls, the ternary operator, and the C operator
-  precedence. Function signatures and bare statement bodies are both accepted, and a sampler
-  declaration without a type is tolerated. Covered by 10 tests.
-- Added the HLSL front end for the upcoming shader runtime: `ShaderLexer` tokenizes the
-  `ps_2_0` subset Milkdrop shaders use, covering identifiers and keywords, numbers with their
-  `f`/`h` suffixes, single- and multi-character operators, swizzles, line and block comments,
-  and source positions, and reports an unexpected character with its offset. Covered by
-  10 tests.
-- Added the generated visualizer texture bank. The `noise_lq` (32 x 32), `noise_mq`
-  (256 x 256), and `noise_hq` (512 x 512) textures and the sixteen `rand00`-`rand15` (32 x 32)
-  textures are produced deterministically from fixed seeds, so no third party image is
-  bundled and every run yields the same textures. Sampling is bilinear with repeat, clamp, and
-  mirror wrap modes, and generation is lazy so a session that never opens the visualizer
-  allocates nothing. Covered by 10 tests.
-- Milkdrop preset keys now act as the per-frame starting values: every numeric key (including
-  the `nWaveMode`, `bWaveDots`, `bWaveThick`, `bAdditiveWaves`, `bDarkenCenter`,
-  `bMotionVectors`, and `nMotionVectorsX/Y` spellings) seeds the matching variable, so real
-  presets that carry their settings as keys instead of code work as written.
-- The visualizer draws the full Milkdrop wave and post-processing set: the circular, doubled,
-  and single-line wave modes with dots, thick, additive, mystery, and colour/position keys,
-  the four declared waveform slots, the outer and inner borders, a motion-vector grid derived
-  from the actual motion field, and the video echo with its zoom, alpha, and orientation.
-  Covered by 11 tests.
-- The preset engine now runs the full Milkdrop stage order. It parses the `per_frame_init`,
-  `per_pixel_init`, `wave_0`-`wave_3` and `shape_N_init` blocks, registers the complete
-  standard variable set (`bass_att`/`mid_att`/`treb_att`, `aspectx`/`aspecty`,
-  `pixelsx`/`pixelsy`, `monitor`, `zoomexp`, `rot`, `cx`/`cy`, `dx`/`dy`, `sx`/`sy`,
-  `blur1`-`blur3`, `darken_center`, `fGammaAdj`, the wave, border, motion-vector and echo
-  groups, `q1`-`q32`, and `b1`-`b8`), and applies the motion parameters, the blur passes, the
-  centre darkening, and the gamma adjustment. The per-pixel block now sees the already warped
-  sampling position in `x`/`y`/`rad`/`ang`, so a real preset can offset or replace it.
-  Covered by 16 tests.
-- The **Visualisierung** settings section gained an **Always show text and controls** toggle.
-  When it is off, the title, hint, and playback buttons appear only while the mouse moves
-  over the visualizer and hide again after three idle seconds; pointer movement is tracked
-  through the window's own events, so moving the mouse on another monitor never reveals them.
-- Added a **Visualisierung** settings section with the render resolution (320 x 180 up to
-  1280 x 720), the target frame rate (24, 30, 60, or 120), and the user preset folder that
-  previously lived under the output device. The window renders at the configured size and
-  lets the image control scale the frame up, so a lower resolution keeps the CPU cost down.
 
 - Extended the static product website with Russian and Simplified Chinese
   pages, language-selector entries, localized metadata, hreflang links, and
@@ -1487,28 +748,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   Chinese under `Orynivo/Localization/Overrides`; missing entries continue to
   use the reviewed built-in fallback.
 
-- The karaoke view now highlights the active word of enhanced-LRC lyrics.
-  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
-  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
-  already-sung words keep the accent colour. Plain synchronized lines keep the
-  line-level highlight, so nothing changes for ordinary LRC files.
-- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
-  now stripped from the line text instead of appearing as literal `<00:12.00>`
-  fragments.
-- Added bulk genre editing for the shared Tracks table. The bulk action bar gained
-  a genre field that stores the value for every selected **local** track through
-  `AudioDatabase.SetTrackGenres`, which writes the library-only
-  `track_genre_overrides` table in one transaction and reapplies it on every later
-  scan. Source media files are never modified, and an empty value removes the
-  override so the next scan restores the embedded genre. Selected Orynivo Server
-  tracks are updated on their owning server through the new authenticated
-  `PUT /api/tracks/{id}/genre`, which records the same library-only override.
-- Podcast episodes can be downloaded for offline playback. Episode rows gained a
-  **Download episode** / **Delete download** context menu and a download marker in
-  the status column, playback prefers the cached file, and Settings > Library sets
-  the cache size limit in megabytes. Eviction removes the least recently used
-  downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
-  the most recently used episode is always kept.
 ### Fixed
 
 - Fixed a runtime language-switch issue where the dynamically created local
@@ -1528,97 +767,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.41.4] - 2026-09-08
 
 ### Added
-- The visualizer's per-pixel path no longer does work the preset never asked for. The compiled
-  programs now report the variables they reference (`PresetProgram.ReferencedVariables` and
-  `Uses`), the warp stage resolves the `x`, `y`, `rad`, and `ang` slots once instead of looking
-  each name up in the layout for every pixel, and it only computes the polar pair, the motion
-  grid, and the seeded sampling position when the preset's own code needs them. A rendered frame
-  is allocation-free, which is now asserted by a test. Covered by 5 tests.
-- The visualizer renders on its own thread now. A frame used to be produced from a
-  `DispatcherTimer`, so a heavy preset blocked the interface for its whole duration; the loop
-  now runs on a background thread, hands a finished copy of the frame to the UI thread through a
-  presentation buffer, and queues at most one present at a time, so a busy interface can never
-  build up a backlog of frames. Preset switching, the reset key, and the overlay follow as
-  thread-safe requests, and the frame pacing lives in the tested `FramePacing` helper. Covered by
-  5 tests.
-- The visualizer now measures where its frame time goes. `PresetRenderer` reports a
-  `RenderTimings` breakdown (warp, blur, post-processing, overlay, composite, comp shaders, and
-  the frame total) per frame and as an average over a window, and the window's diagnostic line in
-  `logs/seek.log` carries those averages once per second, so the cost per stage can be read
-  instead of guessed. A warp shader runs inside the per-pixel loop, so its cost stays part of
-  `warp`; timing it per pixel would cost more than the measurement is worth. The frame budget now
-  compares the complete frame rather than only the shaders. Covered by 8 tests.
-- Milkdrop `.milk` files are read as the multi-preset files they are: `VisualizerPreset.ParseSections`
-  splits the text at its `[presetNN]` headers and the preset folder loads every section as its
-  own preset instead of only the last one surviving. The declared format version
-  (`MILKDROP_PRESET_VERSION`, `PSVERSION`, or `preset_version`) is reported on
-  `VisualizerPreset.Version`; every version is accepted. Skipped presets now carry a reason
-  through `VisualizerPresetLibrary.RejectedReasons`, naming the file or section and the parse
-  error. A hand-written corpus of presets in the real format, including a multi-section file and
-  shader source, guards the format handling; third-party presets stay unbundled because they are
-  licensed by their authors. Covered by 13 tests.
-- The visualizer now runs preset shaders. The numbered `warp_N` and `comp_N` keys are parsed
-  together with their optional `_enabled`, `_per_frame`, and `_per_pixel` companions, and the
-  preset reader keeps the newlines inside a shader's source, because Milkdrop stores the code
-  as a multi-line value. A shader that does not parse is skipped so one broken shader degrades a
-  preset instead of rejecting it. The renderer implements `IShaderSampler`, so shaders can
-  sample `sampler_main`, `sampler_pc_main`, `sampler_fc_main`, `GetBlur1`-`GetBlur3`, and
-  `GetPixel`, and it binds `uv`, `uv_orig`, `texsize`, the audio bands, the smoothed bands, the
-  frame counters, and the aspect ratio. A per-frame time budget (20 ms by default) skips the
-  shaders for a while when they cost too much, so a heavy preset keeps a smooth picture instead
-  of stalling playback. Covered by 11 tests.
-- Added the HLSL interpreter for the shader runtime: `ShaderInterpreter` evaluates the parsed
-  `ps_2_0` tree with scalar and `float2`/`float3`/`float4` values (`ShaderValue`), covering
-  arithmetic with the C precedence, variables and the assignment operators, swizzles read and
-  written, vector constructors with concatenation and broadcast, the ternary operator,
-  `if`/`else`, `for`, and the usual intrinsics (`abs`, `ceil`, `clamp`, `cos`, `dot`, `exp`,
-  `floor`, `frac`, `length`, `lerp`, `log`, `max`, `min`, `mul`, `normalize`, `pow`, `saturate`,
-  `sign`, `sin`, `smoothstep`, `sqrt`, `step`, `tan`). Sampling goes through the
-  `IShaderSampler` contract, so the interpreter carries no render state, and division by zero
-  yields zero instead of an infinity. A loop budget of 4096 iterations and a call depth limit of
-  32 keep a runaway shader from stalling a frame. Covered by 14 tests.
-- Added the HLSL parser and its syntax tree: `ShaderParser` and `ShaderNode` turn the
-  `ps_2_0` subset into a tagged-union tree covering declarations, expression statements,
-  `if`/`else`, `for`, `return`, swizzles, calls, the ternary operator, and the C operator
-  precedence. Function signatures and bare statement bodies are both accepted, and a sampler
-  declaration without a type is tolerated. Covered by 10 tests.
-- Added the HLSL front end for the upcoming shader runtime: `ShaderLexer` tokenizes the
-  `ps_2_0` subset Milkdrop shaders use, covering identifiers and keywords, numbers with their
-  `f`/`h` suffixes, single- and multi-character operators, swizzles, line and block comments,
-  and source positions, and reports an unexpected character with its offset. Covered by
-  10 tests.
-- Added the generated visualizer texture bank. The `noise_lq` (32 x 32), `noise_mq`
-  (256 x 256), and `noise_hq` (512 x 512) textures and the sixteen `rand00`-`rand15` (32 x 32)
-  textures are produced deterministically from fixed seeds, so no third party image is
-  bundled and every run yields the same textures. Sampling is bilinear with repeat, clamp, and
-  mirror wrap modes, and generation is lazy so a session that never opens the visualizer
-  allocates nothing. Covered by 10 tests.
-- Milkdrop preset keys now act as the per-frame starting values: every numeric key (including
-  the `nWaveMode`, `bWaveDots`, `bWaveThick`, `bAdditiveWaves`, `bDarkenCenter`,
-  `bMotionVectors`, and `nMotionVectorsX/Y` spellings) seeds the matching variable, so real
-  presets that carry their settings as keys instead of code work as written.
-- The visualizer draws the full Milkdrop wave and post-processing set: the circular, doubled,
-  and single-line wave modes with dots, thick, additive, mystery, and colour/position keys,
-  the four declared waveform slots, the outer and inner borders, a motion-vector grid derived
-  from the actual motion field, and the video echo with its zoom, alpha, and orientation.
-  Covered by 11 tests.
-- The preset engine now runs the full Milkdrop stage order. It parses the `per_frame_init`,
-  `per_pixel_init`, `wave_0`-`wave_3` and `shape_N_init` blocks, registers the complete
-  standard variable set (`bass_att`/`mid_att`/`treb_att`, `aspectx`/`aspecty`,
-  `pixelsx`/`pixelsy`, `monitor`, `zoomexp`, `rot`, `cx`/`cy`, `dx`/`dy`, `sx`/`sy`,
-  `blur1`-`blur3`, `darken_center`, `fGammaAdj`, the wave, border, motion-vector and echo
-  groups, `q1`-`q32`, and `b1`-`b8`), and applies the motion parameters, the blur passes, the
-  centre darkening, and the gamma adjustment. The per-pixel block now sees the already warped
-  sampling position in `x`/`y`/`rad`/`ang`, so a real preset can offset or replace it.
-  Covered by 16 tests.
-- The **Visualisierung** settings section gained an **Always show text and controls** toggle.
-  When it is off, the title, hint, and playback buttons appear only while the mouse moves
-  over the visualizer and hide again after three idle seconds; pointer movement is tracked
-  through the window's own events, so moving the mouse on another monitor never reveals them.
-- Added a **Visualisierung** settings section with the render resolution (320 x 180 up to
-  1280 x 720), the target frame rate (24, 30, 60, or 120), and the user preset folder that
-  previously lived under the output device. The window renders at the configured size and
-  lets the image control scale the frame up, so a lower resolution keeps the CPU cost down.
 
 - Added Russian and Simplified Chinese (`zh-CN`) as selectable interface
   languages, including culture-aware formatting and artist-profile language
@@ -1629,28 +777,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   Next**. The modal lists the physical file path first, followed by all
   metadata represented by the selectable track columns.
 
-- The karaoke view now highlights the active word of enhanced-LRC lyrics.
-  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
-  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
-  already-sung words keep the accent colour. Plain synchronized lines keep the
-  line-level highlight, so nothing changes for ordinary LRC files.
-- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
-  now stripped from the line text instead of appearing as literal `<00:12.00>`
-  fragments.
-- Added bulk genre editing for the shared Tracks table. The bulk action bar gained
-  a genre field that stores the value for every selected **local** track through
-  `AudioDatabase.SetTrackGenres`, which writes the library-only
-  `track_genre_overrides` table in one transaction and reapplies it on every later
-  scan. Source media files are never modified, and an empty value removes the
-  override so the next scan restores the embedded genre. Selected Orynivo Server
-  tracks are updated on their owning server through the new authenticated
-  `PUT /api/tracks/{id}/genre`, which records the same library-only override.
-- Podcast episodes can be downloaded for offline playback. Episode rows gained a
-  **Download episode** / **Delete download** context menu and a download marker in
-  the status column, playback prefers the cached file, and Settings > Library sets
-  the cache size limit in megabytes. Eviction removes the least recently used
-  downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
-  the most recently used episode is always kept.
 ### Fixed
 
 - The **Up Next** table now offers the same selectable track columns as
@@ -1668,28 +794,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [0.41.3] - 2026-09-05
 
-- The karaoke view now highlights the active word of enhanced-LRC lyrics.
-  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
-  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
-  already-sung words keep the accent colour. Plain synchronized lines keep the
-  line-level highlight, so nothing changes for ordinary LRC files.
-- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
-  now stripped from the line text instead of appearing as literal `<00:12.00>`
-  fragments.
-- Added bulk genre editing for the shared Tracks table. The bulk action bar gained
-  a genre field that stores the value for every selected **local** track through
-  `AudioDatabase.SetTrackGenres`, which writes the library-only
-  `track_genre_overrides` table in one transaction and reapplies it on every later
-  scan. Source media files are never modified, and an empty value removes the
-  override so the next scan restores the embedded genre. Selected Orynivo Server
-  tracks are updated on their owning server through the new authenticated
-  `PUT /api/tracks/{id}/genre`, which records the same library-only override.
-- Podcast episodes can be downloaded for offline playback. Episode rows gained a
-  **Download episode** / **Delete download** context menu and a download marker in
-  the status column, playback prefers the cached file, and Settings > Library sets
-  the cache size limit in megabytes. Eviction removes the least recently used
-  downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
-  the most recently used episode is always kept.
 ### Fixed
 
 - Similar-title and mood-mix actions now navigate directly to **Up Next**
@@ -1698,28 +802,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [0.41.2] - 2026-09-05
 
-- The karaoke view now highlights the active word of enhanced-LRC lyrics.
-  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
-  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
-  already-sung words keep the accent colour. Plain synchronized lines keep the
-  line-level highlight, so nothing changes for ordinary LRC files.
-- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
-  now stripped from the line text instead of appearing as literal `<00:12.00>`
-  fragments.
-- Added bulk genre editing for the shared Tracks table. The bulk action bar gained
-  a genre field that stores the value for every selected **local** track through
-  `AudioDatabase.SetTrackGenres`, which writes the library-only
-  `track_genre_overrides` table in one transaction and reapplies it on every later
-  scan. Source media files are never modified, and an empty value removes the
-  override so the next scan restores the embedded genre. Selected Orynivo Server
-  tracks are updated on their owning server through the new authenticated
-  `PUT /api/tracks/{id}/genre`, which records the same library-only override.
-- Podcast episodes can be downloaded for offline playback. Episode rows gained a
-  **Download episode** / **Delete download** context menu and a download marker in
-  the status column, playback prefers the cached file, and Settings > Library sets
-  the cache size limit in megabytes. Eviction removes the least recently used
-  downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
-  the most recently used episode is always kept.
 ### Fixed
 
 - Similar-title and mood-mix ranking now runs on a background thread, keeping
@@ -1736,28 +818,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [0.41.1] - 2026-09-05
 
-- The karaoke view now highlights the active word of enhanced-LRC lyrics.
-  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
-  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
-  already-sung words keep the accent colour. Plain synchronized lines keep the
-  line-level highlight, so nothing changes for ordinary LRC files.
-- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
-  now stripped from the line text instead of appearing as literal `<00:12.00>`
-  fragments.
-- Added bulk genre editing for the shared Tracks table. The bulk action bar gained
-  a genre field that stores the value for every selected **local** track through
-  `AudioDatabase.SetTrackGenres`, which writes the library-only
-  `track_genre_overrides` table in one transaction and reapplies it on every later
-  scan. Source media files are never modified, and an empty value removes the
-  override so the next scan restores the embedded genre. Selected Orynivo Server
-  tracks are updated on their owning server through the new authenticated
-  `PUT /api/tracks/{id}/genre`, which records the same library-only override.
-- Podcast episodes can be downloaded for offline playback. Episode rows gained a
-  **Download episode** / **Delete download** context menu and a download marker in
-  the status column, playback prefers the cached file, and Settings > Library sets
-  the cache size limit in megabytes. Eviction removes the least recently used
-  downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
-  the most recently used episode is always kept.
 ### Fixed
 
 - Fixed startup failure on existing databases whose `play_history` table did
@@ -1767,97 +827,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.41.0] - 2026-09-05
 
 ### Added
-- The visualizer's per-pixel path no longer does work the preset never asked for. The compiled
-  programs now report the variables they reference (`PresetProgram.ReferencedVariables` and
-  `Uses`), the warp stage resolves the `x`, `y`, `rad`, and `ang` slots once instead of looking
-  each name up in the layout for every pixel, and it only computes the polar pair, the motion
-  grid, and the seeded sampling position when the preset's own code needs them. A rendered frame
-  is allocation-free, which is now asserted by a test. Covered by 5 tests.
-- The visualizer renders on its own thread now. A frame used to be produced from a
-  `DispatcherTimer`, so a heavy preset blocked the interface for its whole duration; the loop
-  now runs on a background thread, hands a finished copy of the frame to the UI thread through a
-  presentation buffer, and queues at most one present at a time, so a busy interface can never
-  build up a backlog of frames. Preset switching, the reset key, and the overlay follow as
-  thread-safe requests, and the frame pacing lives in the tested `FramePacing` helper. Covered by
-  5 tests.
-- The visualizer now measures where its frame time goes. `PresetRenderer` reports a
-  `RenderTimings` breakdown (warp, blur, post-processing, overlay, composite, comp shaders, and
-  the frame total) per frame and as an average over a window, and the window's diagnostic line in
-  `logs/seek.log` carries those averages once per second, so the cost per stage can be read
-  instead of guessed. A warp shader runs inside the per-pixel loop, so its cost stays part of
-  `warp`; timing it per pixel would cost more than the measurement is worth. The frame budget now
-  compares the complete frame rather than only the shaders. Covered by 8 tests.
-- Milkdrop `.milk` files are read as the multi-preset files they are: `VisualizerPreset.ParseSections`
-  splits the text at its `[presetNN]` headers and the preset folder loads every section as its
-  own preset instead of only the last one surviving. The declared format version
-  (`MILKDROP_PRESET_VERSION`, `PSVERSION`, or `preset_version`) is reported on
-  `VisualizerPreset.Version`; every version is accepted. Skipped presets now carry a reason
-  through `VisualizerPresetLibrary.RejectedReasons`, naming the file or section and the parse
-  error. A hand-written corpus of presets in the real format, including a multi-section file and
-  shader source, guards the format handling; third-party presets stay unbundled because they are
-  licensed by their authors. Covered by 13 tests.
-- The visualizer now runs preset shaders. The numbered `warp_N` and `comp_N` keys are parsed
-  together with their optional `_enabled`, `_per_frame`, and `_per_pixel` companions, and the
-  preset reader keeps the newlines inside a shader's source, because Milkdrop stores the code
-  as a multi-line value. A shader that does not parse is skipped so one broken shader degrades a
-  preset instead of rejecting it. The renderer implements `IShaderSampler`, so shaders can
-  sample `sampler_main`, `sampler_pc_main`, `sampler_fc_main`, `GetBlur1`-`GetBlur3`, and
-  `GetPixel`, and it binds `uv`, `uv_orig`, `texsize`, the audio bands, the smoothed bands, the
-  frame counters, and the aspect ratio. A per-frame time budget (20 ms by default) skips the
-  shaders for a while when they cost too much, so a heavy preset keeps a smooth picture instead
-  of stalling playback. Covered by 11 tests.
-- Added the HLSL interpreter for the shader runtime: `ShaderInterpreter` evaluates the parsed
-  `ps_2_0` tree with scalar and `float2`/`float3`/`float4` values (`ShaderValue`), covering
-  arithmetic with the C precedence, variables and the assignment operators, swizzles read and
-  written, vector constructors with concatenation and broadcast, the ternary operator,
-  `if`/`else`, `for`, and the usual intrinsics (`abs`, `ceil`, `clamp`, `cos`, `dot`, `exp`,
-  `floor`, `frac`, `length`, `lerp`, `log`, `max`, `min`, `mul`, `normalize`, `pow`, `saturate`,
-  `sign`, `sin`, `smoothstep`, `sqrt`, `step`, `tan`). Sampling goes through the
-  `IShaderSampler` contract, so the interpreter carries no render state, and division by zero
-  yields zero instead of an infinity. A loop budget of 4096 iterations and a call depth limit of
-  32 keep a runaway shader from stalling a frame. Covered by 14 tests.
-- Added the HLSL parser and its syntax tree: `ShaderParser` and `ShaderNode` turn the
-  `ps_2_0` subset into a tagged-union tree covering declarations, expression statements,
-  `if`/`else`, `for`, `return`, swizzles, calls, the ternary operator, and the C operator
-  precedence. Function signatures and bare statement bodies are both accepted, and a sampler
-  declaration without a type is tolerated. Covered by 10 tests.
-- Added the HLSL front end for the upcoming shader runtime: `ShaderLexer` tokenizes the
-  `ps_2_0` subset Milkdrop shaders use, covering identifiers and keywords, numbers with their
-  `f`/`h` suffixes, single- and multi-character operators, swizzles, line and block comments,
-  and source positions, and reports an unexpected character with its offset. Covered by
-  10 tests.
-- Added the generated visualizer texture bank. The `noise_lq` (32 x 32), `noise_mq`
-  (256 x 256), and `noise_hq` (512 x 512) textures and the sixteen `rand00`-`rand15` (32 x 32)
-  textures are produced deterministically from fixed seeds, so no third party image is
-  bundled and every run yields the same textures. Sampling is bilinear with repeat, clamp, and
-  mirror wrap modes, and generation is lazy so a session that never opens the visualizer
-  allocates nothing. Covered by 10 tests.
-- Milkdrop preset keys now act as the per-frame starting values: every numeric key (including
-  the `nWaveMode`, `bWaveDots`, `bWaveThick`, `bAdditiveWaves`, `bDarkenCenter`,
-  `bMotionVectors`, and `nMotionVectorsX/Y` spellings) seeds the matching variable, so real
-  presets that carry their settings as keys instead of code work as written.
-- The visualizer draws the full Milkdrop wave and post-processing set: the circular, doubled,
-  and single-line wave modes with dots, thick, additive, mystery, and colour/position keys,
-  the four declared waveform slots, the outer and inner borders, a motion-vector grid derived
-  from the actual motion field, and the video echo with its zoom, alpha, and orientation.
-  Covered by 11 tests.
-- The preset engine now runs the full Milkdrop stage order. It parses the `per_frame_init`,
-  `per_pixel_init`, `wave_0`-`wave_3` and `shape_N_init` blocks, registers the complete
-  standard variable set (`bass_att`/`mid_att`/`treb_att`, `aspectx`/`aspecty`,
-  `pixelsx`/`pixelsy`, `monitor`, `zoomexp`, `rot`, `cx`/`cy`, `dx`/`dy`, `sx`/`sy`,
-  `blur1`-`blur3`, `darken_center`, `fGammaAdj`, the wave, border, motion-vector and echo
-  groups, `q1`-`q32`, and `b1`-`b8`), and applies the motion parameters, the blur passes, the
-  centre darkening, and the gamma adjustment. The per-pixel block now sees the already warped
-  sampling position in `x`/`y`/`rad`/`ang`, so a real preset can offset or replace it.
-  Covered by 16 tests.
-- The **Visualisierung** settings section gained an **Always show text and controls** toggle.
-  When it is off, the title, hint, and playback buttons appear only while the mouse moves
-  over the visualizer and hide again after three idle seconds; pointer movement is tracked
-  through the window's own events, so moving the mouse on another monitor never reveals them.
-- Added a **Visualisierung** settings section with the render resolution (320 x 180 up to
-  1280 x 720), the target frame rate (24, 30, 60, or 120), and the user preset folder that
-  previously lived under the output device. The window renders at the configured size and
-  lets the image control scale the frame up, so a lower resolution keeps the CPU cost down.
 
 - Began the multi-user profile foundation with stable local profile identities
   and per-server profile mappings. Existing installations automatically receive
@@ -1894,28 +863,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   server profile and merged back on other clients, keeping profile-based
   recommendations consistent across devices.
 
-- The karaoke view now highlights the active word of enhanced-LRC lyrics.
-  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
-  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
-  already-sung words keep the accent colour. Plain synchronized lines keep the
-  line-level highlight, so nothing changes for ordinary LRC files.
-- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
-  now stripped from the line text instead of appearing as literal `<00:12.00>`
-  fragments.
-- Added bulk genre editing for the shared Tracks table. The bulk action bar gained
-  a genre field that stores the value for every selected **local** track through
-  `AudioDatabase.SetTrackGenres`, which writes the library-only
-  `track_genre_overrides` table in one transaction and reapplies it on every later
-  scan. Source media files are never modified, and an empty value removes the
-  override so the next scan restores the embedded genre. Selected Orynivo Server
-  tracks are updated on their owning server through the new authenticated
-  `PUT /api/tracks/{id}/genre`, which records the same library-only override.
-- Podcast episodes can be downloaded for offline playback. Episode rows gained a
-  **Download episode** / **Delete download** context menu and a download marker in
-  the status column, playback prefers the cached file, and Settings > Library sets
-  the cache size limit in megabytes. Eviction removes the least recently used
-  downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
-  the most recently used episode is always kept.
 ### Fixed
 
 - Dashboard album artwork now refreshes immediately after a cover search or
@@ -1924,124 +871,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.40.2] - 2026-09-05
 
 ### Added
-- The visualizer's per-pixel path no longer does work the preset never asked for. The compiled
-  programs now report the variables they reference (`PresetProgram.ReferencedVariables` and
-  `Uses`), the warp stage resolves the `x`, `y`, `rad`, and `ang` slots once instead of looking
-  each name up in the layout for every pixel, and it only computes the polar pair, the motion
-  grid, and the seeded sampling position when the preset's own code needs them. A rendered frame
-  is allocation-free, which is now asserted by a test. Covered by 5 tests.
-- The visualizer renders on its own thread now. A frame used to be produced from a
-  `DispatcherTimer`, so a heavy preset blocked the interface for its whole duration; the loop
-  now runs on a background thread, hands a finished copy of the frame to the UI thread through a
-  presentation buffer, and queues at most one present at a time, so a busy interface can never
-  build up a backlog of frames. Preset switching, the reset key, and the overlay follow as
-  thread-safe requests, and the frame pacing lives in the tested `FramePacing` helper. Covered by
-  5 tests.
-- The visualizer now measures where its frame time goes. `PresetRenderer` reports a
-  `RenderTimings` breakdown (warp, blur, post-processing, overlay, composite, comp shaders, and
-  the frame total) per frame and as an average over a window, and the window's diagnostic line in
-  `logs/seek.log` carries those averages once per second, so the cost per stage can be read
-  instead of guessed. A warp shader runs inside the per-pixel loop, so its cost stays part of
-  `warp`; timing it per pixel would cost more than the measurement is worth. The frame budget now
-  compares the complete frame rather than only the shaders. Covered by 8 tests.
-- Milkdrop `.milk` files are read as the multi-preset files they are: `VisualizerPreset.ParseSections`
-  splits the text at its `[presetNN]` headers and the preset folder loads every section as its
-  own preset instead of only the last one surviving. The declared format version
-  (`MILKDROP_PRESET_VERSION`, `PSVERSION`, or `preset_version`) is reported on
-  `VisualizerPreset.Version`; every version is accepted. Skipped presets now carry a reason
-  through `VisualizerPresetLibrary.RejectedReasons`, naming the file or section and the parse
-  error. A hand-written corpus of presets in the real format, including a multi-section file and
-  shader source, guards the format handling; third-party presets stay unbundled because they are
-  licensed by their authors. Covered by 13 tests.
-- The visualizer now runs preset shaders. The numbered `warp_N` and `comp_N` keys are parsed
-  together with their optional `_enabled`, `_per_frame`, and `_per_pixel` companions, and the
-  preset reader keeps the newlines inside a shader's source, because Milkdrop stores the code
-  as a multi-line value. A shader that does not parse is skipped so one broken shader degrades a
-  preset instead of rejecting it. The renderer implements `IShaderSampler`, so shaders can
-  sample `sampler_main`, `sampler_pc_main`, `sampler_fc_main`, `GetBlur1`-`GetBlur3`, and
-  `GetPixel`, and it binds `uv`, `uv_orig`, `texsize`, the audio bands, the smoothed bands, the
-  frame counters, and the aspect ratio. A per-frame time budget (20 ms by default) skips the
-  shaders for a while when they cost too much, so a heavy preset keeps a smooth picture instead
-  of stalling playback. Covered by 11 tests.
-- Added the HLSL interpreter for the shader runtime: `ShaderInterpreter` evaluates the parsed
-  `ps_2_0` tree with scalar and `float2`/`float3`/`float4` values (`ShaderValue`), covering
-  arithmetic with the C precedence, variables and the assignment operators, swizzles read and
-  written, vector constructors with concatenation and broadcast, the ternary operator,
-  `if`/`else`, `for`, and the usual intrinsics (`abs`, `ceil`, `clamp`, `cos`, `dot`, `exp`,
-  `floor`, `frac`, `length`, `lerp`, `log`, `max`, `min`, `mul`, `normalize`, `pow`, `saturate`,
-  `sign`, `sin`, `smoothstep`, `sqrt`, `step`, `tan`). Sampling goes through the
-  `IShaderSampler` contract, so the interpreter carries no render state, and division by zero
-  yields zero instead of an infinity. A loop budget of 4096 iterations and a call depth limit of
-  32 keep a runaway shader from stalling a frame. Covered by 14 tests.
-- Added the HLSL parser and its syntax tree: `ShaderParser` and `ShaderNode` turn the
-  `ps_2_0` subset into a tagged-union tree covering declarations, expression statements,
-  `if`/`else`, `for`, `return`, swizzles, calls, the ternary operator, and the C operator
-  precedence. Function signatures and bare statement bodies are both accepted, and a sampler
-  declaration without a type is tolerated. Covered by 10 tests.
-- Added the HLSL front end for the upcoming shader runtime: `ShaderLexer` tokenizes the
-  `ps_2_0` subset Milkdrop shaders use, covering identifiers and keywords, numbers with their
-  `f`/`h` suffixes, single- and multi-character operators, swizzles, line and block comments,
-  and source positions, and reports an unexpected character with its offset. Covered by
-  10 tests.
-- Added the generated visualizer texture bank. The `noise_lq` (32 x 32), `noise_mq`
-  (256 x 256), and `noise_hq` (512 x 512) textures and the sixteen `rand00`-`rand15` (32 x 32)
-  textures are produced deterministically from fixed seeds, so no third party image is
-  bundled and every run yields the same textures. Sampling is bilinear with repeat, clamp, and
-  mirror wrap modes, and generation is lazy so a session that never opens the visualizer
-  allocates nothing. Covered by 10 tests.
-- Milkdrop preset keys now act as the per-frame starting values: every numeric key (including
-  the `nWaveMode`, `bWaveDots`, `bWaveThick`, `bAdditiveWaves`, `bDarkenCenter`,
-  `bMotionVectors`, and `nMotionVectorsX/Y` spellings) seeds the matching variable, so real
-  presets that carry their settings as keys instead of code work as written.
-- The visualizer draws the full Milkdrop wave and post-processing set: the circular, doubled,
-  and single-line wave modes with dots, thick, additive, mystery, and colour/position keys,
-  the four declared waveform slots, the outer and inner borders, a motion-vector grid derived
-  from the actual motion field, and the video echo with its zoom, alpha, and orientation.
-  Covered by 11 tests.
-- The preset engine now runs the full Milkdrop stage order. It parses the `per_frame_init`,
-  `per_pixel_init`, `wave_0`-`wave_3` and `shape_N_init` blocks, registers the complete
-  standard variable set (`bass_att`/`mid_att`/`treb_att`, `aspectx`/`aspecty`,
-  `pixelsx`/`pixelsy`, `monitor`, `zoomexp`, `rot`, `cx`/`cy`, `dx`/`dy`, `sx`/`sy`,
-  `blur1`-`blur3`, `darken_center`, `fGammaAdj`, the wave, border, motion-vector and echo
-  groups, `q1`-`q32`, and `b1`-`b8`), and applies the motion parameters, the blur passes, the
-  centre darkening, and the gamma adjustment. The per-pixel block now sees the already warped
-  sampling position in `x`/`y`/`rad`/`ang`, so a real preset can offset or replace it.
-  Covered by 16 tests.
-- The **Visualisierung** settings section gained an **Always show text and controls** toggle.
-  When it is off, the title, hint, and playback buttons appear only while the mouse moves
-  over the visualizer and hide again after three idle seconds; pointer movement is tracked
-  through the window's own events, so moving the mouse on another monitor never reveals them.
-- Added a **Visualisierung** settings section with the render resolution (320 x 180 up to
-  1280 x 720), the target frame rate (24, 30, 60, or 120), and the user preset folder that
-  previously lived under the output device. The window renders at the configured size and
-  lets the image control scale the frame up, so a lower resolution keeps the CPU cost down.
 
 - Metadata review now explains the review/compare/confirm workflow, distinguishes
   read-only server reports from local corrections, and shows phase progress,
   elapsed time and measured phase-local remaining-time estimates.
 
-- The karaoke view now highlights the active word of enhanced-LRC lyrics.
-  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
-  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
-  already-sung words keep the accent colour. Plain synchronized lines keep the
-  line-level highlight, so nothing changes for ordinary LRC files.
-- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
-  now stripped from the line text instead of appearing as literal `<00:12.00>`
-  fragments.
-- Added bulk genre editing for the shared Tracks table. The bulk action bar gained
-  a genre field that stores the value for every selected **local** track through
-  `AudioDatabase.SetTrackGenres`, which writes the library-only
-  `track_genre_overrides` table in one transaction and reapplies it on every later
-  scan. Source media files are never modified, and an empty value removes the
-  override so the next scan restores the embedded genre. Selected Orynivo Server
-  tracks are updated on their owning server through the new authenticated
-  `PUT /api/tracks/{id}/genre`, which records the same library-only override.
-- Podcast episodes can be downloaded for offline playback. Episode rows gained a
-  **Download episode** / **Delete download** context menu and a download marker in
-  the status column, playback prefers the cached file, and Settings > Library sets
-  the cache size limit in megabytes. Eviction removes the least recently used
-  downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
-  the most recently used episode is always kept.
 ### Fixed
 
 - Opening metadata review uses a fast index-only analysis instead of opening
@@ -2055,28 +889,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [0.40.1] - 2026-09-05
 
-- The karaoke view now highlights the active word of enhanced-LRC lyrics.
-  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
-  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
-  already-sung words keep the accent colour. Plain synchronized lines keep the
-  line-level highlight, so nothing changes for ordinary LRC files.
-- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
-  now stripped from the line text instead of appearing as literal `<00:12.00>`
-  fragments.
-- Added bulk genre editing for the shared Tracks table. The bulk action bar gained
-  a genre field that stores the value for every selected **local** track through
-  `AudioDatabase.SetTrackGenres`, which writes the library-only
-  `track_genre_overrides` table in one transaction and reapplies it on every later
-  scan. Source media files are never modified, and an empty value removes the
-  override so the next scan restores the embedded genre. Selected Orynivo Server
-  tracks are updated on their owning server through the new authenticated
-  `PUT /api/tracks/{id}/genre`, which records the same library-only override.
-- Podcast episodes can be downloaded for offline playback. Episode rows gained a
-  **Download episode** / **Delete download** context menu and a download marker in
-  the status column, playback prefers the cached file, and Settings > Library sets
-  the cache size limit in megabytes. Eviction removes the least recently used
-  downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
-  the most recently used episode is always kept.
 ### Fixed
 
 - Fixed smart playlists missing server tracks (including favorites) because the
@@ -2087,97 +899,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.40.0] - 2026-09-05
 
 ### Added
-- The visualizer's per-pixel path no longer does work the preset never asked for. The compiled
-  programs now report the variables they reference (`PresetProgram.ReferencedVariables` and
-  `Uses`), the warp stage resolves the `x`, `y`, `rad`, and `ang` slots once instead of looking
-  each name up in the layout for every pixel, and it only computes the polar pair, the motion
-  grid, and the seeded sampling position when the preset's own code needs them. A rendered frame
-  is allocation-free, which is now asserted by a test. Covered by 5 tests.
-- The visualizer renders on its own thread now. A frame used to be produced from a
-  `DispatcherTimer`, so a heavy preset blocked the interface for its whole duration; the loop
-  now runs on a background thread, hands a finished copy of the frame to the UI thread through a
-  presentation buffer, and queues at most one present at a time, so a busy interface can never
-  build up a backlog of frames. Preset switching, the reset key, and the overlay follow as
-  thread-safe requests, and the frame pacing lives in the tested `FramePacing` helper. Covered by
-  5 tests.
-- The visualizer now measures where its frame time goes. `PresetRenderer` reports a
-  `RenderTimings` breakdown (warp, blur, post-processing, overlay, composite, comp shaders, and
-  the frame total) per frame and as an average over a window, and the window's diagnostic line in
-  `logs/seek.log` carries those averages once per second, so the cost per stage can be read
-  instead of guessed. A warp shader runs inside the per-pixel loop, so its cost stays part of
-  `warp`; timing it per pixel would cost more than the measurement is worth. The frame budget now
-  compares the complete frame rather than only the shaders. Covered by 8 tests.
-- Milkdrop `.milk` files are read as the multi-preset files they are: `VisualizerPreset.ParseSections`
-  splits the text at its `[presetNN]` headers and the preset folder loads every section as its
-  own preset instead of only the last one surviving. The declared format version
-  (`MILKDROP_PRESET_VERSION`, `PSVERSION`, or `preset_version`) is reported on
-  `VisualizerPreset.Version`; every version is accepted. Skipped presets now carry a reason
-  through `VisualizerPresetLibrary.RejectedReasons`, naming the file or section and the parse
-  error. A hand-written corpus of presets in the real format, including a multi-section file and
-  shader source, guards the format handling; third-party presets stay unbundled because they are
-  licensed by their authors. Covered by 13 tests.
-- The visualizer now runs preset shaders. The numbered `warp_N` and `comp_N` keys are parsed
-  together with their optional `_enabled`, `_per_frame`, and `_per_pixel` companions, and the
-  preset reader keeps the newlines inside a shader's source, because Milkdrop stores the code
-  as a multi-line value. A shader that does not parse is skipped so one broken shader degrades a
-  preset instead of rejecting it. The renderer implements `IShaderSampler`, so shaders can
-  sample `sampler_main`, `sampler_pc_main`, `sampler_fc_main`, `GetBlur1`-`GetBlur3`, and
-  `GetPixel`, and it binds `uv`, `uv_orig`, `texsize`, the audio bands, the smoothed bands, the
-  frame counters, and the aspect ratio. A per-frame time budget (20 ms by default) skips the
-  shaders for a while when they cost too much, so a heavy preset keeps a smooth picture instead
-  of stalling playback. Covered by 11 tests.
-- Added the HLSL interpreter for the shader runtime: `ShaderInterpreter` evaluates the parsed
-  `ps_2_0` tree with scalar and `float2`/`float3`/`float4` values (`ShaderValue`), covering
-  arithmetic with the C precedence, variables and the assignment operators, swizzles read and
-  written, vector constructors with concatenation and broadcast, the ternary operator,
-  `if`/`else`, `for`, and the usual intrinsics (`abs`, `ceil`, `clamp`, `cos`, `dot`, `exp`,
-  `floor`, `frac`, `length`, `lerp`, `log`, `max`, `min`, `mul`, `normalize`, `pow`, `saturate`,
-  `sign`, `sin`, `smoothstep`, `sqrt`, `step`, `tan`). Sampling goes through the
-  `IShaderSampler` contract, so the interpreter carries no render state, and division by zero
-  yields zero instead of an infinity. A loop budget of 4096 iterations and a call depth limit of
-  32 keep a runaway shader from stalling a frame. Covered by 14 tests.
-- Added the HLSL parser and its syntax tree: `ShaderParser` and `ShaderNode` turn the
-  `ps_2_0` subset into a tagged-union tree covering declarations, expression statements,
-  `if`/`else`, `for`, `return`, swizzles, calls, the ternary operator, and the C operator
-  precedence. Function signatures and bare statement bodies are both accepted, and a sampler
-  declaration without a type is tolerated. Covered by 10 tests.
-- Added the HLSL front end for the upcoming shader runtime: `ShaderLexer` tokenizes the
-  `ps_2_0` subset Milkdrop shaders use, covering identifiers and keywords, numbers with their
-  `f`/`h` suffixes, single- and multi-character operators, swizzles, line and block comments,
-  and source positions, and reports an unexpected character with its offset. Covered by
-  10 tests.
-- Added the generated visualizer texture bank. The `noise_lq` (32 x 32), `noise_mq`
-  (256 x 256), and `noise_hq` (512 x 512) textures and the sixteen `rand00`-`rand15` (32 x 32)
-  textures are produced deterministically from fixed seeds, so no third party image is
-  bundled and every run yields the same textures. Sampling is bilinear with repeat, clamp, and
-  mirror wrap modes, and generation is lazy so a session that never opens the visualizer
-  allocates nothing. Covered by 10 tests.
-- Milkdrop preset keys now act as the per-frame starting values: every numeric key (including
-  the `nWaveMode`, `bWaveDots`, `bWaveThick`, `bAdditiveWaves`, `bDarkenCenter`,
-  `bMotionVectors`, and `nMotionVectorsX/Y` spellings) seeds the matching variable, so real
-  presets that carry their settings as keys instead of code work as written.
-- The visualizer draws the full Milkdrop wave and post-processing set: the circular, doubled,
-  and single-line wave modes with dots, thick, additive, mystery, and colour/position keys,
-  the four declared waveform slots, the outer and inner borders, a motion-vector grid derived
-  from the actual motion field, and the video echo with its zoom, alpha, and orientation.
-  Covered by 11 tests.
-- The preset engine now runs the full Milkdrop stage order. It parses the `per_frame_init`,
-  `per_pixel_init`, `wave_0`-`wave_3` and `shape_N_init` blocks, registers the complete
-  standard variable set (`bass_att`/`mid_att`/`treb_att`, `aspectx`/`aspecty`,
-  `pixelsx`/`pixelsy`, `monitor`, `zoomexp`, `rot`, `cx`/`cy`, `dx`/`dy`, `sx`/`sy`,
-  `blur1`-`blur3`, `darken_center`, `fGammaAdj`, the wave, border, motion-vector and echo
-  groups, `q1`-`q32`, and `b1`-`b8`), and applies the motion parameters, the blur passes, the
-  centre darkening, and the gamma adjustment. The per-pixel block now sees the already warped
-  sampling position in `x`/`y`/`rad`/`ang`, so a real preset can offset or replace it.
-  Covered by 16 tests.
-- The **Visualisierung** settings section gained an **Always show text and controls** toggle.
-  When it is off, the title, hint, and playback buttons appear only while the mouse moves
-  over the visualizer and hide again after three idle seconds; pointer movement is tracked
-  through the window's own events, so moving the mouse on another monitor never reveals them.
-- Added a **Visualisierung** settings section with the render resolution (320 x 180 up to
-  1280 x 720), the target frame rate (24, 30, 60, or 120), and the user preset folder that
-  previously lived under the output device. The window renders at the configured size and
-  lets the image control scale the frame up, so a lower resolution keeps the CPU cost down.
 
 - Added LAN IPv4 address selection and an offline-generated QR code in mobile
   remote settings. Scanning signs in with the dedicated token from a URL fragment,
@@ -2206,28 +927,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   the local catalog and configured servers; tracks retain the same safe
   play-now, play-next, and append actions.
 
-- The karaoke view now highlights the active word of enhanced-LRC lyrics.
-  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
-  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
-  already-sung words keep the accent colour. Plain synchronized lines keep the
-  line-level highlight, so nothing changes for ordinary LRC files.
-- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
-  now stripped from the line text instead of appearing as literal `<00:12.00>`
-  fragments.
-- Added bulk genre editing for the shared Tracks table. The bulk action bar gained
-  a genre field that stores the value for every selected **local** track through
-  `AudioDatabase.SetTrackGenres`, which writes the library-only
-  `track_genre_overrides` table in one transaction and reapplies it on every later
-  scan. Source media files are never modified, and an empty value removes the
-  override so the next scan restores the embedded genre. Selected Orynivo Server
-  tracks are updated on their owning server through the new authenticated
-  `PUT /api/tracks/{id}/genre`, which records the same library-only override.
-- Podcast episodes can be downloaded for offline playback. Episode rows gained a
-  **Download episode** / **Delete download** context menu and a download marker in
-  the status column, playback prefers the cached file, and Settings > Library sets
-  the cache size limit in megabytes. Eviction removes the least recently used
-  downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
-  the most recently used episode is always kept.
 ### Fixed
 
 - Allowed authenticated artwork blob URLs in the remote's content security policy,
@@ -2256,97 +955,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.39.0] - 2026-09-04
 
 ### Added
-- The visualizer's per-pixel path no longer does work the preset never asked for. The compiled
-  programs now report the variables they reference (`PresetProgram.ReferencedVariables` and
-  `Uses`), the warp stage resolves the `x`, `y`, `rad`, and `ang` slots once instead of looking
-  each name up in the layout for every pixel, and it only computes the polar pair, the motion
-  grid, and the seeded sampling position when the preset's own code needs them. A rendered frame
-  is allocation-free, which is now asserted by a test. Covered by 5 tests.
-- The visualizer renders on its own thread now. A frame used to be produced from a
-  `DispatcherTimer`, so a heavy preset blocked the interface for its whole duration; the loop
-  now runs on a background thread, hands a finished copy of the frame to the UI thread through a
-  presentation buffer, and queues at most one present at a time, so a busy interface can never
-  build up a backlog of frames. Preset switching, the reset key, and the overlay follow as
-  thread-safe requests, and the frame pacing lives in the tested `FramePacing` helper. Covered by
-  5 tests.
-- The visualizer now measures where its frame time goes. `PresetRenderer` reports a
-  `RenderTimings` breakdown (warp, blur, post-processing, overlay, composite, comp shaders, and
-  the frame total) per frame and as an average over a window, and the window's diagnostic line in
-  `logs/seek.log` carries those averages once per second, so the cost per stage can be read
-  instead of guessed. A warp shader runs inside the per-pixel loop, so its cost stays part of
-  `warp`; timing it per pixel would cost more than the measurement is worth. The frame budget now
-  compares the complete frame rather than only the shaders. Covered by 8 tests.
-- Milkdrop `.milk` files are read as the multi-preset files they are: `VisualizerPreset.ParseSections`
-  splits the text at its `[presetNN]` headers and the preset folder loads every section as its
-  own preset instead of only the last one surviving. The declared format version
-  (`MILKDROP_PRESET_VERSION`, `PSVERSION`, or `preset_version`) is reported on
-  `VisualizerPreset.Version`; every version is accepted. Skipped presets now carry a reason
-  through `VisualizerPresetLibrary.RejectedReasons`, naming the file or section and the parse
-  error. A hand-written corpus of presets in the real format, including a multi-section file and
-  shader source, guards the format handling; third-party presets stay unbundled because they are
-  licensed by their authors. Covered by 13 tests.
-- The visualizer now runs preset shaders. The numbered `warp_N` and `comp_N` keys are parsed
-  together with their optional `_enabled`, `_per_frame`, and `_per_pixel` companions, and the
-  preset reader keeps the newlines inside a shader's source, because Milkdrop stores the code
-  as a multi-line value. A shader that does not parse is skipped so one broken shader degrades a
-  preset instead of rejecting it. The renderer implements `IShaderSampler`, so shaders can
-  sample `sampler_main`, `sampler_pc_main`, `sampler_fc_main`, `GetBlur1`-`GetBlur3`, and
-  `GetPixel`, and it binds `uv`, `uv_orig`, `texsize`, the audio bands, the smoothed bands, the
-  frame counters, and the aspect ratio. A per-frame time budget (20 ms by default) skips the
-  shaders for a while when they cost too much, so a heavy preset keeps a smooth picture instead
-  of stalling playback. Covered by 11 tests.
-- Added the HLSL interpreter for the shader runtime: `ShaderInterpreter` evaluates the parsed
-  `ps_2_0` tree with scalar and `float2`/`float3`/`float4` values (`ShaderValue`), covering
-  arithmetic with the C precedence, variables and the assignment operators, swizzles read and
-  written, vector constructors with concatenation and broadcast, the ternary operator,
-  `if`/`else`, `for`, and the usual intrinsics (`abs`, `ceil`, `clamp`, `cos`, `dot`, `exp`,
-  `floor`, `frac`, `length`, `lerp`, `log`, `max`, `min`, `mul`, `normalize`, `pow`, `saturate`,
-  `sign`, `sin`, `smoothstep`, `sqrt`, `step`, `tan`). Sampling goes through the
-  `IShaderSampler` contract, so the interpreter carries no render state, and division by zero
-  yields zero instead of an infinity. A loop budget of 4096 iterations and a call depth limit of
-  32 keep a runaway shader from stalling a frame. Covered by 14 tests.
-- Added the HLSL parser and its syntax tree: `ShaderParser` and `ShaderNode` turn the
-  `ps_2_0` subset into a tagged-union tree covering declarations, expression statements,
-  `if`/`else`, `for`, `return`, swizzles, calls, the ternary operator, and the C operator
-  precedence. Function signatures and bare statement bodies are both accepted, and a sampler
-  declaration without a type is tolerated. Covered by 10 tests.
-- Added the HLSL front end for the upcoming shader runtime: `ShaderLexer` tokenizes the
-  `ps_2_0` subset Milkdrop shaders use, covering identifiers and keywords, numbers with their
-  `f`/`h` suffixes, single- and multi-character operators, swizzles, line and block comments,
-  and source positions, and reports an unexpected character with its offset. Covered by
-  10 tests.
-- Added the generated visualizer texture bank. The `noise_lq` (32 x 32), `noise_mq`
-  (256 x 256), and `noise_hq` (512 x 512) textures and the sixteen `rand00`-`rand15` (32 x 32)
-  textures are produced deterministically from fixed seeds, so no third party image is
-  bundled and every run yields the same textures. Sampling is bilinear with repeat, clamp, and
-  mirror wrap modes, and generation is lazy so a session that never opens the visualizer
-  allocates nothing. Covered by 10 tests.
-- Milkdrop preset keys now act as the per-frame starting values: every numeric key (including
-  the `nWaveMode`, `bWaveDots`, `bWaveThick`, `bAdditiveWaves`, `bDarkenCenter`,
-  `bMotionVectors`, and `nMotionVectorsX/Y` spellings) seeds the matching variable, so real
-  presets that carry their settings as keys instead of code work as written.
-- The visualizer draws the full Milkdrop wave and post-processing set: the circular, doubled,
-  and single-line wave modes with dots, thick, additive, mystery, and colour/position keys,
-  the four declared waveform slots, the outer and inner borders, a motion-vector grid derived
-  from the actual motion field, and the video echo with its zoom, alpha, and orientation.
-  Covered by 11 tests.
-- The preset engine now runs the full Milkdrop stage order. It parses the `per_frame_init`,
-  `per_pixel_init`, `wave_0`-`wave_3` and `shape_N_init` blocks, registers the complete
-  standard variable set (`bass_att`/`mid_att`/`treb_att`, `aspectx`/`aspecty`,
-  `pixelsx`/`pixelsy`, `monitor`, `zoomexp`, `rot`, `cx`/`cy`, `dx`/`dy`, `sx`/`sy`,
-  `blur1`-`blur3`, `darken_center`, `fGammaAdj`, the wave, border, motion-vector and echo
-  groups, `q1`-`q32`, and `b1`-`b8`), and applies the motion parameters, the blur passes, the
-  centre darkening, and the gamma adjustment. The per-pixel block now sees the already warped
-  sampling position in `x`/`y`/`rad`/`ang`, so a real preset can offset or replace it.
-  Covered by 16 tests.
-- The **Visualisierung** settings section gained an **Always show text and controls** toggle.
-  When it is off, the title, hint, and playback buttons appear only while the mouse moves
-  over the visualizer and hide again after three idle seconds; pointer movement is tracked
-  through the window's own events, so moving the mouse on another monitor never reveals them.
-- Added a **Visualisierung** settings section with the render resolution (320 x 180 up to
-  1280 x 720), the target frame rate (24, 30, 60, or 120), and the user preset folder that
-  previously lived under the output device. The window renders at the configured size and
-  lets the image control scale the frame up, so a lower resolution keeps the CPU cost down.
 
 - Added the version-two provider-neutral similarity feature contract and a
   compact local query that combines effective genres, BPM, explicit mood tags,
@@ -2385,97 +993,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   ## [0.38.0] - 2026-09-04
 
 ### Added
-- The visualizer's per-pixel path no longer does work the preset never asked for. The compiled
-  programs now report the variables they reference (`PresetProgram.ReferencedVariables` and
-  `Uses`), the warp stage resolves the `x`, `y`, `rad`, and `ang` slots once instead of looking
-  each name up in the layout for every pixel, and it only computes the polar pair, the motion
-  grid, and the seeded sampling position when the preset's own code needs them. A rendered frame
-  is allocation-free, which is now asserted by a test. Covered by 5 tests.
-- The visualizer renders on its own thread now. A frame used to be produced from a
-  `DispatcherTimer`, so a heavy preset blocked the interface for its whole duration; the loop
-  now runs on a background thread, hands a finished copy of the frame to the UI thread through a
-  presentation buffer, and queues at most one present at a time, so a busy interface can never
-  build up a backlog of frames. Preset switching, the reset key, and the overlay follow as
-  thread-safe requests, and the frame pacing lives in the tested `FramePacing` helper. Covered by
-  5 tests.
-- The visualizer now measures where its frame time goes. `PresetRenderer` reports a
-  `RenderTimings` breakdown (warp, blur, post-processing, overlay, composite, comp shaders, and
-  the frame total) per frame and as an average over a window, and the window's diagnostic line in
-  `logs/seek.log` carries those averages once per second, so the cost per stage can be read
-  instead of guessed. A warp shader runs inside the per-pixel loop, so its cost stays part of
-  `warp`; timing it per pixel would cost more than the measurement is worth. The frame budget now
-  compares the complete frame rather than only the shaders. Covered by 8 tests.
-- Milkdrop `.milk` files are read as the multi-preset files they are: `VisualizerPreset.ParseSections`
-  splits the text at its `[presetNN]` headers and the preset folder loads every section as its
-  own preset instead of only the last one surviving. The declared format version
-  (`MILKDROP_PRESET_VERSION`, `PSVERSION`, or `preset_version`) is reported on
-  `VisualizerPreset.Version`; every version is accepted. Skipped presets now carry a reason
-  through `VisualizerPresetLibrary.RejectedReasons`, naming the file or section and the parse
-  error. A hand-written corpus of presets in the real format, including a multi-section file and
-  shader source, guards the format handling; third-party presets stay unbundled because they are
-  licensed by their authors. Covered by 13 tests.
-- The visualizer now runs preset shaders. The numbered `warp_N` and `comp_N` keys are parsed
-  together with their optional `_enabled`, `_per_frame`, and `_per_pixel` companions, and the
-  preset reader keeps the newlines inside a shader's source, because Milkdrop stores the code
-  as a multi-line value. A shader that does not parse is skipped so one broken shader degrades a
-  preset instead of rejecting it. The renderer implements `IShaderSampler`, so shaders can
-  sample `sampler_main`, `sampler_pc_main`, `sampler_fc_main`, `GetBlur1`-`GetBlur3`, and
-  `GetPixel`, and it binds `uv`, `uv_orig`, `texsize`, the audio bands, the smoothed bands, the
-  frame counters, and the aspect ratio. A per-frame time budget (20 ms by default) skips the
-  shaders for a while when they cost too much, so a heavy preset keeps a smooth picture instead
-  of stalling playback. Covered by 11 tests.
-- Added the HLSL interpreter for the shader runtime: `ShaderInterpreter` evaluates the parsed
-  `ps_2_0` tree with scalar and `float2`/`float3`/`float4` values (`ShaderValue`), covering
-  arithmetic with the C precedence, variables and the assignment operators, swizzles read and
-  written, vector constructors with concatenation and broadcast, the ternary operator,
-  `if`/`else`, `for`, and the usual intrinsics (`abs`, `ceil`, `clamp`, `cos`, `dot`, `exp`,
-  `floor`, `frac`, `length`, `lerp`, `log`, `max`, `min`, `mul`, `normalize`, `pow`, `saturate`,
-  `sign`, `sin`, `smoothstep`, `sqrt`, `step`, `tan`). Sampling goes through the
-  `IShaderSampler` contract, so the interpreter carries no render state, and division by zero
-  yields zero instead of an infinity. A loop budget of 4096 iterations and a call depth limit of
-  32 keep a runaway shader from stalling a frame. Covered by 14 tests.
-- Added the HLSL parser and its syntax tree: `ShaderParser` and `ShaderNode` turn the
-  `ps_2_0` subset into a tagged-union tree covering declarations, expression statements,
-  `if`/`else`, `for`, `return`, swizzles, calls, the ternary operator, and the C operator
-  precedence. Function signatures and bare statement bodies are both accepted, and a sampler
-  declaration without a type is tolerated. Covered by 10 tests.
-- Added the HLSL front end for the upcoming shader runtime: `ShaderLexer` tokenizes the
-  `ps_2_0` subset Milkdrop shaders use, covering identifiers and keywords, numbers with their
-  `f`/`h` suffixes, single- and multi-character operators, swizzles, line and block comments,
-  and source positions, and reports an unexpected character with its offset. Covered by
-  10 tests.
-- Added the generated visualizer texture bank. The `noise_lq` (32 x 32), `noise_mq`
-  (256 x 256), and `noise_hq` (512 x 512) textures and the sixteen `rand00`-`rand15` (32 x 32)
-  textures are produced deterministically from fixed seeds, so no third party image is
-  bundled and every run yields the same textures. Sampling is bilinear with repeat, clamp, and
-  mirror wrap modes, and generation is lazy so a session that never opens the visualizer
-  allocates nothing. Covered by 10 tests.
-- Milkdrop preset keys now act as the per-frame starting values: every numeric key (including
-  the `nWaveMode`, `bWaveDots`, `bWaveThick`, `bAdditiveWaves`, `bDarkenCenter`,
-  `bMotionVectors`, and `nMotionVectorsX/Y` spellings) seeds the matching variable, so real
-  presets that carry their settings as keys instead of code work as written.
-- The visualizer draws the full Milkdrop wave and post-processing set: the circular, doubled,
-  and single-line wave modes with dots, thick, additive, mystery, and colour/position keys,
-  the four declared waveform slots, the outer and inner borders, a motion-vector grid derived
-  from the actual motion field, and the video echo with its zoom, alpha, and orientation.
-  Covered by 11 tests.
-- The preset engine now runs the full Milkdrop stage order. It parses the `per_frame_init`,
-  `per_pixel_init`, `wave_0`-`wave_3` and `shape_N_init` blocks, registers the complete
-  standard variable set (`bass_att`/`mid_att`/`treb_att`, `aspectx`/`aspecty`,
-  `pixelsx`/`pixelsy`, `monitor`, `zoomexp`, `rot`, `cx`/`cy`, `dx`/`dy`, `sx`/`sy`,
-  `blur1`-`blur3`, `darken_center`, `fGammaAdj`, the wave, border, motion-vector and echo
-  groups, `q1`-`q32`, and `b1`-`b8`), and applies the motion parameters, the blur passes, the
-  centre darkening, and the gamma adjustment. The per-pixel block now sees the already warped
-  sampling position in `x`/`y`/`rad`/`ang`, so a real preset can offset or replace it.
-  Covered by 16 tests.
-- The **Visualisierung** settings section gained an **Always show text and controls** toggle.
-  When it is off, the title, hint, and playback buttons appear only while the mouse moves
-  over the visualizer and hide again after three idle seconds; pointer movement is tracked
-  through the window's own events, so moving the mouse on another monitor never reveals them.
-- Added a **Visualisierung** settings section with the render resolution (320 x 180 up to
-  1280 x 720), the target frame rate (24, 30, 60, or 120), and the user preset folder that
-  previously lived under the output device. The window renders at the configured size and
-  lets the image control scale the frame up, so a lower resolution keeps the CPU cost down.
 
 - Added explicit cancellation and duplicate-start protection to Library Doctor
   analysis; cancellation is checked between folders and physical source files.
@@ -2504,28 +1021,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   Conservatively matched artist-name spelling
   variants are now included as guided-review findings without automatic merges.
 
-- The karaoke view now highlights the active word of enhanced-LRC lyrics.
-  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
-  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
-  already-sung words keep the accent colour. Plain synchronized lines keep the
-  line-level highlight, so nothing changes for ordinary LRC files.
-- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
-  now stripped from the line text instead of appearing as literal `<00:12.00>`
-  fragments.
-- Added bulk genre editing for the shared Tracks table. The bulk action bar gained
-  a genre field that stores the value for every selected **local** track through
-  `AudioDatabase.SetTrackGenres`, which writes the library-only
-  `track_genre_overrides` table in one transaction and reapplies it on every later
-  scan. Source media files are never modified, and an empty value removes the
-  override so the next scan restores the embedded genre. Selected Orynivo Server
-  tracks are updated on their owning server through the new authenticated
-  `PUT /api/tracks/{id}/genre`, which records the same library-only override.
-- Podcast episodes can be downloaded for offline playback. Episode rows gained a
-  **Download episode** / **Delete download** context menu and a download marker in
-  the status column, playback prefers the cached file, and Settings > Library sets
-  the cache size limit in megabytes. Eviction removes the least recently used
-  downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
-  the most recently used episode is always kept.
 ### Fixed
 
 - Fixed a Library Doctor database-column typo that closed Orynivo when metadata
@@ -2535,97 +1030,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.37.4] - 2026-09-04
 
 ### Added
-- The visualizer's per-pixel path no longer does work the preset never asked for. The compiled
-  programs now report the variables they reference (`PresetProgram.ReferencedVariables` and
-  `Uses`), the warp stage resolves the `x`, `y`, `rad`, and `ang` slots once instead of looking
-  each name up in the layout for every pixel, and it only computes the polar pair, the motion
-  grid, and the seeded sampling position when the preset's own code needs them. A rendered frame
-  is allocation-free, which is now asserted by a test. Covered by 5 tests.
-- The visualizer renders on its own thread now. A frame used to be produced from a
-  `DispatcherTimer`, so a heavy preset blocked the interface for its whole duration; the loop
-  now runs on a background thread, hands a finished copy of the frame to the UI thread through a
-  presentation buffer, and queues at most one present at a time, so a busy interface can never
-  build up a backlog of frames. Preset switching, the reset key, and the overlay follow as
-  thread-safe requests, and the frame pacing lives in the tested `FramePacing` helper. Covered by
-  5 tests.
-- The visualizer now measures where its frame time goes. `PresetRenderer` reports a
-  `RenderTimings` breakdown (warp, blur, post-processing, overlay, composite, comp shaders, and
-  the frame total) per frame and as an average over a window, and the window's diagnostic line in
-  `logs/seek.log` carries those averages once per second, so the cost per stage can be read
-  instead of guessed. A warp shader runs inside the per-pixel loop, so its cost stays part of
-  `warp`; timing it per pixel would cost more than the measurement is worth. The frame budget now
-  compares the complete frame rather than only the shaders. Covered by 8 tests.
-- Milkdrop `.milk` files are read as the multi-preset files they are: `VisualizerPreset.ParseSections`
-  splits the text at its `[presetNN]` headers and the preset folder loads every section as its
-  own preset instead of only the last one surviving. The declared format version
-  (`MILKDROP_PRESET_VERSION`, `PSVERSION`, or `preset_version`) is reported on
-  `VisualizerPreset.Version`; every version is accepted. Skipped presets now carry a reason
-  through `VisualizerPresetLibrary.RejectedReasons`, naming the file or section and the parse
-  error. A hand-written corpus of presets in the real format, including a multi-section file and
-  shader source, guards the format handling; third-party presets stay unbundled because they are
-  licensed by their authors. Covered by 13 tests.
-- The visualizer now runs preset shaders. The numbered `warp_N` and `comp_N` keys are parsed
-  together with their optional `_enabled`, `_per_frame`, and `_per_pixel` companions, and the
-  preset reader keeps the newlines inside a shader's source, because Milkdrop stores the code
-  as a multi-line value. A shader that does not parse is skipped so one broken shader degrades a
-  preset instead of rejecting it. The renderer implements `IShaderSampler`, so shaders can
-  sample `sampler_main`, `sampler_pc_main`, `sampler_fc_main`, `GetBlur1`-`GetBlur3`, and
-  `GetPixel`, and it binds `uv`, `uv_orig`, `texsize`, the audio bands, the smoothed bands, the
-  frame counters, and the aspect ratio. A per-frame time budget (20 ms by default) skips the
-  shaders for a while when they cost too much, so a heavy preset keeps a smooth picture instead
-  of stalling playback. Covered by 11 tests.
-- Added the HLSL interpreter for the shader runtime: `ShaderInterpreter` evaluates the parsed
-  `ps_2_0` tree with scalar and `float2`/`float3`/`float4` values (`ShaderValue`), covering
-  arithmetic with the C precedence, variables and the assignment operators, swizzles read and
-  written, vector constructors with concatenation and broadcast, the ternary operator,
-  `if`/`else`, `for`, and the usual intrinsics (`abs`, `ceil`, `clamp`, `cos`, `dot`, `exp`,
-  `floor`, `frac`, `length`, `lerp`, `log`, `max`, `min`, `mul`, `normalize`, `pow`, `saturate`,
-  `sign`, `sin`, `smoothstep`, `sqrt`, `step`, `tan`). Sampling goes through the
-  `IShaderSampler` contract, so the interpreter carries no render state, and division by zero
-  yields zero instead of an infinity. A loop budget of 4096 iterations and a call depth limit of
-  32 keep a runaway shader from stalling a frame. Covered by 14 tests.
-- Added the HLSL parser and its syntax tree: `ShaderParser` and `ShaderNode` turn the
-  `ps_2_0` subset into a tagged-union tree covering declarations, expression statements,
-  `if`/`else`, `for`, `return`, swizzles, calls, the ternary operator, and the C operator
-  precedence. Function signatures and bare statement bodies are both accepted, and a sampler
-  declaration without a type is tolerated. Covered by 10 tests.
-- Added the HLSL front end for the upcoming shader runtime: `ShaderLexer` tokenizes the
-  `ps_2_0` subset Milkdrop shaders use, covering identifiers and keywords, numbers with their
-  `f`/`h` suffixes, single- and multi-character operators, swizzles, line and block comments,
-  and source positions, and reports an unexpected character with its offset. Covered by
-  10 tests.
-- Added the generated visualizer texture bank. The `noise_lq` (32 x 32), `noise_mq`
-  (256 x 256), and `noise_hq` (512 x 512) textures and the sixteen `rand00`-`rand15` (32 x 32)
-  textures are produced deterministically from fixed seeds, so no third party image is
-  bundled and every run yields the same textures. Sampling is bilinear with repeat, clamp, and
-  mirror wrap modes, and generation is lazy so a session that never opens the visualizer
-  allocates nothing. Covered by 10 tests.
-- Milkdrop preset keys now act as the per-frame starting values: every numeric key (including
-  the `nWaveMode`, `bWaveDots`, `bWaveThick`, `bAdditiveWaves`, `bDarkenCenter`,
-  `bMotionVectors`, and `nMotionVectorsX/Y` spellings) seeds the matching variable, so real
-  presets that carry their settings as keys instead of code work as written.
-- The visualizer draws the full Milkdrop wave and post-processing set: the circular, doubled,
-  and single-line wave modes with dots, thick, additive, mystery, and colour/position keys,
-  the four declared waveform slots, the outer and inner borders, a motion-vector grid derived
-  from the actual motion field, and the video echo with its zoom, alpha, and orientation.
-  Covered by 11 tests.
-- The preset engine now runs the full Milkdrop stage order. It parses the `per_frame_init`,
-  `per_pixel_init`, `wave_0`-`wave_3` and `shape_N_init` blocks, registers the complete
-  standard variable set (`bass_att`/`mid_att`/`treb_att`, `aspectx`/`aspecty`,
-  `pixelsx`/`pixelsy`, `monitor`, `zoomexp`, `rot`, `cx`/`cy`, `dx`/`dy`, `sx`/`sy`,
-  `blur1`-`blur3`, `darken_center`, `fGammaAdj`, the wave, border, motion-vector and echo
-  groups, `q1`-`q32`, and `b1`-`b8`), and applies the motion parameters, the blur passes, the
-  centre darkening, and the gamma adjustment. The per-pixel block now sees the already warped
-  sampling position in `x`/`y`/`rad`/`ang`, so a real preset can offset or replace it.
-  Covered by 16 tests.
-- The **Visualisierung** settings section gained an **Always show text and controls** toggle.
-  When it is off, the title, hint, and playback buttons appear only while the mouse moves
-  over the visualizer and hide again after three idle seconds; pointer movement is tracked
-  through the window's own events, so moving the mouse on another monitor never reveals them.
-- Added a **Visualisierung** settings section with the render resolution (320 x 180 up to
-  1280 x 720), the target frame rate (24, 30, 60, or 120), and the user preset folder that
-  previously lived under the output device. The window renders at the configured size and
-  lets the image control scale the frame up, so a lower resolution keeps the CPU cost down.
 
 - Added an explicit opt-in setting for exposing the embedded MCP endpoint to
   the local network. Remote MCP requests require a generated 256-bit bearer
@@ -2638,97 +1042,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.37.3] - 2026-09-02
 
 ### Added
-- The visualizer's per-pixel path no longer does work the preset never asked for. The compiled
-  programs now report the variables they reference (`PresetProgram.ReferencedVariables` and
-  `Uses`), the warp stage resolves the `x`, `y`, `rad`, and `ang` slots once instead of looking
-  each name up in the layout for every pixel, and it only computes the polar pair, the motion
-  grid, and the seeded sampling position when the preset's own code needs them. A rendered frame
-  is allocation-free, which is now asserted by a test. Covered by 5 tests.
-- The visualizer renders on its own thread now. A frame used to be produced from a
-  `DispatcherTimer`, so a heavy preset blocked the interface for its whole duration; the loop
-  now runs on a background thread, hands a finished copy of the frame to the UI thread through a
-  presentation buffer, and queues at most one present at a time, so a busy interface can never
-  build up a backlog of frames. Preset switching, the reset key, and the overlay follow as
-  thread-safe requests, and the frame pacing lives in the tested `FramePacing` helper. Covered by
-  5 tests.
-- The visualizer now measures where its frame time goes. `PresetRenderer` reports a
-  `RenderTimings` breakdown (warp, blur, post-processing, overlay, composite, comp shaders, and
-  the frame total) per frame and as an average over a window, and the window's diagnostic line in
-  `logs/seek.log` carries those averages once per second, so the cost per stage can be read
-  instead of guessed. A warp shader runs inside the per-pixel loop, so its cost stays part of
-  `warp`; timing it per pixel would cost more than the measurement is worth. The frame budget now
-  compares the complete frame rather than only the shaders. Covered by 8 tests.
-- Milkdrop `.milk` files are read as the multi-preset files they are: `VisualizerPreset.ParseSections`
-  splits the text at its `[presetNN]` headers and the preset folder loads every section as its
-  own preset instead of only the last one surviving. The declared format version
-  (`MILKDROP_PRESET_VERSION`, `PSVERSION`, or `preset_version`) is reported on
-  `VisualizerPreset.Version`; every version is accepted. Skipped presets now carry a reason
-  through `VisualizerPresetLibrary.RejectedReasons`, naming the file or section and the parse
-  error. A hand-written corpus of presets in the real format, including a multi-section file and
-  shader source, guards the format handling; third-party presets stay unbundled because they are
-  licensed by their authors. Covered by 13 tests.
-- The visualizer now runs preset shaders. The numbered `warp_N` and `comp_N` keys are parsed
-  together with their optional `_enabled`, `_per_frame`, and `_per_pixel` companions, and the
-  preset reader keeps the newlines inside a shader's source, because Milkdrop stores the code
-  as a multi-line value. A shader that does not parse is skipped so one broken shader degrades a
-  preset instead of rejecting it. The renderer implements `IShaderSampler`, so shaders can
-  sample `sampler_main`, `sampler_pc_main`, `sampler_fc_main`, `GetBlur1`-`GetBlur3`, and
-  `GetPixel`, and it binds `uv`, `uv_orig`, `texsize`, the audio bands, the smoothed bands, the
-  frame counters, and the aspect ratio. A per-frame time budget (20 ms by default) skips the
-  shaders for a while when they cost too much, so a heavy preset keeps a smooth picture instead
-  of stalling playback. Covered by 11 tests.
-- Added the HLSL interpreter for the shader runtime: `ShaderInterpreter` evaluates the parsed
-  `ps_2_0` tree with scalar and `float2`/`float3`/`float4` values (`ShaderValue`), covering
-  arithmetic with the C precedence, variables and the assignment operators, swizzles read and
-  written, vector constructors with concatenation and broadcast, the ternary operator,
-  `if`/`else`, `for`, and the usual intrinsics (`abs`, `ceil`, `clamp`, `cos`, `dot`, `exp`,
-  `floor`, `frac`, `length`, `lerp`, `log`, `max`, `min`, `mul`, `normalize`, `pow`, `saturate`,
-  `sign`, `sin`, `smoothstep`, `sqrt`, `step`, `tan`). Sampling goes through the
-  `IShaderSampler` contract, so the interpreter carries no render state, and division by zero
-  yields zero instead of an infinity. A loop budget of 4096 iterations and a call depth limit of
-  32 keep a runaway shader from stalling a frame. Covered by 14 tests.
-- Added the HLSL parser and its syntax tree: `ShaderParser` and `ShaderNode` turn the
-  `ps_2_0` subset into a tagged-union tree covering declarations, expression statements,
-  `if`/`else`, `for`, `return`, swizzles, calls, the ternary operator, and the C operator
-  precedence. Function signatures and bare statement bodies are both accepted, and a sampler
-  declaration without a type is tolerated. Covered by 10 tests.
-- Added the HLSL front end for the upcoming shader runtime: `ShaderLexer` tokenizes the
-  `ps_2_0` subset Milkdrop shaders use, covering identifiers and keywords, numbers with their
-  `f`/`h` suffixes, single- and multi-character operators, swizzles, line and block comments,
-  and source positions, and reports an unexpected character with its offset. Covered by
-  10 tests.
-- Added the generated visualizer texture bank. The `noise_lq` (32 x 32), `noise_mq`
-  (256 x 256), and `noise_hq` (512 x 512) textures and the sixteen `rand00`-`rand15` (32 x 32)
-  textures are produced deterministically from fixed seeds, so no third party image is
-  bundled and every run yields the same textures. Sampling is bilinear with repeat, clamp, and
-  mirror wrap modes, and generation is lazy so a session that never opens the visualizer
-  allocates nothing. Covered by 10 tests.
-- Milkdrop preset keys now act as the per-frame starting values: every numeric key (including
-  the `nWaveMode`, `bWaveDots`, `bWaveThick`, `bAdditiveWaves`, `bDarkenCenter`,
-  `bMotionVectors`, and `nMotionVectorsX/Y` spellings) seeds the matching variable, so real
-  presets that carry their settings as keys instead of code work as written.
-- The visualizer draws the full Milkdrop wave and post-processing set: the circular, doubled,
-  and single-line wave modes with dots, thick, additive, mystery, and colour/position keys,
-  the four declared waveform slots, the outer and inner borders, a motion-vector grid derived
-  from the actual motion field, and the video echo with its zoom, alpha, and orientation.
-  Covered by 11 tests.
-- The preset engine now runs the full Milkdrop stage order. It parses the `per_frame_init`,
-  `per_pixel_init`, `wave_0`-`wave_3` and `shape_N_init` blocks, registers the complete
-  standard variable set (`bass_att`/`mid_att`/`treb_att`, `aspectx`/`aspecty`,
-  `pixelsx`/`pixelsy`, `monitor`, `zoomexp`, `rot`, `cx`/`cy`, `dx`/`dy`, `sx`/`sy`,
-  `blur1`-`blur3`, `darken_center`, `fGammaAdj`, the wave, border, motion-vector and echo
-  groups, `q1`-`q32`, and `b1`-`b8`), and applies the motion parameters, the blur passes, the
-  centre darkening, and the gamma adjustment. The per-pixel block now sees the already warped
-  sampling position in `x`/`y`/`rad`/`ang`, so a real preset can offset or replace it.
-  Covered by 16 tests.
-- The **Visualisierung** settings section gained an **Always show text and controls** toggle.
-  When it is off, the title, hint, and playback buttons appear only while the mouse moves
-  over the visualizer and hide again after three idle seconds; pointer movement is tracked
-  through the window's own events, so moving the mouse on another monitor never reveals them.
-- Added a **Visualisierung** settings section with the render resolution (320 x 180 up to
-  1280 x 720), the target frame rate (24, 30, 60, or 120), and the user preset folder that
-  previously lived under the output device. The window renders at the configured size and
-  lets the image control scale the frame up, so a lower resolution keeps the CPU cost down.
 
 - Added automatic and manual AI model discovery plus a connection test in the
   AI Chat settings. OpenAI-compatible and Ollama model-list responses populate
@@ -2737,125 +1050,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.37.2] - 2026-08-27
 
 ### Added
-- The visualizer's per-pixel path no longer does work the preset never asked for. The compiled
-  programs now report the variables they reference (`PresetProgram.ReferencedVariables` and
-  `Uses`), the warp stage resolves the `x`, `y`, `rad`, and `ang` slots once instead of looking
-  each name up in the layout for every pixel, and it only computes the polar pair, the motion
-  grid, and the seeded sampling position when the preset's own code needs them. A rendered frame
-  is allocation-free, which is now asserted by a test. Covered by 5 tests.
-- The visualizer renders on its own thread now. A frame used to be produced from a
-  `DispatcherTimer`, so a heavy preset blocked the interface for its whole duration; the loop
-  now runs on a background thread, hands a finished copy of the frame to the UI thread through a
-  presentation buffer, and queues at most one present at a time, so a busy interface can never
-  build up a backlog of frames. Preset switching, the reset key, and the overlay follow as
-  thread-safe requests, and the frame pacing lives in the tested `FramePacing` helper. Covered by
-  5 tests.
-- The visualizer now measures where its frame time goes. `PresetRenderer` reports a
-  `RenderTimings` breakdown (warp, blur, post-processing, overlay, composite, comp shaders, and
-  the frame total) per frame and as an average over a window, and the window's diagnostic line in
-  `logs/seek.log` carries those averages once per second, so the cost per stage can be read
-  instead of guessed. A warp shader runs inside the per-pixel loop, so its cost stays part of
-  `warp`; timing it per pixel would cost more than the measurement is worth. The frame budget now
-  compares the complete frame rather than only the shaders. Covered by 8 tests.
-- Milkdrop `.milk` files are read as the multi-preset files they are: `VisualizerPreset.ParseSections`
-  splits the text at its `[presetNN]` headers and the preset folder loads every section as its
-  own preset instead of only the last one surviving. The declared format version
-  (`MILKDROP_PRESET_VERSION`, `PSVERSION`, or `preset_version`) is reported on
-  `VisualizerPreset.Version`; every version is accepted. Skipped presets now carry a reason
-  through `VisualizerPresetLibrary.RejectedReasons`, naming the file or section and the parse
-  error. A hand-written corpus of presets in the real format, including a multi-section file and
-  shader source, guards the format handling; third-party presets stay unbundled because they are
-  licensed by their authors. Covered by 13 tests.
-- The visualizer now runs preset shaders. The numbered `warp_N` and `comp_N` keys are parsed
-  together with their optional `_enabled`, `_per_frame`, and `_per_pixel` companions, and the
-  preset reader keeps the newlines inside a shader's source, because Milkdrop stores the code
-  as a multi-line value. A shader that does not parse is skipped so one broken shader degrades a
-  preset instead of rejecting it. The renderer implements `IShaderSampler`, so shaders can
-  sample `sampler_main`, `sampler_pc_main`, `sampler_fc_main`, `GetBlur1`-`GetBlur3`, and
-  `GetPixel`, and it binds `uv`, `uv_orig`, `texsize`, the audio bands, the smoothed bands, the
-  frame counters, and the aspect ratio. A per-frame time budget (20 ms by default) skips the
-  shaders for a while when they cost too much, so a heavy preset keeps a smooth picture instead
-  of stalling playback. Covered by 11 tests.
-- Added the HLSL interpreter for the shader runtime: `ShaderInterpreter` evaluates the parsed
-  `ps_2_0` tree with scalar and `float2`/`float3`/`float4` values (`ShaderValue`), covering
-  arithmetic with the C precedence, variables and the assignment operators, swizzles read and
-  written, vector constructors with concatenation and broadcast, the ternary operator,
-  `if`/`else`, `for`, and the usual intrinsics (`abs`, `ceil`, `clamp`, `cos`, `dot`, `exp`,
-  `floor`, `frac`, `length`, `lerp`, `log`, `max`, `min`, `mul`, `normalize`, `pow`, `saturate`,
-  `sign`, `sin`, `smoothstep`, `sqrt`, `step`, `tan`). Sampling goes through the
-  `IShaderSampler` contract, so the interpreter carries no render state, and division by zero
-  yields zero instead of an infinity. A loop budget of 4096 iterations and a call depth limit of
-  32 keep a runaway shader from stalling a frame. Covered by 14 tests.
-- Added the HLSL parser and its syntax tree: `ShaderParser` and `ShaderNode` turn the
-  `ps_2_0` subset into a tagged-union tree covering declarations, expression statements,
-  `if`/`else`, `for`, `return`, swizzles, calls, the ternary operator, and the C operator
-  precedence. Function signatures and bare statement bodies are both accepted, and a sampler
-  declaration without a type is tolerated. Covered by 10 tests.
-- Added the HLSL front end for the upcoming shader runtime: `ShaderLexer` tokenizes the
-  `ps_2_0` subset Milkdrop shaders use, covering identifiers and keywords, numbers with their
-  `f`/`h` suffixes, single- and multi-character operators, swizzles, line and block comments,
-  and source positions, and reports an unexpected character with its offset. Covered by
-  10 tests.
-- Added the generated visualizer texture bank. The `noise_lq` (32 x 32), `noise_mq`
-  (256 x 256), and `noise_hq` (512 x 512) textures and the sixteen `rand00`-`rand15` (32 x 32)
-  textures are produced deterministically from fixed seeds, so no third party image is
-  bundled and every run yields the same textures. Sampling is bilinear with repeat, clamp, and
-  mirror wrap modes, and generation is lazy so a session that never opens the visualizer
-  allocates nothing. Covered by 10 tests.
-- Milkdrop preset keys now act as the per-frame starting values: every numeric key (including
-  the `nWaveMode`, `bWaveDots`, `bWaveThick`, `bAdditiveWaves`, `bDarkenCenter`,
-  `bMotionVectors`, and `nMotionVectorsX/Y` spellings) seeds the matching variable, so real
-  presets that carry their settings as keys instead of code work as written.
-- The visualizer draws the full Milkdrop wave and post-processing set: the circular, doubled,
-  and single-line wave modes with dots, thick, additive, mystery, and colour/position keys,
-  the four declared waveform slots, the outer and inner borders, a motion-vector grid derived
-  from the actual motion field, and the video echo with its zoom, alpha, and orientation.
-  Covered by 11 tests.
-- The preset engine now runs the full Milkdrop stage order. It parses the `per_frame_init`,
-  `per_pixel_init`, `wave_0`-`wave_3` and `shape_N_init` blocks, registers the complete
-  standard variable set (`bass_att`/`mid_att`/`treb_att`, `aspectx`/`aspecty`,
-  `pixelsx`/`pixelsy`, `monitor`, `zoomexp`, `rot`, `cx`/`cy`, `dx`/`dy`, `sx`/`sy`,
-  `blur1`-`blur3`, `darken_center`, `fGammaAdj`, the wave, border, motion-vector and echo
-  groups, `q1`-`q32`, and `b1`-`b8`), and applies the motion parameters, the blur passes, the
-  centre darkening, and the gamma adjustment. The per-pixel block now sees the already warped
-  sampling position in `x`/`y`/`rad`/`ang`, so a real preset can offset or replace it.
-  Covered by 16 tests.
-- The **Visualisierung** settings section gained an **Always show text and controls** toggle.
-  When it is off, the title, hint, and playback buttons appear only while the mouse moves
-  over the visualizer and hide again after three idle seconds; pointer movement is tracked
-  through the window's own events, so moving the mouse on another monitor never reveals them.
-- Added a **Visualisierung** settings section with the render resolution (320 x 180 up to
-  1280 x 720), the target frame rate (24, 30, 60, or 120), and the user preset folder that
-  previously lived under the output device. The window renders at the configured size and
-  lets the image control scale the frame up, so a lower resolution keeps the CPU cost down.
 
 - Added nine individually permissioned MCP and AI-chat tools for current-track
   favorites, Infinite Mix, output and equalizer profiles, cached lyrics, and
   Orynivo Server discovery and library scans. A build-time parity check now
   keeps the MCP surface, AI schema, dispatcher, and Settings checklist aligned.
 
-- The karaoke view now highlights the active word of enhanced-LRC lyrics.
-  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
-  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
-  already-sung words keep the accent colour. Plain synchronized lines keep the
-  line-level highlight, so nothing changes for ordinary LRC files.
-- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
-  now stripped from the line text instead of appearing as literal `<00:12.00>`
-  fragments.
-- Added bulk genre editing for the shared Tracks table. The bulk action bar gained
-  a genre field that stores the value for every selected **local** track through
-  `AudioDatabase.SetTrackGenres`, which writes the library-only
-  `track_genre_overrides` table in one transaction and reapplies it on every later
-  scan. Source media files are never modified, and an empty value removes the
-  override so the next scan restores the embedded genre. Selected Orynivo Server
-  tracks are updated on their owning server through the new authenticated
-  `PUT /api/tracks/{id}/genre`, which records the same library-only override.
-- Podcast episodes can be downloaded for offline playback. Episode rows gained a
-  **Download episode** / **Delete download** context menu and a download marker in
-  the status column, playback prefers the cached file, and Settings > Library sets
-  the cache size limit in megabytes. Eviction removes the least recently used
-  downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
-  the most recently used episode is always kept.
 ### Fixed
 
 - Fixed combined artist-and-title library searches so terms can match across
@@ -2867,97 +1067,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.37.1] - 2026-08-27
 
 ### Added
-- The visualizer's per-pixel path no longer does work the preset never asked for. The compiled
-  programs now report the variables they reference (`PresetProgram.ReferencedVariables` and
-  `Uses`), the warp stage resolves the `x`, `y`, `rad`, and `ang` slots once instead of looking
-  each name up in the layout for every pixel, and it only computes the polar pair, the motion
-  grid, and the seeded sampling position when the preset's own code needs them. A rendered frame
-  is allocation-free, which is now asserted by a test. Covered by 5 tests.
-- The visualizer renders on its own thread now. A frame used to be produced from a
-  `DispatcherTimer`, so a heavy preset blocked the interface for its whole duration; the loop
-  now runs on a background thread, hands a finished copy of the frame to the UI thread through a
-  presentation buffer, and queues at most one present at a time, so a busy interface can never
-  build up a backlog of frames. Preset switching, the reset key, and the overlay follow as
-  thread-safe requests, and the frame pacing lives in the tested `FramePacing` helper. Covered by
-  5 tests.
-- The visualizer now measures where its frame time goes. `PresetRenderer` reports a
-  `RenderTimings` breakdown (warp, blur, post-processing, overlay, composite, comp shaders, and
-  the frame total) per frame and as an average over a window, and the window's diagnostic line in
-  `logs/seek.log` carries those averages once per second, so the cost per stage can be read
-  instead of guessed. A warp shader runs inside the per-pixel loop, so its cost stays part of
-  `warp`; timing it per pixel would cost more than the measurement is worth. The frame budget now
-  compares the complete frame rather than only the shaders. Covered by 8 tests.
-- Milkdrop `.milk` files are read as the multi-preset files they are: `VisualizerPreset.ParseSections`
-  splits the text at its `[presetNN]` headers and the preset folder loads every section as its
-  own preset instead of only the last one surviving. The declared format version
-  (`MILKDROP_PRESET_VERSION`, `PSVERSION`, or `preset_version`) is reported on
-  `VisualizerPreset.Version`; every version is accepted. Skipped presets now carry a reason
-  through `VisualizerPresetLibrary.RejectedReasons`, naming the file or section and the parse
-  error. A hand-written corpus of presets in the real format, including a multi-section file and
-  shader source, guards the format handling; third-party presets stay unbundled because they are
-  licensed by their authors. Covered by 13 tests.
-- The visualizer now runs preset shaders. The numbered `warp_N` and `comp_N` keys are parsed
-  together with their optional `_enabled`, `_per_frame`, and `_per_pixel` companions, and the
-  preset reader keeps the newlines inside a shader's source, because Milkdrop stores the code
-  as a multi-line value. A shader that does not parse is skipped so one broken shader degrades a
-  preset instead of rejecting it. The renderer implements `IShaderSampler`, so shaders can
-  sample `sampler_main`, `sampler_pc_main`, `sampler_fc_main`, `GetBlur1`-`GetBlur3`, and
-  `GetPixel`, and it binds `uv`, `uv_orig`, `texsize`, the audio bands, the smoothed bands, the
-  frame counters, and the aspect ratio. A per-frame time budget (20 ms by default) skips the
-  shaders for a while when they cost too much, so a heavy preset keeps a smooth picture instead
-  of stalling playback. Covered by 11 tests.
-- Added the HLSL interpreter for the shader runtime: `ShaderInterpreter` evaluates the parsed
-  `ps_2_0` tree with scalar and `float2`/`float3`/`float4` values (`ShaderValue`), covering
-  arithmetic with the C precedence, variables and the assignment operators, swizzles read and
-  written, vector constructors with concatenation and broadcast, the ternary operator,
-  `if`/`else`, `for`, and the usual intrinsics (`abs`, `ceil`, `clamp`, `cos`, `dot`, `exp`,
-  `floor`, `frac`, `length`, `lerp`, `log`, `max`, `min`, `mul`, `normalize`, `pow`, `saturate`,
-  `sign`, `sin`, `smoothstep`, `sqrt`, `step`, `tan`). Sampling goes through the
-  `IShaderSampler` contract, so the interpreter carries no render state, and division by zero
-  yields zero instead of an infinity. A loop budget of 4096 iterations and a call depth limit of
-  32 keep a runaway shader from stalling a frame. Covered by 14 tests.
-- Added the HLSL parser and its syntax tree: `ShaderParser` and `ShaderNode` turn the
-  `ps_2_0` subset into a tagged-union tree covering declarations, expression statements,
-  `if`/`else`, `for`, `return`, swizzles, calls, the ternary operator, and the C operator
-  precedence. Function signatures and bare statement bodies are both accepted, and a sampler
-  declaration without a type is tolerated. Covered by 10 tests.
-- Added the HLSL front end for the upcoming shader runtime: `ShaderLexer` tokenizes the
-  `ps_2_0` subset Milkdrop shaders use, covering identifiers and keywords, numbers with their
-  `f`/`h` suffixes, single- and multi-character operators, swizzles, line and block comments,
-  and source positions, and reports an unexpected character with its offset. Covered by
-  10 tests.
-- Added the generated visualizer texture bank. The `noise_lq` (32 x 32), `noise_mq`
-  (256 x 256), and `noise_hq` (512 x 512) textures and the sixteen `rand00`-`rand15` (32 x 32)
-  textures are produced deterministically from fixed seeds, so no third party image is
-  bundled and every run yields the same textures. Sampling is bilinear with repeat, clamp, and
-  mirror wrap modes, and generation is lazy so a session that never opens the visualizer
-  allocates nothing. Covered by 10 tests.
-- Milkdrop preset keys now act as the per-frame starting values: every numeric key (including
-  the `nWaveMode`, `bWaveDots`, `bWaveThick`, `bAdditiveWaves`, `bDarkenCenter`,
-  `bMotionVectors`, and `nMotionVectorsX/Y` spellings) seeds the matching variable, so real
-  presets that carry their settings as keys instead of code work as written.
-- The visualizer draws the full Milkdrop wave and post-processing set: the circular, doubled,
-  and single-line wave modes with dots, thick, additive, mystery, and colour/position keys,
-  the four declared waveform slots, the outer and inner borders, a motion-vector grid derived
-  from the actual motion field, and the video echo with its zoom, alpha, and orientation.
-  Covered by 11 tests.
-- The preset engine now runs the full Milkdrop stage order. It parses the `per_frame_init`,
-  `per_pixel_init`, `wave_0`-`wave_3` and `shape_N_init` blocks, registers the complete
-  standard variable set (`bass_att`/`mid_att`/`treb_att`, `aspectx`/`aspecty`,
-  `pixelsx`/`pixelsy`, `monitor`, `zoomexp`, `rot`, `cx`/`cy`, `dx`/`dy`, `sx`/`sy`,
-  `blur1`-`blur3`, `darken_center`, `fGammaAdj`, the wave, border, motion-vector and echo
-  groups, `q1`-`q32`, and `b1`-`b8`), and applies the motion parameters, the blur passes, the
-  centre darkening, and the gamma adjustment. The per-pixel block now sees the already warped
-  sampling position in `x`/`y`/`rad`/`ang`, so a real preset can offset or replace it.
-  Covered by 16 tests.
-- The **Visualisierung** settings section gained an **Always show text and controls** toggle.
-  When it is off, the title, hint, and playback buttons appear only while the mouse moves
-  over the visualizer and hide again after three idle seconds; pointer movement is tracked
-  through the window's own events, so moving the mouse on another monitor never reveals them.
-- Added a **Visualisierung** settings section with the render resolution (320 x 180 up to
-  1280 x 720), the target frame rate (24, 30, 60, or 120), and the user preset folder that
-  previously lived under the output device. The window renders at the configured size and
-  lets the image control scale the frame up, so a lower resolution keeps the CPU cost down.
 
 - Added a responsive, localized five-minute quick-start guide to the product
   website, a wiki feature-status page that distinguishes everyday,
@@ -2966,28 +1075,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   chooser routes setup questions to Discussions and security reports to private
   security advisories.
 
-- The karaoke view now highlights the active word of enhanced-LRC lyrics.
-  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
-  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
-  already-sung words keep the accent colour. Plain synchronized lines keep the
-  line-level highlight, so nothing changes for ordinary LRC files.
-- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
-  now stripped from the line text instead of appearing as literal `<00:12.00>`
-  fragments.
-- Added bulk genre editing for the shared Tracks table. The bulk action bar gained
-  a genre field that stores the value for every selected **local** track through
-  `AudioDatabase.SetTrackGenres`, which writes the library-only
-  `track_genre_overrides` table in one transaction and reapplies it on every later
-  scan. Source media files are never modified, and an empty value removes the
-  override so the next scan restores the embedded genre. Selected Orynivo Server
-  tracks are updated on their owning server through the new authenticated
-  `PUT /api/tracks/{id}/genre`, which records the same library-only override.
-- Podcast episodes can be downloaded for offline playback. Episode rows gained a
-  **Download episode** / **Delete download** context menu and a download marker in
-  the status column, playback prefers the cached file, and Settings > Library sets
-  the cache size limit in megabytes. Eviction removes the least recently used
-  downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
-  the most recently used episode is always kept.
 ### Fixed
 
 ## [0.37.0] - 2026-08-27
@@ -3010,28 +1097,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   Native `shk` and payload encryption now use the first 32 bytes of the
   transient pairing secret, independently from the event-channel HKDF keys.
 
-- The karaoke view now highlights the active word of enhanced-LRC lyrics.
-  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
-  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
-  already-sung words keep the accent colour. Plain synchronized lines keep the
-  line-level highlight, so nothing changes for ordinary LRC files.
-- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
-  now stripped from the line text instead of appearing as literal `<00:12.00>`
-  fragments.
-- Added bulk genre editing for the shared Tracks table. The bulk action bar gained
-  a genre field that stores the value for every selected **local** track through
-  `AudioDatabase.SetTrackGenres`, which writes the library-only
-  `track_genre_overrides` table in one transaction and reapplies it on every later
-  scan. Source media files are never modified, and an empty value removes the
-  override so the next scan restores the embedded genre. Selected Orynivo Server
-  tracks are updated on their owning server through the new authenticated
-  `PUT /api/tracks/{id}/genre`, which records the same library-only override.
-- Podcast episodes can be downloaded for offline playback. Episode rows gained a
-  **Download episode** / **Delete download** context menu and a download marker in
-  the status column, playback prefers the cached file, and Settings > Library sets
-  the cache size limit in megabytes. Eviction removes the least recently used
-  downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
-  the most recently used episode is always kept.
 ### Fixed
 
 - AirPlay 2 receiver controls now drive Orynivo's transport instead of only
@@ -3088,97 +1153,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   and are not exposed by the current classic RAOP backend.
 
 ### Added
-- The visualizer's per-pixel path no longer does work the preset never asked for. The compiled
-  programs now report the variables they reference (`PresetProgram.ReferencedVariables` and
-  `Uses`), the warp stage resolves the `x`, `y`, `rad`, and `ang` slots once instead of looking
-  each name up in the layout for every pixel, and it only computes the polar pair, the motion
-  grid, and the seeded sampling position when the preset's own code needs them. A rendered frame
-  is allocation-free, which is now asserted by a test. Covered by 5 tests.
-- The visualizer renders on its own thread now. A frame used to be produced from a
-  `DispatcherTimer`, so a heavy preset blocked the interface for its whole duration; the loop
-  now runs on a background thread, hands a finished copy of the frame to the UI thread through a
-  presentation buffer, and queues at most one present at a time, so a busy interface can never
-  build up a backlog of frames. Preset switching, the reset key, and the overlay follow as
-  thread-safe requests, and the frame pacing lives in the tested `FramePacing` helper. Covered by
-  5 tests.
-- The visualizer now measures where its frame time goes. `PresetRenderer` reports a
-  `RenderTimings` breakdown (warp, blur, post-processing, overlay, composite, comp shaders, and
-  the frame total) per frame and as an average over a window, and the window's diagnostic line in
-  `logs/seek.log` carries those averages once per second, so the cost per stage can be read
-  instead of guessed. A warp shader runs inside the per-pixel loop, so its cost stays part of
-  `warp`; timing it per pixel would cost more than the measurement is worth. The frame budget now
-  compares the complete frame rather than only the shaders. Covered by 8 tests.
-- Milkdrop `.milk` files are read as the multi-preset files they are: `VisualizerPreset.ParseSections`
-  splits the text at its `[presetNN]` headers and the preset folder loads every section as its
-  own preset instead of only the last one surviving. The declared format version
-  (`MILKDROP_PRESET_VERSION`, `PSVERSION`, or `preset_version`) is reported on
-  `VisualizerPreset.Version`; every version is accepted. Skipped presets now carry a reason
-  through `VisualizerPresetLibrary.RejectedReasons`, naming the file or section and the parse
-  error. A hand-written corpus of presets in the real format, including a multi-section file and
-  shader source, guards the format handling; third-party presets stay unbundled because they are
-  licensed by their authors. Covered by 13 tests.
-- The visualizer now runs preset shaders. The numbered `warp_N` and `comp_N` keys are parsed
-  together with their optional `_enabled`, `_per_frame`, and `_per_pixel` companions, and the
-  preset reader keeps the newlines inside a shader's source, because Milkdrop stores the code
-  as a multi-line value. A shader that does not parse is skipped so one broken shader degrades a
-  preset instead of rejecting it. The renderer implements `IShaderSampler`, so shaders can
-  sample `sampler_main`, `sampler_pc_main`, `sampler_fc_main`, `GetBlur1`-`GetBlur3`, and
-  `GetPixel`, and it binds `uv`, `uv_orig`, `texsize`, the audio bands, the smoothed bands, the
-  frame counters, and the aspect ratio. A per-frame time budget (20 ms by default) skips the
-  shaders for a while when they cost too much, so a heavy preset keeps a smooth picture instead
-  of stalling playback. Covered by 11 tests.
-- Added the HLSL interpreter for the shader runtime: `ShaderInterpreter` evaluates the parsed
-  `ps_2_0` tree with scalar and `float2`/`float3`/`float4` values (`ShaderValue`), covering
-  arithmetic with the C precedence, variables and the assignment operators, swizzles read and
-  written, vector constructors with concatenation and broadcast, the ternary operator,
-  `if`/`else`, `for`, and the usual intrinsics (`abs`, `ceil`, `clamp`, `cos`, `dot`, `exp`,
-  `floor`, `frac`, `length`, `lerp`, `log`, `max`, `min`, `mul`, `normalize`, `pow`, `saturate`,
-  `sign`, `sin`, `smoothstep`, `sqrt`, `step`, `tan`). Sampling goes through the
-  `IShaderSampler` contract, so the interpreter carries no render state, and division by zero
-  yields zero instead of an infinity. A loop budget of 4096 iterations and a call depth limit of
-  32 keep a runaway shader from stalling a frame. Covered by 14 tests.
-- Added the HLSL parser and its syntax tree: `ShaderParser` and `ShaderNode` turn the
-  `ps_2_0` subset into a tagged-union tree covering declarations, expression statements,
-  `if`/`else`, `for`, `return`, swizzles, calls, the ternary operator, and the C operator
-  precedence. Function signatures and bare statement bodies are both accepted, and a sampler
-  declaration without a type is tolerated. Covered by 10 tests.
-- Added the HLSL front end for the upcoming shader runtime: `ShaderLexer` tokenizes the
-  `ps_2_0` subset Milkdrop shaders use, covering identifiers and keywords, numbers with their
-  `f`/`h` suffixes, single- and multi-character operators, swizzles, line and block comments,
-  and source positions, and reports an unexpected character with its offset. Covered by
-  10 tests.
-- Added the generated visualizer texture bank. The `noise_lq` (32 x 32), `noise_mq`
-  (256 x 256), and `noise_hq` (512 x 512) textures and the sixteen `rand00`-`rand15` (32 x 32)
-  textures are produced deterministically from fixed seeds, so no third party image is
-  bundled and every run yields the same textures. Sampling is bilinear with repeat, clamp, and
-  mirror wrap modes, and generation is lazy so a session that never opens the visualizer
-  allocates nothing. Covered by 10 tests.
-- Milkdrop preset keys now act as the per-frame starting values: every numeric key (including
-  the `nWaveMode`, `bWaveDots`, `bWaveThick`, `bAdditiveWaves`, `bDarkenCenter`,
-  `bMotionVectors`, and `nMotionVectorsX/Y` spellings) seeds the matching variable, so real
-  presets that carry their settings as keys instead of code work as written.
-- The visualizer draws the full Milkdrop wave and post-processing set: the circular, doubled,
-  and single-line wave modes with dots, thick, additive, mystery, and colour/position keys,
-  the four declared waveform slots, the outer and inner borders, a motion-vector grid derived
-  from the actual motion field, and the video echo with its zoom, alpha, and orientation.
-  Covered by 11 tests.
-- The preset engine now runs the full Milkdrop stage order. It parses the `per_frame_init`,
-  `per_pixel_init`, `wave_0`-`wave_3` and `shape_N_init` blocks, registers the complete
-  standard variable set (`bass_att`/`mid_att`/`treb_att`, `aspectx`/`aspecty`,
-  `pixelsx`/`pixelsy`, `monitor`, `zoomexp`, `rot`, `cx`/`cy`, `dx`/`dy`, `sx`/`sy`,
-  `blur1`-`blur3`, `darken_center`, `fGammaAdj`, the wave, border, motion-vector and echo
-  groups, `q1`-`q32`, and `b1`-`b8`), and applies the motion parameters, the blur passes, the
-  centre darkening, and the gamma adjustment. The per-pixel block now sees the already warped
-  sampling position in `x`/`y`/`rad`/`ang`, so a real preset can offset or replace it.
-  Covered by 16 tests.
-- The **Visualisierung** settings section gained an **Always show text and controls** toggle.
-  When it is off, the title, hint, and playback buttons appear only while the mouse moves
-  over the visualizer and hide again after three idle seconds; pointer movement is tracked
-  through the window's own events, so moving the mouse on another monitor never reveals them.
-- Added a **Visualisierung** settings section with the render resolution (320 x 180 up to
-  1280 x 720), the target frame rate (24, 30, 60, or 120), and the user preset folder that
-  previously lived under the output device. The window renders at the configured size and
-  lets the image control scale the frame up, so a lower resolution keeps the CPU cost down.
 
 - Native AirPlay 2 sessions now publish the current title, artist, album, and
   optional bounded JPEG/PNG cover artwork to receiver displays instead of the
@@ -3214,125 +1188,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.36.7] - 2026-08-25
 
 ### Added
-- The visualizer's per-pixel path no longer does work the preset never asked for. The compiled
-  programs now report the variables they reference (`PresetProgram.ReferencedVariables` and
-  `Uses`), the warp stage resolves the `x`, `y`, `rad`, and `ang` slots once instead of looking
-  each name up in the layout for every pixel, and it only computes the polar pair, the motion
-  grid, and the seeded sampling position when the preset's own code needs them. A rendered frame
-  is allocation-free, which is now asserted by a test. Covered by 5 tests.
-- The visualizer renders on its own thread now. A frame used to be produced from a
-  `DispatcherTimer`, so a heavy preset blocked the interface for its whole duration; the loop
-  now runs on a background thread, hands a finished copy of the frame to the UI thread through a
-  presentation buffer, and queues at most one present at a time, so a busy interface can never
-  build up a backlog of frames. Preset switching, the reset key, and the overlay follow as
-  thread-safe requests, and the frame pacing lives in the tested `FramePacing` helper. Covered by
-  5 tests.
-- The visualizer now measures where its frame time goes. `PresetRenderer` reports a
-  `RenderTimings` breakdown (warp, blur, post-processing, overlay, composite, comp shaders, and
-  the frame total) per frame and as an average over a window, and the window's diagnostic line in
-  `logs/seek.log` carries those averages once per second, so the cost per stage can be read
-  instead of guessed. A warp shader runs inside the per-pixel loop, so its cost stays part of
-  `warp`; timing it per pixel would cost more than the measurement is worth. The frame budget now
-  compares the complete frame rather than only the shaders. Covered by 8 tests.
-- Milkdrop `.milk` files are read as the multi-preset files they are: `VisualizerPreset.ParseSections`
-  splits the text at its `[presetNN]` headers and the preset folder loads every section as its
-  own preset instead of only the last one surviving. The declared format version
-  (`MILKDROP_PRESET_VERSION`, `PSVERSION`, or `preset_version`) is reported on
-  `VisualizerPreset.Version`; every version is accepted. Skipped presets now carry a reason
-  through `VisualizerPresetLibrary.RejectedReasons`, naming the file or section and the parse
-  error. A hand-written corpus of presets in the real format, including a multi-section file and
-  shader source, guards the format handling; third-party presets stay unbundled because they are
-  licensed by their authors. Covered by 13 tests.
-- The visualizer now runs preset shaders. The numbered `warp_N` and `comp_N` keys are parsed
-  together with their optional `_enabled`, `_per_frame`, and `_per_pixel` companions, and the
-  preset reader keeps the newlines inside a shader's source, because Milkdrop stores the code
-  as a multi-line value. A shader that does not parse is skipped so one broken shader degrades a
-  preset instead of rejecting it. The renderer implements `IShaderSampler`, so shaders can
-  sample `sampler_main`, `sampler_pc_main`, `sampler_fc_main`, `GetBlur1`-`GetBlur3`, and
-  `GetPixel`, and it binds `uv`, `uv_orig`, `texsize`, the audio bands, the smoothed bands, the
-  frame counters, and the aspect ratio. A per-frame time budget (20 ms by default) skips the
-  shaders for a while when they cost too much, so a heavy preset keeps a smooth picture instead
-  of stalling playback. Covered by 11 tests.
-- Added the HLSL interpreter for the shader runtime: `ShaderInterpreter` evaluates the parsed
-  `ps_2_0` tree with scalar and `float2`/`float3`/`float4` values (`ShaderValue`), covering
-  arithmetic with the C precedence, variables and the assignment operators, swizzles read and
-  written, vector constructors with concatenation and broadcast, the ternary operator,
-  `if`/`else`, `for`, and the usual intrinsics (`abs`, `ceil`, `clamp`, `cos`, `dot`, `exp`,
-  `floor`, `frac`, `length`, `lerp`, `log`, `max`, `min`, `mul`, `normalize`, `pow`, `saturate`,
-  `sign`, `sin`, `smoothstep`, `sqrt`, `step`, `tan`). Sampling goes through the
-  `IShaderSampler` contract, so the interpreter carries no render state, and division by zero
-  yields zero instead of an infinity. A loop budget of 4096 iterations and a call depth limit of
-  32 keep a runaway shader from stalling a frame. Covered by 14 tests.
-- Added the HLSL parser and its syntax tree: `ShaderParser` and `ShaderNode` turn the
-  `ps_2_0` subset into a tagged-union tree covering declarations, expression statements,
-  `if`/`else`, `for`, `return`, swizzles, calls, the ternary operator, and the C operator
-  precedence. Function signatures and bare statement bodies are both accepted, and a sampler
-  declaration without a type is tolerated. Covered by 10 tests.
-- Added the HLSL front end for the upcoming shader runtime: `ShaderLexer` tokenizes the
-  `ps_2_0` subset Milkdrop shaders use, covering identifiers and keywords, numbers with their
-  `f`/`h` suffixes, single- and multi-character operators, swizzles, line and block comments,
-  and source positions, and reports an unexpected character with its offset. Covered by
-  10 tests.
-- Added the generated visualizer texture bank. The `noise_lq` (32 x 32), `noise_mq`
-  (256 x 256), and `noise_hq` (512 x 512) textures and the sixteen `rand00`-`rand15` (32 x 32)
-  textures are produced deterministically from fixed seeds, so no third party image is
-  bundled and every run yields the same textures. Sampling is bilinear with repeat, clamp, and
-  mirror wrap modes, and generation is lazy so a session that never opens the visualizer
-  allocates nothing. Covered by 10 tests.
-- Milkdrop preset keys now act as the per-frame starting values: every numeric key (including
-  the `nWaveMode`, `bWaveDots`, `bWaveThick`, `bAdditiveWaves`, `bDarkenCenter`,
-  `bMotionVectors`, and `nMotionVectorsX/Y` spellings) seeds the matching variable, so real
-  presets that carry their settings as keys instead of code work as written.
-- The visualizer draws the full Milkdrop wave and post-processing set: the circular, doubled,
-  and single-line wave modes with dots, thick, additive, mystery, and colour/position keys,
-  the four declared waveform slots, the outer and inner borders, a motion-vector grid derived
-  from the actual motion field, and the video echo with its zoom, alpha, and orientation.
-  Covered by 11 tests.
-- The preset engine now runs the full Milkdrop stage order. It parses the `per_frame_init`,
-  `per_pixel_init`, `wave_0`-`wave_3` and `shape_N_init` blocks, registers the complete
-  standard variable set (`bass_att`/`mid_att`/`treb_att`, `aspectx`/`aspecty`,
-  `pixelsx`/`pixelsy`, `monitor`, `zoomexp`, `rot`, `cx`/`cy`, `dx`/`dy`, `sx`/`sy`,
-  `blur1`-`blur3`, `darken_center`, `fGammaAdj`, the wave, border, motion-vector and echo
-  groups, `q1`-`q32`, and `b1`-`b8`), and applies the motion parameters, the blur passes, the
-  centre darkening, and the gamma adjustment. The per-pixel block now sees the already warped
-  sampling position in `x`/`y`/`rad`/`ang`, so a real preset can offset or replace it.
-  Covered by 16 tests.
-- The **Visualisierung** settings section gained an **Always show text and controls** toggle.
-  When it is off, the title, hint, and playback buttons appear only while the mouse moves
-  over the visualizer and hide again after three idle seconds; pointer movement is tracked
-  through the window's own events, so moving the mouse on another monitor never reveals them.
-- Added a **Visualisierung** settings section with the render resolution (320 x 180 up to
-  1280 x 720), the target frame rate (24, 30, 60, or 120), and the user preset folder that
-  previously lived under the output device. The window renders at the configured size and
-  lets the image control scale the frame up, so a lower resolution keeps the CPU cost down.
 
 - Unified artist and album details now reconcile missing artwork between the
   local library and matching reachable Orynivo Server identities. Existing
   images are copied only to sources without artwork, and manually protected
   artist images are never overwritten.
 
-- The karaoke view now highlights the active word of enhanced-LRC lyrics.
-  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
-  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
-  already-sung words keep the accent colour. Plain synchronized lines keep the
-  line-level highlight, so nothing changes for ordinary LRC files.
-- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
-  now stripped from the line text instead of appearing as literal `<00:12.00>`
-  fragments.
-- Added bulk genre editing for the shared Tracks table. The bulk action bar gained
-  a genre field that stores the value for every selected **local** track through
-  `AudioDatabase.SetTrackGenres`, which writes the library-only
-  `track_genre_overrides` table in one transaction and reapplies it on every later
-  scan. Source media files are never modified, and an empty value removes the
-  override so the next scan restores the embedded genre. Selected Orynivo Server
-  tracks are updated on their owning server through the new authenticated
-  `PUT /api/tracks/{id}/genre`, which records the same library-only override.
-- Podcast episodes can be downloaded for offline playback. Episode rows gained a
-  **Download episode** / **Delete download** context menu and a download marker in
-  the status column, playback prefers the cached file, and Settings > Library sets
-  the cache size limit in megabytes. Eviction removes the least recently used
-  downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
-  the most recently used episode is always kept.
 ### Fixed
 
 - Artist and album artwork changes now invalidate the unified library view
@@ -3342,97 +1203,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.36.6] - 2026-08-25
 
 ### Added
-- The visualizer's per-pixel path no longer does work the preset never asked for. The compiled
-  programs now report the variables they reference (`PresetProgram.ReferencedVariables` and
-  `Uses`), the warp stage resolves the `x`, `y`, `rad`, and `ang` slots once instead of looking
-  each name up in the layout for every pixel, and it only computes the polar pair, the motion
-  grid, and the seeded sampling position when the preset's own code needs them. A rendered frame
-  is allocation-free, which is now asserted by a test. Covered by 5 tests.
-- The visualizer renders on its own thread now. A frame used to be produced from a
-  `DispatcherTimer`, so a heavy preset blocked the interface for its whole duration; the loop
-  now runs on a background thread, hands a finished copy of the frame to the UI thread through a
-  presentation buffer, and queues at most one present at a time, so a busy interface can never
-  build up a backlog of frames. Preset switching, the reset key, and the overlay follow as
-  thread-safe requests, and the frame pacing lives in the tested `FramePacing` helper. Covered by
-  5 tests.
-- The visualizer now measures where its frame time goes. `PresetRenderer` reports a
-  `RenderTimings` breakdown (warp, blur, post-processing, overlay, composite, comp shaders, and
-  the frame total) per frame and as an average over a window, and the window's diagnostic line in
-  `logs/seek.log` carries those averages once per second, so the cost per stage can be read
-  instead of guessed. A warp shader runs inside the per-pixel loop, so its cost stays part of
-  `warp`; timing it per pixel would cost more than the measurement is worth. The frame budget now
-  compares the complete frame rather than only the shaders. Covered by 8 tests.
-- Milkdrop `.milk` files are read as the multi-preset files they are: `VisualizerPreset.ParseSections`
-  splits the text at its `[presetNN]` headers and the preset folder loads every section as its
-  own preset instead of only the last one surviving. The declared format version
-  (`MILKDROP_PRESET_VERSION`, `PSVERSION`, or `preset_version`) is reported on
-  `VisualizerPreset.Version`; every version is accepted. Skipped presets now carry a reason
-  through `VisualizerPresetLibrary.RejectedReasons`, naming the file or section and the parse
-  error. A hand-written corpus of presets in the real format, including a multi-section file and
-  shader source, guards the format handling; third-party presets stay unbundled because they are
-  licensed by their authors. Covered by 13 tests.
-- The visualizer now runs preset shaders. The numbered `warp_N` and `comp_N` keys are parsed
-  together with their optional `_enabled`, `_per_frame`, and `_per_pixel` companions, and the
-  preset reader keeps the newlines inside a shader's source, because Milkdrop stores the code
-  as a multi-line value. A shader that does not parse is skipped so one broken shader degrades a
-  preset instead of rejecting it. The renderer implements `IShaderSampler`, so shaders can
-  sample `sampler_main`, `sampler_pc_main`, `sampler_fc_main`, `GetBlur1`-`GetBlur3`, and
-  `GetPixel`, and it binds `uv`, `uv_orig`, `texsize`, the audio bands, the smoothed bands, the
-  frame counters, and the aspect ratio. A per-frame time budget (20 ms by default) skips the
-  shaders for a while when they cost too much, so a heavy preset keeps a smooth picture instead
-  of stalling playback. Covered by 11 tests.
-- Added the HLSL interpreter for the shader runtime: `ShaderInterpreter` evaluates the parsed
-  `ps_2_0` tree with scalar and `float2`/`float3`/`float4` values (`ShaderValue`), covering
-  arithmetic with the C precedence, variables and the assignment operators, swizzles read and
-  written, vector constructors with concatenation and broadcast, the ternary operator,
-  `if`/`else`, `for`, and the usual intrinsics (`abs`, `ceil`, `clamp`, `cos`, `dot`, `exp`,
-  `floor`, `frac`, `length`, `lerp`, `log`, `max`, `min`, `mul`, `normalize`, `pow`, `saturate`,
-  `sign`, `sin`, `smoothstep`, `sqrt`, `step`, `tan`). Sampling goes through the
-  `IShaderSampler` contract, so the interpreter carries no render state, and division by zero
-  yields zero instead of an infinity. A loop budget of 4096 iterations and a call depth limit of
-  32 keep a runaway shader from stalling a frame. Covered by 14 tests.
-- Added the HLSL parser and its syntax tree: `ShaderParser` and `ShaderNode` turn the
-  `ps_2_0` subset into a tagged-union tree covering declarations, expression statements,
-  `if`/`else`, `for`, `return`, swizzles, calls, the ternary operator, and the C operator
-  precedence. Function signatures and bare statement bodies are both accepted, and a sampler
-  declaration without a type is tolerated. Covered by 10 tests.
-- Added the HLSL front end for the upcoming shader runtime: `ShaderLexer` tokenizes the
-  `ps_2_0` subset Milkdrop shaders use, covering identifiers and keywords, numbers with their
-  `f`/`h` suffixes, single- and multi-character operators, swizzles, line and block comments,
-  and source positions, and reports an unexpected character with its offset. Covered by
-  10 tests.
-- Added the generated visualizer texture bank. The `noise_lq` (32 x 32), `noise_mq`
-  (256 x 256), and `noise_hq` (512 x 512) textures and the sixteen `rand00`-`rand15` (32 x 32)
-  textures are produced deterministically from fixed seeds, so no third party image is
-  bundled and every run yields the same textures. Sampling is bilinear with repeat, clamp, and
-  mirror wrap modes, and generation is lazy so a session that never opens the visualizer
-  allocates nothing. Covered by 10 tests.
-- Milkdrop preset keys now act as the per-frame starting values: every numeric key (including
-  the `nWaveMode`, `bWaveDots`, `bWaveThick`, `bAdditiveWaves`, `bDarkenCenter`,
-  `bMotionVectors`, and `nMotionVectorsX/Y` spellings) seeds the matching variable, so real
-  presets that carry their settings as keys instead of code work as written.
-- The visualizer draws the full Milkdrop wave and post-processing set: the circular, doubled,
-  and single-line wave modes with dots, thick, additive, mystery, and colour/position keys,
-  the four declared waveform slots, the outer and inner borders, a motion-vector grid derived
-  from the actual motion field, and the video echo with its zoom, alpha, and orientation.
-  Covered by 11 tests.
-- The preset engine now runs the full Milkdrop stage order. It parses the `per_frame_init`,
-  `per_pixel_init`, `wave_0`-`wave_3` and `shape_N_init` blocks, registers the complete
-  standard variable set (`bass_att`/`mid_att`/`treb_att`, `aspectx`/`aspecty`,
-  `pixelsx`/`pixelsy`, `monitor`, `zoomexp`, `rot`, `cx`/`cy`, `dx`/`dy`, `sx`/`sy`,
-  `blur1`-`blur3`, `darken_center`, `fGammaAdj`, the wave, border, motion-vector and echo
-  groups, `q1`-`q32`, and `b1`-`b8`), and applies the motion parameters, the blur passes, the
-  centre darkening, and the gamma adjustment. The per-pixel block now sees the already warped
-  sampling position in `x`/`y`/`rad`/`ang`, so a real preset can offset or replace it.
-  Covered by 16 tests.
-- The **Visualisierung** settings section gained an **Always show text and controls** toggle.
-  When it is off, the title, hint, and playback buttons appear only while the mouse moves
-  over the visualizer and hide again after three idle seconds; pointer movement is tracked
-  through the window's own events, so moving the mouse on another monitor never reveals them.
-- Added a **Visualisierung** settings section with the render resolution (320 x 180 up to
-  1280 x 720), the target frame rate (24, 30, 60, or 120), and the user preset folder that
-  previously lived under the output device. The window renders at the configured size and
-  lets the image control scale the frame up, so a lower resolution keeps the CPU cost down.
 
 - Dashboard loading now records sanitized per-phase performance timings in a
   bounded rolling diagnostic log, separating local data, remote rounds,
@@ -3466,28 +1236,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   remote server library versions invalidate it immediately, while listening
   statistics and recently played rows remain freshly queried.
 
-- The karaoke view now highlights the active word of enhanced-LRC lyrics.
-  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
-  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
-  already-sung words keep the accent colour. Plain synchronized lines keep the
-  line-level highlight, so nothing changes for ordinary LRC files.
-- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
-  now stripped from the line text instead of appearing as literal `<00:12.00>`
-  fragments.
-- Added bulk genre editing for the shared Tracks table. The bulk action bar gained
-  a genre field that stores the value for every selected **local** track through
-  `AudioDatabase.SetTrackGenres`, which writes the library-only
-  `track_genre_overrides` table in one transaction and reapplies it on every later
-  scan. Source media files are never modified, and an empty value removes the
-  override so the next scan restores the embedded genre. Selected Orynivo Server
-  tracks are updated on their owning server through the new authenticated
-  `PUT /api/tracks/{id}/genre`, which records the same library-only override.
-- Podcast episodes can be downloaded for offline playback. Episode rows gained a
-  **Download episode** / **Delete download** context menu and a download marker in
-  the status column, playback prefers the cached file, and Settings > Library sets
-  the cache size limit in megabytes. Eviction removes the least recently used
-  downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
-  the most recently used episode is always kept.
 ### Fixed
 
 - Restarting Orynivo now restores every selectable sidebar content view rather
@@ -3501,28 +1249,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [0.36.5] - 2026-08-12
 
-- The karaoke view now highlights the active word of enhanced-LRC lyrics.
-  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
-  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
-  already-sung words keep the accent colour. Plain synchronized lines keep the
-  line-level highlight, so nothing changes for ordinary LRC files.
-- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
-  now stripped from the line text instead of appearing as literal `<00:12.00>`
-  fragments.
-- Added bulk genre editing for the shared Tracks table. The bulk action bar gained
-  a genre field that stores the value for every selected **local** track through
-  `AudioDatabase.SetTrackGenres`, which writes the library-only
-  `track_genre_overrides` table in one transaction and reapplies it on every later
-  scan. Source media files are never modified, and an empty value removes the
-  override so the next scan restores the embedded genre. Selected Orynivo Server
-  tracks are updated on their owning server through the new authenticated
-  `PUT /api/tracks/{id}/genre`, which records the same library-only override.
-- Podcast episodes can be downloaded for offline playback. Episode rows gained a
-  **Download episode** / **Delete download** context menu and a download marker in
-  the status column, playback prefers the cached file, and Settings > Library sets
-  the cache size limit in megabytes. Eviction removes the least recently used
-  downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
-  the most recently used episode is always kept.
 ### Fixed
 
 - Infinite Mix no longer stalls after exhausting its first two 20-track
@@ -3533,97 +1259,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.36.4] - 2026-08-12
 
 ### Added
-- The visualizer's per-pixel path no longer does work the preset never asked for. The compiled
-  programs now report the variables they reference (`PresetProgram.ReferencedVariables` and
-  `Uses`), the warp stage resolves the `x`, `y`, `rad`, and `ang` slots once instead of looking
-  each name up in the layout for every pixel, and it only computes the polar pair, the motion
-  grid, and the seeded sampling position when the preset's own code needs them. A rendered frame
-  is allocation-free, which is now asserted by a test. Covered by 5 tests.
-- The visualizer renders on its own thread now. A frame used to be produced from a
-  `DispatcherTimer`, so a heavy preset blocked the interface for its whole duration; the loop
-  now runs on a background thread, hands a finished copy of the frame to the UI thread through a
-  presentation buffer, and queues at most one present at a time, so a busy interface can never
-  build up a backlog of frames. Preset switching, the reset key, and the overlay follow as
-  thread-safe requests, and the frame pacing lives in the tested `FramePacing` helper. Covered by
-  5 tests.
-- The visualizer now measures where its frame time goes. `PresetRenderer` reports a
-  `RenderTimings` breakdown (warp, blur, post-processing, overlay, composite, comp shaders, and
-  the frame total) per frame and as an average over a window, and the window's diagnostic line in
-  `logs/seek.log` carries those averages once per second, so the cost per stage can be read
-  instead of guessed. A warp shader runs inside the per-pixel loop, so its cost stays part of
-  `warp`; timing it per pixel would cost more than the measurement is worth. The frame budget now
-  compares the complete frame rather than only the shaders. Covered by 8 tests.
-- Milkdrop `.milk` files are read as the multi-preset files they are: `VisualizerPreset.ParseSections`
-  splits the text at its `[presetNN]` headers and the preset folder loads every section as its
-  own preset instead of only the last one surviving. The declared format version
-  (`MILKDROP_PRESET_VERSION`, `PSVERSION`, or `preset_version`) is reported on
-  `VisualizerPreset.Version`; every version is accepted. Skipped presets now carry a reason
-  through `VisualizerPresetLibrary.RejectedReasons`, naming the file or section and the parse
-  error. A hand-written corpus of presets in the real format, including a multi-section file and
-  shader source, guards the format handling; third-party presets stay unbundled because they are
-  licensed by their authors. Covered by 13 tests.
-- The visualizer now runs preset shaders. The numbered `warp_N` and `comp_N` keys are parsed
-  together with their optional `_enabled`, `_per_frame`, and `_per_pixel` companions, and the
-  preset reader keeps the newlines inside a shader's source, because Milkdrop stores the code
-  as a multi-line value. A shader that does not parse is skipped so one broken shader degrades a
-  preset instead of rejecting it. The renderer implements `IShaderSampler`, so shaders can
-  sample `sampler_main`, `sampler_pc_main`, `sampler_fc_main`, `GetBlur1`-`GetBlur3`, and
-  `GetPixel`, and it binds `uv`, `uv_orig`, `texsize`, the audio bands, the smoothed bands, the
-  frame counters, and the aspect ratio. A per-frame time budget (20 ms by default) skips the
-  shaders for a while when they cost too much, so a heavy preset keeps a smooth picture instead
-  of stalling playback. Covered by 11 tests.
-- Added the HLSL interpreter for the shader runtime: `ShaderInterpreter` evaluates the parsed
-  `ps_2_0` tree with scalar and `float2`/`float3`/`float4` values (`ShaderValue`), covering
-  arithmetic with the C precedence, variables and the assignment operators, swizzles read and
-  written, vector constructors with concatenation and broadcast, the ternary operator,
-  `if`/`else`, `for`, and the usual intrinsics (`abs`, `ceil`, `clamp`, `cos`, `dot`, `exp`,
-  `floor`, `frac`, `length`, `lerp`, `log`, `max`, `min`, `mul`, `normalize`, `pow`, `saturate`,
-  `sign`, `sin`, `smoothstep`, `sqrt`, `step`, `tan`). Sampling goes through the
-  `IShaderSampler` contract, so the interpreter carries no render state, and division by zero
-  yields zero instead of an infinity. A loop budget of 4096 iterations and a call depth limit of
-  32 keep a runaway shader from stalling a frame. Covered by 14 tests.
-- Added the HLSL parser and its syntax tree: `ShaderParser` and `ShaderNode` turn the
-  `ps_2_0` subset into a tagged-union tree covering declarations, expression statements,
-  `if`/`else`, `for`, `return`, swizzles, calls, the ternary operator, and the C operator
-  precedence. Function signatures and bare statement bodies are both accepted, and a sampler
-  declaration without a type is tolerated. Covered by 10 tests.
-- Added the HLSL front end for the upcoming shader runtime: `ShaderLexer` tokenizes the
-  `ps_2_0` subset Milkdrop shaders use, covering identifiers and keywords, numbers with their
-  `f`/`h` suffixes, single- and multi-character operators, swizzles, line and block comments,
-  and source positions, and reports an unexpected character with its offset. Covered by
-  10 tests.
-- Added the generated visualizer texture bank. The `noise_lq` (32 x 32), `noise_mq`
-  (256 x 256), and `noise_hq` (512 x 512) textures and the sixteen `rand00`-`rand15` (32 x 32)
-  textures are produced deterministically from fixed seeds, so no third party image is
-  bundled and every run yields the same textures. Sampling is bilinear with repeat, clamp, and
-  mirror wrap modes, and generation is lazy so a session that never opens the visualizer
-  allocates nothing. Covered by 10 tests.
-- Milkdrop preset keys now act as the per-frame starting values: every numeric key (including
-  the `nWaveMode`, `bWaveDots`, `bWaveThick`, `bAdditiveWaves`, `bDarkenCenter`,
-  `bMotionVectors`, and `nMotionVectorsX/Y` spellings) seeds the matching variable, so real
-  presets that carry their settings as keys instead of code work as written.
-- The visualizer draws the full Milkdrop wave and post-processing set: the circular, doubled,
-  and single-line wave modes with dots, thick, additive, mystery, and colour/position keys,
-  the four declared waveform slots, the outer and inner borders, a motion-vector grid derived
-  from the actual motion field, and the video echo with its zoom, alpha, and orientation.
-  Covered by 11 tests.
-- The preset engine now runs the full Milkdrop stage order. It parses the `per_frame_init`,
-  `per_pixel_init`, `wave_0`-`wave_3` and `shape_N_init` blocks, registers the complete
-  standard variable set (`bass_att`/`mid_att`/`treb_att`, `aspectx`/`aspecty`,
-  `pixelsx`/`pixelsy`, `monitor`, `zoomexp`, `rot`, `cx`/`cy`, `dx`/`dy`, `sx`/`sy`,
-  `blur1`-`blur3`, `darken_center`, `fGammaAdj`, the wave, border, motion-vector and echo
-  groups, `q1`-`q32`, and `b1`-`b8`), and applies the motion parameters, the blur passes, the
-  centre darkening, and the gamma adjustment. The per-pixel block now sees the already warped
-  sampling position in `x`/`y`/`rad`/`ang`, so a real preset can offset or replace it.
-  Covered by 16 tests.
-- The **Visualisierung** settings section gained an **Always show text and controls** toggle.
-  When it is off, the title, hint, and playback buttons appear only while the mouse moves
-  over the visualizer and hide again after three idle seconds; pointer movement is tracked
-  through the window's own events, so moving the mouse on another monitor never reveals them.
-- Added a **Visualisierung** settings section with the render resolution (320 x 180 up to
-  1280 x 720), the target frame rate (24, 30, 60, or 120), and the user preset folder that
-  previously lived under the output device. The window renders at the configured size and
-  lets the image control scale the frame up, so a lower resolution keeps the CPU cost down.
 
 - Genre Cloud now starts Infinite Mix directly from the genres represented by
   its current level. A selected node contributes its complete taxonomy subtree,
@@ -3638,28 +1273,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   table now also exposes the complete shared track-column chooser from its
   header context menu and persists its own visibility, order, and widths.
 
-- The karaoke view now highlights the active word of enhanced-LRC lyrics.
-  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
-  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
-  already-sung words keep the accent colour. Plain synchronized lines keep the
-  line-level highlight, so nothing changes for ordinary LRC files.
-- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
-  now stripped from the line text instead of appearing as literal `<00:12.00>`
-  fragments.
-- Added bulk genre editing for the shared Tracks table. The bulk action bar gained
-  a genre field that stores the value for every selected **local** track through
-  `AudioDatabase.SetTrackGenres`, which writes the library-only
-  `track_genre_overrides` table in one transaction and reapplies it on every later
-  scan. Source media files are never modified, and an empty value removes the
-  override so the next scan restores the embedded genre. Selected Orynivo Server
-  tracks are updated on their owning server through the new authenticated
-  `PUT /api/tracks/{id}/genre`, which records the same library-only override.
-- Podcast episodes can be downloaded for offline playback. Episode rows gained a
-  **Download episode** / **Delete download** context menu and a download marker in
-  the status column, playback prefers the cached file, and Settings > Library sets
-  the cache size limit in megabytes. Eviction removes the least recently used
-  downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
-  the most recently used episode is always kept.
 ### Fixed
 
 - Orynivo Server ReplayGain maintenance now runs FFmpeg with one worker thread,
@@ -3681,28 +1294,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [0.36.3] - 2026-08-11
 
-- The karaoke view now highlights the active word of enhanced-LRC lyrics.
-  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
-  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
-  already-sung words keep the accent colour. Plain synchronized lines keep the
-  line-level highlight, so nothing changes for ordinary LRC files.
-- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
-  now stripped from the line text instead of appearing as literal `<00:12.00>`
-  fragments.
-- Added bulk genre editing for the shared Tracks table. The bulk action bar gained
-  a genre field that stores the value for every selected **local** track through
-  `AudioDatabase.SetTrackGenres`, which writes the library-only
-  `track_genre_overrides` table in one transaction and reapplies it on every later
-  scan. Source media files are never modified, and an empty value removes the
-  override so the next scan restores the embedded genre. Selected Orynivo Server
-  tracks are updated on their owning server through the new authenticated
-  `PUT /api/tracks/{id}/genre`, which records the same library-only override.
-- Podcast episodes can be downloaded for offline playback. Episode rows gained a
-  **Download episode** / **Delete download** context menu and a download marker in
-  the status column, playback prefers the cached file, and Settings > Library sets
-  the cache size limit in megabytes. Eviction removes the least recently used
-  downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
-  the most recently used episode is always kept.
 ### Fixed
 
 - Fixed server scans with multiple library roots occasionally appearing stuck
@@ -3712,97 +1303,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.36.2] - 2026-08-10
 
 ### Added
-- The visualizer's per-pixel path no longer does work the preset never asked for. The compiled
-  programs now report the variables they reference (`PresetProgram.ReferencedVariables` and
-  `Uses`), the warp stage resolves the `x`, `y`, `rad`, and `ang` slots once instead of looking
-  each name up in the layout for every pixel, and it only computes the polar pair, the motion
-  grid, and the seeded sampling position when the preset's own code needs them. A rendered frame
-  is allocation-free, which is now asserted by a test. Covered by 5 tests.
-- The visualizer renders on its own thread now. A frame used to be produced from a
-  `DispatcherTimer`, so a heavy preset blocked the interface for its whole duration; the loop
-  now runs on a background thread, hands a finished copy of the frame to the UI thread through a
-  presentation buffer, and queues at most one present at a time, so a busy interface can never
-  build up a backlog of frames. Preset switching, the reset key, and the overlay follow as
-  thread-safe requests, and the frame pacing lives in the tested `FramePacing` helper. Covered by
-  5 tests.
-- The visualizer now measures where its frame time goes. `PresetRenderer` reports a
-  `RenderTimings` breakdown (warp, blur, post-processing, overlay, composite, comp shaders, and
-  the frame total) per frame and as an average over a window, and the window's diagnostic line in
-  `logs/seek.log` carries those averages once per second, so the cost per stage can be read
-  instead of guessed. A warp shader runs inside the per-pixel loop, so its cost stays part of
-  `warp`; timing it per pixel would cost more than the measurement is worth. The frame budget now
-  compares the complete frame rather than only the shaders. Covered by 8 tests.
-- Milkdrop `.milk` files are read as the multi-preset files they are: `VisualizerPreset.ParseSections`
-  splits the text at its `[presetNN]` headers and the preset folder loads every section as its
-  own preset instead of only the last one surviving. The declared format version
-  (`MILKDROP_PRESET_VERSION`, `PSVERSION`, or `preset_version`) is reported on
-  `VisualizerPreset.Version`; every version is accepted. Skipped presets now carry a reason
-  through `VisualizerPresetLibrary.RejectedReasons`, naming the file or section and the parse
-  error. A hand-written corpus of presets in the real format, including a multi-section file and
-  shader source, guards the format handling; third-party presets stay unbundled because they are
-  licensed by their authors. Covered by 13 tests.
-- The visualizer now runs preset shaders. The numbered `warp_N` and `comp_N` keys are parsed
-  together with their optional `_enabled`, `_per_frame`, and `_per_pixel` companions, and the
-  preset reader keeps the newlines inside a shader's source, because Milkdrop stores the code
-  as a multi-line value. A shader that does not parse is skipped so one broken shader degrades a
-  preset instead of rejecting it. The renderer implements `IShaderSampler`, so shaders can
-  sample `sampler_main`, `sampler_pc_main`, `sampler_fc_main`, `GetBlur1`-`GetBlur3`, and
-  `GetPixel`, and it binds `uv`, `uv_orig`, `texsize`, the audio bands, the smoothed bands, the
-  frame counters, and the aspect ratio. A per-frame time budget (20 ms by default) skips the
-  shaders for a while when they cost too much, so a heavy preset keeps a smooth picture instead
-  of stalling playback. Covered by 11 tests.
-- Added the HLSL interpreter for the shader runtime: `ShaderInterpreter` evaluates the parsed
-  `ps_2_0` tree with scalar and `float2`/`float3`/`float4` values (`ShaderValue`), covering
-  arithmetic with the C precedence, variables and the assignment operators, swizzles read and
-  written, vector constructors with concatenation and broadcast, the ternary operator,
-  `if`/`else`, `for`, and the usual intrinsics (`abs`, `ceil`, `clamp`, `cos`, `dot`, `exp`,
-  `floor`, `frac`, `length`, `lerp`, `log`, `max`, `min`, `mul`, `normalize`, `pow`, `saturate`,
-  `sign`, `sin`, `smoothstep`, `sqrt`, `step`, `tan`). Sampling goes through the
-  `IShaderSampler` contract, so the interpreter carries no render state, and division by zero
-  yields zero instead of an infinity. A loop budget of 4096 iterations and a call depth limit of
-  32 keep a runaway shader from stalling a frame. Covered by 14 tests.
-- Added the HLSL parser and its syntax tree: `ShaderParser` and `ShaderNode` turn the
-  `ps_2_0` subset into a tagged-union tree covering declarations, expression statements,
-  `if`/`else`, `for`, `return`, swizzles, calls, the ternary operator, and the C operator
-  precedence. Function signatures and bare statement bodies are both accepted, and a sampler
-  declaration without a type is tolerated. Covered by 10 tests.
-- Added the HLSL front end for the upcoming shader runtime: `ShaderLexer` tokenizes the
-  `ps_2_0` subset Milkdrop shaders use, covering identifiers and keywords, numbers with their
-  `f`/`h` suffixes, single- and multi-character operators, swizzles, line and block comments,
-  and source positions, and reports an unexpected character with its offset. Covered by
-  10 tests.
-- Added the generated visualizer texture bank. The `noise_lq` (32 x 32), `noise_mq`
-  (256 x 256), and `noise_hq` (512 x 512) textures and the sixteen `rand00`-`rand15` (32 x 32)
-  textures are produced deterministically from fixed seeds, so no third party image is
-  bundled and every run yields the same textures. Sampling is bilinear with repeat, clamp, and
-  mirror wrap modes, and generation is lazy so a session that never opens the visualizer
-  allocates nothing. Covered by 10 tests.
-- Milkdrop preset keys now act as the per-frame starting values: every numeric key (including
-  the `nWaveMode`, `bWaveDots`, `bWaveThick`, `bAdditiveWaves`, `bDarkenCenter`,
-  `bMotionVectors`, and `nMotionVectorsX/Y` spellings) seeds the matching variable, so real
-  presets that carry their settings as keys instead of code work as written.
-- The visualizer draws the full Milkdrop wave and post-processing set: the circular, doubled,
-  and single-line wave modes with dots, thick, additive, mystery, and colour/position keys,
-  the four declared waveform slots, the outer and inner borders, a motion-vector grid derived
-  from the actual motion field, and the video echo with its zoom, alpha, and orientation.
-  Covered by 11 tests.
-- The preset engine now runs the full Milkdrop stage order. It parses the `per_frame_init`,
-  `per_pixel_init`, `wave_0`-`wave_3` and `shape_N_init` blocks, registers the complete
-  standard variable set (`bass_att`/`mid_att`/`treb_att`, `aspectx`/`aspecty`,
-  `pixelsx`/`pixelsy`, `monitor`, `zoomexp`, `rot`, `cx`/`cy`, `dx`/`dy`, `sx`/`sy`,
-  `blur1`-`blur3`, `darken_center`, `fGammaAdj`, the wave, border, motion-vector and echo
-  groups, `q1`-`q32`, and `b1`-`b8`), and applies the motion parameters, the blur passes, the
-  centre darkening, and the gamma adjustment. The per-pixel block now sees the already warped
-  sampling position in `x`/`y`/`rad`/`ang`, so a real preset can offset or replace it.
-  Covered by 16 tests.
-- The **Visualisierung** settings section gained an **Always show text and controls** toggle.
-  When it is off, the title, hint, and playback buttons appear only while the mouse moves
-  over the visualizer and hide again after three idle seconds; pointer movement is tracked
-  through the window's own events, so moving the mouse on another monitor never reveals them.
-- Added a **Visualisierung** settings section with the render resolution (320 x 180 up to
-  1280 x 720), the target frame rate (24, 30, 60, or 120), and the user preset folder that
-  previously lived under the output device. The window renders at the configured size and
-  lets the image control scale the frame up, so a lower resolution keeps the CPU cost down.
 
 - The explicit **Calculate missing ReplayGain** action now processes the local
   library and every configured Orynivo Server. Servers expose a separate
@@ -3820,97 +1320,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.36.1] - 2026-08-10
 
 ### Added
-- The visualizer's per-pixel path no longer does work the preset never asked for. The compiled
-  programs now report the variables they reference (`PresetProgram.ReferencedVariables` and
-  `Uses`), the warp stage resolves the `x`, `y`, `rad`, and `ang` slots once instead of looking
-  each name up in the layout for every pixel, and it only computes the polar pair, the motion
-  grid, and the seeded sampling position when the preset's own code needs them. A rendered frame
-  is allocation-free, which is now asserted by a test. Covered by 5 tests.
-- The visualizer renders on its own thread now. A frame used to be produced from a
-  `DispatcherTimer`, so a heavy preset blocked the interface for its whole duration; the loop
-  now runs on a background thread, hands a finished copy of the frame to the UI thread through a
-  presentation buffer, and queues at most one present at a time, so a busy interface can never
-  build up a backlog of frames. Preset switching, the reset key, and the overlay follow as
-  thread-safe requests, and the frame pacing lives in the tested `FramePacing` helper. Covered by
-  5 tests.
-- The visualizer now measures where its frame time goes. `PresetRenderer` reports a
-  `RenderTimings` breakdown (warp, blur, post-processing, overlay, composite, comp shaders, and
-  the frame total) per frame and as an average over a window, and the window's diagnostic line in
-  `logs/seek.log` carries those averages once per second, so the cost per stage can be read
-  instead of guessed. A warp shader runs inside the per-pixel loop, so its cost stays part of
-  `warp`; timing it per pixel would cost more than the measurement is worth. The frame budget now
-  compares the complete frame rather than only the shaders. Covered by 8 tests.
-- Milkdrop `.milk` files are read as the multi-preset files they are: `VisualizerPreset.ParseSections`
-  splits the text at its `[presetNN]` headers and the preset folder loads every section as its
-  own preset instead of only the last one surviving. The declared format version
-  (`MILKDROP_PRESET_VERSION`, `PSVERSION`, or `preset_version`) is reported on
-  `VisualizerPreset.Version`; every version is accepted. Skipped presets now carry a reason
-  through `VisualizerPresetLibrary.RejectedReasons`, naming the file or section and the parse
-  error. A hand-written corpus of presets in the real format, including a multi-section file and
-  shader source, guards the format handling; third-party presets stay unbundled because they are
-  licensed by their authors. Covered by 13 tests.
-- The visualizer now runs preset shaders. The numbered `warp_N` and `comp_N` keys are parsed
-  together with their optional `_enabled`, `_per_frame`, and `_per_pixel` companions, and the
-  preset reader keeps the newlines inside a shader's source, because Milkdrop stores the code
-  as a multi-line value. A shader that does not parse is skipped so one broken shader degrades a
-  preset instead of rejecting it. The renderer implements `IShaderSampler`, so shaders can
-  sample `sampler_main`, `sampler_pc_main`, `sampler_fc_main`, `GetBlur1`-`GetBlur3`, and
-  `GetPixel`, and it binds `uv`, `uv_orig`, `texsize`, the audio bands, the smoothed bands, the
-  frame counters, and the aspect ratio. A per-frame time budget (20 ms by default) skips the
-  shaders for a while when they cost too much, so a heavy preset keeps a smooth picture instead
-  of stalling playback. Covered by 11 tests.
-- Added the HLSL interpreter for the shader runtime: `ShaderInterpreter` evaluates the parsed
-  `ps_2_0` tree with scalar and `float2`/`float3`/`float4` values (`ShaderValue`), covering
-  arithmetic with the C precedence, variables and the assignment operators, swizzles read and
-  written, vector constructors with concatenation and broadcast, the ternary operator,
-  `if`/`else`, `for`, and the usual intrinsics (`abs`, `ceil`, `clamp`, `cos`, `dot`, `exp`,
-  `floor`, `frac`, `length`, `lerp`, `log`, `max`, `min`, `mul`, `normalize`, `pow`, `saturate`,
-  `sign`, `sin`, `smoothstep`, `sqrt`, `step`, `tan`). Sampling goes through the
-  `IShaderSampler` contract, so the interpreter carries no render state, and division by zero
-  yields zero instead of an infinity. A loop budget of 4096 iterations and a call depth limit of
-  32 keep a runaway shader from stalling a frame. Covered by 14 tests.
-- Added the HLSL parser and its syntax tree: `ShaderParser` and `ShaderNode` turn the
-  `ps_2_0` subset into a tagged-union tree covering declarations, expression statements,
-  `if`/`else`, `for`, `return`, swizzles, calls, the ternary operator, and the C operator
-  precedence. Function signatures and bare statement bodies are both accepted, and a sampler
-  declaration without a type is tolerated. Covered by 10 tests.
-- Added the HLSL front end for the upcoming shader runtime: `ShaderLexer` tokenizes the
-  `ps_2_0` subset Milkdrop shaders use, covering identifiers and keywords, numbers with their
-  `f`/`h` suffixes, single- and multi-character operators, swizzles, line and block comments,
-  and source positions, and reports an unexpected character with its offset. Covered by
-  10 tests.
-- Added the generated visualizer texture bank. The `noise_lq` (32 x 32), `noise_mq`
-  (256 x 256), and `noise_hq` (512 x 512) textures and the sixteen `rand00`-`rand15` (32 x 32)
-  textures are produced deterministically from fixed seeds, so no third party image is
-  bundled and every run yields the same textures. Sampling is bilinear with repeat, clamp, and
-  mirror wrap modes, and generation is lazy so a session that never opens the visualizer
-  allocates nothing. Covered by 10 tests.
-- Milkdrop preset keys now act as the per-frame starting values: every numeric key (including
-  the `nWaveMode`, `bWaveDots`, `bWaveThick`, `bAdditiveWaves`, `bDarkenCenter`,
-  `bMotionVectors`, and `nMotionVectorsX/Y` spellings) seeds the matching variable, so real
-  presets that carry their settings as keys instead of code work as written.
-- The visualizer draws the full Milkdrop wave and post-processing set: the circular, doubled,
-  and single-line wave modes with dots, thick, additive, mystery, and colour/position keys,
-  the four declared waveform slots, the outer and inner borders, a motion-vector grid derived
-  from the actual motion field, and the video echo with its zoom, alpha, and orientation.
-  Covered by 11 tests.
-- The preset engine now runs the full Milkdrop stage order. It parses the `per_frame_init`,
-  `per_pixel_init`, `wave_0`-`wave_3` and `shape_N_init` blocks, registers the complete
-  standard variable set (`bass_att`/`mid_att`/`treb_att`, `aspectx`/`aspecty`,
-  `pixelsx`/`pixelsy`, `monitor`, `zoomexp`, `rot`, `cx`/`cy`, `dx`/`dy`, `sx`/`sy`,
-  `blur1`-`blur3`, `darken_center`, `fGammaAdj`, the wave, border, motion-vector and echo
-  groups, `q1`-`q32`, and `b1`-`b8`), and applies the motion parameters, the blur passes, the
-  centre darkening, and the gamma adjustment. The per-pixel block now sees the already warped
-  sampling position in `x`/`y`/`rad`/`ang`, so a real preset can offset or replace it.
-  Covered by 16 tests.
-- The **Visualisierung** settings section gained an **Always show text and controls** toggle.
-  When it is off, the title, hint, and playback buttons appear only while the mouse moves
-  over the visualizer and hide again after three idle seconds; pointer movement is tracked
-  through the window's own events, so moving the mouse on another monitor never reveals them.
-- Added a **Visualisierung** settings section with the render resolution (320 x 180 up to
-  1280 x 720), the target frame rate (24, 30, 60, or 120), and the user preset folder that
-  previously lived under the output device. The window renders at the configured size and
-  lets the image control scale the frame up, so a lower resolution keeps the CPU cost down.
 
 - Added a transport output-lock button beside the Equalizer and Output
   quick-pickers. It closes the active exclusive audio player to release the
@@ -3918,28 +1327,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   and can reacquire the device and resume from that position without restarting
   Orynivo.
 
-- The karaoke view now highlights the active word of enhanced-LRC lyrics.
-  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
-  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
-  already-sung words keep the accent colour. Plain synchronized lines keep the
-  line-level highlight, so nothing changes for ordinary LRC files.
-- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
-  now stripped from the line text instead of appearing as literal `<00:12.00>`
-  fragments.
-- Added bulk genre editing for the shared Tracks table. The bulk action bar gained
-  a genre field that stores the value for every selected **local** track through
-  `AudioDatabase.SetTrackGenres`, which writes the library-only
-  `track_genre_overrides` table in one transaction and reapplies it on every later
-  scan. Source media files are never modified, and an empty value removes the
-  override so the next scan restores the embedded genre. Selected Orynivo Server
-  tracks are updated on their owning server through the new authenticated
-  `PUT /api/tracks/{id}/genre`, which records the same library-only override.
-- Podcast episodes can be downloaded for offline playback. Episode rows gained a
-  **Download episode** / **Delete download** context menu and a download marker in
-  the status column, playback prefers the cached file, and Settings > Library sets
-  the cache size limit in megabytes. Eviction removes the least recently used
-  downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
-  the most recently used episode is always kept.
 ### Fixed
 
 - Fixed the embedded Settings view at constrained window heights: long
@@ -3949,97 +1336,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.36.0] - 2026-08-10
 
 ### Added
-- The visualizer's per-pixel path no longer does work the preset never asked for. The compiled
-  programs now report the variables they reference (`PresetProgram.ReferencedVariables` and
-  `Uses`), the warp stage resolves the `x`, `y`, `rad`, and `ang` slots once instead of looking
-  each name up in the layout for every pixel, and it only computes the polar pair, the motion
-  grid, and the seeded sampling position when the preset's own code needs them. A rendered frame
-  is allocation-free, which is now asserted by a test. Covered by 5 tests.
-- The visualizer renders on its own thread now. A frame used to be produced from a
-  `DispatcherTimer`, so a heavy preset blocked the interface for its whole duration; the loop
-  now runs on a background thread, hands a finished copy of the frame to the UI thread through a
-  presentation buffer, and queues at most one present at a time, so a busy interface can never
-  build up a backlog of frames. Preset switching, the reset key, and the overlay follow as
-  thread-safe requests, and the frame pacing lives in the tested `FramePacing` helper. Covered by
-  5 tests.
-- The visualizer now measures where its frame time goes. `PresetRenderer` reports a
-  `RenderTimings` breakdown (warp, blur, post-processing, overlay, composite, comp shaders, and
-  the frame total) per frame and as an average over a window, and the window's diagnostic line in
-  `logs/seek.log` carries those averages once per second, so the cost per stage can be read
-  instead of guessed. A warp shader runs inside the per-pixel loop, so its cost stays part of
-  `warp`; timing it per pixel would cost more than the measurement is worth. The frame budget now
-  compares the complete frame rather than only the shaders. Covered by 8 tests.
-- Milkdrop `.milk` files are read as the multi-preset files they are: `VisualizerPreset.ParseSections`
-  splits the text at its `[presetNN]` headers and the preset folder loads every section as its
-  own preset instead of only the last one surviving. The declared format version
-  (`MILKDROP_PRESET_VERSION`, `PSVERSION`, or `preset_version`) is reported on
-  `VisualizerPreset.Version`; every version is accepted. Skipped presets now carry a reason
-  through `VisualizerPresetLibrary.RejectedReasons`, naming the file or section and the parse
-  error. A hand-written corpus of presets in the real format, including a multi-section file and
-  shader source, guards the format handling; third-party presets stay unbundled because they are
-  licensed by their authors. Covered by 13 tests.
-- The visualizer now runs preset shaders. The numbered `warp_N` and `comp_N` keys are parsed
-  together with their optional `_enabled`, `_per_frame`, and `_per_pixel` companions, and the
-  preset reader keeps the newlines inside a shader's source, because Milkdrop stores the code
-  as a multi-line value. A shader that does not parse is skipped so one broken shader degrades a
-  preset instead of rejecting it. The renderer implements `IShaderSampler`, so shaders can
-  sample `sampler_main`, `sampler_pc_main`, `sampler_fc_main`, `GetBlur1`-`GetBlur3`, and
-  `GetPixel`, and it binds `uv`, `uv_orig`, `texsize`, the audio bands, the smoothed bands, the
-  frame counters, and the aspect ratio. A per-frame time budget (20 ms by default) skips the
-  shaders for a while when they cost too much, so a heavy preset keeps a smooth picture instead
-  of stalling playback. Covered by 11 tests.
-- Added the HLSL interpreter for the shader runtime: `ShaderInterpreter` evaluates the parsed
-  `ps_2_0` tree with scalar and `float2`/`float3`/`float4` values (`ShaderValue`), covering
-  arithmetic with the C precedence, variables and the assignment operators, swizzles read and
-  written, vector constructors with concatenation and broadcast, the ternary operator,
-  `if`/`else`, `for`, and the usual intrinsics (`abs`, `ceil`, `clamp`, `cos`, `dot`, `exp`,
-  `floor`, `frac`, `length`, `lerp`, `log`, `max`, `min`, `mul`, `normalize`, `pow`, `saturate`,
-  `sign`, `sin`, `smoothstep`, `sqrt`, `step`, `tan`). Sampling goes through the
-  `IShaderSampler` contract, so the interpreter carries no render state, and division by zero
-  yields zero instead of an infinity. A loop budget of 4096 iterations and a call depth limit of
-  32 keep a runaway shader from stalling a frame. Covered by 14 tests.
-- Added the HLSL parser and its syntax tree: `ShaderParser` and `ShaderNode` turn the
-  `ps_2_0` subset into a tagged-union tree covering declarations, expression statements,
-  `if`/`else`, `for`, `return`, swizzles, calls, the ternary operator, and the C operator
-  precedence. Function signatures and bare statement bodies are both accepted, and a sampler
-  declaration without a type is tolerated. Covered by 10 tests.
-- Added the HLSL front end for the upcoming shader runtime: `ShaderLexer` tokenizes the
-  `ps_2_0` subset Milkdrop shaders use, covering identifiers and keywords, numbers with their
-  `f`/`h` suffixes, single- and multi-character operators, swizzles, line and block comments,
-  and source positions, and reports an unexpected character with its offset. Covered by
-  10 tests.
-- Added the generated visualizer texture bank. The `noise_lq` (32 x 32), `noise_mq`
-  (256 x 256), and `noise_hq` (512 x 512) textures and the sixteen `rand00`-`rand15` (32 x 32)
-  textures are produced deterministically from fixed seeds, so no third party image is
-  bundled and every run yields the same textures. Sampling is bilinear with repeat, clamp, and
-  mirror wrap modes, and generation is lazy so a session that never opens the visualizer
-  allocates nothing. Covered by 10 tests.
-- Milkdrop preset keys now act as the per-frame starting values: every numeric key (including
-  the `nWaveMode`, `bWaveDots`, `bWaveThick`, `bAdditiveWaves`, `bDarkenCenter`,
-  `bMotionVectors`, and `nMotionVectorsX/Y` spellings) seeds the matching variable, so real
-  presets that carry their settings as keys instead of code work as written.
-- The visualizer draws the full Milkdrop wave and post-processing set: the circular, doubled,
-  and single-line wave modes with dots, thick, additive, mystery, and colour/position keys,
-  the four declared waveform slots, the outer and inner borders, a motion-vector grid derived
-  from the actual motion field, and the video echo with its zoom, alpha, and orientation.
-  Covered by 11 tests.
-- The preset engine now runs the full Milkdrop stage order. It parses the `per_frame_init`,
-  `per_pixel_init`, `wave_0`-`wave_3` and `shape_N_init` blocks, registers the complete
-  standard variable set (`bass_att`/`mid_att`/`treb_att`, `aspectx`/`aspecty`,
-  `pixelsx`/`pixelsy`, `monitor`, `zoomexp`, `rot`, `cx`/`cy`, `dx`/`dy`, `sx`/`sy`,
-  `blur1`-`blur3`, `darken_center`, `fGammaAdj`, the wave, border, motion-vector and echo
-  groups, `q1`-`q32`, and `b1`-`b8`), and applies the motion parameters, the blur passes, the
-  centre darkening, and the gamma adjustment. The per-pixel block now sees the already warped
-  sampling position in `x`/`y`/`rad`/`ang`, so a real preset can offset or replace it.
-  Covered by 16 tests.
-- The **Visualisierung** settings section gained an **Always show text and controls** toggle.
-  When it is off, the title, hint, and playback buttons appear only while the mouse moves
-  over the visualizer and hide again after three idle seconds; pointer movement is tracked
-  through the window's own events, so moving the mouse on another monitor never reveals them.
-- Added a **Visualisierung** settings section with the render resolution (320 x 180 up to
-  1280 x 720), the target frame rate (24, 30, 60, or 120), and the user preset folder that
-  previously lived under the output device. The window renders at the configured size and
-  lets the image control scale the frame up, so a lower resolution keeps the CPU cost down.
 
 - MusicBrainz recording refreshes now retrieve curated genres and positively
   confirmed community tags alongside ratings. Supplemental values are stored
@@ -4067,28 +1363,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   and take priority. Unresolved metadata matches are retried after 90 days
   instead of being requested repeatedly.
 
-- The karaoke view now highlights the active word of enhanced-LRC lyrics.
-  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
-  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
-  already-sung words keep the accent colour. Plain synchronized lines keep the
-  line-level highlight, so nothing changes for ordinary LRC files.
-- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
-  now stripped from the line text instead of appearing as literal `<00:12.00>`
-  fragments.
-- Added bulk genre editing for the shared Tracks table. The bulk action bar gained
-  a genre field that stores the value for every selected **local** track through
-  `AudioDatabase.SetTrackGenres`, which writes the library-only
-  `track_genre_overrides` table in one transaction and reapplies it on every later
-  scan. Source media files are never modified, and an empty value removes the
-  override so the next scan restores the embedded genre. Selected Orynivo Server
-  tracks are updated on their owning server through the new authenticated
-  `PUT /api/tracks/{id}/genre`, which records the same library-only override.
-- Podcast episodes can be downloaded for offline playback. Episode rows gained a
-  **Download episode** / **Delete download** context menu and a download marker in
-  the status column, playback prefers the cached file, and Settings > Library sets
-  the cache size limit in megabytes. Eviction removes the least recently used
-  downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
-  the most recently used episode is always kept.
 ### Fixed
 
 - Distinguished a completed MusicBrainz lookup with no community votes from a
@@ -4098,97 +1372,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.35.4] - 2026-08-10
 
 ### Added
-- The visualizer's per-pixel path no longer does work the preset never asked for. The compiled
-  programs now report the variables they reference (`PresetProgram.ReferencedVariables` and
-  `Uses`), the warp stage resolves the `x`, `y`, `rad`, and `ang` slots once instead of looking
-  each name up in the layout for every pixel, and it only computes the polar pair, the motion
-  grid, and the seeded sampling position when the preset's own code needs them. A rendered frame
-  is allocation-free, which is now asserted by a test. Covered by 5 tests.
-- The visualizer renders on its own thread now. A frame used to be produced from a
-  `DispatcherTimer`, so a heavy preset blocked the interface for its whole duration; the loop
-  now runs on a background thread, hands a finished copy of the frame to the UI thread through a
-  presentation buffer, and queues at most one present at a time, so a busy interface can never
-  build up a backlog of frames. Preset switching, the reset key, and the overlay follow as
-  thread-safe requests, and the frame pacing lives in the tested `FramePacing` helper. Covered by
-  5 tests.
-- The visualizer now measures where its frame time goes. `PresetRenderer` reports a
-  `RenderTimings` breakdown (warp, blur, post-processing, overlay, composite, comp shaders, and
-  the frame total) per frame and as an average over a window, and the window's diagnostic line in
-  `logs/seek.log` carries those averages once per second, so the cost per stage can be read
-  instead of guessed. A warp shader runs inside the per-pixel loop, so its cost stays part of
-  `warp`; timing it per pixel would cost more than the measurement is worth. The frame budget now
-  compares the complete frame rather than only the shaders. Covered by 8 tests.
-- Milkdrop `.milk` files are read as the multi-preset files they are: `VisualizerPreset.ParseSections`
-  splits the text at its `[presetNN]` headers and the preset folder loads every section as its
-  own preset instead of only the last one surviving. The declared format version
-  (`MILKDROP_PRESET_VERSION`, `PSVERSION`, or `preset_version`) is reported on
-  `VisualizerPreset.Version`; every version is accepted. Skipped presets now carry a reason
-  through `VisualizerPresetLibrary.RejectedReasons`, naming the file or section and the parse
-  error. A hand-written corpus of presets in the real format, including a multi-section file and
-  shader source, guards the format handling; third-party presets stay unbundled because they are
-  licensed by their authors. Covered by 13 tests.
-- The visualizer now runs preset shaders. The numbered `warp_N` and `comp_N` keys are parsed
-  together with their optional `_enabled`, `_per_frame`, and `_per_pixel` companions, and the
-  preset reader keeps the newlines inside a shader's source, because Milkdrop stores the code
-  as a multi-line value. A shader that does not parse is skipped so one broken shader degrades a
-  preset instead of rejecting it. The renderer implements `IShaderSampler`, so shaders can
-  sample `sampler_main`, `sampler_pc_main`, `sampler_fc_main`, `GetBlur1`-`GetBlur3`, and
-  `GetPixel`, and it binds `uv`, `uv_orig`, `texsize`, the audio bands, the smoothed bands, the
-  frame counters, and the aspect ratio. A per-frame time budget (20 ms by default) skips the
-  shaders for a while when they cost too much, so a heavy preset keeps a smooth picture instead
-  of stalling playback. Covered by 11 tests.
-- Added the HLSL interpreter for the shader runtime: `ShaderInterpreter` evaluates the parsed
-  `ps_2_0` tree with scalar and `float2`/`float3`/`float4` values (`ShaderValue`), covering
-  arithmetic with the C precedence, variables and the assignment operators, swizzles read and
-  written, vector constructors with concatenation and broadcast, the ternary operator,
-  `if`/`else`, `for`, and the usual intrinsics (`abs`, `ceil`, `clamp`, `cos`, `dot`, `exp`,
-  `floor`, `frac`, `length`, `lerp`, `log`, `max`, `min`, `mul`, `normalize`, `pow`, `saturate`,
-  `sign`, `sin`, `smoothstep`, `sqrt`, `step`, `tan`). Sampling goes through the
-  `IShaderSampler` contract, so the interpreter carries no render state, and division by zero
-  yields zero instead of an infinity. A loop budget of 4096 iterations and a call depth limit of
-  32 keep a runaway shader from stalling a frame. Covered by 14 tests.
-- Added the HLSL parser and its syntax tree: `ShaderParser` and `ShaderNode` turn the
-  `ps_2_0` subset into a tagged-union tree covering declarations, expression statements,
-  `if`/`else`, `for`, `return`, swizzles, calls, the ternary operator, and the C operator
-  precedence. Function signatures and bare statement bodies are both accepted, and a sampler
-  declaration without a type is tolerated. Covered by 10 tests.
-- Added the HLSL front end for the upcoming shader runtime: `ShaderLexer` tokenizes the
-  `ps_2_0` subset Milkdrop shaders use, covering identifiers and keywords, numbers with their
-  `f`/`h` suffixes, single- and multi-character operators, swizzles, line and block comments,
-  and source positions, and reports an unexpected character with its offset. Covered by
-  10 tests.
-- Added the generated visualizer texture bank. The `noise_lq` (32 x 32), `noise_mq`
-  (256 x 256), and `noise_hq` (512 x 512) textures and the sixteen `rand00`-`rand15` (32 x 32)
-  textures are produced deterministically from fixed seeds, so no third party image is
-  bundled and every run yields the same textures. Sampling is bilinear with repeat, clamp, and
-  mirror wrap modes, and generation is lazy so a session that never opens the visualizer
-  allocates nothing. Covered by 10 tests.
-- Milkdrop preset keys now act as the per-frame starting values: every numeric key (including
-  the `nWaveMode`, `bWaveDots`, `bWaveThick`, `bAdditiveWaves`, `bDarkenCenter`,
-  `bMotionVectors`, and `nMotionVectorsX/Y` spellings) seeds the matching variable, so real
-  presets that carry their settings as keys instead of code work as written.
-- The visualizer draws the full Milkdrop wave and post-processing set: the circular, doubled,
-  and single-line wave modes with dots, thick, additive, mystery, and colour/position keys,
-  the four declared waveform slots, the outer and inner borders, a motion-vector grid derived
-  from the actual motion field, and the video echo with its zoom, alpha, and orientation.
-  Covered by 11 tests.
-- The preset engine now runs the full Milkdrop stage order. It parses the `per_frame_init`,
-  `per_pixel_init`, `wave_0`-`wave_3` and `shape_N_init` blocks, registers the complete
-  standard variable set (`bass_att`/`mid_att`/`treb_att`, `aspectx`/`aspecty`,
-  `pixelsx`/`pixelsy`, `monitor`, `zoomexp`, `rot`, `cx`/`cy`, `dx`/`dy`, `sx`/`sy`,
-  `blur1`-`blur3`, `darken_center`, `fGammaAdj`, the wave, border, motion-vector and echo
-  groups, `q1`-`q32`, and `b1`-`b8`), and applies the motion parameters, the blur passes, the
-  centre darkening, and the gamma adjustment. The per-pixel block now sees the already warped
-  sampling position in `x`/`y`/`rad`/`ang`, so a real preset can offset or replace it.
-  Covered by 16 tests.
-- The **Visualisierung** settings section gained an **Always show text and controls** toggle.
-  When it is off, the title, hint, and playback buttons appear only while the mouse moves
-  over the visualizer and hide again after three idle seconds; pointer movement is tracked
-  through the window's own events, so moving the mouse on another monitor never reveals them.
-- Added a **Visualisierung** settings section with the render resolution (320 x 180 up to
-  1280 x 720), the target frame rate (24, 30, 60, or 120), and the user preset folder that
-  previously lived under the output device. The window renders at the configured size and
-  lets the image control scale the frame up, so a lower resolution keeps the CPU cost down.
 
 - Added album names to Dashboard Recently Played cards, with direct album
   navigation for local, Orynivo Server, and Plex history entries.
@@ -4198,28 +1381,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   search action when artwork is missing, plus the same favorite control and
   local/Orynivo Server source badge as the main Albums artwork view.
 
-- The karaoke view now highlights the active word of enhanced-LRC lyrics.
-  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
-  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
-  already-sung words keep the accent colour. Plain synchronized lines keep the
-  line-level highlight, so nothing changes for ordinary LRC files.
-- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
-  now stripped from the line text instead of appearing as literal `<00:12.00>`
-  fragments.
-- Added bulk genre editing for the shared Tracks table. The bulk action bar gained
-  a genre field that stores the value for every selected **local** track through
-  `AudioDatabase.SetTrackGenres`, which writes the library-only
-  `track_genre_overrides` table in one transaction and reapplies it on every later
-  scan. Source media files are never modified, and an empty value removes the
-  override so the next scan restores the embedded genre. Selected Orynivo Server
-  tracks are updated on their owning server through the new authenticated
-  `PUT /api/tracks/{id}/genre`, which records the same library-only override.
-- Podcast episodes can be downloaded for offline playback. Episode rows gained a
-  **Download episode** / **Delete download** context menu and a download marker in
-  the status column, playback prefers the cached file, and Settings > Library sets
-  the cache size limit in megabytes. Eviction removes the least recently used
-  downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
-  the most recently used episode is always kept.
 ### Fixed
 
 - Removed the Fluent DataGrid header's permanent empty sort-icon reservation,
@@ -4237,28 +1398,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [0.35.2] - 2026-08-03
 
-- The karaoke view now highlights the active word of enhanced-LRC lyrics.
-  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
-  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
-  already-sung words keep the accent colour. Plain synchronized lines keep the
-  line-level highlight, so nothing changes for ordinary LRC files.
-- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
-  now stripped from the line text instead of appearing as literal `<00:12.00>`
-  fragments.
-- Added bulk genre editing for the shared Tracks table. The bulk action bar gained
-  a genre field that stores the value for every selected **local** track through
-  `AudioDatabase.SetTrackGenres`, which writes the library-only
-  `track_genre_overrides` table in one transaction and reapplies it on every later
-  scan. Source media files are never modified, and an empty value removes the
-  override so the next scan restores the embedded genre. Selected Orynivo Server
-  tracks are updated on their owning server through the new authenticated
-  `PUT /api/tracks/{id}/genre`, which records the same library-only override.
-- Podcast episodes can be downloaded for offline playback. Episode rows gained a
-  **Download episode** / **Delete download** context menu and a download marker in
-  the status column, playback prefers the cached file, and Settings > Library sets
-  the cache size limit in megabytes. Eviction removes the least recently used
-  downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
-  the most recently used episode is always kept.
 ### Fixed
 
 - Fixed unified artist details clearing their already rendered albums when the
@@ -4270,28 +1409,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [0.35.1] - 2026-08-03
 
-- The karaoke view now highlights the active word of enhanced-LRC lyrics.
-  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
-  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
-  already-sung words keep the accent colour. Plain synchronized lines keep the
-  line-level highlight, so nothing changes for ordinary LRC files.
-- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
-  now stripped from the line text instead of appearing as literal `<00:12.00>`
-  fragments.
-- Added bulk genre editing for the shared Tracks table. The bulk action bar gained
-  a genre field that stores the value for every selected **local** track through
-  `AudioDatabase.SetTrackGenres`, which writes the library-only
-  `track_genre_overrides` table in one transaction and reapplies it on every later
-  scan. Source media files are never modified, and an empty value removes the
-  override so the next scan restores the embedded genre. Selected Orynivo Server
-  tracks are updated on their owning server through the new authenticated
-  `PUT /api/tracks/{id}/genre`, which records the same library-only override.
-- Podcast episodes can be downloaded for offline playback. Episode rows gained a
-  **Download episode** / **Delete download** context menu and a download marker in
-  the status column, playback prefers the cached file, and Settings > Library sets
-  the cache size limit in megabytes. Eviction removes the least recently used
-  downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
-  the most recently used episode is always kept.
 ### Fixed
 
 - Reworked the unified artist detail hero to match the album-detail layout:
@@ -4319,97 +1436,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.35.0] - 2026-08-03
 
 ### Added
-- The visualizer's per-pixel path no longer does work the preset never asked for. The compiled
-  programs now report the variables they reference (`PresetProgram.ReferencedVariables` and
-  `Uses`), the warp stage resolves the `x`, `y`, `rad`, and `ang` slots once instead of looking
-  each name up in the layout for every pixel, and it only computes the polar pair, the motion
-  grid, and the seeded sampling position when the preset's own code needs them. A rendered frame
-  is allocation-free, which is now asserted by a test. Covered by 5 tests.
-- The visualizer renders on its own thread now. A frame used to be produced from a
-  `DispatcherTimer`, so a heavy preset blocked the interface for its whole duration; the loop
-  now runs on a background thread, hands a finished copy of the frame to the UI thread through a
-  presentation buffer, and queues at most one present at a time, so a busy interface can never
-  build up a backlog of frames. Preset switching, the reset key, and the overlay follow as
-  thread-safe requests, and the frame pacing lives in the tested `FramePacing` helper. Covered by
-  5 tests.
-- The visualizer now measures where its frame time goes. `PresetRenderer` reports a
-  `RenderTimings` breakdown (warp, blur, post-processing, overlay, composite, comp shaders, and
-  the frame total) per frame and as an average over a window, and the window's diagnostic line in
-  `logs/seek.log` carries those averages once per second, so the cost per stage can be read
-  instead of guessed. A warp shader runs inside the per-pixel loop, so its cost stays part of
-  `warp`; timing it per pixel would cost more than the measurement is worth. The frame budget now
-  compares the complete frame rather than only the shaders. Covered by 8 tests.
-- Milkdrop `.milk` files are read as the multi-preset files they are: `VisualizerPreset.ParseSections`
-  splits the text at its `[presetNN]` headers and the preset folder loads every section as its
-  own preset instead of only the last one surviving. The declared format version
-  (`MILKDROP_PRESET_VERSION`, `PSVERSION`, or `preset_version`) is reported on
-  `VisualizerPreset.Version`; every version is accepted. Skipped presets now carry a reason
-  through `VisualizerPresetLibrary.RejectedReasons`, naming the file or section and the parse
-  error. A hand-written corpus of presets in the real format, including a multi-section file and
-  shader source, guards the format handling; third-party presets stay unbundled because they are
-  licensed by their authors. Covered by 13 tests.
-- The visualizer now runs preset shaders. The numbered `warp_N` and `comp_N` keys are parsed
-  together with their optional `_enabled`, `_per_frame`, and `_per_pixel` companions, and the
-  preset reader keeps the newlines inside a shader's source, because Milkdrop stores the code
-  as a multi-line value. A shader that does not parse is skipped so one broken shader degrades a
-  preset instead of rejecting it. The renderer implements `IShaderSampler`, so shaders can
-  sample `sampler_main`, `sampler_pc_main`, `sampler_fc_main`, `GetBlur1`-`GetBlur3`, and
-  `GetPixel`, and it binds `uv`, `uv_orig`, `texsize`, the audio bands, the smoothed bands, the
-  frame counters, and the aspect ratio. A per-frame time budget (20 ms by default) skips the
-  shaders for a while when they cost too much, so a heavy preset keeps a smooth picture instead
-  of stalling playback. Covered by 11 tests.
-- Added the HLSL interpreter for the shader runtime: `ShaderInterpreter` evaluates the parsed
-  `ps_2_0` tree with scalar and `float2`/`float3`/`float4` values (`ShaderValue`), covering
-  arithmetic with the C precedence, variables and the assignment operators, swizzles read and
-  written, vector constructors with concatenation and broadcast, the ternary operator,
-  `if`/`else`, `for`, and the usual intrinsics (`abs`, `ceil`, `clamp`, `cos`, `dot`, `exp`,
-  `floor`, `frac`, `length`, `lerp`, `log`, `max`, `min`, `mul`, `normalize`, `pow`, `saturate`,
-  `sign`, `sin`, `smoothstep`, `sqrt`, `step`, `tan`). Sampling goes through the
-  `IShaderSampler` contract, so the interpreter carries no render state, and division by zero
-  yields zero instead of an infinity. A loop budget of 4096 iterations and a call depth limit of
-  32 keep a runaway shader from stalling a frame. Covered by 14 tests.
-- Added the HLSL parser and its syntax tree: `ShaderParser` and `ShaderNode` turn the
-  `ps_2_0` subset into a tagged-union tree covering declarations, expression statements,
-  `if`/`else`, `for`, `return`, swizzles, calls, the ternary operator, and the C operator
-  precedence. Function signatures and bare statement bodies are both accepted, and a sampler
-  declaration without a type is tolerated. Covered by 10 tests.
-- Added the HLSL front end for the upcoming shader runtime: `ShaderLexer` tokenizes the
-  `ps_2_0` subset Milkdrop shaders use, covering identifiers and keywords, numbers with their
-  `f`/`h` suffixes, single- and multi-character operators, swizzles, line and block comments,
-  and source positions, and reports an unexpected character with its offset. Covered by
-  10 tests.
-- Added the generated visualizer texture bank. The `noise_lq` (32 x 32), `noise_mq`
-  (256 x 256), and `noise_hq` (512 x 512) textures and the sixteen `rand00`-`rand15` (32 x 32)
-  textures are produced deterministically from fixed seeds, so no third party image is
-  bundled and every run yields the same textures. Sampling is bilinear with repeat, clamp, and
-  mirror wrap modes, and generation is lazy so a session that never opens the visualizer
-  allocates nothing. Covered by 10 tests.
-- Milkdrop preset keys now act as the per-frame starting values: every numeric key (including
-  the `nWaveMode`, `bWaveDots`, `bWaveThick`, `bAdditiveWaves`, `bDarkenCenter`,
-  `bMotionVectors`, and `nMotionVectorsX/Y` spellings) seeds the matching variable, so real
-  presets that carry their settings as keys instead of code work as written.
-- The visualizer draws the full Milkdrop wave and post-processing set: the circular, doubled,
-  and single-line wave modes with dots, thick, additive, mystery, and colour/position keys,
-  the four declared waveform slots, the outer and inner borders, a motion-vector grid derived
-  from the actual motion field, and the video echo with its zoom, alpha, and orientation.
-  Covered by 11 tests.
-- The preset engine now runs the full Milkdrop stage order. It parses the `per_frame_init`,
-  `per_pixel_init`, `wave_0`-`wave_3` and `shape_N_init` blocks, registers the complete
-  standard variable set (`bass_att`/`mid_att`/`treb_att`, `aspectx`/`aspecty`,
-  `pixelsx`/`pixelsy`, `monitor`, `zoomexp`, `rot`, `cx`/`cy`, `dx`/`dy`, `sx`/`sy`,
-  `blur1`-`blur3`, `darken_center`, `fGammaAdj`, the wave, border, motion-vector and echo
-  groups, `q1`-`q32`, and `b1`-`b8`), and applies the motion parameters, the blur passes, the
-  centre darkening, and the gamma adjustment. The per-pixel block now sees the already warped
-  sampling position in `x`/`y`/`rad`/`ang`, so a real preset can offset or replace it.
-  Covered by 16 tests.
-- The **Visualisierung** settings section gained an **Always show text and controls** toggle.
-  When it is off, the title, hint, and playback buttons appear only while the mouse moves
-  over the visualizer and hide again after three idle seconds; pointer movement is tracked
-  through the window's own events, so moving the mouse on another monitor never reveals them.
-- Added a **Visualisierung** settings section with the render resolution (320 x 180 up to
-  1280 x 720), the target frame rate (24, 30, 60, or 120), and the user preset folder that
-  previously lived under the output device. The window renders at the configured size and
-  lets the image control scale the frame up, so a lower resolution keeps the CPU cost down.
 
 - Added a unified artist detail page for every non-Plex artist navigation path.
   Its album-style hero shows the artist image, biography/source, rename and
@@ -4432,28 +1458,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   The Appearance section now keeps the cache-clear action beside the background
   selector and persists a 0–100% tile-visibility slider, defaulting to 50%.
 
-- The karaoke view now highlights the active word of enhanced-LRC lyrics.
-  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
-  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
-  already-sung words keep the accent colour. Plain synchronized lines keep the
-  line-level highlight, so nothing changes for ordinary LRC files.
-- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
-  now stripped from the line text instead of appearing as literal `<00:12.00>`
-  fragments.
-- Added bulk genre editing for the shared Tracks table. The bulk action bar gained
-  a genre field that stores the value for every selected **local** track through
-  `AudioDatabase.SetTrackGenres`, which writes the library-only
-  `track_genre_overrides` table in one transaction and reapplies it on every later
-  scan. Source media files are never modified, and an empty value removes the
-  override so the next scan restores the embedded genre. Selected Orynivo Server
-  tracks are updated on their owning server through the new authenticated
-  `PUT /api/tracks/{id}/genre`, which records the same library-only override.
-- Podcast episodes can be downloaded for offline playback. Episode rows gained a
-  **Download episode** / **Delete download** context menu and a download marker in
-  the status column, playback prefers the cached file, and Settings > Library sets
-  the cache size limit in megabytes. Eviction removes the least recently used
-  downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
-  the most recently used episode is always kept.
 ### Fixed
 
 - Fixed Windows identifying Orynivo as an unknown application in the system
@@ -4467,28 +1471,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [0.34.1] - 2026-08-02
 
-- The karaoke view now highlights the active word of enhanced-LRC lyrics.
-  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
-  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
-  already-sung words keep the accent colour. Plain synchronized lines keep the
-  line-level highlight, so nothing changes for ordinary LRC files.
-- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
-  now stripped from the line text instead of appearing as literal `<00:12.00>`
-  fragments.
-- Added bulk genre editing for the shared Tracks table. The bulk action bar gained
-  a genre field that stores the value for every selected **local** track through
-  `AudioDatabase.SetTrackGenres`, which writes the library-only
-  `track_genre_overrides` table in one transaction and reapplies it on every later
-  scan. Source media files are never modified, and an empty value removes the
-  override so the next scan restores the embedded genre. Selected Orynivo Server
-  tracks are updated on their owning server through the new authenticated
-  `PUT /api/tracks/{id}/genre`, which records the same library-only override.
-- Podcast episodes can be downloaded for offline playback. Episode rows gained a
-  **Download episode** / **Delete download** context menu and a download marker in
-  the status column, playback prefers the cached file, and Settings > Library sets
-  the cache size limit in megabytes. Eviction removes the least recently used
-  downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
-  the most recently used episode is always kept.
 ### Fixed
 
 - Fixed server-library backup downloads failing on Windows because the completed
@@ -4497,97 +1479,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.34.0] - 2026-08-02
 
 ### Added
-- The visualizer's per-pixel path no longer does work the preset never asked for. The compiled
-  programs now report the variables they reference (`PresetProgram.ReferencedVariables` and
-  `Uses`), the warp stage resolves the `x`, `y`, `rad`, and `ang` slots once instead of looking
-  each name up in the layout for every pixel, and it only computes the polar pair, the motion
-  grid, and the seeded sampling position when the preset's own code needs them. A rendered frame
-  is allocation-free, which is now asserted by a test. Covered by 5 tests.
-- The visualizer renders on its own thread now. A frame used to be produced from a
-  `DispatcherTimer`, so a heavy preset blocked the interface for its whole duration; the loop
-  now runs on a background thread, hands a finished copy of the frame to the UI thread through a
-  presentation buffer, and queues at most one present at a time, so a busy interface can never
-  build up a backlog of frames. Preset switching, the reset key, and the overlay follow as
-  thread-safe requests, and the frame pacing lives in the tested `FramePacing` helper. Covered by
-  5 tests.
-- The visualizer now measures where its frame time goes. `PresetRenderer` reports a
-  `RenderTimings` breakdown (warp, blur, post-processing, overlay, composite, comp shaders, and
-  the frame total) per frame and as an average over a window, and the window's diagnostic line in
-  `logs/seek.log` carries those averages once per second, so the cost per stage can be read
-  instead of guessed. A warp shader runs inside the per-pixel loop, so its cost stays part of
-  `warp`; timing it per pixel would cost more than the measurement is worth. The frame budget now
-  compares the complete frame rather than only the shaders. Covered by 8 tests.
-- Milkdrop `.milk` files are read as the multi-preset files they are: `VisualizerPreset.ParseSections`
-  splits the text at its `[presetNN]` headers and the preset folder loads every section as its
-  own preset instead of only the last one surviving. The declared format version
-  (`MILKDROP_PRESET_VERSION`, `PSVERSION`, or `preset_version`) is reported on
-  `VisualizerPreset.Version`; every version is accepted. Skipped presets now carry a reason
-  through `VisualizerPresetLibrary.RejectedReasons`, naming the file or section and the parse
-  error. A hand-written corpus of presets in the real format, including a multi-section file and
-  shader source, guards the format handling; third-party presets stay unbundled because they are
-  licensed by their authors. Covered by 13 tests.
-- The visualizer now runs preset shaders. The numbered `warp_N` and `comp_N` keys are parsed
-  together with their optional `_enabled`, `_per_frame`, and `_per_pixel` companions, and the
-  preset reader keeps the newlines inside a shader's source, because Milkdrop stores the code
-  as a multi-line value. A shader that does not parse is skipped so one broken shader degrades a
-  preset instead of rejecting it. The renderer implements `IShaderSampler`, so shaders can
-  sample `sampler_main`, `sampler_pc_main`, `sampler_fc_main`, `GetBlur1`-`GetBlur3`, and
-  `GetPixel`, and it binds `uv`, `uv_orig`, `texsize`, the audio bands, the smoothed bands, the
-  frame counters, and the aspect ratio. A per-frame time budget (20 ms by default) skips the
-  shaders for a while when they cost too much, so a heavy preset keeps a smooth picture instead
-  of stalling playback. Covered by 11 tests.
-- Added the HLSL interpreter for the shader runtime: `ShaderInterpreter` evaluates the parsed
-  `ps_2_0` tree with scalar and `float2`/`float3`/`float4` values (`ShaderValue`), covering
-  arithmetic with the C precedence, variables and the assignment operators, swizzles read and
-  written, vector constructors with concatenation and broadcast, the ternary operator,
-  `if`/`else`, `for`, and the usual intrinsics (`abs`, `ceil`, `clamp`, `cos`, `dot`, `exp`,
-  `floor`, `frac`, `length`, `lerp`, `log`, `max`, `min`, `mul`, `normalize`, `pow`, `saturate`,
-  `sign`, `sin`, `smoothstep`, `sqrt`, `step`, `tan`). Sampling goes through the
-  `IShaderSampler` contract, so the interpreter carries no render state, and division by zero
-  yields zero instead of an infinity. A loop budget of 4096 iterations and a call depth limit of
-  32 keep a runaway shader from stalling a frame. Covered by 14 tests.
-- Added the HLSL parser and its syntax tree: `ShaderParser` and `ShaderNode` turn the
-  `ps_2_0` subset into a tagged-union tree covering declarations, expression statements,
-  `if`/`else`, `for`, `return`, swizzles, calls, the ternary operator, and the C operator
-  precedence. Function signatures and bare statement bodies are both accepted, and a sampler
-  declaration without a type is tolerated. Covered by 10 tests.
-- Added the HLSL front end for the upcoming shader runtime: `ShaderLexer` tokenizes the
-  `ps_2_0` subset Milkdrop shaders use, covering identifiers and keywords, numbers with their
-  `f`/`h` suffixes, single- and multi-character operators, swizzles, line and block comments,
-  and source positions, and reports an unexpected character with its offset. Covered by
-  10 tests.
-- Added the generated visualizer texture bank. The `noise_lq` (32 x 32), `noise_mq`
-  (256 x 256), and `noise_hq` (512 x 512) textures and the sixteen `rand00`-`rand15` (32 x 32)
-  textures are produced deterministically from fixed seeds, so no third party image is
-  bundled and every run yields the same textures. Sampling is bilinear with repeat, clamp, and
-  mirror wrap modes, and generation is lazy so a session that never opens the visualizer
-  allocates nothing. Covered by 10 tests.
-- Milkdrop preset keys now act as the per-frame starting values: every numeric key (including
-  the `nWaveMode`, `bWaveDots`, `bWaveThick`, `bAdditiveWaves`, `bDarkenCenter`,
-  `bMotionVectors`, and `nMotionVectorsX/Y` spellings) seeds the matching variable, so real
-  presets that carry their settings as keys instead of code work as written.
-- The visualizer draws the full Milkdrop wave and post-processing set: the circular, doubled,
-  and single-line wave modes with dots, thick, additive, mystery, and colour/position keys,
-  the four declared waveform slots, the outer and inner borders, a motion-vector grid derived
-  from the actual motion field, and the video echo with its zoom, alpha, and orientation.
-  Covered by 11 tests.
-- The preset engine now runs the full Milkdrop stage order. It parses the `per_frame_init`,
-  `per_pixel_init`, `wave_0`-`wave_3` and `shape_N_init` blocks, registers the complete
-  standard variable set (`bass_att`/`mid_att`/`treb_att`, `aspectx`/`aspecty`,
-  `pixelsx`/`pixelsy`, `monitor`, `zoomexp`, `rot`, `cx`/`cy`, `dx`/`dy`, `sx`/`sy`,
-  `blur1`-`blur3`, `darken_center`, `fGammaAdj`, the wave, border, motion-vector and echo
-  groups, `q1`-`q32`, and `b1`-`b8`), and applies the motion parameters, the blur passes, the
-  centre darkening, and the gamma adjustment. The per-pixel block now sees the already warped
-  sampling position in `x`/`y`/`rad`/`ang`, so a real preset can offset or replace it.
-  Covered by 16 tests.
-- The **Visualisierung** settings section gained an **Always show text and controls** toggle.
-  When it is off, the title, hint, and playback buttons appear only while the mouse moves
-  over the visualizer and hide again after three idle seconds; pointer movement is tracked
-  through the window's own events, so moving the mouse on another monitor never reveals them.
-- Added a **Visualisierung** settings section with the render resolution (320 x 180 up to
-  1280 x 720), the target frame rate (24, 30, 60, or 120), and the user preset folder that
-  previously lived under the output device. The window renders at the configured size and
-  lets the image control scale the frame up, so a lower resolution keeps the CPU cost down.
 
 - Added authenticated Orynivo Server library backup download and restore. The
   versioned ZIP contains a consistent SQLite snapshot, playlists, playback
@@ -4604,28 +1495,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   servers reject the unsupported operation instead of silently running a
   normal scan.
 
-- The karaoke view now highlights the active word of enhanced-LRC lyrics.
-  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
-  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
-  already-sung words keep the accent colour. Plain synchronized lines keep the
-  line-level highlight, so nothing changes for ordinary LRC files.
-- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
-  now stripped from the line text instead of appearing as literal `<00:12.00>`
-  fragments.
-- Added bulk genre editing for the shared Tracks table. The bulk action bar gained
-  a genre field that stores the value for every selected **local** track through
-  `AudioDatabase.SetTrackGenres`, which writes the library-only
-  `track_genre_overrides` table in one transaction and reapplies it on every later
-  scan. Source media files are never modified, and an empty value removes the
-  override so the next scan restores the embedded genre. Selected Orynivo Server
-  tracks are updated on their owning server through the new authenticated
-  `PUT /api/tracks/{id}/genre`, which records the same library-only override.
-- Podcast episodes can be downloaded for offline playback. Episode rows gained a
-  **Download episode** / **Delete download** context menu and a download marker in
-  the status column, playback prefers the cached file, and Settings > Library sets
-  the cache size limit in megabytes. Eviction removes the least recently used
-  downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
-  the most recently used episode is always kept.
 ### Fixed
 
 - Preserved an album's downloaded artwork and favorite flag when a full
@@ -4635,28 +1504,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [0.33.2] - 2026-08-02
 
-- The karaoke view now highlights the active word of enhanced-LRC lyrics.
-  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
-  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
-  already-sung words keep the accent colour. Plain synchronized lines keep the
-  line-level highlight, so nothing changes for ordinary LRC files.
-- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
-  now stripped from the line text instead of appearing as literal `<00:12.00>`
-  fragments.
-- Added bulk genre editing for the shared Tracks table. The bulk action bar gained
-  a genre field that stores the value for every selected **local** track through
-  `AudioDatabase.SetTrackGenres`, which writes the library-only
-  `track_genre_overrides` table in one transaction and reapplies it on every later
-  scan. Source media files are never modified, and an empty value removes the
-  override so the next scan restores the embedded genre. Selected Orynivo Server
-  tracks are updated on their owning server through the new authenticated
-  `PUT /api/tracks/{id}/genre`, which records the same library-only override.
-- Podcast episodes can be downloaded for offline playback. Episode rows gained a
-  **Download episode** / **Delete download** context menu and a download marker in
-  the status column, playback prefers the cached file, and Settings > Library sets
-  the cache size limit in megabytes. Eviction removes the least recently used
-  downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
-  the most recently used episode is always kept.
 ### Fixed
 
 - Added the complete album title as a tooltip on shared artwork cards so
@@ -4679,28 +1526,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [0.33.1] - 2026-08-01
 
-- The karaoke view now highlights the active word of enhanced-LRC lyrics.
-  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
-  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
-  already-sung words keep the accent colour. Plain synchronized lines keep the
-  line-level highlight, so nothing changes for ordinary LRC files.
-- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
-  now stripped from the line text instead of appearing as literal `<00:12.00>`
-  fragments.
-- Added bulk genre editing for the shared Tracks table. The bulk action bar gained
-  a genre field that stores the value for every selected **local** track through
-  `AudioDatabase.SetTrackGenres`, which writes the library-only
-  `track_genre_overrides` table in one transaction and reapplies it on every later
-  scan. Source media files are never modified, and an empty value removes the
-  override so the next scan restores the embedded genre. Selected Orynivo Server
-  tracks are updated on their owning server through the new authenticated
-  `PUT /api/tracks/{id}/genre`, which records the same library-only override.
-- Podcast episodes can be downloaded for offline playback. Episode rows gained a
-  **Download episode** / **Delete download** context menu and a download marker in
-  the status column, playback prefers the cached file, and Settings > Library sets
-  the cache size limit in megabytes. Eviction removes the least recently used
-  downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
-  the most recently used episode is always kept.
 ### Fixed
 
 - Prevented concurrent platform release jobs from creating duplicate GitHub
@@ -4715,97 +1540,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.33.0] - 2026-08-01
 
 ### Added
-- The visualizer's per-pixel path no longer does work the preset never asked for. The compiled
-  programs now report the variables they reference (`PresetProgram.ReferencedVariables` and
-  `Uses`), the warp stage resolves the `x`, `y`, `rad`, and `ang` slots once instead of looking
-  each name up in the layout for every pixel, and it only computes the polar pair, the motion
-  grid, and the seeded sampling position when the preset's own code needs them. A rendered frame
-  is allocation-free, which is now asserted by a test. Covered by 5 tests.
-- The visualizer renders on its own thread now. A frame used to be produced from a
-  `DispatcherTimer`, so a heavy preset blocked the interface for its whole duration; the loop
-  now runs on a background thread, hands a finished copy of the frame to the UI thread through a
-  presentation buffer, and queues at most one present at a time, so a busy interface can never
-  build up a backlog of frames. Preset switching, the reset key, and the overlay follow as
-  thread-safe requests, and the frame pacing lives in the tested `FramePacing` helper. Covered by
-  5 tests.
-- The visualizer now measures where its frame time goes. `PresetRenderer` reports a
-  `RenderTimings` breakdown (warp, blur, post-processing, overlay, composite, comp shaders, and
-  the frame total) per frame and as an average over a window, and the window's diagnostic line in
-  `logs/seek.log` carries those averages once per second, so the cost per stage can be read
-  instead of guessed. A warp shader runs inside the per-pixel loop, so its cost stays part of
-  `warp`; timing it per pixel would cost more than the measurement is worth. The frame budget now
-  compares the complete frame rather than only the shaders. Covered by 8 tests.
-- Milkdrop `.milk` files are read as the multi-preset files they are: `VisualizerPreset.ParseSections`
-  splits the text at its `[presetNN]` headers and the preset folder loads every section as its
-  own preset instead of only the last one surviving. The declared format version
-  (`MILKDROP_PRESET_VERSION`, `PSVERSION`, or `preset_version`) is reported on
-  `VisualizerPreset.Version`; every version is accepted. Skipped presets now carry a reason
-  through `VisualizerPresetLibrary.RejectedReasons`, naming the file or section and the parse
-  error. A hand-written corpus of presets in the real format, including a multi-section file and
-  shader source, guards the format handling; third-party presets stay unbundled because they are
-  licensed by their authors. Covered by 13 tests.
-- The visualizer now runs preset shaders. The numbered `warp_N` and `comp_N` keys are parsed
-  together with their optional `_enabled`, `_per_frame`, and `_per_pixel` companions, and the
-  preset reader keeps the newlines inside a shader's source, because Milkdrop stores the code
-  as a multi-line value. A shader that does not parse is skipped so one broken shader degrades a
-  preset instead of rejecting it. The renderer implements `IShaderSampler`, so shaders can
-  sample `sampler_main`, `sampler_pc_main`, `sampler_fc_main`, `GetBlur1`-`GetBlur3`, and
-  `GetPixel`, and it binds `uv`, `uv_orig`, `texsize`, the audio bands, the smoothed bands, the
-  frame counters, and the aspect ratio. A per-frame time budget (20 ms by default) skips the
-  shaders for a while when they cost too much, so a heavy preset keeps a smooth picture instead
-  of stalling playback. Covered by 11 tests.
-- Added the HLSL interpreter for the shader runtime: `ShaderInterpreter` evaluates the parsed
-  `ps_2_0` tree with scalar and `float2`/`float3`/`float4` values (`ShaderValue`), covering
-  arithmetic with the C precedence, variables and the assignment operators, swizzles read and
-  written, vector constructors with concatenation and broadcast, the ternary operator,
-  `if`/`else`, `for`, and the usual intrinsics (`abs`, `ceil`, `clamp`, `cos`, `dot`, `exp`,
-  `floor`, `frac`, `length`, `lerp`, `log`, `max`, `min`, `mul`, `normalize`, `pow`, `saturate`,
-  `sign`, `sin`, `smoothstep`, `sqrt`, `step`, `tan`). Sampling goes through the
-  `IShaderSampler` contract, so the interpreter carries no render state, and division by zero
-  yields zero instead of an infinity. A loop budget of 4096 iterations and a call depth limit of
-  32 keep a runaway shader from stalling a frame. Covered by 14 tests.
-- Added the HLSL parser and its syntax tree: `ShaderParser` and `ShaderNode` turn the
-  `ps_2_0` subset into a tagged-union tree covering declarations, expression statements,
-  `if`/`else`, `for`, `return`, swizzles, calls, the ternary operator, and the C operator
-  precedence. Function signatures and bare statement bodies are both accepted, and a sampler
-  declaration without a type is tolerated. Covered by 10 tests.
-- Added the HLSL front end for the upcoming shader runtime: `ShaderLexer` tokenizes the
-  `ps_2_0` subset Milkdrop shaders use, covering identifiers and keywords, numbers with their
-  `f`/`h` suffixes, single- and multi-character operators, swizzles, line and block comments,
-  and source positions, and reports an unexpected character with its offset. Covered by
-  10 tests.
-- Added the generated visualizer texture bank. The `noise_lq` (32 x 32), `noise_mq`
-  (256 x 256), and `noise_hq` (512 x 512) textures and the sixteen `rand00`-`rand15` (32 x 32)
-  textures are produced deterministically from fixed seeds, so no third party image is
-  bundled and every run yields the same textures. Sampling is bilinear with repeat, clamp, and
-  mirror wrap modes, and generation is lazy so a session that never opens the visualizer
-  allocates nothing. Covered by 10 tests.
-- Milkdrop preset keys now act as the per-frame starting values: every numeric key (including
-  the `nWaveMode`, `bWaveDots`, `bWaveThick`, `bAdditiveWaves`, `bDarkenCenter`,
-  `bMotionVectors`, and `nMotionVectorsX/Y` spellings) seeds the matching variable, so real
-  presets that carry their settings as keys instead of code work as written.
-- The visualizer draws the full Milkdrop wave and post-processing set: the circular, doubled,
-  and single-line wave modes with dots, thick, additive, mystery, and colour/position keys,
-  the four declared waveform slots, the outer and inner borders, a motion-vector grid derived
-  from the actual motion field, and the video echo with its zoom, alpha, and orientation.
-  Covered by 11 tests.
-- The preset engine now runs the full Milkdrop stage order. It parses the `per_frame_init`,
-  `per_pixel_init`, `wave_0`-`wave_3` and `shape_N_init` blocks, registers the complete
-  standard variable set (`bass_att`/`mid_att`/`treb_att`, `aspectx`/`aspecty`,
-  `pixelsx`/`pixelsy`, `monitor`, `zoomexp`, `rot`, `cx`/`cy`, `dx`/`dy`, `sx`/`sy`,
-  `blur1`-`blur3`, `darken_center`, `fGammaAdj`, the wave, border, motion-vector and echo
-  groups, `q1`-`q32`, and `b1`-`b8`), and applies the motion parameters, the blur passes, the
-  centre darkening, and the gamma adjustment. The per-pixel block now sees the already warped
-  sampling position in `x`/`y`/`rad`/`ang`, so a real preset can offset or replace it.
-  Covered by 16 tests.
-- The **Visualisierung** settings section gained an **Always show text and controls** toggle.
-  When it is off, the title, hint, and playback buttons appear only while the mouse moves
-  over the visualizer and hide again after three idle seconds; pointer movement is tracked
-  through the window's own events, so moving the mouse on another monitor never reveals them.
-- Added a **Visualisierung** settings section with the render resolution (320 x 180 up to
-  1280 x 720), the target frame rate (24, 30, 60, or 120), and the user preset folder that
-  previously lived under the output device. The window renders at the configured size and
-  lets the image control scale the frame up, so a lower resolution keeps the CPU cost down.
 
 - Added an Infinite Mix that builds a source-aware queue from configurable
   recent listening affinities, favorites, local tracks, and selected reachable
@@ -4834,28 +1568,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   current Genre Cloud and Infinite Mix behavior, usage, server integration, and
   local cache/data-location documentation.
 
-- The karaoke view now highlights the active word of enhanced-LRC lyrics.
-  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
-  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
-  already-sung words keep the accent colour. Plain synchronized lines keep the
-  line-level highlight, so nothing changes for ordinary LRC files.
-- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
-  now stripped from the line text instead of appearing as literal `<00:12.00>`
-  fragments.
-- Added bulk genre editing for the shared Tracks table. The bulk action bar gained
-  a genre field that stores the value for every selected **local** track through
-  `AudioDatabase.SetTrackGenres`, which writes the library-only
-  `track_genre_overrides` table in one transaction and reapplies it on every later
-  scan. Source media files are never modified, and an empty value removes the
-  override so the next scan restores the embedded genre. Selected Orynivo Server
-  tracks are updated on their owning server through the new authenticated
-  `PUT /api/tracks/{id}/genre`, which records the same library-only override.
-- Podcast episodes can be downloaded for offline playback. Episode rows gained a
-  **Download episode** / **Delete download** context menu and a download marker in
-  the status column, playback prefers the cached file, and Settings > Library sets
-  the cache size limit in megabytes. Eviction removes the least recently used
-  downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
-  the most recently used episode is always kept.
 ### Fixed
 
 - Enlarged the Infinite Mix profile dialog, made it resizable, and reserved a
@@ -4875,97 +1587,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.32.0] - 2026-08-01
 
 ### Added
-- The visualizer's per-pixel path no longer does work the preset never asked for. The compiled
-  programs now report the variables they reference (`PresetProgram.ReferencedVariables` and
-  `Uses`), the warp stage resolves the `x`, `y`, `rad`, and `ang` slots once instead of looking
-  each name up in the layout for every pixel, and it only computes the polar pair, the motion
-  grid, and the seeded sampling position when the preset's own code needs them. A rendered frame
-  is allocation-free, which is now asserted by a test. Covered by 5 tests.
-- The visualizer renders on its own thread now. A frame used to be produced from a
-  `DispatcherTimer`, so a heavy preset blocked the interface for its whole duration; the loop
-  now runs on a background thread, hands a finished copy of the frame to the UI thread through a
-  presentation buffer, and queues at most one present at a time, so a busy interface can never
-  build up a backlog of frames. Preset switching, the reset key, and the overlay follow as
-  thread-safe requests, and the frame pacing lives in the tested `FramePacing` helper. Covered by
-  5 tests.
-- The visualizer now measures where its frame time goes. `PresetRenderer` reports a
-  `RenderTimings` breakdown (warp, blur, post-processing, overlay, composite, comp shaders, and
-  the frame total) per frame and as an average over a window, and the window's diagnostic line in
-  `logs/seek.log` carries those averages once per second, so the cost per stage can be read
-  instead of guessed. A warp shader runs inside the per-pixel loop, so its cost stays part of
-  `warp`; timing it per pixel would cost more than the measurement is worth. The frame budget now
-  compares the complete frame rather than only the shaders. Covered by 8 tests.
-- Milkdrop `.milk` files are read as the multi-preset files they are: `VisualizerPreset.ParseSections`
-  splits the text at its `[presetNN]` headers and the preset folder loads every section as its
-  own preset instead of only the last one surviving. The declared format version
-  (`MILKDROP_PRESET_VERSION`, `PSVERSION`, or `preset_version`) is reported on
-  `VisualizerPreset.Version`; every version is accepted. Skipped presets now carry a reason
-  through `VisualizerPresetLibrary.RejectedReasons`, naming the file or section and the parse
-  error. A hand-written corpus of presets in the real format, including a multi-section file and
-  shader source, guards the format handling; third-party presets stay unbundled because they are
-  licensed by their authors. Covered by 13 tests.
-- The visualizer now runs preset shaders. The numbered `warp_N` and `comp_N` keys are parsed
-  together with their optional `_enabled`, `_per_frame`, and `_per_pixel` companions, and the
-  preset reader keeps the newlines inside a shader's source, because Milkdrop stores the code
-  as a multi-line value. A shader that does not parse is skipped so one broken shader degrades a
-  preset instead of rejecting it. The renderer implements `IShaderSampler`, so shaders can
-  sample `sampler_main`, `sampler_pc_main`, `sampler_fc_main`, `GetBlur1`-`GetBlur3`, and
-  `GetPixel`, and it binds `uv`, `uv_orig`, `texsize`, the audio bands, the smoothed bands, the
-  frame counters, and the aspect ratio. A per-frame time budget (20 ms by default) skips the
-  shaders for a while when they cost too much, so a heavy preset keeps a smooth picture instead
-  of stalling playback. Covered by 11 tests.
-- Added the HLSL interpreter for the shader runtime: `ShaderInterpreter` evaluates the parsed
-  `ps_2_0` tree with scalar and `float2`/`float3`/`float4` values (`ShaderValue`), covering
-  arithmetic with the C precedence, variables and the assignment operators, swizzles read and
-  written, vector constructors with concatenation and broadcast, the ternary operator,
-  `if`/`else`, `for`, and the usual intrinsics (`abs`, `ceil`, `clamp`, `cos`, `dot`, `exp`,
-  `floor`, `frac`, `length`, `lerp`, `log`, `max`, `min`, `mul`, `normalize`, `pow`, `saturate`,
-  `sign`, `sin`, `smoothstep`, `sqrt`, `step`, `tan`). Sampling goes through the
-  `IShaderSampler` contract, so the interpreter carries no render state, and division by zero
-  yields zero instead of an infinity. A loop budget of 4096 iterations and a call depth limit of
-  32 keep a runaway shader from stalling a frame. Covered by 14 tests.
-- Added the HLSL parser and its syntax tree: `ShaderParser` and `ShaderNode` turn the
-  `ps_2_0` subset into a tagged-union tree covering declarations, expression statements,
-  `if`/`else`, `for`, `return`, swizzles, calls, the ternary operator, and the C operator
-  precedence. Function signatures and bare statement bodies are both accepted, and a sampler
-  declaration without a type is tolerated. Covered by 10 tests.
-- Added the HLSL front end for the upcoming shader runtime: `ShaderLexer` tokenizes the
-  `ps_2_0` subset Milkdrop shaders use, covering identifiers and keywords, numbers with their
-  `f`/`h` suffixes, single- and multi-character operators, swizzles, line and block comments,
-  and source positions, and reports an unexpected character with its offset. Covered by
-  10 tests.
-- Added the generated visualizer texture bank. The `noise_lq` (32 x 32), `noise_mq`
-  (256 x 256), and `noise_hq` (512 x 512) textures and the sixteen `rand00`-`rand15` (32 x 32)
-  textures are produced deterministically from fixed seeds, so no third party image is
-  bundled and every run yields the same textures. Sampling is bilinear with repeat, clamp, and
-  mirror wrap modes, and generation is lazy so a session that never opens the visualizer
-  allocates nothing. Covered by 10 tests.
-- Milkdrop preset keys now act as the per-frame starting values: every numeric key (including
-  the `nWaveMode`, `bWaveDots`, `bWaveThick`, `bAdditiveWaves`, `bDarkenCenter`,
-  `bMotionVectors`, and `nMotionVectorsX/Y` spellings) seeds the matching variable, so real
-  presets that carry their settings as keys instead of code work as written.
-- The visualizer draws the full Milkdrop wave and post-processing set: the circular, doubled,
-  and single-line wave modes with dots, thick, additive, mystery, and colour/position keys,
-  the four declared waveform slots, the outer and inner borders, a motion-vector grid derived
-  from the actual motion field, and the video echo with its zoom, alpha, and orientation.
-  Covered by 11 tests.
-- The preset engine now runs the full Milkdrop stage order. It parses the `per_frame_init`,
-  `per_pixel_init`, `wave_0`-`wave_3` and `shape_N_init` blocks, registers the complete
-  standard variable set (`bass_att`/`mid_att`/`treb_att`, `aspectx`/`aspecty`,
-  `pixelsx`/`pixelsy`, `monitor`, `zoomexp`, `rot`, `cx`/`cy`, `dx`/`dy`, `sx`/`sy`,
-  `blur1`-`blur3`, `darken_center`, `fGammaAdj`, the wave, border, motion-vector and echo
-  groups, `q1`-`q32`, and `b1`-`b8`), and applies the motion parameters, the blur passes, the
-  centre darkening, and the gamma adjustment. The per-pixel block now sees the already warped
-  sampling position in `x`/`y`/`rad`/`ang`, so a real preset can offset or replace it.
-  Covered by 16 tests.
-- The **Visualisierung** settings section gained an **Always show text and controls** toggle.
-  When it is off, the title, hint, and playback buttons appear only while the mouse moves
-  over the visualizer and hide again after three idle seconds; pointer movement is tracked
-  through the window's own events, so moving the mouse on another monitor never reveals them.
-- Added a **Visualisierung** settings section with the render resolution (320 x 180 up to
-  1280 x 720), the target frame rate (24, 30, 60, or 120), and the user preset folder that
-  previously lived under the output device. The window renders at the configured size and
-  lets the image control scale the frame up, so a lower resolution keeps the CPU cost down.
 
 - Added an interactive, count-scaled genre cloud with hierarchical drill-down
   and listening-history-based track recommendations. It merges the local
@@ -4991,28 +1612,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   remain readable. Genre recommendations can now switch between the playable
   track table and a source-aware album artwork grid.
 
-- The karaoke view now highlights the active word of enhanced-LRC lyrics.
-  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
-  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
-  already-sung words keep the accent colour. Plain synchronized lines keep the
-  line-level highlight, so nothing changes for ordinary LRC files.
-- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
-  now stripped from the line text instead of appearing as literal `<00:12.00>`
-  fragments.
-- Added bulk genre editing for the shared Tracks table. The bulk action bar gained
-  a genre field that stores the value for every selected **local** track through
-  `AudioDatabase.SetTrackGenres`, which writes the library-only
-  `track_genre_overrides` table in one transaction and reapplies it on every later
-  scan. Source media files are never modified, and an empty value removes the
-  override so the next scan restores the embedded genre. Selected Orynivo Server
-  tracks are updated on their owning server through the new authenticated
-  `PUT /api/tracks/{id}/genre`, which records the same library-only override.
-- Podcast episodes can be downloaded for offline playback. Episode rows gained a
-  **Download episode** / **Delete download** context menu and a download marker in
-  the status column, playback prefers the cached file, and Settings > Library sets
-  the cache size limit in megabytes. Eviction removes the least recently used
-  downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
-  the most recently used episode is always kept.
 ### Fixed
 
 - Fixed Genre Cloud drill-downs reverting to all root genres when a connected
@@ -5040,97 +1639,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.31.0] - 2026-08-01
 
 ### Added
-- The visualizer's per-pixel path no longer does work the preset never asked for. The compiled
-  programs now report the variables they reference (`PresetProgram.ReferencedVariables` and
-  `Uses`), the warp stage resolves the `x`, `y`, `rad`, and `ang` slots once instead of looking
-  each name up in the layout for every pixel, and it only computes the polar pair, the motion
-  grid, and the seeded sampling position when the preset's own code needs them. A rendered frame
-  is allocation-free, which is now asserted by a test. Covered by 5 tests.
-- The visualizer renders on its own thread now. A frame used to be produced from a
-  `DispatcherTimer`, so a heavy preset blocked the interface for its whole duration; the loop
-  now runs on a background thread, hands a finished copy of the frame to the UI thread through a
-  presentation buffer, and queues at most one present at a time, so a busy interface can never
-  build up a backlog of frames. Preset switching, the reset key, and the overlay follow as
-  thread-safe requests, and the frame pacing lives in the tested `FramePacing` helper. Covered by
-  5 tests.
-- The visualizer now measures where its frame time goes. `PresetRenderer` reports a
-  `RenderTimings` breakdown (warp, blur, post-processing, overlay, composite, comp shaders, and
-  the frame total) per frame and as an average over a window, and the window's diagnostic line in
-  `logs/seek.log` carries those averages once per second, so the cost per stage can be read
-  instead of guessed. A warp shader runs inside the per-pixel loop, so its cost stays part of
-  `warp`; timing it per pixel would cost more than the measurement is worth. The frame budget now
-  compares the complete frame rather than only the shaders. Covered by 8 tests.
-- Milkdrop `.milk` files are read as the multi-preset files they are: `VisualizerPreset.ParseSections`
-  splits the text at its `[presetNN]` headers and the preset folder loads every section as its
-  own preset instead of only the last one surviving. The declared format version
-  (`MILKDROP_PRESET_VERSION`, `PSVERSION`, or `preset_version`) is reported on
-  `VisualizerPreset.Version`; every version is accepted. Skipped presets now carry a reason
-  through `VisualizerPresetLibrary.RejectedReasons`, naming the file or section and the parse
-  error. A hand-written corpus of presets in the real format, including a multi-section file and
-  shader source, guards the format handling; third-party presets stay unbundled because they are
-  licensed by their authors. Covered by 13 tests.
-- The visualizer now runs preset shaders. The numbered `warp_N` and `comp_N` keys are parsed
-  together with their optional `_enabled`, `_per_frame`, and `_per_pixel` companions, and the
-  preset reader keeps the newlines inside a shader's source, because Milkdrop stores the code
-  as a multi-line value. A shader that does not parse is skipped so one broken shader degrades a
-  preset instead of rejecting it. The renderer implements `IShaderSampler`, so shaders can
-  sample `sampler_main`, `sampler_pc_main`, `sampler_fc_main`, `GetBlur1`-`GetBlur3`, and
-  `GetPixel`, and it binds `uv`, `uv_orig`, `texsize`, the audio bands, the smoothed bands, the
-  frame counters, and the aspect ratio. A per-frame time budget (20 ms by default) skips the
-  shaders for a while when they cost too much, so a heavy preset keeps a smooth picture instead
-  of stalling playback. Covered by 11 tests.
-- Added the HLSL interpreter for the shader runtime: `ShaderInterpreter` evaluates the parsed
-  `ps_2_0` tree with scalar and `float2`/`float3`/`float4` values (`ShaderValue`), covering
-  arithmetic with the C precedence, variables and the assignment operators, swizzles read and
-  written, vector constructors with concatenation and broadcast, the ternary operator,
-  `if`/`else`, `for`, and the usual intrinsics (`abs`, `ceil`, `clamp`, `cos`, `dot`, `exp`,
-  `floor`, `frac`, `length`, `lerp`, `log`, `max`, `min`, `mul`, `normalize`, `pow`, `saturate`,
-  `sign`, `sin`, `smoothstep`, `sqrt`, `step`, `tan`). Sampling goes through the
-  `IShaderSampler` contract, so the interpreter carries no render state, and division by zero
-  yields zero instead of an infinity. A loop budget of 4096 iterations and a call depth limit of
-  32 keep a runaway shader from stalling a frame. Covered by 14 tests.
-- Added the HLSL parser and its syntax tree: `ShaderParser` and `ShaderNode` turn the
-  `ps_2_0` subset into a tagged-union tree covering declarations, expression statements,
-  `if`/`else`, `for`, `return`, swizzles, calls, the ternary operator, and the C operator
-  precedence. Function signatures and bare statement bodies are both accepted, and a sampler
-  declaration without a type is tolerated. Covered by 10 tests.
-- Added the HLSL front end for the upcoming shader runtime: `ShaderLexer` tokenizes the
-  `ps_2_0` subset Milkdrop shaders use, covering identifiers and keywords, numbers with their
-  `f`/`h` suffixes, single- and multi-character operators, swizzles, line and block comments,
-  and source positions, and reports an unexpected character with its offset. Covered by
-  10 tests.
-- Added the generated visualizer texture bank. The `noise_lq` (32 x 32), `noise_mq`
-  (256 x 256), and `noise_hq` (512 x 512) textures and the sixteen `rand00`-`rand15` (32 x 32)
-  textures are produced deterministically from fixed seeds, so no third party image is
-  bundled and every run yields the same textures. Sampling is bilinear with repeat, clamp, and
-  mirror wrap modes, and generation is lazy so a session that never opens the visualizer
-  allocates nothing. Covered by 10 tests.
-- Milkdrop preset keys now act as the per-frame starting values: every numeric key (including
-  the `nWaveMode`, `bWaveDots`, `bWaveThick`, `bAdditiveWaves`, `bDarkenCenter`,
-  `bMotionVectors`, and `nMotionVectorsX/Y` spellings) seeds the matching variable, so real
-  presets that carry their settings as keys instead of code work as written.
-- The visualizer draws the full Milkdrop wave and post-processing set: the circular, doubled,
-  and single-line wave modes with dots, thick, additive, mystery, and colour/position keys,
-  the four declared waveform slots, the outer and inner borders, a motion-vector grid derived
-  from the actual motion field, and the video echo with its zoom, alpha, and orientation.
-  Covered by 11 tests.
-- The preset engine now runs the full Milkdrop stage order. It parses the `per_frame_init`,
-  `per_pixel_init`, `wave_0`-`wave_3` and `shape_N_init` blocks, registers the complete
-  standard variable set (`bass_att`/`mid_att`/`treb_att`, `aspectx`/`aspecty`,
-  `pixelsx`/`pixelsy`, `monitor`, `zoomexp`, `rot`, `cx`/`cy`, `dx`/`dy`, `sx`/`sy`,
-  `blur1`-`blur3`, `darken_center`, `fGammaAdj`, the wave, border, motion-vector and echo
-  groups, `q1`-`q32`, and `b1`-`b8`), and applies the motion parameters, the blur passes, the
-  centre darkening, and the gamma adjustment. The per-pixel block now sees the already warped
-  sampling position in `x`/`y`/`rad`/`ang`, so a real preset can offset or replace it.
-  Covered by 16 tests.
-- The **Visualisierung** settings section gained an **Always show text and controls** toggle.
-  When it is off, the title, hint, and playback buttons appear only while the mouse moves
-  over the visualizer and hide again after three idle seconds; pointer movement is tracked
-  through the window's own events, so moving the mouse on another monitor never reveals them.
-- Added a **Visualisierung** settings section with the render resolution (320 x 180 up to
-  1280 x 720), the target frame rate (24, 30, 60, or 120), and the user preset folder that
-  previously lived under the output device. The window renders at the configured size and
-  lets the image control scale the frame up, so a lower resolution keeps the CPU cost down.
 
 - Added a complete responsive multilingual product website under `html/`, including
   current in-app screenshots, feature and privacy information, installation
@@ -5148,28 +1656,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   canonical and hreflang metadata, an XML sitemap, complete social metadata,
   SoftwareApplication structured data, and optimized screenshot assets.
 
-- The karaoke view now highlights the active word of enhanced-LRC lyrics.
-  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
-  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
-  already-sung words keep the accent colour. Plain synchronized lines keep the
-  line-level highlight, so nothing changes for ordinary LRC files.
-- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
-  now stripped from the line text instead of appearing as literal `<00:12.00>`
-  fragments.
-- Added bulk genre editing for the shared Tracks table. The bulk action bar gained
-  a genre field that stores the value for every selected **local** track through
-  `AudioDatabase.SetTrackGenres`, which writes the library-only
-  `track_genre_overrides` table in one transaction and reapplies it on every later
-  scan. Source media files are never modified, and an empty value removes the
-  override so the next scan restores the embedded genre. Selected Orynivo Server
-  tracks are updated on their owning server through the new authenticated
-  `PUT /api/tracks/{id}/genre`, which records the same library-only override.
-- Podcast episodes can be downloaded for offline playback. Episode rows gained a
-  **Download episode** / **Delete download** context menu and a download marker in
-  the status column, playback prefers the cached file, and Settings > Library sets
-  the cache size limit in megabytes. Eviction removes the least recently used
-  downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
-  the most recently used episode is always kept.
 ### Fixed
 
 - Fixed SEO image dimensions stretching the product screenshots and brand
@@ -5191,97 +1677,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.30.3] - 2026-07-30
 
 ### Added
-- The visualizer's per-pixel path no longer does work the preset never asked for. The compiled
-  programs now report the variables they reference (`PresetProgram.ReferencedVariables` and
-  `Uses`), the warp stage resolves the `x`, `y`, `rad`, and `ang` slots once instead of looking
-  each name up in the layout for every pixel, and it only computes the polar pair, the motion
-  grid, and the seeded sampling position when the preset's own code needs them. A rendered frame
-  is allocation-free, which is now asserted by a test. Covered by 5 tests.
-- The visualizer renders on its own thread now. A frame used to be produced from a
-  `DispatcherTimer`, so a heavy preset blocked the interface for its whole duration; the loop
-  now runs on a background thread, hands a finished copy of the frame to the UI thread through a
-  presentation buffer, and queues at most one present at a time, so a busy interface can never
-  build up a backlog of frames. Preset switching, the reset key, and the overlay follow as
-  thread-safe requests, and the frame pacing lives in the tested `FramePacing` helper. Covered by
-  5 tests.
-- The visualizer now measures where its frame time goes. `PresetRenderer` reports a
-  `RenderTimings` breakdown (warp, blur, post-processing, overlay, composite, comp shaders, and
-  the frame total) per frame and as an average over a window, and the window's diagnostic line in
-  `logs/seek.log` carries those averages once per second, so the cost per stage can be read
-  instead of guessed. A warp shader runs inside the per-pixel loop, so its cost stays part of
-  `warp`; timing it per pixel would cost more than the measurement is worth. The frame budget now
-  compares the complete frame rather than only the shaders. Covered by 8 tests.
-- Milkdrop `.milk` files are read as the multi-preset files they are: `VisualizerPreset.ParseSections`
-  splits the text at its `[presetNN]` headers and the preset folder loads every section as its
-  own preset instead of only the last one surviving. The declared format version
-  (`MILKDROP_PRESET_VERSION`, `PSVERSION`, or `preset_version`) is reported on
-  `VisualizerPreset.Version`; every version is accepted. Skipped presets now carry a reason
-  through `VisualizerPresetLibrary.RejectedReasons`, naming the file or section and the parse
-  error. A hand-written corpus of presets in the real format, including a multi-section file and
-  shader source, guards the format handling; third-party presets stay unbundled because they are
-  licensed by their authors. Covered by 13 tests.
-- The visualizer now runs preset shaders. The numbered `warp_N` and `comp_N` keys are parsed
-  together with their optional `_enabled`, `_per_frame`, and `_per_pixel` companions, and the
-  preset reader keeps the newlines inside a shader's source, because Milkdrop stores the code
-  as a multi-line value. A shader that does not parse is skipped so one broken shader degrades a
-  preset instead of rejecting it. The renderer implements `IShaderSampler`, so shaders can
-  sample `sampler_main`, `sampler_pc_main`, `sampler_fc_main`, `GetBlur1`-`GetBlur3`, and
-  `GetPixel`, and it binds `uv`, `uv_orig`, `texsize`, the audio bands, the smoothed bands, the
-  frame counters, and the aspect ratio. A per-frame time budget (20 ms by default) skips the
-  shaders for a while when they cost too much, so a heavy preset keeps a smooth picture instead
-  of stalling playback. Covered by 11 tests.
-- Added the HLSL interpreter for the shader runtime: `ShaderInterpreter` evaluates the parsed
-  `ps_2_0` tree with scalar and `float2`/`float3`/`float4` values (`ShaderValue`), covering
-  arithmetic with the C precedence, variables and the assignment operators, swizzles read and
-  written, vector constructors with concatenation and broadcast, the ternary operator,
-  `if`/`else`, `for`, and the usual intrinsics (`abs`, `ceil`, `clamp`, `cos`, `dot`, `exp`,
-  `floor`, `frac`, `length`, `lerp`, `log`, `max`, `min`, `mul`, `normalize`, `pow`, `saturate`,
-  `sign`, `sin`, `smoothstep`, `sqrt`, `step`, `tan`). Sampling goes through the
-  `IShaderSampler` contract, so the interpreter carries no render state, and division by zero
-  yields zero instead of an infinity. A loop budget of 4096 iterations and a call depth limit of
-  32 keep a runaway shader from stalling a frame. Covered by 14 tests.
-- Added the HLSL parser and its syntax tree: `ShaderParser` and `ShaderNode` turn the
-  `ps_2_0` subset into a tagged-union tree covering declarations, expression statements,
-  `if`/`else`, `for`, `return`, swizzles, calls, the ternary operator, and the C operator
-  precedence. Function signatures and bare statement bodies are both accepted, and a sampler
-  declaration without a type is tolerated. Covered by 10 tests.
-- Added the HLSL front end for the upcoming shader runtime: `ShaderLexer` tokenizes the
-  `ps_2_0` subset Milkdrop shaders use, covering identifiers and keywords, numbers with their
-  `f`/`h` suffixes, single- and multi-character operators, swizzles, line and block comments,
-  and source positions, and reports an unexpected character with its offset. Covered by
-  10 tests.
-- Added the generated visualizer texture bank. The `noise_lq` (32 x 32), `noise_mq`
-  (256 x 256), and `noise_hq` (512 x 512) textures and the sixteen `rand00`-`rand15` (32 x 32)
-  textures are produced deterministically from fixed seeds, so no third party image is
-  bundled and every run yields the same textures. Sampling is bilinear with repeat, clamp, and
-  mirror wrap modes, and generation is lazy so a session that never opens the visualizer
-  allocates nothing. Covered by 10 tests.
-- Milkdrop preset keys now act as the per-frame starting values: every numeric key (including
-  the `nWaveMode`, `bWaveDots`, `bWaveThick`, `bAdditiveWaves`, `bDarkenCenter`,
-  `bMotionVectors`, and `nMotionVectorsX/Y` spellings) seeds the matching variable, so real
-  presets that carry their settings as keys instead of code work as written.
-- The visualizer draws the full Milkdrop wave and post-processing set: the circular, doubled,
-  and single-line wave modes with dots, thick, additive, mystery, and colour/position keys,
-  the four declared waveform slots, the outer and inner borders, a motion-vector grid derived
-  from the actual motion field, and the video echo with its zoom, alpha, and orientation.
-  Covered by 11 tests.
-- The preset engine now runs the full Milkdrop stage order. It parses the `per_frame_init`,
-  `per_pixel_init`, `wave_0`-`wave_3` and `shape_N_init` blocks, registers the complete
-  standard variable set (`bass_att`/`mid_att`/`treb_att`, `aspectx`/`aspecty`,
-  `pixelsx`/`pixelsy`, `monitor`, `zoomexp`, `rot`, `cx`/`cy`, `dx`/`dy`, `sx`/`sy`,
-  `blur1`-`blur3`, `darken_center`, `fGammaAdj`, the wave, border, motion-vector and echo
-  groups, `q1`-`q32`, and `b1`-`b8`), and applies the motion parameters, the blur passes, the
-  centre darkening, and the gamma adjustment. The per-pixel block now sees the already warped
-  sampling position in `x`/`y`/`rad`/`ang`, so a real preset can offset or replace it.
-  Covered by 16 tests.
-- The **Visualisierung** settings section gained an **Always show text and controls** toggle.
-  When it is off, the title, hint, and playback buttons appear only while the mouse moves
-  over the visualizer and hide again after three idle seconds; pointer movement is tracked
-  through the window's own events, so moving the mouse on another monitor never reveals them.
-- Added a **Visualisierung** settings section with the render resolution (320 x 180 up to
-  1280 x 720), the target frame rate (24, 30, 60, or 120), and the user preset folder that
-  previously lived under the output device. The window renders at the configured size and
-  lets the image control scale the frame up, so a lower resolution keeps the CPU cost down.
 
 - The review dialog for missing artist images can cancel the complete
   assignment run.
@@ -5289,28 +1684,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   same provider order as batch discovery: Fanart.tv first when a key is
   configured, then Wikimedia Commons when Fanart.tv has no usable result.
 
-- The karaoke view now highlights the active word of enhanced-LRC lyrics.
-  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
-  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
-  already-sung words keep the accent colour. Plain synchronized lines keep the
-  line-level highlight, so nothing changes for ordinary LRC files.
-- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
-  now stripped from the line text instead of appearing as literal `<00:12.00>`
-  fragments.
-- Added bulk genre editing for the shared Tracks table. The bulk action bar gained
-  a genre field that stores the value for every selected **local** track through
-  `AudioDatabase.SetTrackGenres`, which writes the library-only
-  `track_genre_overrides` table in one transaction and reapplies it on every later
-  scan. Source media files are never modified, and an empty value removes the
-  override so the next scan restores the embedded genre. Selected Orynivo Server
-  tracks are updated on their owning server through the new authenticated
-  `PUT /api/tracks/{id}/genre`, which records the same library-only override.
-- Podcast episodes can be downloaded for offline playback. Episode rows gained a
-  **Download episode** / **Delete download** context menu and a download marker in
-  the status column, playback prefers the cached file, and Settings > Library sets
-  the cache size limit in megabytes. Eviction removes the least recently used
-  downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
-  the most recently used episode is always kept.
 ### Fixed
 
 - Masked the Last.fm API key in Settings so it is no longer displayed as
@@ -5319,97 +1692,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.30.2] - 2026-07-29
 
 ### Added
-- The visualizer's per-pixel path no longer does work the preset never asked for. The compiled
-  programs now report the variables they reference (`PresetProgram.ReferencedVariables` and
-  `Uses`), the warp stage resolves the `x`, `y`, `rad`, and `ang` slots once instead of looking
-  each name up in the layout for every pixel, and it only computes the polar pair, the motion
-  grid, and the seeded sampling position when the preset's own code needs them. A rendered frame
-  is allocation-free, which is now asserted by a test. Covered by 5 tests.
-- The visualizer renders on its own thread now. A frame used to be produced from a
-  `DispatcherTimer`, so a heavy preset blocked the interface for its whole duration; the loop
-  now runs on a background thread, hands a finished copy of the frame to the UI thread through a
-  presentation buffer, and queues at most one present at a time, so a busy interface can never
-  build up a backlog of frames. Preset switching, the reset key, and the overlay follow as
-  thread-safe requests, and the frame pacing lives in the tested `FramePacing` helper. Covered by
-  5 tests.
-- The visualizer now measures where its frame time goes. `PresetRenderer` reports a
-  `RenderTimings` breakdown (warp, blur, post-processing, overlay, composite, comp shaders, and
-  the frame total) per frame and as an average over a window, and the window's diagnostic line in
-  `logs/seek.log` carries those averages once per second, so the cost per stage can be read
-  instead of guessed. A warp shader runs inside the per-pixel loop, so its cost stays part of
-  `warp`; timing it per pixel would cost more than the measurement is worth. The frame budget now
-  compares the complete frame rather than only the shaders. Covered by 8 tests.
-- Milkdrop `.milk` files are read as the multi-preset files they are: `VisualizerPreset.ParseSections`
-  splits the text at its `[presetNN]` headers and the preset folder loads every section as its
-  own preset instead of only the last one surviving. The declared format version
-  (`MILKDROP_PRESET_VERSION`, `PSVERSION`, or `preset_version`) is reported on
-  `VisualizerPreset.Version`; every version is accepted. Skipped presets now carry a reason
-  through `VisualizerPresetLibrary.RejectedReasons`, naming the file or section and the parse
-  error. A hand-written corpus of presets in the real format, including a multi-section file and
-  shader source, guards the format handling; third-party presets stay unbundled because they are
-  licensed by their authors. Covered by 13 tests.
-- The visualizer now runs preset shaders. The numbered `warp_N` and `comp_N` keys are parsed
-  together with their optional `_enabled`, `_per_frame`, and `_per_pixel` companions, and the
-  preset reader keeps the newlines inside a shader's source, because Milkdrop stores the code
-  as a multi-line value. A shader that does not parse is skipped so one broken shader degrades a
-  preset instead of rejecting it. The renderer implements `IShaderSampler`, so shaders can
-  sample `sampler_main`, `sampler_pc_main`, `sampler_fc_main`, `GetBlur1`-`GetBlur3`, and
-  `GetPixel`, and it binds `uv`, `uv_orig`, `texsize`, the audio bands, the smoothed bands, the
-  frame counters, and the aspect ratio. A per-frame time budget (20 ms by default) skips the
-  shaders for a while when they cost too much, so a heavy preset keeps a smooth picture instead
-  of stalling playback. Covered by 11 tests.
-- Added the HLSL interpreter for the shader runtime: `ShaderInterpreter` evaluates the parsed
-  `ps_2_0` tree with scalar and `float2`/`float3`/`float4` values (`ShaderValue`), covering
-  arithmetic with the C precedence, variables and the assignment operators, swizzles read and
-  written, vector constructors with concatenation and broadcast, the ternary operator,
-  `if`/`else`, `for`, and the usual intrinsics (`abs`, `ceil`, `clamp`, `cos`, `dot`, `exp`,
-  `floor`, `frac`, `length`, `lerp`, `log`, `max`, `min`, `mul`, `normalize`, `pow`, `saturate`,
-  `sign`, `sin`, `smoothstep`, `sqrt`, `step`, `tan`). Sampling goes through the
-  `IShaderSampler` contract, so the interpreter carries no render state, and division by zero
-  yields zero instead of an infinity. A loop budget of 4096 iterations and a call depth limit of
-  32 keep a runaway shader from stalling a frame. Covered by 14 tests.
-- Added the HLSL parser and its syntax tree: `ShaderParser` and `ShaderNode` turn the
-  `ps_2_0` subset into a tagged-union tree covering declarations, expression statements,
-  `if`/`else`, `for`, `return`, swizzles, calls, the ternary operator, and the C operator
-  precedence. Function signatures and bare statement bodies are both accepted, and a sampler
-  declaration without a type is tolerated. Covered by 10 tests.
-- Added the HLSL front end for the upcoming shader runtime: `ShaderLexer` tokenizes the
-  `ps_2_0` subset Milkdrop shaders use, covering identifiers and keywords, numbers with their
-  `f`/`h` suffixes, single- and multi-character operators, swizzles, line and block comments,
-  and source positions, and reports an unexpected character with its offset. Covered by
-  10 tests.
-- Added the generated visualizer texture bank. The `noise_lq` (32 x 32), `noise_mq`
-  (256 x 256), and `noise_hq` (512 x 512) textures and the sixteen `rand00`-`rand15` (32 x 32)
-  textures are produced deterministically from fixed seeds, so no third party image is
-  bundled and every run yields the same textures. Sampling is bilinear with repeat, clamp, and
-  mirror wrap modes, and generation is lazy so a session that never opens the visualizer
-  allocates nothing. Covered by 10 tests.
-- Milkdrop preset keys now act as the per-frame starting values: every numeric key (including
-  the `nWaveMode`, `bWaveDots`, `bWaveThick`, `bAdditiveWaves`, `bDarkenCenter`,
-  `bMotionVectors`, and `nMotionVectorsX/Y` spellings) seeds the matching variable, so real
-  presets that carry their settings as keys instead of code work as written.
-- The visualizer draws the full Milkdrop wave and post-processing set: the circular, doubled,
-  and single-line wave modes with dots, thick, additive, mystery, and colour/position keys,
-  the four declared waveform slots, the outer and inner borders, a motion-vector grid derived
-  from the actual motion field, and the video echo with its zoom, alpha, and orientation.
-  Covered by 11 tests.
-- The preset engine now runs the full Milkdrop stage order. It parses the `per_frame_init`,
-  `per_pixel_init`, `wave_0`-`wave_3` and `shape_N_init` blocks, registers the complete
-  standard variable set (`bass_att`/`mid_att`/`treb_att`, `aspectx`/`aspecty`,
-  `pixelsx`/`pixelsy`, `monitor`, `zoomexp`, `rot`, `cx`/`cy`, `dx`/`dy`, `sx`/`sy`,
-  `blur1`-`blur3`, `darken_center`, `fGammaAdj`, the wave, border, motion-vector and echo
-  groups, `q1`-`q32`, and `b1`-`b8`), and applies the motion parameters, the blur passes, the
-  centre darkening, and the gamma adjustment. The per-pixel block now sees the already warped
-  sampling position in `x`/`y`/`rad`/`ang`, so a real preset can offset or replace it.
-  Covered by 16 tests.
-- The **Visualisierung** settings section gained an **Always show text and controls** toggle.
-  When it is off, the title, hint, and playback buttons appear only while the mouse moves
-  over the visualizer and hide again after three idle seconds; pointer movement is tracked
-  through the window's own events, so moving the mouse on another monitor never reveals them.
-- Added a **Visualisierung** settings section with the render resolution (320 x 180 up to
-  1280 x 720), the target frame rate (24, 30, 60, or 120), and the user preset folder that
-  previously lived under the output device. The window renders at the configured size and
-  lets the image control scale the frame up, so a lower resolution keeps the CPU cost down.
 
 - Added a cancellable Settings action that searches sequentially for missing
   artist images in the local library and every configured Orynivo Server. It
@@ -5428,97 +1710,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.30.1] - 2026-07-28
 
 ### Added
-- The visualizer's per-pixel path no longer does work the preset never asked for. The compiled
-  programs now report the variables they reference (`PresetProgram.ReferencedVariables` and
-  `Uses`), the warp stage resolves the `x`, `y`, `rad`, and `ang` slots once instead of looking
-  each name up in the layout for every pixel, and it only computes the polar pair, the motion
-  grid, and the seeded sampling position when the preset's own code needs them. A rendered frame
-  is allocation-free, which is now asserted by a test. Covered by 5 tests.
-- The visualizer renders on its own thread now. A frame used to be produced from a
-  `DispatcherTimer`, so a heavy preset blocked the interface for its whole duration; the loop
-  now runs on a background thread, hands a finished copy of the frame to the UI thread through a
-  presentation buffer, and queues at most one present at a time, so a busy interface can never
-  build up a backlog of frames. Preset switching, the reset key, and the overlay follow as
-  thread-safe requests, and the frame pacing lives in the tested `FramePacing` helper. Covered by
-  5 tests.
-- The visualizer now measures where its frame time goes. `PresetRenderer` reports a
-  `RenderTimings` breakdown (warp, blur, post-processing, overlay, composite, comp shaders, and
-  the frame total) per frame and as an average over a window, and the window's diagnostic line in
-  `logs/seek.log` carries those averages once per second, so the cost per stage can be read
-  instead of guessed. A warp shader runs inside the per-pixel loop, so its cost stays part of
-  `warp`; timing it per pixel would cost more than the measurement is worth. The frame budget now
-  compares the complete frame rather than only the shaders. Covered by 8 tests.
-- Milkdrop `.milk` files are read as the multi-preset files they are: `VisualizerPreset.ParseSections`
-  splits the text at its `[presetNN]` headers and the preset folder loads every section as its
-  own preset instead of only the last one surviving. The declared format version
-  (`MILKDROP_PRESET_VERSION`, `PSVERSION`, or `preset_version`) is reported on
-  `VisualizerPreset.Version`; every version is accepted. Skipped presets now carry a reason
-  through `VisualizerPresetLibrary.RejectedReasons`, naming the file or section and the parse
-  error. A hand-written corpus of presets in the real format, including a multi-section file and
-  shader source, guards the format handling; third-party presets stay unbundled because they are
-  licensed by their authors. Covered by 13 tests.
-- The visualizer now runs preset shaders. The numbered `warp_N` and `comp_N` keys are parsed
-  together with their optional `_enabled`, `_per_frame`, and `_per_pixel` companions, and the
-  preset reader keeps the newlines inside a shader's source, because Milkdrop stores the code
-  as a multi-line value. A shader that does not parse is skipped so one broken shader degrades a
-  preset instead of rejecting it. The renderer implements `IShaderSampler`, so shaders can
-  sample `sampler_main`, `sampler_pc_main`, `sampler_fc_main`, `GetBlur1`-`GetBlur3`, and
-  `GetPixel`, and it binds `uv`, `uv_orig`, `texsize`, the audio bands, the smoothed bands, the
-  frame counters, and the aspect ratio. A per-frame time budget (20 ms by default) skips the
-  shaders for a while when they cost too much, so a heavy preset keeps a smooth picture instead
-  of stalling playback. Covered by 11 tests.
-- Added the HLSL interpreter for the shader runtime: `ShaderInterpreter` evaluates the parsed
-  `ps_2_0` tree with scalar and `float2`/`float3`/`float4` values (`ShaderValue`), covering
-  arithmetic with the C precedence, variables and the assignment operators, swizzles read and
-  written, vector constructors with concatenation and broadcast, the ternary operator,
-  `if`/`else`, `for`, and the usual intrinsics (`abs`, `ceil`, `clamp`, `cos`, `dot`, `exp`,
-  `floor`, `frac`, `length`, `lerp`, `log`, `max`, `min`, `mul`, `normalize`, `pow`, `saturate`,
-  `sign`, `sin`, `smoothstep`, `sqrt`, `step`, `tan`). Sampling goes through the
-  `IShaderSampler` contract, so the interpreter carries no render state, and division by zero
-  yields zero instead of an infinity. A loop budget of 4096 iterations and a call depth limit of
-  32 keep a runaway shader from stalling a frame. Covered by 14 tests.
-- Added the HLSL parser and its syntax tree: `ShaderParser` and `ShaderNode` turn the
-  `ps_2_0` subset into a tagged-union tree covering declarations, expression statements,
-  `if`/`else`, `for`, `return`, swizzles, calls, the ternary operator, and the C operator
-  precedence. Function signatures and bare statement bodies are both accepted, and a sampler
-  declaration without a type is tolerated. Covered by 10 tests.
-- Added the HLSL front end for the upcoming shader runtime: `ShaderLexer` tokenizes the
-  `ps_2_0` subset Milkdrop shaders use, covering identifiers and keywords, numbers with their
-  `f`/`h` suffixes, single- and multi-character operators, swizzles, line and block comments,
-  and source positions, and reports an unexpected character with its offset. Covered by
-  10 tests.
-- Added the generated visualizer texture bank. The `noise_lq` (32 x 32), `noise_mq`
-  (256 x 256), and `noise_hq` (512 x 512) textures and the sixteen `rand00`-`rand15` (32 x 32)
-  textures are produced deterministically from fixed seeds, so no third party image is
-  bundled and every run yields the same textures. Sampling is bilinear with repeat, clamp, and
-  mirror wrap modes, and generation is lazy so a session that never opens the visualizer
-  allocates nothing. Covered by 10 tests.
-- Milkdrop preset keys now act as the per-frame starting values: every numeric key (including
-  the `nWaveMode`, `bWaveDots`, `bWaveThick`, `bAdditiveWaves`, `bDarkenCenter`,
-  `bMotionVectors`, and `nMotionVectorsX/Y` spellings) seeds the matching variable, so real
-  presets that carry their settings as keys instead of code work as written.
-- The visualizer draws the full Milkdrop wave and post-processing set: the circular, doubled,
-  and single-line wave modes with dots, thick, additive, mystery, and colour/position keys,
-  the four declared waveform slots, the outer and inner borders, a motion-vector grid derived
-  from the actual motion field, and the video echo with its zoom, alpha, and orientation.
-  Covered by 11 tests.
-- The preset engine now runs the full Milkdrop stage order. It parses the `per_frame_init`,
-  `per_pixel_init`, `wave_0`-`wave_3` and `shape_N_init` blocks, registers the complete
-  standard variable set (`bass_att`/`mid_att`/`treb_att`, `aspectx`/`aspecty`,
-  `pixelsx`/`pixelsy`, `monitor`, `zoomexp`, `rot`, `cx`/`cy`, `dx`/`dy`, `sx`/`sy`,
-  `blur1`-`blur3`, `darken_center`, `fGammaAdj`, the wave, border, motion-vector and echo
-  groups, `q1`-`q32`, and `b1`-`b8`), and applies the motion parameters, the blur passes, the
-  centre darkening, and the gamma adjustment. The per-pixel block now sees the already warped
-  sampling position in `x`/`y`/`rad`/`ang`, so a real preset can offset or replace it.
-  Covered by 16 tests.
-- The **Visualisierung** settings section gained an **Always show text and controls** toggle.
-  When it is off, the title, hint, and playback buttons appear only while the mouse moves
-  over the visualizer and hide again after three idle seconds; pointer movement is tracked
-  through the window's own events, so moving the mouse on another monitor never reveals them.
-- Added a **Visualisierung** settings section with the render resolution (320 x 180 up to
-  1280 x 720), the target frame rate (24, 30, 60, or 120), and the user preset folder that
-  previously lived under the output device. The window renders at the configured size and
-  lets the image control scale the frame up, so a lower resolution keeps the CPU cost down.
 
 - Added **Library > Review metadata** to Settings. It detects
   physically grouped folders split by inconsistent album titles or album artists,
@@ -5533,28 +1724,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   numbering, and MusicBrainz IDs as library-only overrides that survive scans
   without modifying audio-file tags.
 
-- The karaoke view now highlights the active word of enhanced-LRC lyrics.
-  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
-  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
-  already-sung words keep the accent colour. Plain synchronized lines keep the
-  line-level highlight, so nothing changes for ordinary LRC files.
-- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
-  now stripped from the line text instead of appearing as literal `<00:12.00>`
-  fragments.
-- Added bulk genre editing for the shared Tracks table. The bulk action bar gained
-  a genre field that stores the value for every selected **local** track through
-  `AudioDatabase.SetTrackGenres`, which writes the library-only
-  `track_genre_overrides` table in one transaction and reapplies it on every later
-  scan. Source media files are never modified, and an empty value removes the
-  override so the next scan restores the embedded genre. Selected Orynivo Server
-  tracks are updated on their owning server through the new authenticated
-  `PUT /api/tracks/{id}/genre`, which records the same library-only override.
-- Podcast episodes can be downloaded for offline playback. Episode rows gained a
-  **Download episode** / **Delete download** context menu and a download marker in
-  the status column, playback prefers the cached file, and Settings > Library sets
-  the cache size limit in megabytes. Eviction removes the least recently used
-  downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
-  the most recently used episode is always kept.
 ### Fixed
 
 - Fixed Linux desktop updates being unavailable or attempting to treat the
@@ -5577,97 +1746,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.30.0] - 2026-07-28
 
 ### Added
-- The visualizer's per-pixel path no longer does work the preset never asked for. The compiled
-  programs now report the variables they reference (`PresetProgram.ReferencedVariables` and
-  `Uses`), the warp stage resolves the `x`, `y`, `rad`, and `ang` slots once instead of looking
-  each name up in the layout for every pixel, and it only computes the polar pair, the motion
-  grid, and the seeded sampling position when the preset's own code needs them. A rendered frame
-  is allocation-free, which is now asserted by a test. Covered by 5 tests.
-- The visualizer renders on its own thread now. A frame used to be produced from a
-  `DispatcherTimer`, so a heavy preset blocked the interface for its whole duration; the loop
-  now runs on a background thread, hands a finished copy of the frame to the UI thread through a
-  presentation buffer, and queues at most one present at a time, so a busy interface can never
-  build up a backlog of frames. Preset switching, the reset key, and the overlay follow as
-  thread-safe requests, and the frame pacing lives in the tested `FramePacing` helper. Covered by
-  5 tests.
-- The visualizer now measures where its frame time goes. `PresetRenderer` reports a
-  `RenderTimings` breakdown (warp, blur, post-processing, overlay, composite, comp shaders, and
-  the frame total) per frame and as an average over a window, and the window's diagnostic line in
-  `logs/seek.log` carries those averages once per second, so the cost per stage can be read
-  instead of guessed. A warp shader runs inside the per-pixel loop, so its cost stays part of
-  `warp`; timing it per pixel would cost more than the measurement is worth. The frame budget now
-  compares the complete frame rather than only the shaders. Covered by 8 tests.
-- Milkdrop `.milk` files are read as the multi-preset files they are: `VisualizerPreset.ParseSections`
-  splits the text at its `[presetNN]` headers and the preset folder loads every section as its
-  own preset instead of only the last one surviving. The declared format version
-  (`MILKDROP_PRESET_VERSION`, `PSVERSION`, or `preset_version`) is reported on
-  `VisualizerPreset.Version`; every version is accepted. Skipped presets now carry a reason
-  through `VisualizerPresetLibrary.RejectedReasons`, naming the file or section and the parse
-  error. A hand-written corpus of presets in the real format, including a multi-section file and
-  shader source, guards the format handling; third-party presets stay unbundled because they are
-  licensed by their authors. Covered by 13 tests.
-- The visualizer now runs preset shaders. The numbered `warp_N` and `comp_N` keys are parsed
-  together with their optional `_enabled`, `_per_frame`, and `_per_pixel` companions, and the
-  preset reader keeps the newlines inside a shader's source, because Milkdrop stores the code
-  as a multi-line value. A shader that does not parse is skipped so one broken shader degrades a
-  preset instead of rejecting it. The renderer implements `IShaderSampler`, so shaders can
-  sample `sampler_main`, `sampler_pc_main`, `sampler_fc_main`, `GetBlur1`-`GetBlur3`, and
-  `GetPixel`, and it binds `uv`, `uv_orig`, `texsize`, the audio bands, the smoothed bands, the
-  frame counters, and the aspect ratio. A per-frame time budget (20 ms by default) skips the
-  shaders for a while when they cost too much, so a heavy preset keeps a smooth picture instead
-  of stalling playback. Covered by 11 tests.
-- Added the HLSL interpreter for the shader runtime: `ShaderInterpreter` evaluates the parsed
-  `ps_2_0` tree with scalar and `float2`/`float3`/`float4` values (`ShaderValue`), covering
-  arithmetic with the C precedence, variables and the assignment operators, swizzles read and
-  written, vector constructors with concatenation and broadcast, the ternary operator,
-  `if`/`else`, `for`, and the usual intrinsics (`abs`, `ceil`, `clamp`, `cos`, `dot`, `exp`,
-  `floor`, `frac`, `length`, `lerp`, `log`, `max`, `min`, `mul`, `normalize`, `pow`, `saturate`,
-  `sign`, `sin`, `smoothstep`, `sqrt`, `step`, `tan`). Sampling goes through the
-  `IShaderSampler` contract, so the interpreter carries no render state, and division by zero
-  yields zero instead of an infinity. A loop budget of 4096 iterations and a call depth limit of
-  32 keep a runaway shader from stalling a frame. Covered by 14 tests.
-- Added the HLSL parser and its syntax tree: `ShaderParser` and `ShaderNode` turn the
-  `ps_2_0` subset into a tagged-union tree covering declarations, expression statements,
-  `if`/`else`, `for`, `return`, swizzles, calls, the ternary operator, and the C operator
-  precedence. Function signatures and bare statement bodies are both accepted, and a sampler
-  declaration without a type is tolerated. Covered by 10 tests.
-- Added the HLSL front end for the upcoming shader runtime: `ShaderLexer` tokenizes the
-  `ps_2_0` subset Milkdrop shaders use, covering identifiers and keywords, numbers with their
-  `f`/`h` suffixes, single- and multi-character operators, swizzles, line and block comments,
-  and source positions, and reports an unexpected character with its offset. Covered by
-  10 tests.
-- Added the generated visualizer texture bank. The `noise_lq` (32 x 32), `noise_mq`
-  (256 x 256), and `noise_hq` (512 x 512) textures and the sixteen `rand00`-`rand15` (32 x 32)
-  textures are produced deterministically from fixed seeds, so no third party image is
-  bundled and every run yields the same textures. Sampling is bilinear with repeat, clamp, and
-  mirror wrap modes, and generation is lazy so a session that never opens the visualizer
-  allocates nothing. Covered by 10 tests.
-- Milkdrop preset keys now act as the per-frame starting values: every numeric key (including
-  the `nWaveMode`, `bWaveDots`, `bWaveThick`, `bAdditiveWaves`, `bDarkenCenter`,
-  `bMotionVectors`, and `nMotionVectorsX/Y` spellings) seeds the matching variable, so real
-  presets that carry their settings as keys instead of code work as written.
-- The visualizer draws the full Milkdrop wave and post-processing set: the circular, doubled,
-  and single-line wave modes with dots, thick, additive, mystery, and colour/position keys,
-  the four declared waveform slots, the outer and inner borders, a motion-vector grid derived
-  from the actual motion field, and the video echo with its zoom, alpha, and orientation.
-  Covered by 11 tests.
-- The preset engine now runs the full Milkdrop stage order. It parses the `per_frame_init`,
-  `per_pixel_init`, `wave_0`-`wave_3` and `shape_N_init` blocks, registers the complete
-  standard variable set (`bass_att`/`mid_att`/`treb_att`, `aspectx`/`aspecty`,
-  `pixelsx`/`pixelsy`, `monitor`, `zoomexp`, `rot`, `cx`/`cy`, `dx`/`dy`, `sx`/`sy`,
-  `blur1`-`blur3`, `darken_center`, `fGammaAdj`, the wave, border, motion-vector and echo
-  groups, `q1`-`q32`, and `b1`-`b8`), and applies the motion parameters, the blur passes, the
-  centre darkening, and the gamma adjustment. The per-pixel block now sees the already warped
-  sampling position in `x`/`y`/`rad`/`ang`, so a real preset can offset or replace it.
-  Covered by 16 tests.
-- The **Visualisierung** settings section gained an **Always show text and controls** toggle.
-  When it is off, the title, hint, and playback buttons appear only while the mouse moves
-  over the visualizer and hide again after three idle seconds; pointer movement is tracked
-  through the window's own events, so moving the mouse on another monitor never reveals them.
-- Added a **Visualisierung** settings section with the render resolution (320 x 180 up to
-  1280 x 720), the target frame rate (24, 30, 60, or 120), and the user preset folder that
-  previously lived under the output device. The window renders at the configured size and
-  lets the image control scale the frame up, so a lower resolution keeps the CPU cost down.
 
 - The Dashboard now suggests albums from local and Orynivo Server libraries by
   matching album genres against the selected listening-history period. Users can
@@ -5688,28 +1766,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   `actions/checkout@v6`, `actions/setup-dotnet@v5`, and
   `softprops/action-gh-release@v3`.
 
-- The karaoke view now highlights the active word of enhanced-LRC lyrics.
-  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
-  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
-  already-sung words keep the accent colour. Plain synchronized lines keep the
-  line-level highlight, so nothing changes for ordinary LRC files.
-- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
-  now stripped from the line text instead of appearing as literal `<00:12.00>`
-  fragments.
-- Added bulk genre editing for the shared Tracks table. The bulk action bar gained
-  a genre field that stores the value for every selected **local** track through
-  `AudioDatabase.SetTrackGenres`, which writes the library-only
-  `track_genre_overrides` table in one transaction and reapplies it on every later
-  scan. Source media files are never modified, and an empty value removes the
-  override so the next scan restores the embedded genre. Selected Orynivo Server
-  tracks are updated on their owning server through the new authenticated
-  `PUT /api/tracks/{id}/genre`, which records the same library-only override.
-- Podcast episodes can be downloaded for offline playback. Episode rows gained a
-  **Download episode** / **Delete download** context menu and a download marker in
-  the status column, playback prefers the cached file, and Settings > Library sets
-  the cache size limit in megabytes. Eviction removes the least recently used
-  downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
-  the most recently used episode is always kept.
 ### Fixed
 
 - Linux server release builds now normalize and validate packaged maintainer
@@ -5717,28 +1773,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [0.29.3] - 2026-07-28
 
-- The karaoke view now highlights the active word of enhanced-LRC lyrics.
-  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
-  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
-  already-sung words keep the accent colour. Plain synchronized lines keep the
-  line-level highlight, so nothing changes for ordinary LRC files.
-- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
-  now stripped from the line text instead of appearing as literal `<00:12.00>`
-  fragments.
-- Added bulk genre editing for the shared Tracks table. The bulk action bar gained
-  a genre field that stores the value for every selected **local** track through
-  `AudioDatabase.SetTrackGenres`, which writes the library-only
-  `track_genre_overrides` table in one transaction and reapplies it on every later
-  scan. Source media files are never modified, and an empty value removes the
-  override so the next scan restores the embedded genre. Selected Orynivo Server
-  tracks are updated on their owning server through the new authenticated
-  `PUT /api/tracks/{id}/genre`, which records the same library-only override.
-- Podcast episodes can be downloaded for offline playback. Episode rows gained a
-  **Download episode** / **Delete download** context menu and a download marker in
-  the status column, playback prefers the cached file, and Settings > Library sets
-  the cache size limit in megabytes. Eviction removes the least recently used
-  downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
-  the most recently used episode is always kept.
 ### Fixed
 
 - Managed DEB server updates now retain the administrator's existing
@@ -5748,97 +1782,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.29.2] - 2026-07-27
 
 ### Added
-- The visualizer's per-pixel path no longer does work the preset never asked for. The compiled
-  programs now report the variables they reference (`PresetProgram.ReferencedVariables` and
-  `Uses`), the warp stage resolves the `x`, `y`, `rad`, and `ang` slots once instead of looking
-  each name up in the layout for every pixel, and it only computes the polar pair, the motion
-  grid, and the seeded sampling position when the preset's own code needs them. A rendered frame
-  is allocation-free, which is now asserted by a test. Covered by 5 tests.
-- The visualizer renders on its own thread now. A frame used to be produced from a
-  `DispatcherTimer`, so a heavy preset blocked the interface for its whole duration; the loop
-  now runs on a background thread, hands a finished copy of the frame to the UI thread through a
-  presentation buffer, and queues at most one present at a time, so a busy interface can never
-  build up a backlog of frames. Preset switching, the reset key, and the overlay follow as
-  thread-safe requests, and the frame pacing lives in the tested `FramePacing` helper. Covered by
-  5 tests.
-- The visualizer now measures where its frame time goes. `PresetRenderer` reports a
-  `RenderTimings` breakdown (warp, blur, post-processing, overlay, composite, comp shaders, and
-  the frame total) per frame and as an average over a window, and the window's diagnostic line in
-  `logs/seek.log` carries those averages once per second, so the cost per stage can be read
-  instead of guessed. A warp shader runs inside the per-pixel loop, so its cost stays part of
-  `warp`; timing it per pixel would cost more than the measurement is worth. The frame budget now
-  compares the complete frame rather than only the shaders. Covered by 8 tests.
-- Milkdrop `.milk` files are read as the multi-preset files they are: `VisualizerPreset.ParseSections`
-  splits the text at its `[presetNN]` headers and the preset folder loads every section as its
-  own preset instead of only the last one surviving. The declared format version
-  (`MILKDROP_PRESET_VERSION`, `PSVERSION`, or `preset_version`) is reported on
-  `VisualizerPreset.Version`; every version is accepted. Skipped presets now carry a reason
-  through `VisualizerPresetLibrary.RejectedReasons`, naming the file or section and the parse
-  error. A hand-written corpus of presets in the real format, including a multi-section file and
-  shader source, guards the format handling; third-party presets stay unbundled because they are
-  licensed by their authors. Covered by 13 tests.
-- The visualizer now runs preset shaders. The numbered `warp_N` and `comp_N` keys are parsed
-  together with their optional `_enabled`, `_per_frame`, and `_per_pixel` companions, and the
-  preset reader keeps the newlines inside a shader's source, because Milkdrop stores the code
-  as a multi-line value. A shader that does not parse is skipped so one broken shader degrades a
-  preset instead of rejecting it. The renderer implements `IShaderSampler`, so shaders can
-  sample `sampler_main`, `sampler_pc_main`, `sampler_fc_main`, `GetBlur1`-`GetBlur3`, and
-  `GetPixel`, and it binds `uv`, `uv_orig`, `texsize`, the audio bands, the smoothed bands, the
-  frame counters, and the aspect ratio. A per-frame time budget (20 ms by default) skips the
-  shaders for a while when they cost too much, so a heavy preset keeps a smooth picture instead
-  of stalling playback. Covered by 11 tests.
-- Added the HLSL interpreter for the shader runtime: `ShaderInterpreter` evaluates the parsed
-  `ps_2_0` tree with scalar and `float2`/`float3`/`float4` values (`ShaderValue`), covering
-  arithmetic with the C precedence, variables and the assignment operators, swizzles read and
-  written, vector constructors with concatenation and broadcast, the ternary operator,
-  `if`/`else`, `for`, and the usual intrinsics (`abs`, `ceil`, `clamp`, `cos`, `dot`, `exp`,
-  `floor`, `frac`, `length`, `lerp`, `log`, `max`, `min`, `mul`, `normalize`, `pow`, `saturate`,
-  `sign`, `sin`, `smoothstep`, `sqrt`, `step`, `tan`). Sampling goes through the
-  `IShaderSampler` contract, so the interpreter carries no render state, and division by zero
-  yields zero instead of an infinity. A loop budget of 4096 iterations and a call depth limit of
-  32 keep a runaway shader from stalling a frame. Covered by 14 tests.
-- Added the HLSL parser and its syntax tree: `ShaderParser` and `ShaderNode` turn the
-  `ps_2_0` subset into a tagged-union tree covering declarations, expression statements,
-  `if`/`else`, `for`, `return`, swizzles, calls, the ternary operator, and the C operator
-  precedence. Function signatures and bare statement bodies are both accepted, and a sampler
-  declaration without a type is tolerated. Covered by 10 tests.
-- Added the HLSL front end for the upcoming shader runtime: `ShaderLexer` tokenizes the
-  `ps_2_0` subset Milkdrop shaders use, covering identifiers and keywords, numbers with their
-  `f`/`h` suffixes, single- and multi-character operators, swizzles, line and block comments,
-  and source positions, and reports an unexpected character with its offset. Covered by
-  10 tests.
-- Added the generated visualizer texture bank. The `noise_lq` (32 x 32), `noise_mq`
-  (256 x 256), and `noise_hq` (512 x 512) textures and the sixteen `rand00`-`rand15` (32 x 32)
-  textures are produced deterministically from fixed seeds, so no third party image is
-  bundled and every run yields the same textures. Sampling is bilinear with repeat, clamp, and
-  mirror wrap modes, and generation is lazy so a session that never opens the visualizer
-  allocates nothing. Covered by 10 tests.
-- Milkdrop preset keys now act as the per-frame starting values: every numeric key (including
-  the `nWaveMode`, `bWaveDots`, `bWaveThick`, `bAdditiveWaves`, `bDarkenCenter`,
-  `bMotionVectors`, and `nMotionVectorsX/Y` spellings) seeds the matching variable, so real
-  presets that carry their settings as keys instead of code work as written.
-- The visualizer draws the full Milkdrop wave and post-processing set: the circular, doubled,
-  and single-line wave modes with dots, thick, additive, mystery, and colour/position keys,
-  the four declared waveform slots, the outer and inner borders, a motion-vector grid derived
-  from the actual motion field, and the video echo with its zoom, alpha, and orientation.
-  Covered by 11 tests.
-- The preset engine now runs the full Milkdrop stage order. It parses the `per_frame_init`,
-  `per_pixel_init`, `wave_0`-`wave_3` and `shape_N_init` blocks, registers the complete
-  standard variable set (`bass_att`/`mid_att`/`treb_att`, `aspectx`/`aspecty`,
-  `pixelsx`/`pixelsy`, `monitor`, `zoomexp`, `rot`, `cx`/`cy`, `dx`/`dy`, `sx`/`sy`,
-  `blur1`-`blur3`, `darken_center`, `fGammaAdj`, the wave, border, motion-vector and echo
-  groups, `q1`-`q32`, and `b1`-`b8`), and applies the motion parameters, the blur passes, the
-  centre darkening, and the gamma adjustment. The per-pixel block now sees the already warped
-  sampling position in `x`/`y`/`rad`/`ang`, so a real preset can offset or replace it.
-  Covered by 16 tests.
-- The **Visualisierung** settings section gained an **Always show text and controls** toggle.
-  When it is off, the title, hint, and playback buttons appear only while the mouse moves
-  over the visualizer and hide again after three idle seconds; pointer movement is tracked
-  through the window's own events, so moving the mouse on another monitor never reveals them.
-- Added a **Visualisierung** settings section with the render resolution (320 x 180 up to
-  1280 x 720), the target frame rate (24, 30, 60, or 120), and the user preset folder that
-  previously lived under the output device. The window renders at the configured size and
-  lets the image control scale the frame up, so a lower resolution keeps the CPU cost down.
 
 - Added optional Fanart.tv artist thumbnails. Orynivo uses embedded MusicBrainz
   artist IDs when available, otherwise accepts only an unambiguous exact
@@ -5859,28 +1802,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   Existing libraries receive a one-time attribution metadata refresh during
   their next scan.
 
-- The karaoke view now highlights the active word of enhanced-LRC lyrics.
-  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
-  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
-  already-sung words keep the accent colour. Plain synchronized lines keep the
-  line-level highlight, so nothing changes for ordinary LRC files.
-- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
-  now stripped from the line text instead of appearing as literal `<00:12.00>`
-  fragments.
-- Added bulk genre editing for the shared Tracks table. The bulk action bar gained
-  a genre field that stores the value for every selected **local** track through
-  `AudioDatabase.SetTrackGenres`, which writes the library-only
-  `track_genre_overrides` table in one transaction and reapplies it on every later
-  scan. Source media files are never modified, and an empty value removes the
-  override so the next scan restores the embedded genre. Selected Orynivo Server
-  tracks are updated on their owning server through the new authenticated
-  `PUT /api/tracks/{id}/genre`, which records the same library-only override.
-- Podcast episodes can be downloaded for offline playback. Episode rows gained a
-  **Download episode** / **Delete download** context menu and a download marker in
-  the status column, playback prefers the cached file, and Settings > Library sets
-  the cache size limit in megabytes. Eviction removes the least recently used
-  downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
-  the most recently used episode is always kept.
 ### Fixed
 
 - Opening a local or Orynivo Server album from a unified artist view once again
@@ -5889,28 +1810,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [0.29.1] - 2026-07-26
 
-- The karaoke view now highlights the active word of enhanced-LRC lyrics.
-  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
-  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
-  already-sung words keep the accent colour. Plain synchronized lines keep the
-  line-level highlight, so nothing changes for ordinary LRC files.
-- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
-  now stripped from the line text instead of appearing as literal `<00:12.00>`
-  fragments.
-- Added bulk genre editing for the shared Tracks table. The bulk action bar gained
-  a genre field that stores the value for every selected **local** track through
-  `AudioDatabase.SetTrackGenres`, which writes the library-only
-  `track_genre_overrides` table in one transaction and reapplies it on every later
-  scan. Source media files are never modified, and an empty value removes the
-  override so the next scan restores the embedded genre. Selected Orynivo Server
-  tracks are updated on their owning server through the new authenticated
-  `PUT /api/tracks/{id}/genre`, which records the same library-only override.
-- Podcast episodes can be downloaded for offline playback. Episode rows gained a
-  **Download episode** / **Delete download** context menu and a download marker in
-  the status column, playback prefers the cached file, and Settings > Library sets
-  the cache size limit in megabytes. Eviction removes the least recently used
-  downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
-  the most recently used episode is always kept.
 ### Fixed
 
 - macOS now finds FFmpeg and FFprobe installed in common Homebrew, MacPorts,
@@ -5927,97 +1826,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.29.0] - 2026-07-26
 
 ### Added
-- The visualizer's per-pixel path no longer does work the preset never asked for. The compiled
-  programs now report the variables they reference (`PresetProgram.ReferencedVariables` and
-  `Uses`), the warp stage resolves the `x`, `y`, `rad`, and `ang` slots once instead of looking
-  each name up in the layout for every pixel, and it only computes the polar pair, the motion
-  grid, and the seeded sampling position when the preset's own code needs them. A rendered frame
-  is allocation-free, which is now asserted by a test. Covered by 5 tests.
-- The visualizer renders on its own thread now. A frame used to be produced from a
-  `DispatcherTimer`, so a heavy preset blocked the interface for its whole duration; the loop
-  now runs on a background thread, hands a finished copy of the frame to the UI thread through a
-  presentation buffer, and queues at most one present at a time, so a busy interface can never
-  build up a backlog of frames. Preset switching, the reset key, and the overlay follow as
-  thread-safe requests, and the frame pacing lives in the tested `FramePacing` helper. Covered by
-  5 tests.
-- The visualizer now measures where its frame time goes. `PresetRenderer` reports a
-  `RenderTimings` breakdown (warp, blur, post-processing, overlay, composite, comp shaders, and
-  the frame total) per frame and as an average over a window, and the window's diagnostic line in
-  `logs/seek.log` carries those averages once per second, so the cost per stage can be read
-  instead of guessed. A warp shader runs inside the per-pixel loop, so its cost stays part of
-  `warp`; timing it per pixel would cost more than the measurement is worth. The frame budget now
-  compares the complete frame rather than only the shaders. Covered by 8 tests.
-- Milkdrop `.milk` files are read as the multi-preset files they are: `VisualizerPreset.ParseSections`
-  splits the text at its `[presetNN]` headers and the preset folder loads every section as its
-  own preset instead of only the last one surviving. The declared format version
-  (`MILKDROP_PRESET_VERSION`, `PSVERSION`, or `preset_version`) is reported on
-  `VisualizerPreset.Version`; every version is accepted. Skipped presets now carry a reason
-  through `VisualizerPresetLibrary.RejectedReasons`, naming the file or section and the parse
-  error. A hand-written corpus of presets in the real format, including a multi-section file and
-  shader source, guards the format handling; third-party presets stay unbundled because they are
-  licensed by their authors. Covered by 13 tests.
-- The visualizer now runs preset shaders. The numbered `warp_N` and `comp_N` keys are parsed
-  together with their optional `_enabled`, `_per_frame`, and `_per_pixel` companions, and the
-  preset reader keeps the newlines inside a shader's source, because Milkdrop stores the code
-  as a multi-line value. A shader that does not parse is skipped so one broken shader degrades a
-  preset instead of rejecting it. The renderer implements `IShaderSampler`, so shaders can
-  sample `sampler_main`, `sampler_pc_main`, `sampler_fc_main`, `GetBlur1`-`GetBlur3`, and
-  `GetPixel`, and it binds `uv`, `uv_orig`, `texsize`, the audio bands, the smoothed bands, the
-  frame counters, and the aspect ratio. A per-frame time budget (20 ms by default) skips the
-  shaders for a while when they cost too much, so a heavy preset keeps a smooth picture instead
-  of stalling playback. Covered by 11 tests.
-- Added the HLSL interpreter for the shader runtime: `ShaderInterpreter` evaluates the parsed
-  `ps_2_0` tree with scalar and `float2`/`float3`/`float4` values (`ShaderValue`), covering
-  arithmetic with the C precedence, variables and the assignment operators, swizzles read and
-  written, vector constructors with concatenation and broadcast, the ternary operator,
-  `if`/`else`, `for`, and the usual intrinsics (`abs`, `ceil`, `clamp`, `cos`, `dot`, `exp`,
-  `floor`, `frac`, `length`, `lerp`, `log`, `max`, `min`, `mul`, `normalize`, `pow`, `saturate`,
-  `sign`, `sin`, `smoothstep`, `sqrt`, `step`, `tan`). Sampling goes through the
-  `IShaderSampler` contract, so the interpreter carries no render state, and division by zero
-  yields zero instead of an infinity. A loop budget of 4096 iterations and a call depth limit of
-  32 keep a runaway shader from stalling a frame. Covered by 14 tests.
-- Added the HLSL parser and its syntax tree: `ShaderParser` and `ShaderNode` turn the
-  `ps_2_0` subset into a tagged-union tree covering declarations, expression statements,
-  `if`/`else`, `for`, `return`, swizzles, calls, the ternary operator, and the C operator
-  precedence. Function signatures and bare statement bodies are both accepted, and a sampler
-  declaration without a type is tolerated. Covered by 10 tests.
-- Added the HLSL front end for the upcoming shader runtime: `ShaderLexer` tokenizes the
-  `ps_2_0` subset Milkdrop shaders use, covering identifiers and keywords, numbers with their
-  `f`/`h` suffixes, single- and multi-character operators, swizzles, line and block comments,
-  and source positions, and reports an unexpected character with its offset. Covered by
-  10 tests.
-- Added the generated visualizer texture bank. The `noise_lq` (32 x 32), `noise_mq`
-  (256 x 256), and `noise_hq` (512 x 512) textures and the sixteen `rand00`-`rand15` (32 x 32)
-  textures are produced deterministically from fixed seeds, so no third party image is
-  bundled and every run yields the same textures. Sampling is bilinear with repeat, clamp, and
-  mirror wrap modes, and generation is lazy so a session that never opens the visualizer
-  allocates nothing. Covered by 10 tests.
-- Milkdrop preset keys now act as the per-frame starting values: every numeric key (including
-  the `nWaveMode`, `bWaveDots`, `bWaveThick`, `bAdditiveWaves`, `bDarkenCenter`,
-  `bMotionVectors`, and `nMotionVectorsX/Y` spellings) seeds the matching variable, so real
-  presets that carry their settings as keys instead of code work as written.
-- The visualizer draws the full Milkdrop wave and post-processing set: the circular, doubled,
-  and single-line wave modes with dots, thick, additive, mystery, and colour/position keys,
-  the four declared waveform slots, the outer and inner borders, a motion-vector grid derived
-  from the actual motion field, and the video echo with its zoom, alpha, and orientation.
-  Covered by 11 tests.
-- The preset engine now runs the full Milkdrop stage order. It parses the `per_frame_init`,
-  `per_pixel_init`, `wave_0`-`wave_3` and `shape_N_init` blocks, registers the complete
-  standard variable set (`bass_att`/`mid_att`/`treb_att`, `aspectx`/`aspecty`,
-  `pixelsx`/`pixelsy`, `monitor`, `zoomexp`, `rot`, `cx`/`cy`, `dx`/`dy`, `sx`/`sy`,
-  `blur1`-`blur3`, `darken_center`, `fGammaAdj`, the wave, border, motion-vector and echo
-  groups, `q1`-`q32`, and `b1`-`b8`), and applies the motion parameters, the blur passes, the
-  centre darkening, and the gamma adjustment. The per-pixel block now sees the already warped
-  sampling position in `x`/`y`/`rad`/`ang`, so a real preset can offset or replace it.
-  Covered by 16 tests.
-- The **Visualisierung** settings section gained an **Always show text and controls** toggle.
-  When it is off, the title, hint, and playback buttons appear only while the mouse moves
-  over the visualizer and hide again after three idle seconds; pointer movement is tracked
-  through the window's own events, so moving the mouse on another monitor never reveals them.
-- Added a **Visualisierung** settings section with the render resolution (320 x 180 up to
-  1280 x 720), the target frame rate (24, 30, 60, or 120), and the user preset folder that
-  previously lived under the output device. The window renders at the configured size and
-  lets the image control scale the frame up, so a lower resolution keeps the CPU cost down.
 
 - Added macOS desktop support for Intel (`osx-x64`) and Apple Silicon
   (`osx-arm64`). The Avalonia player now uses the macOS system OpenAL framework
@@ -6029,28 +1837,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   verify the manifest signature and package SHA-256 digest, and open the
   verified package in the macOS Installer.
 
-- The karaoke view now highlights the active word of enhanced-LRC lyrics.
-  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
-  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
-  already-sung words keep the accent colour. Plain synchronized lines keep the
-  line-level highlight, so nothing changes for ordinary LRC files.
-- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
-  now stripped from the line text instead of appearing as literal `<00:12.00>`
-  fragments.
-- Added bulk genre editing for the shared Tracks table. The bulk action bar gained
-  a genre field that stores the value for every selected **local** track through
-  `AudioDatabase.SetTrackGenres`, which writes the library-only
-  `track_genre_overrides` table in one transaction and reapplies it on every later
-  scan. Source media files are never modified, and an empty value removes the
-  override so the next scan restores the embedded genre. Selected Orynivo Server
-  tracks are updated on their owning server through the new authenticated
-  `PUT /api/tracks/{id}/genre`, which records the same library-only override.
-- Podcast episodes can be downloaded for offline playback. Episode rows gained a
-  **Download episode** / **Delete download** context menu and a download marker in
-  the status column, playback prefers the cached file, and Settings > Library sets
-  the cache size limit in megabytes. Eviction removes the least recently used
-  downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
-  the most recently used episode is always kept.
 ### Fixed
 
 - Hidden the Steinberg ASIO and cwASIO subsystem badges on macOS and Linux,
@@ -6077,28 +1863,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [0.28.1] - 2026-07-25
 
-- The karaoke view now highlights the active word of enhanced-LRC lyrics.
-  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
-  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
-  already-sung words keep the accent colour. Plain synchronized lines keep the
-  line-level highlight, so nothing changes for ordinary LRC files.
-- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
-  now stripped from the line text instead of appearing as literal `<00:12.00>`
-  fragments.
-- Added bulk genre editing for the shared Tracks table. The bulk action bar gained
-  a genre field that stores the value for every selected **local** track through
-  `AudioDatabase.SetTrackGenres`, which writes the library-only
-  `track_genre_overrides` table in one transaction and reapplies it on every later
-  scan. Source media files are never modified, and an empty value removes the
-  override so the next scan restores the embedded genre. Selected Orynivo Server
-  tracks are updated on their owning server through the new authenticated
-  `PUT /api/tracks/{id}/genre`, which records the same library-only override.
-- Podcast episodes can be downloaded for offline playback. Episode rows gained a
-  **Download episode** / **Delete download** context menu and a download marker in
-  the status column, playback prefers the cached file, and Settings > Library sets
-  the cache size limit in megabytes. Eviction removes the least recently used
-  downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
-  the most recently used episode is always kept.
 ### Fixed
 
 - Fixed the Arch Linux player package layout so `.PKGINFO` is stored at the
@@ -6108,97 +1872,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.28.0] - 2026-07-25
 
 ### Added
-- The visualizer's per-pixel path no longer does work the preset never asked for. The compiled
-  programs now report the variables they reference (`PresetProgram.ReferencedVariables` and
-  `Uses`), the warp stage resolves the `x`, `y`, `rad`, and `ang` slots once instead of looking
-  each name up in the layout for every pixel, and it only computes the polar pair, the motion
-  grid, and the seeded sampling position when the preset's own code needs them. A rendered frame
-  is allocation-free, which is now asserted by a test. Covered by 5 tests.
-- The visualizer renders on its own thread now. A frame used to be produced from a
-  `DispatcherTimer`, so a heavy preset blocked the interface for its whole duration; the loop
-  now runs on a background thread, hands a finished copy of the frame to the UI thread through a
-  presentation buffer, and queues at most one present at a time, so a busy interface can never
-  build up a backlog of frames. Preset switching, the reset key, and the overlay follow as
-  thread-safe requests, and the frame pacing lives in the tested `FramePacing` helper. Covered by
-  5 tests.
-- The visualizer now measures where its frame time goes. `PresetRenderer` reports a
-  `RenderTimings` breakdown (warp, blur, post-processing, overlay, composite, comp shaders, and
-  the frame total) per frame and as an average over a window, and the window's diagnostic line in
-  `logs/seek.log` carries those averages once per second, so the cost per stage can be read
-  instead of guessed. A warp shader runs inside the per-pixel loop, so its cost stays part of
-  `warp`; timing it per pixel would cost more than the measurement is worth. The frame budget now
-  compares the complete frame rather than only the shaders. Covered by 8 tests.
-- Milkdrop `.milk` files are read as the multi-preset files they are: `VisualizerPreset.ParseSections`
-  splits the text at its `[presetNN]` headers and the preset folder loads every section as its
-  own preset instead of only the last one surviving. The declared format version
-  (`MILKDROP_PRESET_VERSION`, `PSVERSION`, or `preset_version`) is reported on
-  `VisualizerPreset.Version`; every version is accepted. Skipped presets now carry a reason
-  through `VisualizerPresetLibrary.RejectedReasons`, naming the file or section and the parse
-  error. A hand-written corpus of presets in the real format, including a multi-section file and
-  shader source, guards the format handling; third-party presets stay unbundled because they are
-  licensed by their authors. Covered by 13 tests.
-- The visualizer now runs preset shaders. The numbered `warp_N` and `comp_N` keys are parsed
-  together with their optional `_enabled`, `_per_frame`, and `_per_pixel` companions, and the
-  preset reader keeps the newlines inside a shader's source, because Milkdrop stores the code
-  as a multi-line value. A shader that does not parse is skipped so one broken shader degrades a
-  preset instead of rejecting it. The renderer implements `IShaderSampler`, so shaders can
-  sample `sampler_main`, `sampler_pc_main`, `sampler_fc_main`, `GetBlur1`-`GetBlur3`, and
-  `GetPixel`, and it binds `uv`, `uv_orig`, `texsize`, the audio bands, the smoothed bands, the
-  frame counters, and the aspect ratio. A per-frame time budget (20 ms by default) skips the
-  shaders for a while when they cost too much, so a heavy preset keeps a smooth picture instead
-  of stalling playback. Covered by 11 tests.
-- Added the HLSL interpreter for the shader runtime: `ShaderInterpreter` evaluates the parsed
-  `ps_2_0` tree with scalar and `float2`/`float3`/`float4` values (`ShaderValue`), covering
-  arithmetic with the C precedence, variables and the assignment operators, swizzles read and
-  written, vector constructors with concatenation and broadcast, the ternary operator,
-  `if`/`else`, `for`, and the usual intrinsics (`abs`, `ceil`, `clamp`, `cos`, `dot`, `exp`,
-  `floor`, `frac`, `length`, `lerp`, `log`, `max`, `min`, `mul`, `normalize`, `pow`, `saturate`,
-  `sign`, `sin`, `smoothstep`, `sqrt`, `step`, `tan`). Sampling goes through the
-  `IShaderSampler` contract, so the interpreter carries no render state, and division by zero
-  yields zero instead of an infinity. A loop budget of 4096 iterations and a call depth limit of
-  32 keep a runaway shader from stalling a frame. Covered by 14 tests.
-- Added the HLSL parser and its syntax tree: `ShaderParser` and `ShaderNode` turn the
-  `ps_2_0` subset into a tagged-union tree covering declarations, expression statements,
-  `if`/`else`, `for`, `return`, swizzles, calls, the ternary operator, and the C operator
-  precedence. Function signatures and bare statement bodies are both accepted, and a sampler
-  declaration without a type is tolerated. Covered by 10 tests.
-- Added the HLSL front end for the upcoming shader runtime: `ShaderLexer` tokenizes the
-  `ps_2_0` subset Milkdrop shaders use, covering identifiers and keywords, numbers with their
-  `f`/`h` suffixes, single- and multi-character operators, swizzles, line and block comments,
-  and source positions, and reports an unexpected character with its offset. Covered by
-  10 tests.
-- Added the generated visualizer texture bank. The `noise_lq` (32 x 32), `noise_mq`
-  (256 x 256), and `noise_hq` (512 x 512) textures and the sixteen `rand00`-`rand15` (32 x 32)
-  textures are produced deterministically from fixed seeds, so no third party image is
-  bundled and every run yields the same textures. Sampling is bilinear with repeat, clamp, and
-  mirror wrap modes, and generation is lazy so a session that never opens the visualizer
-  allocates nothing. Covered by 10 tests.
-- Milkdrop preset keys now act as the per-frame starting values: every numeric key (including
-  the `nWaveMode`, `bWaveDots`, `bWaveThick`, `bAdditiveWaves`, `bDarkenCenter`,
-  `bMotionVectors`, and `nMotionVectorsX/Y` spellings) seeds the matching variable, so real
-  presets that carry their settings as keys instead of code work as written.
-- The visualizer draws the full Milkdrop wave and post-processing set: the circular, doubled,
-  and single-line wave modes with dots, thick, additive, mystery, and colour/position keys,
-  the four declared waveform slots, the outer and inner borders, a motion-vector grid derived
-  from the actual motion field, and the video echo with its zoom, alpha, and orientation.
-  Covered by 11 tests.
-- The preset engine now runs the full Milkdrop stage order. It parses the `per_frame_init`,
-  `per_pixel_init`, `wave_0`-`wave_3` and `shape_N_init` blocks, registers the complete
-  standard variable set (`bass_att`/`mid_att`/`treb_att`, `aspectx`/`aspecty`,
-  `pixelsx`/`pixelsy`, `monitor`, `zoomexp`, `rot`, `cx`/`cy`, `dx`/`dy`, `sx`/`sy`,
-  `blur1`-`blur3`, `darken_center`, `fGammaAdj`, the wave, border, motion-vector and echo
-  groups, `q1`-`q32`, and `b1`-`b8`), and applies the motion parameters, the blur passes, the
-  centre darkening, and the gamma adjustment. The per-pixel block now sees the already warped
-  sampling position in `x`/`y`/`rad`/`ang`, so a real preset can offset or replace it.
-  Covered by 16 tests.
-- The **Visualisierung** settings section gained an **Always show text and controls** toggle.
-  When it is off, the title, hint, and playback buttons appear only while the mouse moves
-  over the visualizer and hide again after three idle seconds; pointer movement is tracked
-  through the window's own events, so moving the mouse on another monitor never reveals them.
-- Added a **Visualisierung** settings section with the render resolution (320 x 180 up to
-  1280 x 720), the target frame rate (24, 30, 60, or 120), and the user preset folder that
-  previously lived under the output device. The window renders at the configured size and
-  lets the image control scale the frame up, so a lower resolution keeps the CPU cost down.
 
 - Added bit-perfect DSF playback over DoP through direct ALSA on Linux.
   Orynivo bypasses FFmpeg and PCM processing, adds alternating standard DoP
@@ -6249,28 +1922,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   streaming secrets remain process-local instead of being written without
   Windows DPAPI protection.
 
-- The karaoke view now highlights the active word of enhanced-LRC lyrics.
-  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
-  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
-  already-sung words keep the accent colour. Plain synchronized lines keep the
-  line-level highlight, so nothing changes for ordinary LRC files.
-- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
-  now stripped from the line text instead of appearing as literal `<00:12.00>`
-  fragments.
-- Added bulk genre editing for the shared Tracks table. The bulk action bar gained
-  a genre field that stores the value for every selected **local** track through
-  `AudioDatabase.SetTrackGenres`, which writes the library-only
-  `track_genre_overrides` table in one transaction and reapplies it on every later
-  scan. Source media files are never modified, and an empty value removes the
-  override so the next scan restores the embedded genre. Selected Orynivo Server
-  tracks are updated on their owning server through the new authenticated
-  `PUT /api/tracks/{id}/genre`, which records the same library-only override.
-- Podcast episodes can be downloaded for offline playback. Episode rows gained a
-  **Download episode** / **Delete download** context menu and a download marker in
-  the status column, playback prefers the cached file, and Settings > Library sets
-  the cache size limit in megabytes. Eviction removes the least recently used
-  downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
-  the most recently used episode is always kept.
 ### Fixed
 
 - Linux now detects the extensionless `ffmpeg` and `ffprobe` executables for
@@ -6287,107 +1938,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   of displaying the source rate when OpenAL or PipeWire resamples the stream.
 - Prevented a Linux desktop shutdown crash in Avalonia's D-Bus cleanup by using
   the non-blocking observer dispatch from Tmds.DBus.Protocol 0.92.0.
-- Prevented Orynivo Server library scans from appearing stuck on large or
-  chaptered media by disabling missing-ReplayGain FFmpeg analysis by default;
-  deployments can opt back in through configuration.
-- Bounded Matroska chapter probing to 30 seconds per file and limited FFprobe's
-  analysis window so a malformed or slow network-hosted MKA cannot stall the
-  complete server scan indefinitely.
 
 ## [0.27.0] - 2026-07-15
 
 ### Added
-- The visualizer's per-pixel path no longer does work the preset never asked for. The compiled
-  programs now report the variables they reference (`PresetProgram.ReferencedVariables` and
-  `Uses`), the warp stage resolves the `x`, `y`, `rad`, and `ang` slots once instead of looking
-  each name up in the layout for every pixel, and it only computes the polar pair, the motion
-  grid, and the seeded sampling position when the preset's own code needs them. A rendered frame
-  is allocation-free, which is now asserted by a test. Covered by 5 tests.
-- The visualizer renders on its own thread now. A frame used to be produced from a
-  `DispatcherTimer`, so a heavy preset blocked the interface for its whole duration; the loop
-  now runs on a background thread, hands a finished copy of the frame to the UI thread through a
-  presentation buffer, and queues at most one present at a time, so a busy interface can never
-  build up a backlog of frames. Preset switching, the reset key, and the overlay follow as
-  thread-safe requests, and the frame pacing lives in the tested `FramePacing` helper. Covered by
-  5 tests.
-- The visualizer now measures where its frame time goes. `PresetRenderer` reports a
-  `RenderTimings` breakdown (warp, blur, post-processing, overlay, composite, comp shaders, and
-  the frame total) per frame and as an average over a window, and the window's diagnostic line in
-  `logs/seek.log` carries those averages once per second, so the cost per stage can be read
-  instead of guessed. A warp shader runs inside the per-pixel loop, so its cost stays part of
-  `warp`; timing it per pixel would cost more than the measurement is worth. The frame budget now
-  compares the complete frame rather than only the shaders. Covered by 8 tests.
-- Milkdrop `.milk` files are read as the multi-preset files they are: `VisualizerPreset.ParseSections`
-  splits the text at its `[presetNN]` headers and the preset folder loads every section as its
-  own preset instead of only the last one surviving. The declared format version
-  (`MILKDROP_PRESET_VERSION`, `PSVERSION`, or `preset_version`) is reported on
-  `VisualizerPreset.Version`; every version is accepted. Skipped presets now carry a reason
-  through `VisualizerPresetLibrary.RejectedReasons`, naming the file or section and the parse
-  error. A hand-written corpus of presets in the real format, including a multi-section file and
-  shader source, guards the format handling; third-party presets stay unbundled because they are
-  licensed by their authors. Covered by 13 tests.
-- The visualizer now runs preset shaders. The numbered `warp_N` and `comp_N` keys are parsed
-  together with their optional `_enabled`, `_per_frame`, and `_per_pixel` companions, and the
-  preset reader keeps the newlines inside a shader's source, because Milkdrop stores the code
-  as a multi-line value. A shader that does not parse is skipped so one broken shader degrades a
-  preset instead of rejecting it. The renderer implements `IShaderSampler`, so shaders can
-  sample `sampler_main`, `sampler_pc_main`, `sampler_fc_main`, `GetBlur1`-`GetBlur3`, and
-  `GetPixel`, and it binds `uv`, `uv_orig`, `texsize`, the audio bands, the smoothed bands, the
-  frame counters, and the aspect ratio. A per-frame time budget (20 ms by default) skips the
-  shaders for a while when they cost too much, so a heavy preset keeps a smooth picture instead
-  of stalling playback. Covered by 11 tests.
-- Added the HLSL interpreter for the shader runtime: `ShaderInterpreter` evaluates the parsed
-  `ps_2_0` tree with scalar and `float2`/`float3`/`float4` values (`ShaderValue`), covering
-  arithmetic with the C precedence, variables and the assignment operators, swizzles read and
-  written, vector constructors with concatenation and broadcast, the ternary operator,
-  `if`/`else`, `for`, and the usual intrinsics (`abs`, `ceil`, `clamp`, `cos`, `dot`, `exp`,
-  `floor`, `frac`, `length`, `lerp`, `log`, `max`, `min`, `mul`, `normalize`, `pow`, `saturate`,
-  `sign`, `sin`, `smoothstep`, `sqrt`, `step`, `tan`). Sampling goes through the
-  `IShaderSampler` contract, so the interpreter carries no render state, and division by zero
-  yields zero instead of an infinity. A loop budget of 4096 iterations and a call depth limit of
-  32 keep a runaway shader from stalling a frame. Covered by 14 tests.
-- Added the HLSL parser and its syntax tree: `ShaderParser` and `ShaderNode` turn the
-  `ps_2_0` subset into a tagged-union tree covering declarations, expression statements,
-  `if`/`else`, `for`, `return`, swizzles, calls, the ternary operator, and the C operator
-  precedence. Function signatures and bare statement bodies are both accepted, and a sampler
-  declaration without a type is tolerated. Covered by 10 tests.
-- Added the HLSL front end for the upcoming shader runtime: `ShaderLexer` tokenizes the
-  `ps_2_0` subset Milkdrop shaders use, covering identifiers and keywords, numbers with their
-  `f`/`h` suffixes, single- and multi-character operators, swizzles, line and block comments,
-  and source positions, and reports an unexpected character with its offset. Covered by
-  10 tests.
-- Added the generated visualizer texture bank. The `noise_lq` (32 x 32), `noise_mq`
-  (256 x 256), and `noise_hq` (512 x 512) textures and the sixteen `rand00`-`rand15` (32 x 32)
-  textures are produced deterministically from fixed seeds, so no third party image is
-  bundled and every run yields the same textures. Sampling is bilinear with repeat, clamp, and
-  mirror wrap modes, and generation is lazy so a session that never opens the visualizer
-  allocates nothing. Covered by 10 tests.
-- Milkdrop preset keys now act as the per-frame starting values: every numeric key (including
-  the `nWaveMode`, `bWaveDots`, `bWaveThick`, `bAdditiveWaves`, `bDarkenCenter`,
-  `bMotionVectors`, and `nMotionVectorsX/Y` spellings) seeds the matching variable, so real
-  presets that carry their settings as keys instead of code work as written.
-- The visualizer draws the full Milkdrop wave and post-processing set: the circular, doubled,
-  and single-line wave modes with dots, thick, additive, mystery, and colour/position keys,
-  the four declared waveform slots, the outer and inner borders, a motion-vector grid derived
-  from the actual motion field, and the video echo with its zoom, alpha, and orientation.
-  Covered by 11 tests.
-- The preset engine now runs the full Milkdrop stage order. It parses the `per_frame_init`,
-  `per_pixel_init`, `wave_0`-`wave_3` and `shape_N_init` blocks, registers the complete
-  standard variable set (`bass_att`/`mid_att`/`treb_att`, `aspectx`/`aspecty`,
-  `pixelsx`/`pixelsy`, `monitor`, `zoomexp`, `rot`, `cx`/`cy`, `dx`/`dy`, `sx`/`sy`,
-  `blur1`-`blur3`, `darken_center`, `fGammaAdj`, the wave, border, motion-vector and echo
-  groups, `q1`-`q32`, and `b1`-`b8`), and applies the motion parameters, the blur passes, the
-  centre darkening, and the gamma adjustment. The per-pixel block now sees the already warped
-  sampling position in `x`/`y`/`rad`/`ang`, so a real preset can offset or replace it.
-  Covered by 16 tests.
-- The **Visualisierung** settings section gained an **Always show text and controls** toggle.
-  When it is off, the title, hint, and playback buttons appear only while the mouse moves
-  over the visualizer and hide again after three idle seconds; pointer movement is tracked
-  through the window's own events, so moving the mouse on another monitor never reveals them.
-- Added a **Visualisierung** settings section with the render resolution (320 x 180 up to
-  1280 x 720), the target frame rate (24, 30, 60, or 120), and the user preset folder that
-  previously lived under the output device. The window renders at the configured size and
-  lets the image control scale the frame up, so a lower resolution keeps the CPU cost down.
 
 - Added Matroska Audio (`.mka`) files to library scanning, desktop file
   recognition, and Orynivo Server streaming. Chaptered MKA albums are expanded
@@ -6395,28 +1949,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   and boundaries. Library-only chapter-title corrections persist across scans
   without modifying the MKA file.
 
-- The karaoke view now highlights the active word of enhanced-LRC lyrics.
-  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
-  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
-  already-sung words keep the accent colour. Plain synchronized lines keep the
-  line-level highlight, so nothing changes for ordinary LRC files.
-- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
-  now stripped from the line text instead of appearing as literal `<00:12.00>`
-  fragments.
-- Added bulk genre editing for the shared Tracks table. The bulk action bar gained
-  a genre field that stores the value for every selected **local** track through
-  `AudioDatabase.SetTrackGenres`, which writes the library-only
-  `track_genre_overrides` table in one transaction and reapplies it on every later
-  scan. Source media files are never modified, and an empty value removes the
-  override so the next scan restores the embedded genre. Selected Orynivo Server
-  tracks are updated on their owning server through the new authenticated
-  `PUT /api/tracks/{id}/genre`, which records the same library-only override.
-- Podcast episodes can be downloaded for offline playback. Episode rows gained a
-  **Download episode** / **Delete download** context menu and a download marker in
-  the status column, playback prefers the cached file, and Settings > Library sets
-  the cache size limit in megabytes. Eviction removes the least recently used
-  downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
-  the most recently used episode is always kept.
 ### Fixed
 
 - Improved the startup update dialog's primary action contrast, spacing, and
@@ -6425,124 +1957,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.26.6] - 2026-07-15
 
 ### Added
-- The visualizer's per-pixel path no longer does work the preset never asked for. The compiled
-  programs now report the variables they reference (`PresetProgram.ReferencedVariables` and
-  `Uses`), the warp stage resolves the `x`, `y`, `rad`, and `ang` slots once instead of looking
-  each name up in the layout for every pixel, and it only computes the polar pair, the motion
-  grid, and the seeded sampling position when the preset's own code needs them. A rendered frame
-  is allocation-free, which is now asserted by a test. Covered by 5 tests.
-- The visualizer renders on its own thread now. A frame used to be produced from a
-  `DispatcherTimer`, so a heavy preset blocked the interface for its whole duration; the loop
-  now runs on a background thread, hands a finished copy of the frame to the UI thread through a
-  presentation buffer, and queues at most one present at a time, so a busy interface can never
-  build up a backlog of frames. Preset switching, the reset key, and the overlay follow as
-  thread-safe requests, and the frame pacing lives in the tested `FramePacing` helper. Covered by
-  5 tests.
-- The visualizer now measures where its frame time goes. `PresetRenderer` reports a
-  `RenderTimings` breakdown (warp, blur, post-processing, overlay, composite, comp shaders, and
-  the frame total) per frame and as an average over a window, and the window's diagnostic line in
-  `logs/seek.log` carries those averages once per second, so the cost per stage can be read
-  instead of guessed. A warp shader runs inside the per-pixel loop, so its cost stays part of
-  `warp`; timing it per pixel would cost more than the measurement is worth. The frame budget now
-  compares the complete frame rather than only the shaders. Covered by 8 tests.
-- Milkdrop `.milk` files are read as the multi-preset files they are: `VisualizerPreset.ParseSections`
-  splits the text at its `[presetNN]` headers and the preset folder loads every section as its
-  own preset instead of only the last one surviving. The declared format version
-  (`MILKDROP_PRESET_VERSION`, `PSVERSION`, or `preset_version`) is reported on
-  `VisualizerPreset.Version`; every version is accepted. Skipped presets now carry a reason
-  through `VisualizerPresetLibrary.RejectedReasons`, naming the file or section and the parse
-  error. A hand-written corpus of presets in the real format, including a multi-section file and
-  shader source, guards the format handling; third-party presets stay unbundled because they are
-  licensed by their authors. Covered by 13 tests.
-- The visualizer now runs preset shaders. The numbered `warp_N` and `comp_N` keys are parsed
-  together with their optional `_enabled`, `_per_frame`, and `_per_pixel` companions, and the
-  preset reader keeps the newlines inside a shader's source, because Milkdrop stores the code
-  as a multi-line value. A shader that does not parse is skipped so one broken shader degrades a
-  preset instead of rejecting it. The renderer implements `IShaderSampler`, so shaders can
-  sample `sampler_main`, `sampler_pc_main`, `sampler_fc_main`, `GetBlur1`-`GetBlur3`, and
-  `GetPixel`, and it binds `uv`, `uv_orig`, `texsize`, the audio bands, the smoothed bands, the
-  frame counters, and the aspect ratio. A per-frame time budget (20 ms by default) skips the
-  shaders for a while when they cost too much, so a heavy preset keeps a smooth picture instead
-  of stalling playback. Covered by 11 tests.
-- Added the HLSL interpreter for the shader runtime: `ShaderInterpreter` evaluates the parsed
-  `ps_2_0` tree with scalar and `float2`/`float3`/`float4` values (`ShaderValue`), covering
-  arithmetic with the C precedence, variables and the assignment operators, swizzles read and
-  written, vector constructors with concatenation and broadcast, the ternary operator,
-  `if`/`else`, `for`, and the usual intrinsics (`abs`, `ceil`, `clamp`, `cos`, `dot`, `exp`,
-  `floor`, `frac`, `length`, `lerp`, `log`, `max`, `min`, `mul`, `normalize`, `pow`, `saturate`,
-  `sign`, `sin`, `smoothstep`, `sqrt`, `step`, `tan`). Sampling goes through the
-  `IShaderSampler` contract, so the interpreter carries no render state, and division by zero
-  yields zero instead of an infinity. A loop budget of 4096 iterations and a call depth limit of
-  32 keep a runaway shader from stalling a frame. Covered by 14 tests.
-- Added the HLSL parser and its syntax tree: `ShaderParser` and `ShaderNode` turn the
-  `ps_2_0` subset into a tagged-union tree covering declarations, expression statements,
-  `if`/`else`, `for`, `return`, swizzles, calls, the ternary operator, and the C operator
-  precedence. Function signatures and bare statement bodies are both accepted, and a sampler
-  declaration without a type is tolerated. Covered by 10 tests.
-- Added the HLSL front end for the upcoming shader runtime: `ShaderLexer` tokenizes the
-  `ps_2_0` subset Milkdrop shaders use, covering identifiers and keywords, numbers with their
-  `f`/`h` suffixes, single- and multi-character operators, swizzles, line and block comments,
-  and source positions, and reports an unexpected character with its offset. Covered by
-  10 tests.
-- Added the generated visualizer texture bank. The `noise_lq` (32 x 32), `noise_mq`
-  (256 x 256), and `noise_hq` (512 x 512) textures and the sixteen `rand00`-`rand15` (32 x 32)
-  textures are produced deterministically from fixed seeds, so no third party image is
-  bundled and every run yields the same textures. Sampling is bilinear with repeat, clamp, and
-  mirror wrap modes, and generation is lazy so a session that never opens the visualizer
-  allocates nothing. Covered by 10 tests.
-- Milkdrop preset keys now act as the per-frame starting values: every numeric key (including
-  the `nWaveMode`, `bWaveDots`, `bWaveThick`, `bAdditiveWaves`, `bDarkenCenter`,
-  `bMotionVectors`, and `nMotionVectorsX/Y` spellings) seeds the matching variable, so real
-  presets that carry their settings as keys instead of code work as written.
-- The visualizer draws the full Milkdrop wave and post-processing set: the circular, doubled,
-  and single-line wave modes with dots, thick, additive, mystery, and colour/position keys,
-  the four declared waveform slots, the outer and inner borders, a motion-vector grid derived
-  from the actual motion field, and the video echo with its zoom, alpha, and orientation.
-  Covered by 11 tests.
-- The preset engine now runs the full Milkdrop stage order. It parses the `per_frame_init`,
-  `per_pixel_init`, `wave_0`-`wave_3` and `shape_N_init` blocks, registers the complete
-  standard variable set (`bass_att`/`mid_att`/`treb_att`, `aspectx`/`aspecty`,
-  `pixelsx`/`pixelsy`, `monitor`, `zoomexp`, `rot`, `cx`/`cy`, `dx`/`dy`, `sx`/`sy`,
-  `blur1`-`blur3`, `darken_center`, `fGammaAdj`, the wave, border, motion-vector and echo
-  groups, `q1`-`q32`, and `b1`-`b8`), and applies the motion parameters, the blur passes, the
-  centre darkening, and the gamma adjustment. The per-pixel block now sees the already warped
-  sampling position in `x`/`y`/`rad`/`ang`, so a real preset can offset or replace it.
-  Covered by 16 tests.
-- The **Visualisierung** settings section gained an **Always show text and controls** toggle.
-  When it is off, the title, hint, and playback buttons appear only while the mouse moves
-  over the visualizer and hide again after three idle seconds; pointer movement is tracked
-  through the window's own events, so moving the mouse on another monitor never reveals them.
-- Added a **Visualisierung** settings section with the render resolution (320 x 180 up to
-  1280 x 720), the target frame rate (24, 30, 60, or 120), and the user preset folder that
-  previously lived under the output device. The window renders at the configured size and
-  lets the image control scale the frame up, so a lower resolution keeps the CPU cost down.
 
 - Added the authenticated Orynivo Server `/api/library/summary` endpoint and
   client method for compact aggregate Dashboard counts without transferring
   complete track or album rows.
 
-- The karaoke view now highlights the active word of enhanced-LRC lyrics.
-  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
-  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
-  already-sung words keep the accent colour. Plain synchronized lines keep the
-  line-level highlight, so nothing changes for ordinary LRC files.
-- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
-  now stripped from the line text instead of appearing as literal `<00:12.00>`
-  fragments.
-- Added bulk genre editing for the shared Tracks table. The bulk action bar gained
-  a genre field that stores the value for every selected **local** track through
-  `AudioDatabase.SetTrackGenres`, which writes the library-only
-  `track_genre_overrides` table in one transaction and reapplies it on every later
-  scan. Source media files are never modified, and an empty value removes the
-  override so the next scan restores the embedded genre. Selected Orynivo Server
-  tracks are updated on their owning server through the new authenticated
-  `PUT /api/tracks/{id}/genre`, which records the same library-only override.
-- Podcast episodes can be downloaded for offline playback. Episode rows gained a
-  **Download episode** / **Delete download** context menu and a download marker in
-  the status column, playback prefers the cached file, and Settings > Library sets
-  the cache size limit in megabytes. Eviction removes the least recently used
-  downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
-  the most recently used episode is always kept.
 ### Fixed
 
 - Corrected Dashboard library totals to include tracks and albums from all
@@ -6555,97 +1974,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.26.5] - 2026-07-15
 
 ### Added
-- The visualizer's per-pixel path no longer does work the preset never asked for. The compiled
-  programs now report the variables they reference (`PresetProgram.ReferencedVariables` and
-  `Uses`), the warp stage resolves the `x`, `y`, `rad`, and `ang` slots once instead of looking
-  each name up in the layout for every pixel, and it only computes the polar pair, the motion
-  grid, and the seeded sampling position when the preset's own code needs them. A rendered frame
-  is allocation-free, which is now asserted by a test. Covered by 5 tests.
-- The visualizer renders on its own thread now. A frame used to be produced from a
-  `DispatcherTimer`, so a heavy preset blocked the interface for its whole duration; the loop
-  now runs on a background thread, hands a finished copy of the frame to the UI thread through a
-  presentation buffer, and queues at most one present at a time, so a busy interface can never
-  build up a backlog of frames. Preset switching, the reset key, and the overlay follow as
-  thread-safe requests, and the frame pacing lives in the tested `FramePacing` helper. Covered by
-  5 tests.
-- The visualizer now measures where its frame time goes. `PresetRenderer` reports a
-  `RenderTimings` breakdown (warp, blur, post-processing, overlay, composite, comp shaders, and
-  the frame total) per frame and as an average over a window, and the window's diagnostic line in
-  `logs/seek.log` carries those averages once per second, so the cost per stage can be read
-  instead of guessed. A warp shader runs inside the per-pixel loop, so its cost stays part of
-  `warp`; timing it per pixel would cost more than the measurement is worth. The frame budget now
-  compares the complete frame rather than only the shaders. Covered by 8 tests.
-- Milkdrop `.milk` files are read as the multi-preset files they are: `VisualizerPreset.ParseSections`
-  splits the text at its `[presetNN]` headers and the preset folder loads every section as its
-  own preset instead of only the last one surviving. The declared format version
-  (`MILKDROP_PRESET_VERSION`, `PSVERSION`, or `preset_version`) is reported on
-  `VisualizerPreset.Version`; every version is accepted. Skipped presets now carry a reason
-  through `VisualizerPresetLibrary.RejectedReasons`, naming the file or section and the parse
-  error. A hand-written corpus of presets in the real format, including a multi-section file and
-  shader source, guards the format handling; third-party presets stay unbundled because they are
-  licensed by their authors. Covered by 13 tests.
-- The visualizer now runs preset shaders. The numbered `warp_N` and `comp_N` keys are parsed
-  together with their optional `_enabled`, `_per_frame`, and `_per_pixel` companions, and the
-  preset reader keeps the newlines inside a shader's source, because Milkdrop stores the code
-  as a multi-line value. A shader that does not parse is skipped so one broken shader degrades a
-  preset instead of rejecting it. The renderer implements `IShaderSampler`, so shaders can
-  sample `sampler_main`, `sampler_pc_main`, `sampler_fc_main`, `GetBlur1`-`GetBlur3`, and
-  `GetPixel`, and it binds `uv`, `uv_orig`, `texsize`, the audio bands, the smoothed bands, the
-  frame counters, and the aspect ratio. A per-frame time budget (20 ms by default) skips the
-  shaders for a while when they cost too much, so a heavy preset keeps a smooth picture instead
-  of stalling playback. Covered by 11 tests.
-- Added the HLSL interpreter for the shader runtime: `ShaderInterpreter` evaluates the parsed
-  `ps_2_0` tree with scalar and `float2`/`float3`/`float4` values (`ShaderValue`), covering
-  arithmetic with the C precedence, variables and the assignment operators, swizzles read and
-  written, vector constructors with concatenation and broadcast, the ternary operator,
-  `if`/`else`, `for`, and the usual intrinsics (`abs`, `ceil`, `clamp`, `cos`, `dot`, `exp`,
-  `floor`, `frac`, `length`, `lerp`, `log`, `max`, `min`, `mul`, `normalize`, `pow`, `saturate`,
-  `sign`, `sin`, `smoothstep`, `sqrt`, `step`, `tan`). Sampling goes through the
-  `IShaderSampler` contract, so the interpreter carries no render state, and division by zero
-  yields zero instead of an infinity. A loop budget of 4096 iterations and a call depth limit of
-  32 keep a runaway shader from stalling a frame. Covered by 14 tests.
-- Added the HLSL parser and its syntax tree: `ShaderParser` and `ShaderNode` turn the
-  `ps_2_0` subset into a tagged-union tree covering declarations, expression statements,
-  `if`/`else`, `for`, `return`, swizzles, calls, the ternary operator, and the C operator
-  precedence. Function signatures and bare statement bodies are both accepted, and a sampler
-  declaration without a type is tolerated. Covered by 10 tests.
-- Added the HLSL front end for the upcoming shader runtime: `ShaderLexer` tokenizes the
-  `ps_2_0` subset Milkdrop shaders use, covering identifiers and keywords, numbers with their
-  `f`/`h` suffixes, single- and multi-character operators, swizzles, line and block comments,
-  and source positions, and reports an unexpected character with its offset. Covered by
-  10 tests.
-- Added the generated visualizer texture bank. The `noise_lq` (32 x 32), `noise_mq`
-  (256 x 256), and `noise_hq` (512 x 512) textures and the sixteen `rand00`-`rand15` (32 x 32)
-  textures are produced deterministically from fixed seeds, so no third party image is
-  bundled and every run yields the same textures. Sampling is bilinear with repeat, clamp, and
-  mirror wrap modes, and generation is lazy so a session that never opens the visualizer
-  allocates nothing. Covered by 10 tests.
-- Milkdrop preset keys now act as the per-frame starting values: every numeric key (including
-  the `nWaveMode`, `bWaveDots`, `bWaveThick`, `bAdditiveWaves`, `bDarkenCenter`,
-  `bMotionVectors`, and `nMotionVectorsX/Y` spellings) seeds the matching variable, so real
-  presets that carry their settings as keys instead of code work as written.
-- The visualizer draws the full Milkdrop wave and post-processing set: the circular, doubled,
-  and single-line wave modes with dots, thick, additive, mystery, and colour/position keys,
-  the four declared waveform slots, the outer and inner borders, a motion-vector grid derived
-  from the actual motion field, and the video echo with its zoom, alpha, and orientation.
-  Covered by 11 tests.
-- The preset engine now runs the full Milkdrop stage order. It parses the `per_frame_init`,
-  `per_pixel_init`, `wave_0`-`wave_3` and `shape_N_init` blocks, registers the complete
-  standard variable set (`bass_att`/`mid_att`/`treb_att`, `aspectx`/`aspecty`,
-  `pixelsx`/`pixelsy`, `monitor`, `zoomexp`, `rot`, `cx`/`cy`, `dx`/`dy`, `sx`/`sy`,
-  `blur1`-`blur3`, `darken_center`, `fGammaAdj`, the wave, border, motion-vector and echo
-  groups, `q1`-`q32`, and `b1`-`b8`), and applies the motion parameters, the blur passes, the
-  centre darkening, and the gamma adjustment. The per-pixel block now sees the already warped
-  sampling position in `x`/`y`/`rad`/`ang`, so a real preset can offset or replace it.
-  Covered by 16 tests.
-- The **Visualisierung** settings section gained an **Always show text and controls** toggle.
-  When it is off, the title, hint, and playback buttons appear only while the mouse moves
-  over the visualizer and hide again after three idle seconds; pointer movement is tracked
-  through the window's own events, so moving the mouse on another monitor never reveals them.
-- Added a **Visualisierung** settings section with the render resolution (320 x 180 up to
-  1280 x 720), the target frame rate (24, 30, 60, or 120), and the user preset folder that
-  previously lived under the output device. The window renders at the configured size and
-  lets the image control scale the frame up, so a lower resolution keeps the CPU cost down.
 
 - Added an Appearance option for maximized startup; when disabled, Orynivo
   restores the last normal main-window size and on-screen position.
@@ -6653,28 +1981,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   startup update notification to launch the existing verified update flow
   directly.
 
-- The karaoke view now highlights the active word of enhanced-LRC lyrics.
-  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
-  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
-  already-sung words keep the accent colour. Plain synchronized lines keep the
-  line-level highlight, so nothing changes for ordinary LRC files.
-- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
-  now stripped from the line text instead of appearing as literal `<00:12.00>`
-  fragments.
-- Added bulk genre editing for the shared Tracks table. The bulk action bar gained
-  a genre field that stores the value for every selected **local** track through
-  `AudioDatabase.SetTrackGenres`, which writes the library-only
-  `track_genre_overrides` table in one transaction and reapplies it on every later
-  scan. Source media files are never modified, and an empty value removes the
-  override so the next scan restores the embedded genre. Selected Orynivo Server
-  tracks are updated on their owning server through the new authenticated
-  `PUT /api/tracks/{id}/genre`, which records the same library-only override.
-- Podcast episodes can be downloaded for offline playback. Episode rows gained a
-  **Download episode** / **Delete download** context menu and a download marker in
-  the status column, playback prefers the cached file, and Settings > Library sets
-  the cache size limit in megabytes. Eviction removes the least recently used
-  downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
-  the most recently used episode is always kept.
 ### Fixed
 
 - Placed Settings on/off switches immediately before their labels and aligned
@@ -6684,125 +1990,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.26.4] - 2026-07-15
 
 ### Added
-- The visualizer's per-pixel path no longer does work the preset never asked for. The compiled
-  programs now report the variables they reference (`PresetProgram.ReferencedVariables` and
-  `Uses`), the warp stage resolves the `x`, `y`, `rad`, and `ang` slots once instead of looking
-  each name up in the layout for every pixel, and it only computes the polar pair, the motion
-  grid, and the seeded sampling position when the preset's own code needs them. A rendered frame
-  is allocation-free, which is now asserted by a test. Covered by 5 tests.
-- The visualizer renders on its own thread now. A frame used to be produced from a
-  `DispatcherTimer`, so a heavy preset blocked the interface for its whole duration; the loop
-  now runs on a background thread, hands a finished copy of the frame to the UI thread through a
-  presentation buffer, and queues at most one present at a time, so a busy interface can never
-  build up a backlog of frames. Preset switching, the reset key, and the overlay follow as
-  thread-safe requests, and the frame pacing lives in the tested `FramePacing` helper. Covered by
-  5 tests.
-- The visualizer now measures where its frame time goes. `PresetRenderer` reports a
-  `RenderTimings` breakdown (warp, blur, post-processing, overlay, composite, comp shaders, and
-  the frame total) per frame and as an average over a window, and the window's diagnostic line in
-  `logs/seek.log` carries those averages once per second, so the cost per stage can be read
-  instead of guessed. A warp shader runs inside the per-pixel loop, so its cost stays part of
-  `warp`; timing it per pixel would cost more than the measurement is worth. The frame budget now
-  compares the complete frame rather than only the shaders. Covered by 8 tests.
-- Milkdrop `.milk` files are read as the multi-preset files they are: `VisualizerPreset.ParseSections`
-  splits the text at its `[presetNN]` headers and the preset folder loads every section as its
-  own preset instead of only the last one surviving. The declared format version
-  (`MILKDROP_PRESET_VERSION`, `PSVERSION`, or `preset_version`) is reported on
-  `VisualizerPreset.Version`; every version is accepted. Skipped presets now carry a reason
-  through `VisualizerPresetLibrary.RejectedReasons`, naming the file or section and the parse
-  error. A hand-written corpus of presets in the real format, including a multi-section file and
-  shader source, guards the format handling; third-party presets stay unbundled because they are
-  licensed by their authors. Covered by 13 tests.
-- The visualizer now runs preset shaders. The numbered `warp_N` and `comp_N` keys are parsed
-  together with their optional `_enabled`, `_per_frame`, and `_per_pixel` companions, and the
-  preset reader keeps the newlines inside a shader's source, because Milkdrop stores the code
-  as a multi-line value. A shader that does not parse is skipped so one broken shader degrades a
-  preset instead of rejecting it. The renderer implements `IShaderSampler`, so shaders can
-  sample `sampler_main`, `sampler_pc_main`, `sampler_fc_main`, `GetBlur1`-`GetBlur3`, and
-  `GetPixel`, and it binds `uv`, `uv_orig`, `texsize`, the audio bands, the smoothed bands, the
-  frame counters, and the aspect ratio. A per-frame time budget (20 ms by default) skips the
-  shaders for a while when they cost too much, so a heavy preset keeps a smooth picture instead
-  of stalling playback. Covered by 11 tests.
-- Added the HLSL interpreter for the shader runtime: `ShaderInterpreter` evaluates the parsed
-  `ps_2_0` tree with scalar and `float2`/`float3`/`float4` values (`ShaderValue`), covering
-  arithmetic with the C precedence, variables and the assignment operators, swizzles read and
-  written, vector constructors with concatenation and broadcast, the ternary operator,
-  `if`/`else`, `for`, and the usual intrinsics (`abs`, `ceil`, `clamp`, `cos`, `dot`, `exp`,
-  `floor`, `frac`, `length`, `lerp`, `log`, `max`, `min`, `mul`, `normalize`, `pow`, `saturate`,
-  `sign`, `sin`, `smoothstep`, `sqrt`, `step`, `tan`). Sampling goes through the
-  `IShaderSampler` contract, so the interpreter carries no render state, and division by zero
-  yields zero instead of an infinity. A loop budget of 4096 iterations and a call depth limit of
-  32 keep a runaway shader from stalling a frame. Covered by 14 tests.
-- Added the HLSL parser and its syntax tree: `ShaderParser` and `ShaderNode` turn the
-  `ps_2_0` subset into a tagged-union tree covering declarations, expression statements,
-  `if`/`else`, `for`, `return`, swizzles, calls, the ternary operator, and the C operator
-  precedence. Function signatures and bare statement bodies are both accepted, and a sampler
-  declaration without a type is tolerated. Covered by 10 tests.
-- Added the HLSL front end for the upcoming shader runtime: `ShaderLexer` tokenizes the
-  `ps_2_0` subset Milkdrop shaders use, covering identifiers and keywords, numbers with their
-  `f`/`h` suffixes, single- and multi-character operators, swizzles, line and block comments,
-  and source positions, and reports an unexpected character with its offset. Covered by
-  10 tests.
-- Added the generated visualizer texture bank. The `noise_lq` (32 x 32), `noise_mq`
-  (256 x 256), and `noise_hq` (512 x 512) textures and the sixteen `rand00`-`rand15` (32 x 32)
-  textures are produced deterministically from fixed seeds, so no third party image is
-  bundled and every run yields the same textures. Sampling is bilinear with repeat, clamp, and
-  mirror wrap modes, and generation is lazy so a session that never opens the visualizer
-  allocates nothing. Covered by 10 tests.
-- Milkdrop preset keys now act as the per-frame starting values: every numeric key (including
-  the `nWaveMode`, `bWaveDots`, `bWaveThick`, `bAdditiveWaves`, `bDarkenCenter`,
-  `bMotionVectors`, and `nMotionVectorsX/Y` spellings) seeds the matching variable, so real
-  presets that carry their settings as keys instead of code work as written.
-- The visualizer draws the full Milkdrop wave and post-processing set: the circular, doubled,
-  and single-line wave modes with dots, thick, additive, mystery, and colour/position keys,
-  the four declared waveform slots, the outer and inner borders, a motion-vector grid derived
-  from the actual motion field, and the video echo with its zoom, alpha, and orientation.
-  Covered by 11 tests.
-- The preset engine now runs the full Milkdrop stage order. It parses the `per_frame_init`,
-  `per_pixel_init`, `wave_0`-`wave_3` and `shape_N_init` blocks, registers the complete
-  standard variable set (`bass_att`/`mid_att`/`treb_att`, `aspectx`/`aspecty`,
-  `pixelsx`/`pixelsy`, `monitor`, `zoomexp`, `rot`, `cx`/`cy`, `dx`/`dy`, `sx`/`sy`,
-  `blur1`-`blur3`, `darken_center`, `fGammaAdj`, the wave, border, motion-vector and echo
-  groups, `q1`-`q32`, and `b1`-`b8`), and applies the motion parameters, the blur passes, the
-  centre darkening, and the gamma adjustment. The per-pixel block now sees the already warped
-  sampling position in `x`/`y`/`rad`/`ang`, so a real preset can offset or replace it.
-  Covered by 16 tests.
-- The **Visualisierung** settings section gained an **Always show text and controls** toggle.
-  When it is off, the title, hint, and playback buttons appear only while the mouse moves
-  over the visualizer and hide again after three idle seconds; pointer movement is tracked
-  through the window's own events, so moving the mouse on another monitor never reveals them.
-- Added a **Visualisierung** settings section with the render resolution (320 x 180 up to
-  1280 x 720), the target frame rate (24, 30, 60, or 120), and the user preset folder that
-  previously lived under the output device. The window renders at the configured size and
-  lets the image control scale the frame up, so a lower resolution keeps the CPU cost down.
 
 - Added a Playback setting to make automatic FFmpeg calculation of missing
   ReplayGain values during library scans optional and disabled by default;
   embedded ReplayGain tags are still imported and manual calculation remains
   available.
 
-- The karaoke view now highlights the active word of enhanced-LRC lyrics.
-  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
-  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
-  already-sung words keep the accent colour. Plain synchronized lines keep the
-  line-level highlight, so nothing changes for ordinary LRC files.
-- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
-  now stripped from the line text instead of appearing as literal `<00:12.00>`
-  fragments.
-- Added bulk genre editing for the shared Tracks table. The bulk action bar gained
-  a genre field that stores the value for every selected **local** track through
-  `AudioDatabase.SetTrackGenres`, which writes the library-only
-  `track_genre_overrides` table in one transaction and reapplies it on every later
-  scan. Source media files are never modified, and an empty value removes the
-  override so the next scan restores the embedded genre. Selected Orynivo Server
-  tracks are updated on their owning server through the new authenticated
-  `PUT /api/tracks/{id}/genre`, which records the same library-only override.
-- Podcast episodes can be downloaded for offline playback. Episode rows gained a
-  **Download episode** / **Delete download** context menu and a download marker in
-  the status column, playback prefers the cached file, and Settings > Library sets
-  the cache size limit in megabytes. Eviction removes the least recently used
-  downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
-  the most recently used episode is always kept.
 ### Fixed
 
 - Removed the standalone cyan scan-activity dot from the sidebar while retaining
@@ -6811,131 +2004,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.26.3] - 2026-07-15
 
 ### Added
-- The visualizer's per-pixel path no longer does work the preset never asked for. The compiled
-  programs now report the variables they reference (`PresetProgram.ReferencedVariables` and
-  `Uses`), the warp stage resolves the `x`, `y`, `rad`, and `ang` slots once instead of looking
-  each name up in the layout for every pixel, and it only computes the polar pair, the motion
-  grid, and the seeded sampling position when the preset's own code needs them. A rendered frame
-  is allocation-free, which is now asserted by a test. Covered by 5 tests.
-- The visualizer renders on its own thread now. A frame used to be produced from a
-  `DispatcherTimer`, so a heavy preset blocked the interface for its whole duration; the loop
-  now runs on a background thread, hands a finished copy of the frame to the UI thread through a
-  presentation buffer, and queues at most one present at a time, so a busy interface can never
-  build up a backlog of frames. Preset switching, the reset key, and the overlay follow as
-  thread-safe requests, and the frame pacing lives in the tested `FramePacing` helper. Covered by
-  5 tests.
-- The visualizer now measures where its frame time goes. `PresetRenderer` reports a
-  `RenderTimings` breakdown (warp, blur, post-processing, overlay, composite, comp shaders, and
-  the frame total) per frame and as an average over a window, and the window's diagnostic line in
-  `logs/seek.log` carries those averages once per second, so the cost per stage can be read
-  instead of guessed. A warp shader runs inside the per-pixel loop, so its cost stays part of
-  `warp`; timing it per pixel would cost more than the measurement is worth. The frame budget now
-  compares the complete frame rather than only the shaders. Covered by 8 tests.
-- Milkdrop `.milk` files are read as the multi-preset files they are: `VisualizerPreset.ParseSections`
-  splits the text at its `[presetNN]` headers and the preset folder loads every section as its
-  own preset instead of only the last one surviving. The declared format version
-  (`MILKDROP_PRESET_VERSION`, `PSVERSION`, or `preset_version`) is reported on
-  `VisualizerPreset.Version`; every version is accepted. Skipped presets now carry a reason
-  through `VisualizerPresetLibrary.RejectedReasons`, naming the file or section and the parse
-  error. A hand-written corpus of presets in the real format, including a multi-section file and
-  shader source, guards the format handling; third-party presets stay unbundled because they are
-  licensed by their authors. Covered by 13 tests.
-- The visualizer now runs preset shaders. The numbered `warp_N` and `comp_N` keys are parsed
-  together with their optional `_enabled`, `_per_frame`, and `_per_pixel` companions, and the
-  preset reader keeps the newlines inside a shader's source, because Milkdrop stores the code
-  as a multi-line value. A shader that does not parse is skipped so one broken shader degrades a
-  preset instead of rejecting it. The renderer implements `IShaderSampler`, so shaders can
-  sample `sampler_main`, `sampler_pc_main`, `sampler_fc_main`, `GetBlur1`-`GetBlur3`, and
-  `GetPixel`, and it binds `uv`, `uv_orig`, `texsize`, the audio bands, the smoothed bands, the
-  frame counters, and the aspect ratio. A per-frame time budget (20 ms by default) skips the
-  shaders for a while when they cost too much, so a heavy preset keeps a smooth picture instead
-  of stalling playback. Covered by 11 tests.
-- Added the HLSL interpreter for the shader runtime: `ShaderInterpreter` evaluates the parsed
-  `ps_2_0` tree with scalar and `float2`/`float3`/`float4` values (`ShaderValue`), covering
-  arithmetic with the C precedence, variables and the assignment operators, swizzles read and
-  written, vector constructors with concatenation and broadcast, the ternary operator,
-  `if`/`else`, `for`, and the usual intrinsics (`abs`, `ceil`, `clamp`, `cos`, `dot`, `exp`,
-  `floor`, `frac`, `length`, `lerp`, `log`, `max`, `min`, `mul`, `normalize`, `pow`, `saturate`,
-  `sign`, `sin`, `smoothstep`, `sqrt`, `step`, `tan`). Sampling goes through the
-  `IShaderSampler` contract, so the interpreter carries no render state, and division by zero
-  yields zero instead of an infinity. A loop budget of 4096 iterations and a call depth limit of
-  32 keep a runaway shader from stalling a frame. Covered by 14 tests.
-- Added the HLSL parser and its syntax tree: `ShaderParser` and `ShaderNode` turn the
-  `ps_2_0` subset into a tagged-union tree covering declarations, expression statements,
-  `if`/`else`, `for`, `return`, swizzles, calls, the ternary operator, and the C operator
-  precedence. Function signatures and bare statement bodies are both accepted, and a sampler
-  declaration without a type is tolerated. Covered by 10 tests.
-- Added the HLSL front end for the upcoming shader runtime: `ShaderLexer` tokenizes the
-  `ps_2_0` subset Milkdrop shaders use, covering identifiers and keywords, numbers with their
-  `f`/`h` suffixes, single- and multi-character operators, swizzles, line and block comments,
-  and source positions, and reports an unexpected character with its offset. Covered by
-  10 tests.
-- Added the generated visualizer texture bank. The `noise_lq` (32 x 32), `noise_mq`
-  (256 x 256), and `noise_hq` (512 x 512) textures and the sixteen `rand00`-`rand15` (32 x 32)
-  textures are produced deterministically from fixed seeds, so no third party image is
-  bundled and every run yields the same textures. Sampling is bilinear with repeat, clamp, and
-  mirror wrap modes, and generation is lazy so a session that never opens the visualizer
-  allocates nothing. Covered by 10 tests.
-- Milkdrop preset keys now act as the per-frame starting values: every numeric key (including
-  the `nWaveMode`, `bWaveDots`, `bWaveThick`, `bAdditiveWaves`, `bDarkenCenter`,
-  `bMotionVectors`, and `nMotionVectorsX/Y` spellings) seeds the matching variable, so real
-  presets that carry their settings as keys instead of code work as written.
-- The visualizer draws the full Milkdrop wave and post-processing set: the circular, doubled,
-  and single-line wave modes with dots, thick, additive, mystery, and colour/position keys,
-  the four declared waveform slots, the outer and inner borders, a motion-vector grid derived
-  from the actual motion field, and the video echo with its zoom, alpha, and orientation.
-  Covered by 11 tests.
-- The preset engine now runs the full Milkdrop stage order. It parses the `per_frame_init`,
-  `per_pixel_init`, `wave_0`-`wave_3` and `shape_N_init` blocks, registers the complete
-  standard variable set (`bass_att`/`mid_att`/`treb_att`, `aspectx`/`aspecty`,
-  `pixelsx`/`pixelsy`, `monitor`, `zoomexp`, `rot`, `cx`/`cy`, `dx`/`dy`, `sx`/`sy`,
-  `blur1`-`blur3`, `darken_center`, `fGammaAdj`, the wave, border, motion-vector and echo
-  groups, `q1`-`q32`, and `b1`-`b8`), and applies the motion parameters, the blur passes, the
-  centre darkening, and the gamma adjustment. The per-pixel block now sees the already warped
-  sampling position in `x`/`y`/`rad`/`ang`, so a real preset can offset or replace it.
-  Covered by 16 tests.
-- The **Visualisierung** settings section gained an **Always show text and controls** toggle.
-  When it is off, the title, hint, and playback buttons appear only while the mouse moves
-  over the visualizer and hide again after three idle seconds; pointer movement is tracked
-  through the window's own events, so moving the mouse on another monitor never reveals them.
-- Added a **Visualisierung** settings section with the render resolution (320 x 180 up to
-  1280 x 720), the target frame rate (24, 30, 60, or 120), and the user preset folder that
-  previously lived under the output device. The window renders at the configured size and
-  lets the image control scale the frame up, so a lower resolution keeps the CPU cost down.
 
 - Desktop updates now relay the same signed release to every reachable,
   update-enabled Orynivo Server before launching the Windows installer; failed
   servers are named and the user can explicitly continue the desktop update.
 
-- The karaoke view now highlights the active word of enhanced-LRC lyrics.
-  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
-  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
-  already-sung words keep the accent colour. Plain synchronized lines keep the
-  line-level highlight, so nothing changes for ordinary LRC files.
-- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
-  now stripped from the line text instead of appearing as literal `<00:12.00>`
-  fragments.
-- Added bulk genre editing for the shared Tracks table. The bulk action bar gained
-  a genre field that stores the value for every selected **local** track through
-  `AudioDatabase.SetTrackGenres`, which writes the library-only
-  `track_genre_overrides` table in one transaction and reapplies it on every later
-  scan. Source media files are never modified, and an empty value removes the
-  override so the next scan restores the embedded genre. Selected Orynivo Server
-  tracks are updated on their owning server through the new authenticated
-  `PUT /api/tracks/{id}/genre`, which records the same library-only override.
-- Podcast episodes can be downloaded for offline playback. Episode rows gained a
-  **Download episode** / **Delete download** context menu and a download marker in
-  the status column, playback prefers the cached file, and Settings > Library sets
-  the cache size limit in megabytes. Eviction removes the least recently used
-  downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
-  the most recently used episode is always kept.
 ### Fixed
 
 - Allowed signed server-update bundles up to the endpoint's verified one-GiB
   safety limit instead of Kestrel's default request limit rejecting current
   packages, and surfaced HTTP rejection codes in Settings.
-- Removed the standalone cyan scan-activity dot from the sidebar while retaining
-  the textual scan-progress indicator.
 - Applied Kestrel's global request-body limit again after layering the editable
   Linux configuration, so `Kestrel:Limits:MaxRequestBodySize` from
   `/etc/orynivo-server/appsettings.json` is actually honoured.
@@ -6943,124 +2021,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.26.2] - 2026-07-15
 
 ### Added
-- The visualizer's per-pixel path no longer does work the preset never asked for. The compiled
-  programs now report the variables they reference (`PresetProgram.ReferencedVariables` and
-  `Uses`), the warp stage resolves the `x`, `y`, `rad`, and `ang` slots once instead of looking
-  each name up in the layout for every pixel, and it only computes the polar pair, the motion
-  grid, and the seeded sampling position when the preset's own code needs them. A rendered frame
-  is allocation-free, which is now asserted by a test. Covered by 5 tests.
-- The visualizer renders on its own thread now. A frame used to be produced from a
-  `DispatcherTimer`, so a heavy preset blocked the interface for its whole duration; the loop
-  now runs on a background thread, hands a finished copy of the frame to the UI thread through a
-  presentation buffer, and queues at most one present at a time, so a busy interface can never
-  build up a backlog of frames. Preset switching, the reset key, and the overlay follow as
-  thread-safe requests, and the frame pacing lives in the tested `FramePacing` helper. Covered by
-  5 tests.
-- The visualizer now measures where its frame time goes. `PresetRenderer` reports a
-  `RenderTimings` breakdown (warp, blur, post-processing, overlay, composite, comp shaders, and
-  the frame total) per frame and as an average over a window, and the window's diagnostic line in
-  `logs/seek.log` carries those averages once per second, so the cost per stage can be read
-  instead of guessed. A warp shader runs inside the per-pixel loop, so its cost stays part of
-  `warp`; timing it per pixel would cost more than the measurement is worth. The frame budget now
-  compares the complete frame rather than only the shaders. Covered by 8 tests.
-- Milkdrop `.milk` files are read as the multi-preset files they are: `VisualizerPreset.ParseSections`
-  splits the text at its `[presetNN]` headers and the preset folder loads every section as its
-  own preset instead of only the last one surviving. The declared format version
-  (`MILKDROP_PRESET_VERSION`, `PSVERSION`, or `preset_version`) is reported on
-  `VisualizerPreset.Version`; every version is accepted. Skipped presets now carry a reason
-  through `VisualizerPresetLibrary.RejectedReasons`, naming the file or section and the parse
-  error. A hand-written corpus of presets in the real format, including a multi-section file and
-  shader source, guards the format handling; third-party presets stay unbundled because they are
-  licensed by their authors. Covered by 13 tests.
-- The visualizer now runs preset shaders. The numbered `warp_N` and `comp_N` keys are parsed
-  together with their optional `_enabled`, `_per_frame`, and `_per_pixel` companions, and the
-  preset reader keeps the newlines inside a shader's source, because Milkdrop stores the code
-  as a multi-line value. A shader that does not parse is skipped so one broken shader degrades a
-  preset instead of rejecting it. The renderer implements `IShaderSampler`, so shaders can
-  sample `sampler_main`, `sampler_pc_main`, `sampler_fc_main`, `GetBlur1`-`GetBlur3`, and
-  `GetPixel`, and it binds `uv`, `uv_orig`, `texsize`, the audio bands, the smoothed bands, the
-  frame counters, and the aspect ratio. A per-frame time budget (20 ms by default) skips the
-  shaders for a while when they cost too much, so a heavy preset keeps a smooth picture instead
-  of stalling playback. Covered by 11 tests.
-- Added the HLSL interpreter for the shader runtime: `ShaderInterpreter` evaluates the parsed
-  `ps_2_0` tree with scalar and `float2`/`float3`/`float4` values (`ShaderValue`), covering
-  arithmetic with the C precedence, variables and the assignment operators, swizzles read and
-  written, vector constructors with concatenation and broadcast, the ternary operator,
-  `if`/`else`, `for`, and the usual intrinsics (`abs`, `ceil`, `clamp`, `cos`, `dot`, `exp`,
-  `floor`, `frac`, `length`, `lerp`, `log`, `max`, `min`, `mul`, `normalize`, `pow`, `saturate`,
-  `sign`, `sin`, `smoothstep`, `sqrt`, `step`, `tan`). Sampling goes through the
-  `IShaderSampler` contract, so the interpreter carries no render state, and division by zero
-  yields zero instead of an infinity. A loop budget of 4096 iterations and a call depth limit of
-  32 keep a runaway shader from stalling a frame. Covered by 14 tests.
-- Added the HLSL parser and its syntax tree: `ShaderParser` and `ShaderNode` turn the
-  `ps_2_0` subset into a tagged-union tree covering declarations, expression statements,
-  `if`/`else`, `for`, `return`, swizzles, calls, the ternary operator, and the C operator
-  precedence. Function signatures and bare statement bodies are both accepted, and a sampler
-  declaration without a type is tolerated. Covered by 10 tests.
-- Added the HLSL front end for the upcoming shader runtime: `ShaderLexer` tokenizes the
-  `ps_2_0` subset Milkdrop shaders use, covering identifiers and keywords, numbers with their
-  `f`/`h` suffixes, single- and multi-character operators, swizzles, line and block comments,
-  and source positions, and reports an unexpected character with its offset. Covered by
-  10 tests.
-- Added the generated visualizer texture bank. The `noise_lq` (32 x 32), `noise_mq`
-  (256 x 256), and `noise_hq` (512 x 512) textures and the sixteen `rand00`-`rand15` (32 x 32)
-  textures are produced deterministically from fixed seeds, so no third party image is
-  bundled and every run yields the same textures. Sampling is bilinear with repeat, clamp, and
-  mirror wrap modes, and generation is lazy so a session that never opens the visualizer
-  allocates nothing. Covered by 10 tests.
-- Milkdrop preset keys now act as the per-frame starting values: every numeric key (including
-  the `nWaveMode`, `bWaveDots`, `bWaveThick`, `bAdditiveWaves`, `bDarkenCenter`,
-  `bMotionVectors`, and `nMotionVectorsX/Y` spellings) seeds the matching variable, so real
-  presets that carry their settings as keys instead of code work as written.
-- The visualizer draws the full Milkdrop wave and post-processing set: the circular, doubled,
-  and single-line wave modes with dots, thick, additive, mystery, and colour/position keys,
-  the four declared waveform slots, the outer and inner borders, a motion-vector grid derived
-  from the actual motion field, and the video echo with its zoom, alpha, and orientation.
-  Covered by 11 tests.
-- The preset engine now runs the full Milkdrop stage order. It parses the `per_frame_init`,
-  `per_pixel_init`, `wave_0`-`wave_3` and `shape_N_init` blocks, registers the complete
-  standard variable set (`bass_att`/`mid_att`/`treb_att`, `aspectx`/`aspecty`,
-  `pixelsx`/`pixelsy`, `monitor`, `zoomexp`, `rot`, `cx`/`cy`, `dx`/`dy`, `sx`/`sy`,
-  `blur1`-`blur3`, `darken_center`, `fGammaAdj`, the wave, border, motion-vector and echo
-  groups, `q1`-`q32`, and `b1`-`b8`), and applies the motion parameters, the blur passes, the
-  centre darkening, and the gamma adjustment. The per-pixel block now sees the already warped
-  sampling position in `x`/`y`/`rad`/`ang`, so a real preset can offset or replace it.
-  Covered by 16 tests.
-- The **Visualisierung** settings section gained an **Always show text and controls** toggle.
-  When it is off, the title, hint, and playback buttons appear only while the mouse moves
-  over the visualizer and hide again after three idle seconds; pointer movement is tracked
-  through the window's own events, so moving the mouse on another monitor never reveals them.
-- Added a **Visualisierung** settings section with the render resolution (320 x 180 up to
-  1280 x 720), the target frame rate (24, 30, 60, or 120), and the user preset folder that
-  previously lived under the output device. The window renders at the configured size and
-  lets the image control scale the frame up, so a lower resolution keeps the CPU cost down.
 
 - Added an Appearance setting that optionally checks the signed GitHub Release
   manifest in the background at application startup and notifies the user when
   a newer Windows version is available.
 
-- The karaoke view now highlights the active word of enhanced-LRC lyrics.
-  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
-  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
-  already-sung words keep the accent colour. Plain synchronized lines keep the
-  line-level highlight, so nothing changes for ordinary LRC files.
-- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
-  now stripped from the line text instead of appearing as literal `<00:12.00>`
-  fragments.
-- Added bulk genre editing for the shared Tracks table. The bulk action bar gained
-  a genre field that stores the value for every selected **local** track through
-  `AudioDatabase.SetTrackGenres`, which writes the library-only
-  `track_genre_overrides` table in one transaction and reapplies it on every later
-  scan. Source media files are never modified, and an empty value removes the
-  override so the next scan restores the embedded genre. Selected Orynivo Server
-  tracks are updated on their owning server through the new authenticated
-  `PUT /api/tracks/{id}/genre`, which records the same library-only override.
-- Podcast episodes can be downloaded for offline playback. Episode rows gained a
-  **Download episode** / **Delete download** context menu and a download marker in
-  the status column, playback prefers the cached file, and Settings > Library sets
-  the cache size limit in megabytes. Eviction removes the least recently used
-  downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
-  the most recently used episode is always kept.
 ### Fixed
 
 - Prevented publication of incomplete signed update manifests by waiting for
@@ -7075,28 +2040,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   and favorite vector icons used by navigation, while retaining each tile's
   colored circular badge.
 
-- The karaoke view now highlights the active word of enhanced-LRC lyrics.
-  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
-  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
-  already-sung words keep the accent colour. Plain synchronized lines keep the
-  line-level highlight, so nothing changes for ordinary LRC files.
-- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
-  now stripped from the line text instead of appearing as literal `<00:12.00>`
-  fragments.
-- Added bulk genre editing for the shared Tracks table. The bulk action bar gained
-  a genre field that stores the value for every selected **local** track through
-  `AudioDatabase.SetTrackGenres`, which writes the library-only
-  `track_genre_overrides` table in one transaction and reapplies it on every later
-  scan. Source media files are never modified, and an empty value removes the
-  override so the next scan restores the embedded genre. Selected Orynivo Server
-  tracks are updated on their owning server through the new authenticated
-  `PUT /api/tracks/{id}/genre`, which records the same library-only override.
-- Podcast episodes can be downloaded for offline playback. Episode rows gained a
-  **Download episode** / **Delete download** context menu and a download marker in
-  the status column, playback prefers the cached file, and Settings > Library sets
-  the cache size limit in megabytes. Eviction removes the least recently used
-  downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
-  the most recently used episode is always kept.
 ### Fixed
 
 - Enlarged the About window, placed its proportionally filled logo in a compact
@@ -7111,97 +2054,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.26.0] - 2026-07-15
 
 ### Added
-- The visualizer's per-pixel path no longer does work the preset never asked for. The compiled
-  programs now report the variables they reference (`PresetProgram.ReferencedVariables` and
-  `Uses`), the warp stage resolves the `x`, `y`, `rad`, and `ang` slots once instead of looking
-  each name up in the layout for every pixel, and it only computes the polar pair, the motion
-  grid, and the seeded sampling position when the preset's own code needs them. A rendered frame
-  is allocation-free, which is now asserted by a test. Covered by 5 tests.
-- The visualizer renders on its own thread now. A frame used to be produced from a
-  `DispatcherTimer`, so a heavy preset blocked the interface for its whole duration; the loop
-  now runs on a background thread, hands a finished copy of the frame to the UI thread through a
-  presentation buffer, and queues at most one present at a time, so a busy interface can never
-  build up a backlog of frames. Preset switching, the reset key, and the overlay follow as
-  thread-safe requests, and the frame pacing lives in the tested `FramePacing` helper. Covered by
-  5 tests.
-- The visualizer now measures where its frame time goes. `PresetRenderer` reports a
-  `RenderTimings` breakdown (warp, blur, post-processing, overlay, composite, comp shaders, and
-  the frame total) per frame and as an average over a window, and the window's diagnostic line in
-  `logs/seek.log` carries those averages once per second, so the cost per stage can be read
-  instead of guessed. A warp shader runs inside the per-pixel loop, so its cost stays part of
-  `warp`; timing it per pixel would cost more than the measurement is worth. The frame budget now
-  compares the complete frame rather than only the shaders. Covered by 8 tests.
-- Milkdrop `.milk` files are read as the multi-preset files they are: `VisualizerPreset.ParseSections`
-  splits the text at its `[presetNN]` headers and the preset folder loads every section as its
-  own preset instead of only the last one surviving. The declared format version
-  (`MILKDROP_PRESET_VERSION`, `PSVERSION`, or `preset_version`) is reported on
-  `VisualizerPreset.Version`; every version is accepted. Skipped presets now carry a reason
-  through `VisualizerPresetLibrary.RejectedReasons`, naming the file or section and the parse
-  error. A hand-written corpus of presets in the real format, including a multi-section file and
-  shader source, guards the format handling; third-party presets stay unbundled because they are
-  licensed by their authors. Covered by 13 tests.
-- The visualizer now runs preset shaders. The numbered `warp_N` and `comp_N` keys are parsed
-  together with their optional `_enabled`, `_per_frame`, and `_per_pixel` companions, and the
-  preset reader keeps the newlines inside a shader's source, because Milkdrop stores the code
-  as a multi-line value. A shader that does not parse is skipped so one broken shader degrades a
-  preset instead of rejecting it. The renderer implements `IShaderSampler`, so shaders can
-  sample `sampler_main`, `sampler_pc_main`, `sampler_fc_main`, `GetBlur1`-`GetBlur3`, and
-  `GetPixel`, and it binds `uv`, `uv_orig`, `texsize`, the audio bands, the smoothed bands, the
-  frame counters, and the aspect ratio. A per-frame time budget (20 ms by default) skips the
-  shaders for a while when they cost too much, so a heavy preset keeps a smooth picture instead
-  of stalling playback. Covered by 11 tests.
-- Added the HLSL interpreter for the shader runtime: `ShaderInterpreter` evaluates the parsed
-  `ps_2_0` tree with scalar and `float2`/`float3`/`float4` values (`ShaderValue`), covering
-  arithmetic with the C precedence, variables and the assignment operators, swizzles read and
-  written, vector constructors with concatenation and broadcast, the ternary operator,
-  `if`/`else`, `for`, and the usual intrinsics (`abs`, `ceil`, `clamp`, `cos`, `dot`, `exp`,
-  `floor`, `frac`, `length`, `lerp`, `log`, `max`, `min`, `mul`, `normalize`, `pow`, `saturate`,
-  `sign`, `sin`, `smoothstep`, `sqrt`, `step`, `tan`). Sampling goes through the
-  `IShaderSampler` contract, so the interpreter carries no render state, and division by zero
-  yields zero instead of an infinity. A loop budget of 4096 iterations and a call depth limit of
-  32 keep a runaway shader from stalling a frame. Covered by 14 tests.
-- Added the HLSL parser and its syntax tree: `ShaderParser` and `ShaderNode` turn the
-  `ps_2_0` subset into a tagged-union tree covering declarations, expression statements,
-  `if`/`else`, `for`, `return`, swizzles, calls, the ternary operator, and the C operator
-  precedence. Function signatures and bare statement bodies are both accepted, and a sampler
-  declaration without a type is tolerated. Covered by 10 tests.
-- Added the HLSL front end for the upcoming shader runtime: `ShaderLexer` tokenizes the
-  `ps_2_0` subset Milkdrop shaders use, covering identifiers and keywords, numbers with their
-  `f`/`h` suffixes, single- and multi-character operators, swizzles, line and block comments,
-  and source positions, and reports an unexpected character with its offset. Covered by
-  10 tests.
-- Added the generated visualizer texture bank. The `noise_lq` (32 x 32), `noise_mq`
-  (256 x 256), and `noise_hq` (512 x 512) textures and the sixteen `rand00`-`rand15` (32 x 32)
-  textures are produced deterministically from fixed seeds, so no third party image is
-  bundled and every run yields the same textures. Sampling is bilinear with repeat, clamp, and
-  mirror wrap modes, and generation is lazy so a session that never opens the visualizer
-  allocates nothing. Covered by 10 tests.
-- Milkdrop preset keys now act as the per-frame starting values: every numeric key (including
-  the `nWaveMode`, `bWaveDots`, `bWaveThick`, `bAdditiveWaves`, `bDarkenCenter`,
-  `bMotionVectors`, and `nMotionVectorsX/Y` spellings) seeds the matching variable, so real
-  presets that carry their settings as keys instead of code work as written.
-- The visualizer draws the full Milkdrop wave and post-processing set: the circular, doubled,
-  and single-line wave modes with dots, thick, additive, mystery, and colour/position keys,
-  the four declared waveform slots, the outer and inner borders, a motion-vector grid derived
-  from the actual motion field, and the video echo with its zoom, alpha, and orientation.
-  Covered by 11 tests.
-- The preset engine now runs the full Milkdrop stage order. It parses the `per_frame_init`,
-  `per_pixel_init`, `wave_0`-`wave_3` and `shape_N_init` blocks, registers the complete
-  standard variable set (`bass_att`/`mid_att`/`treb_att`, `aspectx`/`aspecty`,
-  `pixelsx`/`pixelsy`, `monitor`, `zoomexp`, `rot`, `cx`/`cy`, `dx`/`dy`, `sx`/`sy`,
-  `blur1`-`blur3`, `darken_center`, `fGammaAdj`, the wave, border, motion-vector and echo
-  groups, `q1`-`q32`, and `b1`-`b8`), and applies the motion parameters, the blur passes, the
-  centre darkening, and the gamma adjustment. The per-pixel block now sees the already warped
-  sampling position in `x`/`y`/`rad`/`ang`, so a real preset can offset or replace it.
-  Covered by 16 tests.
-- The **Visualisierung** settings section gained an **Always show text and controls** toggle.
-  When it is off, the title, hint, and playback buttons appear only while the mouse moves
-  over the visualizer and hide again after three idle seconds; pointer movement is tracked
-  through the window's own events, so moving the mouse on another monitor never reveals them.
-- Added a **Visualisierung** settings section with the render resolution (320 x 180 up to
-  1280 x 720), the target frame rate (24, 30, 60, or 120), and the user preset folder that
-  previously lived under the output device. The window renders at the configured size and
-  lets the image control scale the frame up, so a lower resolution keeps the CPU cost down.
 
 - Added build-time desktop/server version reporting and signed GitHub Release
   updates. The About window can check, verify, download, and launch a newer
@@ -7228,97 +2080,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.25.0] - 2026-07-15
 
 ### Added
-- The visualizer's per-pixel path no longer does work the preset never asked for. The compiled
-  programs now report the variables they reference (`PresetProgram.ReferencedVariables` and
-  `Uses`), the warp stage resolves the `x`, `y`, `rad`, and `ang` slots once instead of looking
-  each name up in the layout for every pixel, and it only computes the polar pair, the motion
-  grid, and the seeded sampling position when the preset's own code needs them. A rendered frame
-  is allocation-free, which is now asserted by a test. Covered by 5 tests.
-- The visualizer renders on its own thread now. A frame used to be produced from a
-  `DispatcherTimer`, so a heavy preset blocked the interface for its whole duration; the loop
-  now runs on a background thread, hands a finished copy of the frame to the UI thread through a
-  presentation buffer, and queues at most one present at a time, so a busy interface can never
-  build up a backlog of frames. Preset switching, the reset key, and the overlay follow as
-  thread-safe requests, and the frame pacing lives in the tested `FramePacing` helper. Covered by
-  5 tests.
-- The visualizer now measures where its frame time goes. `PresetRenderer` reports a
-  `RenderTimings` breakdown (warp, blur, post-processing, overlay, composite, comp shaders, and
-  the frame total) per frame and as an average over a window, and the window's diagnostic line in
-  `logs/seek.log` carries those averages once per second, so the cost per stage can be read
-  instead of guessed. A warp shader runs inside the per-pixel loop, so its cost stays part of
-  `warp`; timing it per pixel would cost more than the measurement is worth. The frame budget now
-  compares the complete frame rather than only the shaders. Covered by 8 tests.
-- Milkdrop `.milk` files are read as the multi-preset files they are: `VisualizerPreset.ParseSections`
-  splits the text at its `[presetNN]` headers and the preset folder loads every section as its
-  own preset instead of only the last one surviving. The declared format version
-  (`MILKDROP_PRESET_VERSION`, `PSVERSION`, or `preset_version`) is reported on
-  `VisualizerPreset.Version`; every version is accepted. Skipped presets now carry a reason
-  through `VisualizerPresetLibrary.RejectedReasons`, naming the file or section and the parse
-  error. A hand-written corpus of presets in the real format, including a multi-section file and
-  shader source, guards the format handling; third-party presets stay unbundled because they are
-  licensed by their authors. Covered by 13 tests.
-- The visualizer now runs preset shaders. The numbered `warp_N` and `comp_N` keys are parsed
-  together with their optional `_enabled`, `_per_frame`, and `_per_pixel` companions, and the
-  preset reader keeps the newlines inside a shader's source, because Milkdrop stores the code
-  as a multi-line value. A shader that does not parse is skipped so one broken shader degrades a
-  preset instead of rejecting it. The renderer implements `IShaderSampler`, so shaders can
-  sample `sampler_main`, `sampler_pc_main`, `sampler_fc_main`, `GetBlur1`-`GetBlur3`, and
-  `GetPixel`, and it binds `uv`, `uv_orig`, `texsize`, the audio bands, the smoothed bands, the
-  frame counters, and the aspect ratio. A per-frame time budget (20 ms by default) skips the
-  shaders for a while when they cost too much, so a heavy preset keeps a smooth picture instead
-  of stalling playback. Covered by 11 tests.
-- Added the HLSL interpreter for the shader runtime: `ShaderInterpreter` evaluates the parsed
-  `ps_2_0` tree with scalar and `float2`/`float3`/`float4` values (`ShaderValue`), covering
-  arithmetic with the C precedence, variables and the assignment operators, swizzles read and
-  written, vector constructors with concatenation and broadcast, the ternary operator,
-  `if`/`else`, `for`, and the usual intrinsics (`abs`, `ceil`, `clamp`, `cos`, `dot`, `exp`,
-  `floor`, `frac`, `length`, `lerp`, `log`, `max`, `min`, `mul`, `normalize`, `pow`, `saturate`,
-  `sign`, `sin`, `smoothstep`, `sqrt`, `step`, `tan`). Sampling goes through the
-  `IShaderSampler` contract, so the interpreter carries no render state, and division by zero
-  yields zero instead of an infinity. A loop budget of 4096 iterations and a call depth limit of
-  32 keep a runaway shader from stalling a frame. Covered by 14 tests.
-- Added the HLSL parser and its syntax tree: `ShaderParser` and `ShaderNode` turn the
-  `ps_2_0` subset into a tagged-union tree covering declarations, expression statements,
-  `if`/`else`, `for`, `return`, swizzles, calls, the ternary operator, and the C operator
-  precedence. Function signatures and bare statement bodies are both accepted, and a sampler
-  declaration without a type is tolerated. Covered by 10 tests.
-- Added the HLSL front end for the upcoming shader runtime: `ShaderLexer` tokenizes the
-  `ps_2_0` subset Milkdrop shaders use, covering identifiers and keywords, numbers with their
-  `f`/`h` suffixes, single- and multi-character operators, swizzles, line and block comments,
-  and source positions, and reports an unexpected character with its offset. Covered by
-  10 tests.
-- Added the generated visualizer texture bank. The `noise_lq` (32 x 32), `noise_mq`
-  (256 x 256), and `noise_hq` (512 x 512) textures and the sixteen `rand00`-`rand15` (32 x 32)
-  textures are produced deterministically from fixed seeds, so no third party image is
-  bundled and every run yields the same textures. Sampling is bilinear with repeat, clamp, and
-  mirror wrap modes, and generation is lazy so a session that never opens the visualizer
-  allocates nothing. Covered by 10 tests.
-- Milkdrop preset keys now act as the per-frame starting values: every numeric key (including
-  the `nWaveMode`, `bWaveDots`, `bWaveThick`, `bAdditiveWaves`, `bDarkenCenter`,
-  `bMotionVectors`, and `nMotionVectorsX/Y` spellings) seeds the matching variable, so real
-  presets that carry their settings as keys instead of code work as written.
-- The visualizer draws the full Milkdrop wave and post-processing set: the circular, doubled,
-  and single-line wave modes with dots, thick, additive, mystery, and colour/position keys,
-  the four declared waveform slots, the outer and inner borders, a motion-vector grid derived
-  from the actual motion field, and the video echo with its zoom, alpha, and orientation.
-  Covered by 11 tests.
-- The preset engine now runs the full Milkdrop stage order. It parses the `per_frame_init`,
-  `per_pixel_init`, `wave_0`-`wave_3` and `shape_N_init` blocks, registers the complete
-  standard variable set (`bass_att`/`mid_att`/`treb_att`, `aspectx`/`aspecty`,
-  `pixelsx`/`pixelsy`, `monitor`, `zoomexp`, `rot`, `cx`/`cy`, `dx`/`dy`, `sx`/`sy`,
-  `blur1`-`blur3`, `darken_center`, `fGammaAdj`, the wave, border, motion-vector and echo
-  groups, `q1`-`q32`, and `b1`-`b8`), and applies the motion parameters, the blur passes, the
-  centre darkening, and the gamma adjustment. The per-pixel block now sees the already warped
-  sampling position in `x`/`y`/`rad`/`ang`, so a real preset can offset or replace it.
-  Covered by 16 tests.
-- The **Visualisierung** settings section gained an **Always show text and controls** toggle.
-  When it is off, the title, hint, and playback buttons appear only while the mouse moves
-  over the visualizer and hide again after three idle seconds; pointer movement is tracked
-  through the window's own events, so moving the mouse on another monitor never reveals them.
-- Added a **Visualisierung** settings section with the render resolution (320 x 180 up to
-  1280 x 720), the target frame rate (24, 30, 60, or 120), and the user preset folder that
-  previously lived under the output device. The window renders at the configured size and
-  lets the image control scale the frame up, so a lower resolution keeps the CPU cost down.
 
 - Added vector previous/next controls directly beside Show all in the Dashboard's
   20-item Recently Played and Recently Added headers. Scrolling uses a short,
@@ -7388,28 +2149,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Tightened the four hero counter tiles to compact fixed-width cards and aligned
   their icon badges to the left like the reference layout.
 
-- The karaoke view now highlights the active word of enhanced-LRC lyrics.
-  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
-  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
-  already-sung words keep the accent colour. Plain synchronized lines keep the
-  line-level highlight, so nothing changes for ordinary LRC files.
-- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
-  now stripped from the line text instead of appearing as literal `<00:12.00>`
-  fragments.
-- Added bulk genre editing for the shared Tracks table. The bulk action bar gained
-  a genre field that stores the value for every selected **local** track through
-  `AudioDatabase.SetTrackGenres`, which writes the library-only
-  `track_genre_overrides` table in one transaction and reapplies it on every later
-  scan. Source media files are never modified, and an empty value removes the
-  override so the next scan restores the embedded genre. Selected Orynivo Server
-  tracks are updated on their owning server through the new authenticated
-  `PUT /api/tracks/{id}/genre`, which records the same library-only override.
-- Podcast episodes can be downloaded for offline playback. Episode rows gained a
-  **Download episode** / **Delete download** context menu and a download marker in
-  the status column, playback prefers the cached file, and Settings > Library sets
-  the cache size limit in megabytes. Eviction removes the least recently used
-  downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
-  the most recently used episode is always kept.
 ### Fixed
 
 - Fixed the listening chart's Y-axis rendering: the filled path now includes an
@@ -7436,97 +2175,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.24.0] - 2026-07-08
 
 ### Added
-- The visualizer's per-pixel path no longer does work the preset never asked for. The compiled
-  programs now report the variables they reference (`PresetProgram.ReferencedVariables` and
-  `Uses`), the warp stage resolves the `x`, `y`, `rad`, and `ang` slots once instead of looking
-  each name up in the layout for every pixel, and it only computes the polar pair, the motion
-  grid, and the seeded sampling position when the preset's own code needs them. A rendered frame
-  is allocation-free, which is now asserted by a test. Covered by 5 tests.
-- The visualizer renders on its own thread now. A frame used to be produced from a
-  `DispatcherTimer`, so a heavy preset blocked the interface for its whole duration; the loop
-  now runs on a background thread, hands a finished copy of the frame to the UI thread through a
-  presentation buffer, and queues at most one present at a time, so a busy interface can never
-  build up a backlog of frames. Preset switching, the reset key, and the overlay follow as
-  thread-safe requests, and the frame pacing lives in the tested `FramePacing` helper. Covered by
-  5 tests.
-- The visualizer now measures where its frame time goes. `PresetRenderer` reports a
-  `RenderTimings` breakdown (warp, blur, post-processing, overlay, composite, comp shaders, and
-  the frame total) per frame and as an average over a window, and the window's diagnostic line in
-  `logs/seek.log` carries those averages once per second, so the cost per stage can be read
-  instead of guessed. A warp shader runs inside the per-pixel loop, so its cost stays part of
-  `warp`; timing it per pixel would cost more than the measurement is worth. The frame budget now
-  compares the complete frame rather than only the shaders. Covered by 8 tests.
-- Milkdrop `.milk` files are read as the multi-preset files they are: `VisualizerPreset.ParseSections`
-  splits the text at its `[presetNN]` headers and the preset folder loads every section as its
-  own preset instead of only the last one surviving. The declared format version
-  (`MILKDROP_PRESET_VERSION`, `PSVERSION`, or `preset_version`) is reported on
-  `VisualizerPreset.Version`; every version is accepted. Skipped presets now carry a reason
-  through `VisualizerPresetLibrary.RejectedReasons`, naming the file or section and the parse
-  error. A hand-written corpus of presets in the real format, including a multi-section file and
-  shader source, guards the format handling; third-party presets stay unbundled because they are
-  licensed by their authors. Covered by 13 tests.
-- The visualizer now runs preset shaders. The numbered `warp_N` and `comp_N` keys are parsed
-  together with their optional `_enabled`, `_per_frame`, and `_per_pixel` companions, and the
-  preset reader keeps the newlines inside a shader's source, because Milkdrop stores the code
-  as a multi-line value. A shader that does not parse is skipped so one broken shader degrades a
-  preset instead of rejecting it. The renderer implements `IShaderSampler`, so shaders can
-  sample `sampler_main`, `sampler_pc_main`, `sampler_fc_main`, `GetBlur1`-`GetBlur3`, and
-  `GetPixel`, and it binds `uv`, `uv_orig`, `texsize`, the audio bands, the smoothed bands, the
-  frame counters, and the aspect ratio. A per-frame time budget (20 ms by default) skips the
-  shaders for a while when they cost too much, so a heavy preset keeps a smooth picture instead
-  of stalling playback. Covered by 11 tests.
-- Added the HLSL interpreter for the shader runtime: `ShaderInterpreter` evaluates the parsed
-  `ps_2_0` tree with scalar and `float2`/`float3`/`float4` values (`ShaderValue`), covering
-  arithmetic with the C precedence, variables and the assignment operators, swizzles read and
-  written, vector constructors with concatenation and broadcast, the ternary operator,
-  `if`/`else`, `for`, and the usual intrinsics (`abs`, `ceil`, `clamp`, `cos`, `dot`, `exp`,
-  `floor`, `frac`, `length`, `lerp`, `log`, `max`, `min`, `mul`, `normalize`, `pow`, `saturate`,
-  `sign`, `sin`, `smoothstep`, `sqrt`, `step`, `tan`). Sampling goes through the
-  `IShaderSampler` contract, so the interpreter carries no render state, and division by zero
-  yields zero instead of an infinity. A loop budget of 4096 iterations and a call depth limit of
-  32 keep a runaway shader from stalling a frame. Covered by 14 tests.
-- Added the HLSL parser and its syntax tree: `ShaderParser` and `ShaderNode` turn the
-  `ps_2_0` subset into a tagged-union tree covering declarations, expression statements,
-  `if`/`else`, `for`, `return`, swizzles, calls, the ternary operator, and the C operator
-  precedence. Function signatures and bare statement bodies are both accepted, and a sampler
-  declaration without a type is tolerated. Covered by 10 tests.
-- Added the HLSL front end for the upcoming shader runtime: `ShaderLexer` tokenizes the
-  `ps_2_0` subset Milkdrop shaders use, covering identifiers and keywords, numbers with their
-  `f`/`h` suffixes, single- and multi-character operators, swizzles, line and block comments,
-  and source positions, and reports an unexpected character with its offset. Covered by
-  10 tests.
-- Added the generated visualizer texture bank. The `noise_lq` (32 x 32), `noise_mq`
-  (256 x 256), and `noise_hq` (512 x 512) textures and the sixteen `rand00`-`rand15` (32 x 32)
-  textures are produced deterministically from fixed seeds, so no third party image is
-  bundled and every run yields the same textures. Sampling is bilinear with repeat, clamp, and
-  mirror wrap modes, and generation is lazy so a session that never opens the visualizer
-  allocates nothing. Covered by 10 tests.
-- Milkdrop preset keys now act as the per-frame starting values: every numeric key (including
-  the `nWaveMode`, `bWaveDots`, `bWaveThick`, `bAdditiveWaves`, `bDarkenCenter`,
-  `bMotionVectors`, and `nMotionVectorsX/Y` spellings) seeds the matching variable, so real
-  presets that carry their settings as keys instead of code work as written.
-- The visualizer draws the full Milkdrop wave and post-processing set: the circular, doubled,
-  and single-line wave modes with dots, thick, additive, mystery, and colour/position keys,
-  the four declared waveform slots, the outer and inner borders, a motion-vector grid derived
-  from the actual motion field, and the video echo with its zoom, alpha, and orientation.
-  Covered by 11 tests.
-- The preset engine now runs the full Milkdrop stage order. It parses the `per_frame_init`,
-  `per_pixel_init`, `wave_0`-`wave_3` and `shape_N_init` blocks, registers the complete
-  standard variable set (`bass_att`/`mid_att`/`treb_att`, `aspectx`/`aspecty`,
-  `pixelsx`/`pixelsy`, `monitor`, `zoomexp`, `rot`, `cx`/`cy`, `dx`/`dy`, `sx`/`sy`,
-  `blur1`-`blur3`, `darken_center`, `fGammaAdj`, the wave, border, motion-vector and echo
-  groups, `q1`-`q32`, and `b1`-`b8`), and applies the motion parameters, the blur passes, the
-  centre darkening, and the gamma adjustment. The per-pixel block now sees the already warped
-  sampling position in `x`/`y`/`rad`/`ang`, so a real preset can offset or replace it.
-  Covered by 16 tests.
-- The **Visualisierung** settings section gained an **Always show text and controls** toggle.
-  When it is off, the title, hint, and playback buttons appear only while the mouse moves
-  over the visualizer and hide again after three idle seconds; pointer movement is tracked
-  through the window's own events, so moving the mouse on another monitor never reveals them.
-- Added a **Visualisierung** settings section with the render resolution (320 x 180 up to
-  1280 x 720), the target frame rate (24, 30, 60, or 120), and the user preset folder that
-  previously lived under the output device. The window renders at the configured size and
-  lets the image control scale the frame up, so a lower resolution keeps the CPU cost down.
 
 - Smart-playlist editor live preview: while editing a smart playlist's criteria,
   a debounced preview line shows how many tracks currently match, resolved the
@@ -7599,28 +2247,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Updated the README to reflect current queue, smart-playlist, dashboard, MCP,
   remote Orynivo Server, and cwASIO/native-DSD capabilities.
 
-- The karaoke view now highlights the active word of enhanced-LRC lyrics.
-  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
-  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
-  already-sung words keep the accent colour. Plain synchronized lines keep the
-  line-level highlight, so nothing changes for ordinary LRC files.
-- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
-  now stripped from the line text instead of appearing as literal `<00:12.00>`
-  fragments.
-- Added bulk genre editing for the shared Tracks table. The bulk action bar gained
-  a genre field that stores the value for every selected **local** track through
-  `AudioDatabase.SetTrackGenres`, which writes the library-only
-  `track_genre_overrides` table in one transaction and reapplies it on every later
-  scan. Source media files are never modified, and an empty value removes the
-  override so the next scan restores the embedded genre. Selected Orynivo Server
-  tracks are updated on their owning server through the new authenticated
-  `PUT /api/tracks/{id}/genre`, which records the same library-only override.
-- Podcast episodes can be downloaded for offline playback. Episode rows gained a
-  **Download episode** / **Delete download** context menu and a download marker in
-  the status column, playback prefers the cached file, and Settings > Library sets
-  the cache size limit in megabytes. Eviction removes the least recently used
-  downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
-  the most recently used episode is always kept.
 ### Fixed
 
 - Fixed dragging albums onto the "Up Next" sidebar item restarting the current
@@ -7643,97 +2269,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.23.3] - 2026-07-05
 
 ### Added
-- The visualizer's per-pixel path no longer does work the preset never asked for. The compiled
-  programs now report the variables they reference (`PresetProgram.ReferencedVariables` and
-  `Uses`), the warp stage resolves the `x`, `y`, `rad`, and `ang` slots once instead of looking
-  each name up in the layout for every pixel, and it only computes the polar pair, the motion
-  grid, and the seeded sampling position when the preset's own code needs them. A rendered frame
-  is allocation-free, which is now asserted by a test. Covered by 5 tests.
-- The visualizer renders on its own thread now. A frame used to be produced from a
-  `DispatcherTimer`, so a heavy preset blocked the interface for its whole duration; the loop
-  now runs on a background thread, hands a finished copy of the frame to the UI thread through a
-  presentation buffer, and queues at most one present at a time, so a busy interface can never
-  build up a backlog of frames. Preset switching, the reset key, and the overlay follow as
-  thread-safe requests, and the frame pacing lives in the tested `FramePacing` helper. Covered by
-  5 tests.
-- The visualizer now measures where its frame time goes. `PresetRenderer` reports a
-  `RenderTimings` breakdown (warp, blur, post-processing, overlay, composite, comp shaders, and
-  the frame total) per frame and as an average over a window, and the window's diagnostic line in
-  `logs/seek.log` carries those averages once per second, so the cost per stage can be read
-  instead of guessed. A warp shader runs inside the per-pixel loop, so its cost stays part of
-  `warp`; timing it per pixel would cost more than the measurement is worth. The frame budget now
-  compares the complete frame rather than only the shaders. Covered by 8 tests.
-- Milkdrop `.milk` files are read as the multi-preset files they are: `VisualizerPreset.ParseSections`
-  splits the text at its `[presetNN]` headers and the preset folder loads every section as its
-  own preset instead of only the last one surviving. The declared format version
-  (`MILKDROP_PRESET_VERSION`, `PSVERSION`, or `preset_version`) is reported on
-  `VisualizerPreset.Version`; every version is accepted. Skipped presets now carry a reason
-  through `VisualizerPresetLibrary.RejectedReasons`, naming the file or section and the parse
-  error. A hand-written corpus of presets in the real format, including a multi-section file and
-  shader source, guards the format handling; third-party presets stay unbundled because they are
-  licensed by their authors. Covered by 13 tests.
-- The visualizer now runs preset shaders. The numbered `warp_N` and `comp_N` keys are parsed
-  together with their optional `_enabled`, `_per_frame`, and `_per_pixel` companions, and the
-  preset reader keeps the newlines inside a shader's source, because Milkdrop stores the code
-  as a multi-line value. A shader that does not parse is skipped so one broken shader degrades a
-  preset instead of rejecting it. The renderer implements `IShaderSampler`, so shaders can
-  sample `sampler_main`, `sampler_pc_main`, `sampler_fc_main`, `GetBlur1`-`GetBlur3`, and
-  `GetPixel`, and it binds `uv`, `uv_orig`, `texsize`, the audio bands, the smoothed bands, the
-  frame counters, and the aspect ratio. A per-frame time budget (20 ms by default) skips the
-  shaders for a while when they cost too much, so a heavy preset keeps a smooth picture instead
-  of stalling playback. Covered by 11 tests.
-- Added the HLSL interpreter for the shader runtime: `ShaderInterpreter` evaluates the parsed
-  `ps_2_0` tree with scalar and `float2`/`float3`/`float4` values (`ShaderValue`), covering
-  arithmetic with the C precedence, variables and the assignment operators, swizzles read and
-  written, vector constructors with concatenation and broadcast, the ternary operator,
-  `if`/`else`, `for`, and the usual intrinsics (`abs`, `ceil`, `clamp`, `cos`, `dot`, `exp`,
-  `floor`, `frac`, `length`, `lerp`, `log`, `max`, `min`, `mul`, `normalize`, `pow`, `saturate`,
-  `sign`, `sin`, `smoothstep`, `sqrt`, `step`, `tan`). Sampling goes through the
-  `IShaderSampler` contract, so the interpreter carries no render state, and division by zero
-  yields zero instead of an infinity. A loop budget of 4096 iterations and a call depth limit of
-  32 keep a runaway shader from stalling a frame. Covered by 14 tests.
-- Added the HLSL parser and its syntax tree: `ShaderParser` and `ShaderNode` turn the
-  `ps_2_0` subset into a tagged-union tree covering declarations, expression statements,
-  `if`/`else`, `for`, `return`, swizzles, calls, the ternary operator, and the C operator
-  precedence. Function signatures and bare statement bodies are both accepted, and a sampler
-  declaration without a type is tolerated. Covered by 10 tests.
-- Added the HLSL front end for the upcoming shader runtime: `ShaderLexer` tokenizes the
-  `ps_2_0` subset Milkdrop shaders use, covering identifiers and keywords, numbers with their
-  `f`/`h` suffixes, single- and multi-character operators, swizzles, line and block comments,
-  and source positions, and reports an unexpected character with its offset. Covered by
-  10 tests.
-- Added the generated visualizer texture bank. The `noise_lq` (32 x 32), `noise_mq`
-  (256 x 256), and `noise_hq` (512 x 512) textures and the sixteen `rand00`-`rand15` (32 x 32)
-  textures are produced deterministically from fixed seeds, so no third party image is
-  bundled and every run yields the same textures. Sampling is bilinear with repeat, clamp, and
-  mirror wrap modes, and generation is lazy so a session that never opens the visualizer
-  allocates nothing. Covered by 10 tests.
-- Milkdrop preset keys now act as the per-frame starting values: every numeric key (including
-  the `nWaveMode`, `bWaveDots`, `bWaveThick`, `bAdditiveWaves`, `bDarkenCenter`,
-  `bMotionVectors`, and `nMotionVectorsX/Y` spellings) seeds the matching variable, so real
-  presets that carry their settings as keys instead of code work as written.
-- The visualizer draws the full Milkdrop wave and post-processing set: the circular, doubled,
-  and single-line wave modes with dots, thick, additive, mystery, and colour/position keys,
-  the four declared waveform slots, the outer and inner borders, a motion-vector grid derived
-  from the actual motion field, and the video echo with its zoom, alpha, and orientation.
-  Covered by 11 tests.
-- The preset engine now runs the full Milkdrop stage order. It parses the `per_frame_init`,
-  `per_pixel_init`, `wave_0`-`wave_3` and `shape_N_init` blocks, registers the complete
-  standard variable set (`bass_att`/`mid_att`/`treb_att`, `aspectx`/`aspecty`,
-  `pixelsx`/`pixelsy`, `monitor`, `zoomexp`, `rot`, `cx`/`cy`, `dx`/`dy`, `sx`/`sy`,
-  `blur1`-`blur3`, `darken_center`, `fGammaAdj`, the wave, border, motion-vector and echo
-  groups, `q1`-`q32`, and `b1`-`b8`), and applies the motion parameters, the blur passes, the
-  centre darkening, and the gamma adjustment. The per-pixel block now sees the already warped
-  sampling position in `x`/`y`/`rad`/`ang`, so a real preset can offset or replace it.
-  Covered by 16 tests.
-- The **Visualisierung** settings section gained an **Always show text and controls** toggle.
-  When it is off, the title, hint, and playback buttons appear only while the mouse moves
-  over the visualizer and hide again after three idle seconds; pointer movement is tracked
-  through the window's own events, so moving the mouse on another monitor never reveals them.
-- Added a **Visualisierung** settings section with the render resolution (320 x 180 up to
-  1280 x 720), the target frame rate (24, 30, 60, or 120), and the user preset folder that
-  previously lived under the output device. The window renders at the configured size and
-  lets the image control scale the frame up, so a lower resolution keeps the CPU cost down.
 
 - Added an artist-info button beside the artist name in album/track detail
   headers, opening the same biography, image, and rename/merge view used by the
@@ -7741,28 +2276,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Restyled the favorite heart with a warmer Orynivo-specific color and adjusted
   glyph across tables, artwork cards, album headers, and the transport bar.
 
-- The karaoke view now highlights the active word of enhanced-LRC lyrics.
-  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
-  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
-  already-sung words keep the accent colour. Plain synchronized lines keep the
-  line-level highlight, so nothing changes for ordinary LRC files.
-- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
-  now stripped from the line text instead of appearing as literal `<00:12.00>`
-  fragments.
-- Added bulk genre editing for the shared Tracks table. The bulk action bar gained
-  a genre field that stores the value for every selected **local** track through
-  `AudioDatabase.SetTrackGenres`, which writes the library-only
-  `track_genre_overrides` table in one transaction and reapplies it on every later
-  scan. Source media files are never modified, and an empty value removes the
-  override so the next scan restores the embedded genre. Selected Orynivo Server
-  tracks are updated on their owning server through the new authenticated
-  `PUT /api/tracks/{id}/genre`, which records the same library-only override.
-- Podcast episodes can be downloaded for offline playback. Episode rows gained a
-  **Download episode** / **Delete download** context menu and a download marker in
-  the status column, playback prefers the cached file, and Settings > Library sets
-  the cache size limit in megabytes. Eviction removes the least recently used
-  downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
-  the most recently used episode is always kept.
 ### Fixed
 
 - Reduced local and Orynivo Server artist rename work by updating only the
@@ -7782,28 +2295,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [0.23.2] - 2026-07-05
 
-- The karaoke view now highlights the active word of enhanced-LRC lyrics.
-  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
-  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
-  already-sung words keep the accent colour. Plain synchronized lines keep the
-  line-level highlight, so nothing changes for ordinary LRC files.
-- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
-  now stripped from the line text instead of appearing as literal `<00:12.00>`
-  fragments.
-- Added bulk genre editing for the shared Tracks table. The bulk action bar gained
-  a genre field that stores the value for every selected **local** track through
-  `AudioDatabase.SetTrackGenres`, which writes the library-only
-  `track_genre_overrides` table in one transaction and reapplies it on every later
-  scan. Source media files are never modified, and an empty value removes the
-  override so the next scan restores the embedded genre. Selected Orynivo Server
-  tracks are updated on their owning server through the new authenticated
-  `PUT /api/tracks/{id}/genre`, which records the same library-only override.
-- Podcast episodes can be downloaded for offline playback. Episode rows gained a
-  **Download episode** / **Delete download** context menu and a download marker in
-  the status column, playback prefers the cached file, and Settings > Library sets
-  the cache size limit in megabytes. Eviction removes the least recently used
-  downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
-  the most recently used episode is always kept.
 ### Fixed
 
 - Fixed remote Orynivo Server artist information from the shared Artists view so
@@ -7824,28 +2315,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [0.23.1] - 2026-07-05
 
-- The karaoke view now highlights the active word of enhanced-LRC lyrics.
-  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
-  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
-  already-sung words keep the accent colour. Plain synchronized lines keep the
-  line-level highlight, so nothing changes for ordinary LRC files.
-- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
-  now stripped from the line text instead of appearing as literal `<00:12.00>`
-  fragments.
-- Added bulk genre editing for the shared Tracks table. The bulk action bar gained
-  a genre field that stores the value for every selected **local** track through
-  `AudioDatabase.SetTrackGenres`, which writes the library-only
-  `track_genre_overrides` table in one transaction and reapplies it on every later
-  scan. Source media files are never modified, and an empty value removes the
-  override so the next scan restores the embedded genre. Selected Orynivo Server
-  tracks are updated on their owning server through the new authenticated
-  `PUT /api/tracks/{id}/genre`, which records the same library-only override.
-- Podcast episodes can be downloaded for offline playback. Episode rows gained a
-  **Download episode** / **Delete download** context menu and a download marker in
-  the status column, playback prefers the cached file, and Settings > Library sets
-  the cache size limit in megabytes. Eviction removes the least recently used
-  downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
-  the most recently used episode is always kept.
 ### Fixed
 
 - Reduced the Artist artwork-card height after adding the source badge so the
@@ -7861,97 +2330,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.23.0] - 2026-07-05
 
 ### Added
-- The visualizer's per-pixel path no longer does work the preset never asked for. The compiled
-  programs now report the variables they reference (`PresetProgram.ReferencedVariables` and
-  `Uses`), the warp stage resolves the `x`, `y`, `rad`, and `ang` slots once instead of looking
-  each name up in the layout for every pixel, and it only computes the polar pair, the motion
-  grid, and the seeded sampling position when the preset's own code needs them. A rendered frame
-  is allocation-free, which is now asserted by a test. Covered by 5 tests.
-- The visualizer renders on its own thread now. A frame used to be produced from a
-  `DispatcherTimer`, so a heavy preset blocked the interface for its whole duration; the loop
-  now runs on a background thread, hands a finished copy of the frame to the UI thread through a
-  presentation buffer, and queues at most one present at a time, so a busy interface can never
-  build up a backlog of frames. Preset switching, the reset key, and the overlay follow as
-  thread-safe requests, and the frame pacing lives in the tested `FramePacing` helper. Covered by
-  5 tests.
-- The visualizer now measures where its frame time goes. `PresetRenderer` reports a
-  `RenderTimings` breakdown (warp, blur, post-processing, overlay, composite, comp shaders, and
-  the frame total) per frame and as an average over a window, and the window's diagnostic line in
-  `logs/seek.log` carries those averages once per second, so the cost per stage can be read
-  instead of guessed. A warp shader runs inside the per-pixel loop, so its cost stays part of
-  `warp`; timing it per pixel would cost more than the measurement is worth. The frame budget now
-  compares the complete frame rather than only the shaders. Covered by 8 tests.
-- Milkdrop `.milk` files are read as the multi-preset files they are: `VisualizerPreset.ParseSections`
-  splits the text at its `[presetNN]` headers and the preset folder loads every section as its
-  own preset instead of only the last one surviving. The declared format version
-  (`MILKDROP_PRESET_VERSION`, `PSVERSION`, or `preset_version`) is reported on
-  `VisualizerPreset.Version`; every version is accepted. Skipped presets now carry a reason
-  through `VisualizerPresetLibrary.RejectedReasons`, naming the file or section and the parse
-  error. A hand-written corpus of presets in the real format, including a multi-section file and
-  shader source, guards the format handling; third-party presets stay unbundled because they are
-  licensed by their authors. Covered by 13 tests.
-- The visualizer now runs preset shaders. The numbered `warp_N` and `comp_N` keys are parsed
-  together with their optional `_enabled`, `_per_frame`, and `_per_pixel` companions, and the
-  preset reader keeps the newlines inside a shader's source, because Milkdrop stores the code
-  as a multi-line value. A shader that does not parse is skipped so one broken shader degrades a
-  preset instead of rejecting it. The renderer implements `IShaderSampler`, so shaders can
-  sample `sampler_main`, `sampler_pc_main`, `sampler_fc_main`, `GetBlur1`-`GetBlur3`, and
-  `GetPixel`, and it binds `uv`, `uv_orig`, `texsize`, the audio bands, the smoothed bands, the
-  frame counters, and the aspect ratio. A per-frame time budget (20 ms by default) skips the
-  shaders for a while when they cost too much, so a heavy preset keeps a smooth picture instead
-  of stalling playback. Covered by 11 tests.
-- Added the HLSL interpreter for the shader runtime: `ShaderInterpreter` evaluates the parsed
-  `ps_2_0` tree with scalar and `float2`/`float3`/`float4` values (`ShaderValue`), covering
-  arithmetic with the C precedence, variables and the assignment operators, swizzles read and
-  written, vector constructors with concatenation and broadcast, the ternary operator,
-  `if`/`else`, `for`, and the usual intrinsics (`abs`, `ceil`, `clamp`, `cos`, `dot`, `exp`,
-  `floor`, `frac`, `length`, `lerp`, `log`, `max`, `min`, `mul`, `normalize`, `pow`, `saturate`,
-  `sign`, `sin`, `smoothstep`, `sqrt`, `step`, `tan`). Sampling goes through the
-  `IShaderSampler` contract, so the interpreter carries no render state, and division by zero
-  yields zero instead of an infinity. A loop budget of 4096 iterations and a call depth limit of
-  32 keep a runaway shader from stalling a frame. Covered by 14 tests.
-- Added the HLSL parser and its syntax tree: `ShaderParser` and `ShaderNode` turn the
-  `ps_2_0` subset into a tagged-union tree covering declarations, expression statements,
-  `if`/`else`, `for`, `return`, swizzles, calls, the ternary operator, and the C operator
-  precedence. Function signatures and bare statement bodies are both accepted, and a sampler
-  declaration without a type is tolerated. Covered by 10 tests.
-- Added the HLSL front end for the upcoming shader runtime: `ShaderLexer` tokenizes the
-  `ps_2_0` subset Milkdrop shaders use, covering identifiers and keywords, numbers with their
-  `f`/`h` suffixes, single- and multi-character operators, swizzles, line and block comments,
-  and source positions, and reports an unexpected character with its offset. Covered by
-  10 tests.
-- Added the generated visualizer texture bank. The `noise_lq` (32 x 32), `noise_mq`
-  (256 x 256), and `noise_hq` (512 x 512) textures and the sixteen `rand00`-`rand15` (32 x 32)
-  textures are produced deterministically from fixed seeds, so no third party image is
-  bundled and every run yields the same textures. Sampling is bilinear with repeat, clamp, and
-  mirror wrap modes, and generation is lazy so a session that never opens the visualizer
-  allocates nothing. Covered by 10 tests.
-- Milkdrop preset keys now act as the per-frame starting values: every numeric key (including
-  the `nWaveMode`, `bWaveDots`, `bWaveThick`, `bAdditiveWaves`, `bDarkenCenter`,
-  `bMotionVectors`, and `nMotionVectorsX/Y` spellings) seeds the matching variable, so real
-  presets that carry their settings as keys instead of code work as written.
-- The visualizer draws the full Milkdrop wave and post-processing set: the circular, doubled,
-  and single-line wave modes with dots, thick, additive, mystery, and colour/position keys,
-  the four declared waveform slots, the outer and inner borders, a motion-vector grid derived
-  from the actual motion field, and the video echo with its zoom, alpha, and orientation.
-  Covered by 11 tests.
-- The preset engine now runs the full Milkdrop stage order. It parses the `per_frame_init`,
-  `per_pixel_init`, `wave_0`-`wave_3` and `shape_N_init` blocks, registers the complete
-  standard variable set (`bass_att`/`mid_att`/`treb_att`, `aspectx`/`aspecty`,
-  `pixelsx`/`pixelsy`, `monitor`, `zoomexp`, `rot`, `cx`/`cy`, `dx`/`dy`, `sx`/`sy`,
-  `blur1`-`blur3`, `darken_center`, `fGammaAdj`, the wave, border, motion-vector and echo
-  groups, `q1`-`q32`, and `b1`-`b8`), and applies the motion parameters, the blur passes, the
-  centre darkening, and the gamma adjustment. The per-pixel block now sees the already warped
-  sampling position in `x`/`y`/`rad`/`ang`, so a real preset can offset or replace it.
-  Covered by 16 tests.
-- The **Visualisierung** settings section gained an **Always show text and controls** toggle.
-  When it is off, the title, hint, and playback buttons appear only while the mouse moves
-  over the visualizer and hide again after three idle seconds; pointer movement is tracked
-  through the window's own events, so moving the mouse on another monitor never reveals them.
-- Added a **Visualisierung** settings section with the render resolution (320 x 180 up to
-  1280 x 720), the target frame rate (24, 30, 60, or 120), and the user preset folder that
-  previously lived under the output device. The window renders at the configured size and
-  lets the image control scale the frame up, so a lower resolution keeps the CPU cost down.
 
 - The Tracks search now honours the active facet filters. The **source** facet
   restricts which sources are searched at all (e.g. with only an Orynivo Server
@@ -7990,28 +2368,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   source column directly beside it. Source tooltips use theme-aware foreground
   and background colors.
 
-- The karaoke view now highlights the active word of enhanced-LRC lyrics.
-  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
-  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
-  already-sung words keep the accent colour. Plain synchronized lines keep the
-  line-level highlight, so nothing changes for ordinary LRC files.
-- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
-  now stripped from the line text instead of appearing as literal `<00:12.00>`
-  fragments.
-- Added bulk genre editing for the shared Tracks table. The bulk action bar gained
-  a genre field that stores the value for every selected **local** track through
-  `AudioDatabase.SetTrackGenres`, which writes the library-only
-  `track_genre_overrides` table in one transaction and reapplies it on every later
-  scan. Source media files are never modified, and an empty value removes the
-  override so the next scan restores the embedded genre. Selected Orynivo Server
-  tracks are updated on their owning server through the new authenticated
-  `PUT /api/tracks/{id}/genre`, which records the same library-only override.
-- Podcast episodes can be downloaded for offline playback. Episode rows gained a
-  **Download episode** / **Delete download** context menu and a download marker in
-  the status column, playback prefers the cached file, and Settings > Library sets
-  the cache size limit in megabytes. Eviction removes the least recently used
-  downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
-  the most recently used episode is always kept.
 ### Fixed
 
 - The content loading skeleton now fully covers the content area (it spans the
@@ -8082,97 +2438,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.22.0] - 2026-07-04
 
 ### Added
-- The visualizer's per-pixel path no longer does work the preset never asked for. The compiled
-  programs now report the variables they reference (`PresetProgram.ReferencedVariables` and
-  `Uses`), the warp stage resolves the `x`, `y`, `rad`, and `ang` slots once instead of looking
-  each name up in the layout for every pixel, and it only computes the polar pair, the motion
-  grid, and the seeded sampling position when the preset's own code needs them. A rendered frame
-  is allocation-free, which is now asserted by a test. Covered by 5 tests.
-- The visualizer renders on its own thread now. A frame used to be produced from a
-  `DispatcherTimer`, so a heavy preset blocked the interface for its whole duration; the loop
-  now runs on a background thread, hands a finished copy of the frame to the UI thread through a
-  presentation buffer, and queues at most one present at a time, so a busy interface can never
-  build up a backlog of frames. Preset switching, the reset key, and the overlay follow as
-  thread-safe requests, and the frame pacing lives in the tested `FramePacing` helper. Covered by
-  5 tests.
-- The visualizer now measures where its frame time goes. `PresetRenderer` reports a
-  `RenderTimings` breakdown (warp, blur, post-processing, overlay, composite, comp shaders, and
-  the frame total) per frame and as an average over a window, and the window's diagnostic line in
-  `logs/seek.log` carries those averages once per second, so the cost per stage can be read
-  instead of guessed. A warp shader runs inside the per-pixel loop, so its cost stays part of
-  `warp`; timing it per pixel would cost more than the measurement is worth. The frame budget now
-  compares the complete frame rather than only the shaders. Covered by 8 tests.
-- Milkdrop `.milk` files are read as the multi-preset files they are: `VisualizerPreset.ParseSections`
-  splits the text at its `[presetNN]` headers and the preset folder loads every section as its
-  own preset instead of only the last one surviving. The declared format version
-  (`MILKDROP_PRESET_VERSION`, `PSVERSION`, or `preset_version`) is reported on
-  `VisualizerPreset.Version`; every version is accepted. Skipped presets now carry a reason
-  through `VisualizerPresetLibrary.RejectedReasons`, naming the file or section and the parse
-  error. A hand-written corpus of presets in the real format, including a multi-section file and
-  shader source, guards the format handling; third-party presets stay unbundled because they are
-  licensed by their authors. Covered by 13 tests.
-- The visualizer now runs preset shaders. The numbered `warp_N` and `comp_N` keys are parsed
-  together with their optional `_enabled`, `_per_frame`, and `_per_pixel` companions, and the
-  preset reader keeps the newlines inside a shader's source, because Milkdrop stores the code
-  as a multi-line value. A shader that does not parse is skipped so one broken shader degrades a
-  preset instead of rejecting it. The renderer implements `IShaderSampler`, so shaders can
-  sample `sampler_main`, `sampler_pc_main`, `sampler_fc_main`, `GetBlur1`-`GetBlur3`, and
-  `GetPixel`, and it binds `uv`, `uv_orig`, `texsize`, the audio bands, the smoothed bands, the
-  frame counters, and the aspect ratio. A per-frame time budget (20 ms by default) skips the
-  shaders for a while when they cost too much, so a heavy preset keeps a smooth picture instead
-  of stalling playback. Covered by 11 tests.
-- Added the HLSL interpreter for the shader runtime: `ShaderInterpreter` evaluates the parsed
-  `ps_2_0` tree with scalar and `float2`/`float3`/`float4` values (`ShaderValue`), covering
-  arithmetic with the C precedence, variables and the assignment operators, swizzles read and
-  written, vector constructors with concatenation and broadcast, the ternary operator,
-  `if`/`else`, `for`, and the usual intrinsics (`abs`, `ceil`, `clamp`, `cos`, `dot`, `exp`,
-  `floor`, `frac`, `length`, `lerp`, `log`, `max`, `min`, `mul`, `normalize`, `pow`, `saturate`,
-  `sign`, `sin`, `smoothstep`, `sqrt`, `step`, `tan`). Sampling goes through the
-  `IShaderSampler` contract, so the interpreter carries no render state, and division by zero
-  yields zero instead of an infinity. A loop budget of 4096 iterations and a call depth limit of
-  32 keep a runaway shader from stalling a frame. Covered by 14 tests.
-- Added the HLSL parser and its syntax tree: `ShaderParser` and `ShaderNode` turn the
-  `ps_2_0` subset into a tagged-union tree covering declarations, expression statements,
-  `if`/`else`, `for`, `return`, swizzles, calls, the ternary operator, and the C operator
-  precedence. Function signatures and bare statement bodies are both accepted, and a sampler
-  declaration without a type is tolerated. Covered by 10 tests.
-- Added the HLSL front end for the upcoming shader runtime: `ShaderLexer` tokenizes the
-  `ps_2_0` subset Milkdrop shaders use, covering identifiers and keywords, numbers with their
-  `f`/`h` suffixes, single- and multi-character operators, swizzles, line and block comments,
-  and source positions, and reports an unexpected character with its offset. Covered by
-  10 tests.
-- Added the generated visualizer texture bank. The `noise_lq` (32 x 32), `noise_mq`
-  (256 x 256), and `noise_hq` (512 x 512) textures and the sixteen `rand00`-`rand15` (32 x 32)
-  textures are produced deterministically from fixed seeds, so no third party image is
-  bundled and every run yields the same textures. Sampling is bilinear with repeat, clamp, and
-  mirror wrap modes, and generation is lazy so a session that never opens the visualizer
-  allocates nothing. Covered by 10 tests.
-- Milkdrop preset keys now act as the per-frame starting values: every numeric key (including
-  the `nWaveMode`, `bWaveDots`, `bWaveThick`, `bAdditiveWaves`, `bDarkenCenter`,
-  `bMotionVectors`, and `nMotionVectorsX/Y` spellings) seeds the matching variable, so real
-  presets that carry their settings as keys instead of code work as written.
-- The visualizer draws the full Milkdrop wave and post-processing set: the circular, doubled,
-  and single-line wave modes with dots, thick, additive, mystery, and colour/position keys,
-  the four declared waveform slots, the outer and inner borders, a motion-vector grid derived
-  from the actual motion field, and the video echo with its zoom, alpha, and orientation.
-  Covered by 11 tests.
-- The preset engine now runs the full Milkdrop stage order. It parses the `per_frame_init`,
-  `per_pixel_init`, `wave_0`-`wave_3` and `shape_N_init` blocks, registers the complete
-  standard variable set (`bass_att`/`mid_att`/`treb_att`, `aspectx`/`aspecty`,
-  `pixelsx`/`pixelsy`, `monitor`, `zoomexp`, `rot`, `cx`/`cy`, `dx`/`dy`, `sx`/`sy`,
-  `blur1`-`blur3`, `darken_center`, `fGammaAdj`, the wave, border, motion-vector and echo
-  groups, `q1`-`q32`, and `b1`-`b8`), and applies the motion parameters, the blur passes, the
-  centre darkening, and the gamma adjustment. The per-pixel block now sees the already warped
-  sampling position in `x`/`y`/`rad`/`ang`, so a real preset can offset or replace it.
-  Covered by 16 tests.
-- The **Visualisierung** settings section gained an **Always show text and controls** toggle.
-  When it is off, the title, hint, and playback buttons appear only while the mouse moves
-  over the visualizer and hide again after three idle seconds; pointer movement is tracked
-  through the window's own events, so moving the mouse on another monitor never reveals them.
-- Added a **Visualisierung** settings section with the render resolution (320 x 180 up to
-  1280 x 720), the target frame rate (24, 30, 60, or 120), and the user preset folder that
-  previously lived under the output device. The window renders at the configured size and
-  lets the image control scale the frame up, so a lower resolution keeps the CPU cost down.
 
 - Reworked the Dashboard into a more personal "music hub": a time-of-day
   greeting with a short tagline now opens the page, followed by a new **Recently
@@ -8200,28 +2465,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   radio, podcasts, and DSD sources when they are converted to PCM; native DSD
   output remains bit-perfect and unchanged.
 
-- The karaoke view now highlights the active word of enhanced-LRC lyrics.
-  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
-  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
-  already-sung words keep the accent colour. Plain synchronized lines keep the
-  line-level highlight, so nothing changes for ordinary LRC files.
-- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
-  now stripped from the line text instead of appearing as literal `<00:12.00>`
-  fragments.
-- Added bulk genre editing for the shared Tracks table. The bulk action bar gained
-  a genre field that stores the value for every selected **local** track through
-  `AudioDatabase.SetTrackGenres`, which writes the library-only
-  `track_genre_overrides` table in one transaction and reapplies it on every later
-  scan. Source media files are never modified, and an empty value removes the
-  override so the next scan restores the embedded genre. Selected Orynivo Server
-  tracks are updated on their owning server through the new authenticated
-  `PUT /api/tracks/{id}/genre`, which records the same library-only override.
-- Podcast episodes can be downloaded for offline playback. Episode rows gained a
-  **Download episode** / **Delete download** context menu and a download marker in
-  the status column, playback prefers the cached file, and Settings > Library sets
-  the cache size limit in megabytes. Eviction removes the least recently used
-  downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
-  the most recently used episode is always kept.
 ### Fixed
 
 - Fixed manual MusicBrainz cover search failing on stylized album titles with
@@ -8328,97 +2571,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.21.0] - 2026-07-04
 
 ### Added
-- The visualizer's per-pixel path no longer does work the preset never asked for. The compiled
-  programs now report the variables they reference (`PresetProgram.ReferencedVariables` and
-  `Uses`), the warp stage resolves the `x`, `y`, `rad`, and `ang` slots once instead of looking
-  each name up in the layout for every pixel, and it only computes the polar pair, the motion
-  grid, and the seeded sampling position when the preset's own code needs them. A rendered frame
-  is allocation-free, which is now asserted by a test. Covered by 5 tests.
-- The visualizer renders on its own thread now. A frame used to be produced from a
-  `DispatcherTimer`, so a heavy preset blocked the interface for its whole duration; the loop
-  now runs on a background thread, hands a finished copy of the frame to the UI thread through a
-  presentation buffer, and queues at most one present at a time, so a busy interface can never
-  build up a backlog of frames. Preset switching, the reset key, and the overlay follow as
-  thread-safe requests, and the frame pacing lives in the tested `FramePacing` helper. Covered by
-  5 tests.
-- The visualizer now measures where its frame time goes. `PresetRenderer` reports a
-  `RenderTimings` breakdown (warp, blur, post-processing, overlay, composite, comp shaders, and
-  the frame total) per frame and as an average over a window, and the window's diagnostic line in
-  `logs/seek.log` carries those averages once per second, so the cost per stage can be read
-  instead of guessed. A warp shader runs inside the per-pixel loop, so its cost stays part of
-  `warp`; timing it per pixel would cost more than the measurement is worth. The frame budget now
-  compares the complete frame rather than only the shaders. Covered by 8 tests.
-- Milkdrop `.milk` files are read as the multi-preset files they are: `VisualizerPreset.ParseSections`
-  splits the text at its `[presetNN]` headers and the preset folder loads every section as its
-  own preset instead of only the last one surviving. The declared format version
-  (`MILKDROP_PRESET_VERSION`, `PSVERSION`, or `preset_version`) is reported on
-  `VisualizerPreset.Version`; every version is accepted. Skipped presets now carry a reason
-  through `VisualizerPresetLibrary.RejectedReasons`, naming the file or section and the parse
-  error. A hand-written corpus of presets in the real format, including a multi-section file and
-  shader source, guards the format handling; third-party presets stay unbundled because they are
-  licensed by their authors. Covered by 13 tests.
-- The visualizer now runs preset shaders. The numbered `warp_N` and `comp_N` keys are parsed
-  together with their optional `_enabled`, `_per_frame`, and `_per_pixel` companions, and the
-  preset reader keeps the newlines inside a shader's source, because Milkdrop stores the code
-  as a multi-line value. A shader that does not parse is skipped so one broken shader degrades a
-  preset instead of rejecting it. The renderer implements `IShaderSampler`, so shaders can
-  sample `sampler_main`, `sampler_pc_main`, `sampler_fc_main`, `GetBlur1`-`GetBlur3`, and
-  `GetPixel`, and it binds `uv`, `uv_orig`, `texsize`, the audio bands, the smoothed bands, the
-  frame counters, and the aspect ratio. A per-frame time budget (20 ms by default) skips the
-  shaders for a while when they cost too much, so a heavy preset keeps a smooth picture instead
-  of stalling playback. Covered by 11 tests.
-- Added the HLSL interpreter for the shader runtime: `ShaderInterpreter` evaluates the parsed
-  `ps_2_0` tree with scalar and `float2`/`float3`/`float4` values (`ShaderValue`), covering
-  arithmetic with the C precedence, variables and the assignment operators, swizzles read and
-  written, vector constructors with concatenation and broadcast, the ternary operator,
-  `if`/`else`, `for`, and the usual intrinsics (`abs`, `ceil`, `clamp`, `cos`, `dot`, `exp`,
-  `floor`, `frac`, `length`, `lerp`, `log`, `max`, `min`, `mul`, `normalize`, `pow`, `saturate`,
-  `sign`, `sin`, `smoothstep`, `sqrt`, `step`, `tan`). Sampling goes through the
-  `IShaderSampler` contract, so the interpreter carries no render state, and division by zero
-  yields zero instead of an infinity. A loop budget of 4096 iterations and a call depth limit of
-  32 keep a runaway shader from stalling a frame. Covered by 14 tests.
-- Added the HLSL parser and its syntax tree: `ShaderParser` and `ShaderNode` turn the
-  `ps_2_0` subset into a tagged-union tree covering declarations, expression statements,
-  `if`/`else`, `for`, `return`, swizzles, calls, the ternary operator, and the C operator
-  precedence. Function signatures and bare statement bodies are both accepted, and a sampler
-  declaration without a type is tolerated. Covered by 10 tests.
-- Added the HLSL front end for the upcoming shader runtime: `ShaderLexer` tokenizes the
-  `ps_2_0` subset Milkdrop shaders use, covering identifiers and keywords, numbers with their
-  `f`/`h` suffixes, single- and multi-character operators, swizzles, line and block comments,
-  and source positions, and reports an unexpected character with its offset. Covered by
-  10 tests.
-- Added the generated visualizer texture bank. The `noise_lq` (32 x 32), `noise_mq`
-  (256 x 256), and `noise_hq` (512 x 512) textures and the sixteen `rand00`-`rand15` (32 x 32)
-  textures are produced deterministically from fixed seeds, so no third party image is
-  bundled and every run yields the same textures. Sampling is bilinear with repeat, clamp, and
-  mirror wrap modes, and generation is lazy so a session that never opens the visualizer
-  allocates nothing. Covered by 10 tests.
-- Milkdrop preset keys now act as the per-frame starting values: every numeric key (including
-  the `nWaveMode`, `bWaveDots`, `bWaveThick`, `bAdditiveWaves`, `bDarkenCenter`,
-  `bMotionVectors`, and `nMotionVectorsX/Y` spellings) seeds the matching variable, so real
-  presets that carry their settings as keys instead of code work as written.
-- The visualizer draws the full Milkdrop wave and post-processing set: the circular, doubled,
-  and single-line wave modes with dots, thick, additive, mystery, and colour/position keys,
-  the four declared waveform slots, the outer and inner borders, a motion-vector grid derived
-  from the actual motion field, and the video echo with its zoom, alpha, and orientation.
-  Covered by 11 tests.
-- The preset engine now runs the full Milkdrop stage order. It parses the `per_frame_init`,
-  `per_pixel_init`, `wave_0`-`wave_3` and `shape_N_init` blocks, registers the complete
-  standard variable set (`bass_att`/`mid_att`/`treb_att`, `aspectx`/`aspecty`,
-  `pixelsx`/`pixelsy`, `monitor`, `zoomexp`, `rot`, `cx`/`cy`, `dx`/`dy`, `sx`/`sy`,
-  `blur1`-`blur3`, `darken_center`, `fGammaAdj`, the wave, border, motion-vector and echo
-  groups, `q1`-`q32`, and `b1`-`b8`), and applies the motion parameters, the blur passes, the
-  centre darkening, and the gamma adjustment. The per-pixel block now sees the already warped
-  sampling position in `x`/`y`/`rad`/`ang`, so a real preset can offset or replace it.
-  Covered by 16 tests.
-- The **Visualisierung** settings section gained an **Always show text and controls** toggle.
-  When it is off, the title, hint, and playback buttons appear only while the mouse moves
-  over the visualizer and hide again after three idle seconds; pointer movement is tracked
-  through the window's own events, so moving the mouse on another monitor never reveals them.
-- Added a **Visualisierung** settings section with the render resolution (320 x 180 up to
-  1280 x 720), the target frame rate (24, 30, 60, or 120), and the user preset folder that
-  previously lived under the output device. The window renders at the configured size and
-  lets the image control scale the frame up, so a lower resolution keeps the CPU cost down.
 
 - Added a waveform-style transport progress view that keeps the existing seek
   behaviour while showing local-file peak data with the active transport accent
@@ -8453,28 +2605,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   chat and to external MCP clients, and has its own enable/disable toggle in
   Settings → Integration → MCP Server (bringing the tool count to 20).
 
-- The karaoke view now highlights the active word of enhanced-LRC lyrics.
-  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
-  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
-  already-sung words keep the accent colour. Plain synchronized lines keep the
-  line-level highlight, so nothing changes for ordinary LRC files.
-- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
-  now stripped from the line text instead of appearing as literal `<00:12.00>`
-  fragments.
-- Added bulk genre editing for the shared Tracks table. The bulk action bar gained
-  a genre field that stores the value for every selected **local** track through
-  `AudioDatabase.SetTrackGenres`, which writes the library-only
-  `track_genre_overrides` table in one transaction and reapplies it on every later
-  scan. Source media files are never modified, and an empty value removes the
-  override so the next scan restores the embedded genre. Selected Orynivo Server
-  tracks are updated on their owning server through the new authenticated
-  `PUT /api/tracks/{id}/genre`, which records the same library-only override.
-- Podcast episodes can be downloaded for offline playback. Episode rows gained a
-  **Download episode** / **Delete download** context menu and a download marker in
-  the status column, playback prefers the cached file, and Settings > Library sets
-  the cache size limit in megabytes. Eviction removes the least recently used
-  downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
-  the most recently used episode is always kept.
 ### Fixed
 
 - Fixed waveform transport seeking so pointer release is captured reliably, the
@@ -8536,97 +2666,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.20.5] - 2026-07-01
 
 ### Added
-- The visualizer's per-pixel path no longer does work the preset never asked for. The compiled
-  programs now report the variables they reference (`PresetProgram.ReferencedVariables` and
-  `Uses`), the warp stage resolves the `x`, `y`, `rad`, and `ang` slots once instead of looking
-  each name up in the layout for every pixel, and it only computes the polar pair, the motion
-  grid, and the seeded sampling position when the preset's own code needs them. A rendered frame
-  is allocation-free, which is now asserted by a test. Covered by 5 tests.
-- The visualizer renders on its own thread now. A frame used to be produced from a
-  `DispatcherTimer`, so a heavy preset blocked the interface for its whole duration; the loop
-  now runs on a background thread, hands a finished copy of the frame to the UI thread through a
-  presentation buffer, and queues at most one present at a time, so a busy interface can never
-  build up a backlog of frames. Preset switching, the reset key, and the overlay follow as
-  thread-safe requests, and the frame pacing lives in the tested `FramePacing` helper. Covered by
-  5 tests.
-- The visualizer now measures where its frame time goes. `PresetRenderer` reports a
-  `RenderTimings` breakdown (warp, blur, post-processing, overlay, composite, comp shaders, and
-  the frame total) per frame and as an average over a window, and the window's diagnostic line in
-  `logs/seek.log` carries those averages once per second, so the cost per stage can be read
-  instead of guessed. A warp shader runs inside the per-pixel loop, so its cost stays part of
-  `warp`; timing it per pixel would cost more than the measurement is worth. The frame budget now
-  compares the complete frame rather than only the shaders. Covered by 8 tests.
-- Milkdrop `.milk` files are read as the multi-preset files they are: `VisualizerPreset.ParseSections`
-  splits the text at its `[presetNN]` headers and the preset folder loads every section as its
-  own preset instead of only the last one surviving. The declared format version
-  (`MILKDROP_PRESET_VERSION`, `PSVERSION`, or `preset_version`) is reported on
-  `VisualizerPreset.Version`; every version is accepted. Skipped presets now carry a reason
-  through `VisualizerPresetLibrary.RejectedReasons`, naming the file or section and the parse
-  error. A hand-written corpus of presets in the real format, including a multi-section file and
-  shader source, guards the format handling; third-party presets stay unbundled because they are
-  licensed by their authors. Covered by 13 tests.
-- The visualizer now runs preset shaders. The numbered `warp_N` and `comp_N` keys are parsed
-  together with their optional `_enabled`, `_per_frame`, and `_per_pixel` companions, and the
-  preset reader keeps the newlines inside a shader's source, because Milkdrop stores the code
-  as a multi-line value. A shader that does not parse is skipped so one broken shader degrades a
-  preset instead of rejecting it. The renderer implements `IShaderSampler`, so shaders can
-  sample `sampler_main`, `sampler_pc_main`, `sampler_fc_main`, `GetBlur1`-`GetBlur3`, and
-  `GetPixel`, and it binds `uv`, `uv_orig`, `texsize`, the audio bands, the smoothed bands, the
-  frame counters, and the aspect ratio. A per-frame time budget (20 ms by default) skips the
-  shaders for a while when they cost too much, so a heavy preset keeps a smooth picture instead
-  of stalling playback. Covered by 11 tests.
-- Added the HLSL interpreter for the shader runtime: `ShaderInterpreter` evaluates the parsed
-  `ps_2_0` tree with scalar and `float2`/`float3`/`float4` values (`ShaderValue`), covering
-  arithmetic with the C precedence, variables and the assignment operators, swizzles read and
-  written, vector constructors with concatenation and broadcast, the ternary operator,
-  `if`/`else`, `for`, and the usual intrinsics (`abs`, `ceil`, `clamp`, `cos`, `dot`, `exp`,
-  `floor`, `frac`, `length`, `lerp`, `log`, `max`, `min`, `mul`, `normalize`, `pow`, `saturate`,
-  `sign`, `sin`, `smoothstep`, `sqrt`, `step`, `tan`). Sampling goes through the
-  `IShaderSampler` contract, so the interpreter carries no render state, and division by zero
-  yields zero instead of an infinity. A loop budget of 4096 iterations and a call depth limit of
-  32 keep a runaway shader from stalling a frame. Covered by 14 tests.
-- Added the HLSL parser and its syntax tree: `ShaderParser` and `ShaderNode` turn the
-  `ps_2_0` subset into a tagged-union tree covering declarations, expression statements,
-  `if`/`else`, `for`, `return`, swizzles, calls, the ternary operator, and the C operator
-  precedence. Function signatures and bare statement bodies are both accepted, and a sampler
-  declaration without a type is tolerated. Covered by 10 tests.
-- Added the HLSL front end for the upcoming shader runtime: `ShaderLexer` tokenizes the
-  `ps_2_0` subset Milkdrop shaders use, covering identifiers and keywords, numbers with their
-  `f`/`h` suffixes, single- and multi-character operators, swizzles, line and block comments,
-  and source positions, and reports an unexpected character with its offset. Covered by
-  10 tests.
-- Added the generated visualizer texture bank. The `noise_lq` (32 x 32), `noise_mq`
-  (256 x 256), and `noise_hq` (512 x 512) textures and the sixteen `rand00`-`rand15` (32 x 32)
-  textures are produced deterministically from fixed seeds, so no third party image is
-  bundled and every run yields the same textures. Sampling is bilinear with repeat, clamp, and
-  mirror wrap modes, and generation is lazy so a session that never opens the visualizer
-  allocates nothing. Covered by 10 tests.
-- Milkdrop preset keys now act as the per-frame starting values: every numeric key (including
-  the `nWaveMode`, `bWaveDots`, `bWaveThick`, `bAdditiveWaves`, `bDarkenCenter`,
-  `bMotionVectors`, and `nMotionVectorsX/Y` spellings) seeds the matching variable, so real
-  presets that carry their settings as keys instead of code work as written.
-- The visualizer draws the full Milkdrop wave and post-processing set: the circular, doubled,
-  and single-line wave modes with dots, thick, additive, mystery, and colour/position keys,
-  the four declared waveform slots, the outer and inner borders, a motion-vector grid derived
-  from the actual motion field, and the video echo with its zoom, alpha, and orientation.
-  Covered by 11 tests.
-- The preset engine now runs the full Milkdrop stage order. It parses the `per_frame_init`,
-  `per_pixel_init`, `wave_0`-`wave_3` and `shape_N_init` blocks, registers the complete
-  standard variable set (`bass_att`/`mid_att`/`treb_att`, `aspectx`/`aspecty`,
-  `pixelsx`/`pixelsy`, `monitor`, `zoomexp`, `rot`, `cx`/`cy`, `dx`/`dy`, `sx`/`sy`,
-  `blur1`-`blur3`, `darken_center`, `fGammaAdj`, the wave, border, motion-vector and echo
-  groups, `q1`-`q32`, and `b1`-`b8`), and applies the motion parameters, the blur passes, the
-  centre darkening, and the gamma adjustment. The per-pixel block now sees the already warped
-  sampling position in `x`/`y`/`rad`/`ang`, so a real preset can offset or replace it.
-  Covered by 16 tests.
-- The **Visualisierung** settings section gained an **Always show text and controls** toggle.
-  When it is off, the title, hint, and playback buttons appear only while the mouse moves
-  over the visualizer and hide again after three idle seconds; pointer movement is tracked
-  through the window's own events, so moving the mouse on another monitor never reveals them.
-- Added a **Visualisierung** settings section with the render resolution (320 x 180 up to
-  1280 x 720), the target frame rate (24, 30, 60, or 120), and the user preset folder that
-  previously lived under the output device. The window renders at the configured size and
-  lets the image control scale the frame up, so a lower resolution keeps the CPU cost down.
 
 - Introduced a shared typography scale as application resources
   (`FontSizeMeta`, `FontSizeCaption`, `FontSizeBody`, `FontSizeBodyStrong`,
@@ -8667,28 +2706,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   Settings, and pending checks are cancelled when the list is rebuilt or Settings
   is closed.
 
-- The karaoke view now highlights the active word of enhanced-LRC lyrics.
-  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
-  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
-  already-sung words keep the accent colour. Plain synchronized lines keep the
-  line-level highlight, so nothing changes for ordinary LRC files.
-- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
-  now stripped from the line text instead of appearing as literal `<00:12.00>`
-  fragments.
-- Added bulk genre editing for the shared Tracks table. The bulk action bar gained
-  a genre field that stores the value for every selected **local** track through
-  `AudioDatabase.SetTrackGenres`, which writes the library-only
-  `track_genre_overrides` table in one transaction and reapplies it on every later
-  scan. Source media files are never modified, and an empty value removes the
-  override so the next scan restores the embedded genre. Selected Orynivo Server
-  tracks are updated on their owning server through the new authenticated
-  `PUT /api/tracks/{id}/genre`, which records the same library-only override.
-- Podcast episodes can be downloaded for offline playback. Episode rows gained a
-  **Download episode** / **Delete download** context menu and a download marker in
-  the status column, playback prefers the cached file, and Settings > Library sets
-  the cache size limit in megabytes. Eviction removes the least recently used
-  downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
-  the most recently used episode is always kept.
 ### Fixed
 
 - Fixed checkbox borders appearing near-black on the dark background: the app
@@ -8713,28 +2730,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Album and artist artwork cards now use theme-aware placeholder backgrounds,
   subtle borders, clipped covers, and a calmer asymmetric card shape.
 
-- The karaoke view now highlights the active word of enhanced-LRC lyrics.
-  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
-  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
-  already-sung words keep the accent colour. Plain synchronized lines keep the
-  line-level highlight, so nothing changes for ordinary LRC files.
-- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
-  now stripped from the line text instead of appearing as literal `<00:12.00>`
-  fragments.
-- Added bulk genre editing for the shared Tracks table. The bulk action bar gained
-  a genre field that stores the value for every selected **local** track through
-  `AudioDatabase.SetTrackGenres`, which writes the library-only
-  `track_genre_overrides` table in one transaction and reapplies it on every later
-  scan. Source media files are never modified, and an empty value removes the
-  override so the next scan restores the embedded genre. Selected Orynivo Server
-  tracks are updated on their owning server through the new authenticated
-  `PUT /api/tracks/{id}/genre`, which records the same library-only override.
-- Podcast episodes can be downloaded for offline playback. Episode rows gained a
-  **Download episode** / **Delete download** context menu and a download marker in
-  the status column, playback prefers the cached file, and Settings > Library sets
-  the cache size limit in megabytes. Eviction removes the least recently used
-  downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
-  the most recently used episode is always kept.
 ### Fixed
 
 - Library watcher rescans now honour cancellation while waiting between locked
@@ -8776,97 +2771,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.20.3] - 2026-06-30
 
 ### Added
-- The visualizer's per-pixel path no longer does work the preset never asked for. The compiled
-  programs now report the variables they reference (`PresetProgram.ReferencedVariables` and
-  `Uses`), the warp stage resolves the `x`, `y`, `rad`, and `ang` slots once instead of looking
-  each name up in the layout for every pixel, and it only computes the polar pair, the motion
-  grid, and the seeded sampling position when the preset's own code needs them. A rendered frame
-  is allocation-free, which is now asserted by a test. Covered by 5 tests.
-- The visualizer renders on its own thread now. A frame used to be produced from a
-  `DispatcherTimer`, so a heavy preset blocked the interface for its whole duration; the loop
-  now runs on a background thread, hands a finished copy of the frame to the UI thread through a
-  presentation buffer, and queues at most one present at a time, so a busy interface can never
-  build up a backlog of frames. Preset switching, the reset key, and the overlay follow as
-  thread-safe requests, and the frame pacing lives in the tested `FramePacing` helper. Covered by
-  5 tests.
-- The visualizer now measures where its frame time goes. `PresetRenderer` reports a
-  `RenderTimings` breakdown (warp, blur, post-processing, overlay, composite, comp shaders, and
-  the frame total) per frame and as an average over a window, and the window's diagnostic line in
-  `logs/seek.log` carries those averages once per second, so the cost per stage can be read
-  instead of guessed. A warp shader runs inside the per-pixel loop, so its cost stays part of
-  `warp`; timing it per pixel would cost more than the measurement is worth. The frame budget now
-  compares the complete frame rather than only the shaders. Covered by 8 tests.
-- Milkdrop `.milk` files are read as the multi-preset files they are: `VisualizerPreset.ParseSections`
-  splits the text at its `[presetNN]` headers and the preset folder loads every section as its
-  own preset instead of only the last one surviving. The declared format version
-  (`MILKDROP_PRESET_VERSION`, `PSVERSION`, or `preset_version`) is reported on
-  `VisualizerPreset.Version`; every version is accepted. Skipped presets now carry a reason
-  through `VisualizerPresetLibrary.RejectedReasons`, naming the file or section and the parse
-  error. A hand-written corpus of presets in the real format, including a multi-section file and
-  shader source, guards the format handling; third-party presets stay unbundled because they are
-  licensed by their authors. Covered by 13 tests.
-- The visualizer now runs preset shaders. The numbered `warp_N` and `comp_N` keys are parsed
-  together with their optional `_enabled`, `_per_frame`, and `_per_pixel` companions, and the
-  preset reader keeps the newlines inside a shader's source, because Milkdrop stores the code
-  as a multi-line value. A shader that does not parse is skipped so one broken shader degrades a
-  preset instead of rejecting it. The renderer implements `IShaderSampler`, so shaders can
-  sample `sampler_main`, `sampler_pc_main`, `sampler_fc_main`, `GetBlur1`-`GetBlur3`, and
-  `GetPixel`, and it binds `uv`, `uv_orig`, `texsize`, the audio bands, the smoothed bands, the
-  frame counters, and the aspect ratio. A per-frame time budget (20 ms by default) skips the
-  shaders for a while when they cost too much, so a heavy preset keeps a smooth picture instead
-  of stalling playback. Covered by 11 tests.
-- Added the HLSL interpreter for the shader runtime: `ShaderInterpreter` evaluates the parsed
-  `ps_2_0` tree with scalar and `float2`/`float3`/`float4` values (`ShaderValue`), covering
-  arithmetic with the C precedence, variables and the assignment operators, swizzles read and
-  written, vector constructors with concatenation and broadcast, the ternary operator,
-  `if`/`else`, `for`, and the usual intrinsics (`abs`, `ceil`, `clamp`, `cos`, `dot`, `exp`,
-  `floor`, `frac`, `length`, `lerp`, `log`, `max`, `min`, `mul`, `normalize`, `pow`, `saturate`,
-  `sign`, `sin`, `smoothstep`, `sqrt`, `step`, `tan`). Sampling goes through the
-  `IShaderSampler` contract, so the interpreter carries no render state, and division by zero
-  yields zero instead of an infinity. A loop budget of 4096 iterations and a call depth limit of
-  32 keep a runaway shader from stalling a frame. Covered by 14 tests.
-- Added the HLSL parser and its syntax tree: `ShaderParser` and `ShaderNode` turn the
-  `ps_2_0` subset into a tagged-union tree covering declarations, expression statements,
-  `if`/`else`, `for`, `return`, swizzles, calls, the ternary operator, and the C operator
-  precedence. Function signatures and bare statement bodies are both accepted, and a sampler
-  declaration without a type is tolerated. Covered by 10 tests.
-- Added the HLSL front end for the upcoming shader runtime: `ShaderLexer` tokenizes the
-  `ps_2_0` subset Milkdrop shaders use, covering identifiers and keywords, numbers with their
-  `f`/`h` suffixes, single- and multi-character operators, swizzles, line and block comments,
-  and source positions, and reports an unexpected character with its offset. Covered by
-  10 tests.
-- Added the generated visualizer texture bank. The `noise_lq` (32 x 32), `noise_mq`
-  (256 x 256), and `noise_hq` (512 x 512) textures and the sixteen `rand00`-`rand15` (32 x 32)
-  textures are produced deterministically from fixed seeds, so no third party image is
-  bundled and every run yields the same textures. Sampling is bilinear with repeat, clamp, and
-  mirror wrap modes, and generation is lazy so a session that never opens the visualizer
-  allocates nothing. Covered by 10 tests.
-- Milkdrop preset keys now act as the per-frame starting values: every numeric key (including
-  the `nWaveMode`, `bWaveDots`, `bWaveThick`, `bAdditiveWaves`, `bDarkenCenter`,
-  `bMotionVectors`, and `nMotionVectorsX/Y` spellings) seeds the matching variable, so real
-  presets that carry their settings as keys instead of code work as written.
-- The visualizer draws the full Milkdrop wave and post-processing set: the circular, doubled,
-  and single-line wave modes with dots, thick, additive, mystery, and colour/position keys,
-  the four declared waveform slots, the outer and inner borders, a motion-vector grid derived
-  from the actual motion field, and the video echo with its zoom, alpha, and orientation.
-  Covered by 11 tests.
-- The preset engine now runs the full Milkdrop stage order. It parses the `per_frame_init`,
-  `per_pixel_init`, `wave_0`-`wave_3` and `shape_N_init` blocks, registers the complete
-  standard variable set (`bass_att`/`mid_att`/`treb_att`, `aspectx`/`aspecty`,
-  `pixelsx`/`pixelsy`, `monitor`, `zoomexp`, `rot`, `cx`/`cy`, `dx`/`dy`, `sx`/`sy`,
-  `blur1`-`blur3`, `darken_center`, `fGammaAdj`, the wave, border, motion-vector and echo
-  groups, `q1`-`q32`, and `b1`-`b8`), and applies the motion parameters, the blur passes, the
-  centre darkening, and the gamma adjustment. The per-pixel block now sees the already warped
-  sampling position in `x`/`y`/`rad`/`ang`, so a real preset can offset or replace it.
-  Covered by 16 tests.
-- The **Visualisierung** settings section gained an **Always show text and controls** toggle.
-  When it is off, the title, hint, and playback buttons appear only while the mouse moves
-  over the visualizer and hide again after three idle seconds; pointer movement is tracked
-  through the window's own events, so moving the mouse on another monitor never reveals them.
-- Added a **Visualisierung** settings section with the render resolution (320 x 180 up to
-  1280 x 720), the target frame rate (24, 30, 60, or 120), and the user preset folder that
-  previously lived under the output device. The window renders at the configured size and
-  lets the image control scale the frame up, so a lower resolution keeps the CPU cost down.
 
 - The Dashboard's "Recently added albums" strip now also includes albums from
   every configured remote Orynivo Server, merged with the local library and
@@ -8886,28 +2790,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   accent-bordered card style (`#6C63FF`, `CornerRadius="0,24,0,24"`) as the
   library headline/intro card, for both local and remote search results.
 
-- The karaoke view now highlights the active word of enhanced-LRC lyrics.
-  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
-  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
-  already-sung words keep the accent colour. Plain synchronized lines keep the
-  line-level highlight, so nothing changes for ordinary LRC files.
-- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
-  now stripped from the line text instead of appearing as literal `<00:12.00>`
-  fragments.
-- Added bulk genre editing for the shared Tracks table. The bulk action bar gained
-  a genre field that stores the value for every selected **local** track through
-  `AudioDatabase.SetTrackGenres`, which writes the library-only
-  `track_genre_overrides` table in one transaction and reapplies it on every later
-  scan. Source media files are never modified, and an empty value removes the
-  override so the next scan restores the embedded genre. Selected Orynivo Server
-  tracks are updated on their owning server through the new authenticated
-  `PUT /api/tracks/{id}/genre`, which records the same library-only override.
-- Podcast episodes can be downloaded for offline playback. Episode rows gained a
-  **Download episode** / **Delete download** context menu and a download marker in
-  the status column, playback prefers the cached file, and Settings > Library sets
-  the cache size limit in megabytes. Eviction removes the least recently used
-  downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
-  the most recently used episode is always kept.
 ### Fixed
 
 - The Dashboard genre statistics (Top genres and the per-day calendar genres) now
@@ -8929,28 +2811,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [0.20.2] - 2026-06-29
 
-- The karaoke view now highlights the active word of enhanced-LRC lyrics.
-  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
-  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
-  already-sung words keep the accent colour. Plain synchronized lines keep the
-  line-level highlight, so nothing changes for ordinary LRC files.
-- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
-  now stripped from the line text instead of appearing as literal `<00:12.00>`
-  fragments.
-- Added bulk genre editing for the shared Tracks table. The bulk action bar gained
-  a genre field that stores the value for every selected **local** track through
-  `AudioDatabase.SetTrackGenres`, which writes the library-only
-  `track_genre_overrides` table in one transaction and reapplies it on every later
-  scan. Source media files are never modified, and an empty value removes the
-  override so the next scan restores the embedded genre. Selected Orynivo Server
-  tracks are updated on their owning server through the new authenticated
-  `PUT /api/tracks/{id}/genre`, which records the same library-only override.
-- Podcast episodes can be downloaded for offline playback. Episode rows gained a
-  **Download episode** / **Delete download** context menu and a download marker in
-  the status column, playback prefers the cached file, and Settings > Library sets
-  the cache size limit in megabytes. Eviction removes the least recently used
-  downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
-  the most recently used episode is always kept.
 ### Fixed
 
 - The Linux Orynivo Server now reads and writes its editable configuration at
@@ -8963,28 +2823,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [0.20.1] - 2026-06-29
 
-- The karaoke view now highlights the active word of enhanced-LRC lyrics.
-  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
-  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
-  already-sung words keep the accent colour. Plain synchronized lines keep the
-  line-level highlight, so nothing changes for ordinary LRC files.
-- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
-  now stripped from the line text instead of appearing as literal `<00:12.00>`
-  fragments.
-- Added bulk genre editing for the shared Tracks table. The bulk action bar gained
-  a genre field that stores the value for every selected **local** track through
-  `AudioDatabase.SetTrackGenres`, which writes the library-only
-  `track_genre_overrides` table in one transaction and reapplies it on every later
-  scan. Source media files are never modified, and an empty value removes the
-  override so the next scan restores the embedded genre. Selected Orynivo Server
-  tracks are updated on their owning server through the new authenticated
-  `PUT /api/tracks/{id}/genre`, which records the same library-only override.
-- Podcast episodes can be downloaded for offline playback. Episode rows gained a
-  **Download episode** / **Delete download** context menu and a download marker in
-  the status column, playback prefers the cached file, and Settings > Library sets
-  the cache size limit in megabytes. Eviction removes the least recently used
-  downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
-  the most recently used episode is always kept.
 ### Fixed
 
 - The Linux Orynivo Server package no longer crashes on startup
@@ -9004,97 +2842,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.20.0] - 2026-06-29
 
 ### Added
-- The visualizer's per-pixel path no longer does work the preset never asked for. The compiled
-  programs now report the variables they reference (`PresetProgram.ReferencedVariables` and
-  `Uses`), the warp stage resolves the `x`, `y`, `rad`, and `ang` slots once instead of looking
-  each name up in the layout for every pixel, and it only computes the polar pair, the motion
-  grid, and the seeded sampling position when the preset's own code needs them. A rendered frame
-  is allocation-free, which is now asserted by a test. Covered by 5 tests.
-- The visualizer renders on its own thread now. A frame used to be produced from a
-  `DispatcherTimer`, so a heavy preset blocked the interface for its whole duration; the loop
-  now runs on a background thread, hands a finished copy of the frame to the UI thread through a
-  presentation buffer, and queues at most one present at a time, so a busy interface can never
-  build up a backlog of frames. Preset switching, the reset key, and the overlay follow as
-  thread-safe requests, and the frame pacing lives in the tested `FramePacing` helper. Covered by
-  5 tests.
-- The visualizer now measures where its frame time goes. `PresetRenderer` reports a
-  `RenderTimings` breakdown (warp, blur, post-processing, overlay, composite, comp shaders, and
-  the frame total) per frame and as an average over a window, and the window's diagnostic line in
-  `logs/seek.log` carries those averages once per second, so the cost per stage can be read
-  instead of guessed. A warp shader runs inside the per-pixel loop, so its cost stays part of
-  `warp`; timing it per pixel would cost more than the measurement is worth. The frame budget now
-  compares the complete frame rather than only the shaders. Covered by 8 tests.
-- Milkdrop `.milk` files are read as the multi-preset files they are: `VisualizerPreset.ParseSections`
-  splits the text at its `[presetNN]` headers and the preset folder loads every section as its
-  own preset instead of only the last one surviving. The declared format version
-  (`MILKDROP_PRESET_VERSION`, `PSVERSION`, or `preset_version`) is reported on
-  `VisualizerPreset.Version`; every version is accepted. Skipped presets now carry a reason
-  through `VisualizerPresetLibrary.RejectedReasons`, naming the file or section and the parse
-  error. A hand-written corpus of presets in the real format, including a multi-section file and
-  shader source, guards the format handling; third-party presets stay unbundled because they are
-  licensed by their authors. Covered by 13 tests.
-- The visualizer now runs preset shaders. The numbered `warp_N` and `comp_N` keys are parsed
-  together with their optional `_enabled`, `_per_frame`, and `_per_pixel` companions, and the
-  preset reader keeps the newlines inside a shader's source, because Milkdrop stores the code
-  as a multi-line value. A shader that does not parse is skipped so one broken shader degrades a
-  preset instead of rejecting it. The renderer implements `IShaderSampler`, so shaders can
-  sample `sampler_main`, `sampler_pc_main`, `sampler_fc_main`, `GetBlur1`-`GetBlur3`, and
-  `GetPixel`, and it binds `uv`, `uv_orig`, `texsize`, the audio bands, the smoothed bands, the
-  frame counters, and the aspect ratio. A per-frame time budget (20 ms by default) skips the
-  shaders for a while when they cost too much, so a heavy preset keeps a smooth picture instead
-  of stalling playback. Covered by 11 tests.
-- Added the HLSL interpreter for the shader runtime: `ShaderInterpreter` evaluates the parsed
-  `ps_2_0` tree with scalar and `float2`/`float3`/`float4` values (`ShaderValue`), covering
-  arithmetic with the C precedence, variables and the assignment operators, swizzles read and
-  written, vector constructors with concatenation and broadcast, the ternary operator,
-  `if`/`else`, `for`, and the usual intrinsics (`abs`, `ceil`, `clamp`, `cos`, `dot`, `exp`,
-  `floor`, `frac`, `length`, `lerp`, `log`, `max`, `min`, `mul`, `normalize`, `pow`, `saturate`,
-  `sign`, `sin`, `smoothstep`, `sqrt`, `step`, `tan`). Sampling goes through the
-  `IShaderSampler` contract, so the interpreter carries no render state, and division by zero
-  yields zero instead of an infinity. A loop budget of 4096 iterations and a call depth limit of
-  32 keep a runaway shader from stalling a frame. Covered by 14 tests.
-- Added the HLSL parser and its syntax tree: `ShaderParser` and `ShaderNode` turn the
-  `ps_2_0` subset into a tagged-union tree covering declarations, expression statements,
-  `if`/`else`, `for`, `return`, swizzles, calls, the ternary operator, and the C operator
-  precedence. Function signatures and bare statement bodies are both accepted, and a sampler
-  declaration without a type is tolerated. Covered by 10 tests.
-- Added the HLSL front end for the upcoming shader runtime: `ShaderLexer` tokenizes the
-  `ps_2_0` subset Milkdrop shaders use, covering identifiers and keywords, numbers with their
-  `f`/`h` suffixes, single- and multi-character operators, swizzles, line and block comments,
-  and source positions, and reports an unexpected character with its offset. Covered by
-  10 tests.
-- Added the generated visualizer texture bank. The `noise_lq` (32 x 32), `noise_mq`
-  (256 x 256), and `noise_hq` (512 x 512) textures and the sixteen `rand00`-`rand15` (32 x 32)
-  textures are produced deterministically from fixed seeds, so no third party image is
-  bundled and every run yields the same textures. Sampling is bilinear with repeat, clamp, and
-  mirror wrap modes, and generation is lazy so a session that never opens the visualizer
-  allocates nothing. Covered by 10 tests.
-- Milkdrop preset keys now act as the per-frame starting values: every numeric key (including
-  the `nWaveMode`, `bWaveDots`, `bWaveThick`, `bAdditiveWaves`, `bDarkenCenter`,
-  `bMotionVectors`, and `nMotionVectorsX/Y` spellings) seeds the matching variable, so real
-  presets that carry their settings as keys instead of code work as written.
-- The visualizer draws the full Milkdrop wave and post-processing set: the circular, doubled,
-  and single-line wave modes with dots, thick, additive, mystery, and colour/position keys,
-  the four declared waveform slots, the outer and inner borders, a motion-vector grid derived
-  from the actual motion field, and the video echo with its zoom, alpha, and orientation.
-  Covered by 11 tests.
-- The preset engine now runs the full Milkdrop stage order. It parses the `per_frame_init`,
-  `per_pixel_init`, `wave_0`-`wave_3` and `shape_N_init` blocks, registers the complete
-  standard variable set (`bass_att`/`mid_att`/`treb_att`, `aspectx`/`aspecty`,
-  `pixelsx`/`pixelsy`, `monitor`, `zoomexp`, `rot`, `cx`/`cy`, `dx`/`dy`, `sx`/`sy`,
-  `blur1`-`blur3`, `darken_center`, `fGammaAdj`, the wave, border, motion-vector and echo
-  groups, `q1`-`q32`, and `b1`-`b8`), and applies the motion parameters, the blur passes, the
-  centre darkening, and the gamma adjustment. The per-pixel block now sees the already warped
-  sampling position in `x`/`y`/`rad`/`ang`, so a real preset can offset or replace it.
-  Covered by 16 tests.
-- The **Visualisierung** settings section gained an **Always show text and controls** toggle.
-  When it is off, the title, hint, and playback buttons appear only while the mouse moves
-  over the visualizer and hide again after three idle seconds; pointer movement is tracked
-  through the window's own events, so moving the mouse on another monitor never reveals them.
-- Added a **Visualisierung** settings section with the render resolution (320 x 180 up to
-  1280 x 720), the target frame rate (24, 30, 60, or 120), and the user preset folder that
-  previously lived under the output device. The window renders at the configured size and
-  lets the image control scale the frame up, so a lower resolution keeps the CPU cost down.
 
 - Remote Orynivo Server Tracks now caches the downloaded full track list under
   `%LOCALAPPDATA%\Orynivo\remote-track-cache\` and reuses it while the server's
@@ -9103,28 +2850,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   (cached playback URLs embed it) and client-side favourites are re-applied after
   loading so toggling a favourite is never masked by stale cached flags.
 
-- The karaoke view now highlights the active word of enhanced-LRC lyrics.
-  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
-  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
-  already-sung words keep the accent colour. Plain synchronized lines keep the
-  line-level highlight, so nothing changes for ordinary LRC files.
-- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
-  now stripped from the line text instead of appearing as literal `<00:12.00>`
-  fragments.
-- Added bulk genre editing for the shared Tracks table. The bulk action bar gained
-  a genre field that stores the value for every selected **local** track through
-  `AudioDatabase.SetTrackGenres`, which writes the library-only
-  `track_genre_overrides` table in one transaction and reapplies it on every later
-  scan. Source media files are never modified, and an empty value removes the
-  override so the next scan restores the embedded genre. Selected Orynivo Server
-  tracks are updated on their owning server through the new authenticated
-  `PUT /api/tracks/{id}/genre`, which records the same library-only override.
-- Podcast episodes can be downloaded for offline playback. Episode rows gained a
-  **Download episode** / **Delete download** context menu and a download marker in
-  the status column, playback prefers the cached file, and Settings > Library sets
-  the cache size limit in megabytes. Eviction removes the least recently used
-  downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
-  the most recently used episode is always kept.
 ### Fixed
 
 - Remote Orynivo Server folder view loading placeholder now uses the themed muted
@@ -9165,28 +2890,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [0.19.0] - 2026-06-28
 
-- The karaoke view now highlights the active word of enhanced-LRC lyrics.
-  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
-  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
-  already-sung words keep the accent colour. Plain synchronized lines keep the
-  line-level highlight, so nothing changes for ordinary LRC files.
-- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
-  now stripped from the line text instead of appearing as literal `<00:12.00>`
-  fragments.
-- Added bulk genre editing for the shared Tracks table. The bulk action bar gained
-  a genre field that stores the value for every selected **local** track through
-  `AudioDatabase.SetTrackGenres`, which writes the library-only
-  `track_genre_overrides` table in one transaction and reapplies it on every later
-  scan. Source media files are never modified, and an empty value removes the
-  override so the next scan restores the embedded genre. Selected Orynivo Server
-  tracks are updated on their owning server through the new authenticated
-  `PUT /api/tracks/{id}/genre`, which records the same library-only override.
-- Podcast episodes can be downloaded for offline playback. Episode rows gained a
-  **Download episode** / **Delete download** context menu and a download marker in
-  the status column, playback prefers the cached file, and Settings > Library sets
-  the cache size limit in megabytes. Eviction removes the least recently used
-  downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
-  the most recently used episode is always kept.
 ### Fixed
 
 - Windows FFmpeg auto-download now resolves the current BtbN release asset via
@@ -9195,124 +2898,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.18.0] - 2026-06-28
 
 ### Added
-- The visualizer's per-pixel path no longer does work the preset never asked for. The compiled
-  programs now report the variables they reference (`PresetProgram.ReferencedVariables` and
-  `Uses`), the warp stage resolves the `x`, `y`, `rad`, and `ang` slots once instead of looking
-  each name up in the layout for every pixel, and it only computes the polar pair, the motion
-  grid, and the seeded sampling position when the preset's own code needs them. A rendered frame
-  is allocation-free, which is now asserted by a test. Covered by 5 tests.
-- The visualizer renders on its own thread now. A frame used to be produced from a
-  `DispatcherTimer`, so a heavy preset blocked the interface for its whole duration; the loop
-  now runs on a background thread, hands a finished copy of the frame to the UI thread through a
-  presentation buffer, and queues at most one present at a time, so a busy interface can never
-  build up a backlog of frames. Preset switching, the reset key, and the overlay follow as
-  thread-safe requests, and the frame pacing lives in the tested `FramePacing` helper. Covered by
-  5 tests.
-- The visualizer now measures where its frame time goes. `PresetRenderer` reports a
-  `RenderTimings` breakdown (warp, blur, post-processing, overlay, composite, comp shaders, and
-  the frame total) per frame and as an average over a window, and the window's diagnostic line in
-  `logs/seek.log` carries those averages once per second, so the cost per stage can be read
-  instead of guessed. A warp shader runs inside the per-pixel loop, so its cost stays part of
-  `warp`; timing it per pixel would cost more than the measurement is worth. The frame budget now
-  compares the complete frame rather than only the shaders. Covered by 8 tests.
-- Milkdrop `.milk` files are read as the multi-preset files they are: `VisualizerPreset.ParseSections`
-  splits the text at its `[presetNN]` headers and the preset folder loads every section as its
-  own preset instead of only the last one surviving. The declared format version
-  (`MILKDROP_PRESET_VERSION`, `PSVERSION`, or `preset_version`) is reported on
-  `VisualizerPreset.Version`; every version is accepted. Skipped presets now carry a reason
-  through `VisualizerPresetLibrary.RejectedReasons`, naming the file or section and the parse
-  error. A hand-written corpus of presets in the real format, including a multi-section file and
-  shader source, guards the format handling; third-party presets stay unbundled because they are
-  licensed by their authors. Covered by 13 tests.
-- The visualizer now runs preset shaders. The numbered `warp_N` and `comp_N` keys are parsed
-  together with their optional `_enabled`, `_per_frame`, and `_per_pixel` companions, and the
-  preset reader keeps the newlines inside a shader's source, because Milkdrop stores the code
-  as a multi-line value. A shader that does not parse is skipped so one broken shader degrades a
-  preset instead of rejecting it. The renderer implements `IShaderSampler`, so shaders can
-  sample `sampler_main`, `sampler_pc_main`, `sampler_fc_main`, `GetBlur1`-`GetBlur3`, and
-  `GetPixel`, and it binds `uv`, `uv_orig`, `texsize`, the audio bands, the smoothed bands, the
-  frame counters, and the aspect ratio. A per-frame time budget (20 ms by default) skips the
-  shaders for a while when they cost too much, so a heavy preset keeps a smooth picture instead
-  of stalling playback. Covered by 11 tests.
-- Added the HLSL interpreter for the shader runtime: `ShaderInterpreter` evaluates the parsed
-  `ps_2_0` tree with scalar and `float2`/`float3`/`float4` values (`ShaderValue`), covering
-  arithmetic with the C precedence, variables and the assignment operators, swizzles read and
-  written, vector constructors with concatenation and broadcast, the ternary operator,
-  `if`/`else`, `for`, and the usual intrinsics (`abs`, `ceil`, `clamp`, `cos`, `dot`, `exp`,
-  `floor`, `frac`, `length`, `lerp`, `log`, `max`, `min`, `mul`, `normalize`, `pow`, `saturate`,
-  `sign`, `sin`, `smoothstep`, `sqrt`, `step`, `tan`). Sampling goes through the
-  `IShaderSampler` contract, so the interpreter carries no render state, and division by zero
-  yields zero instead of an infinity. A loop budget of 4096 iterations and a call depth limit of
-  32 keep a runaway shader from stalling a frame. Covered by 14 tests.
-- Added the HLSL parser and its syntax tree: `ShaderParser` and `ShaderNode` turn the
-  `ps_2_0` subset into a tagged-union tree covering declarations, expression statements,
-  `if`/`else`, `for`, `return`, swizzles, calls, the ternary operator, and the C operator
-  precedence. Function signatures and bare statement bodies are both accepted, and a sampler
-  declaration without a type is tolerated. Covered by 10 tests.
-- Added the HLSL front end for the upcoming shader runtime: `ShaderLexer` tokenizes the
-  `ps_2_0` subset Milkdrop shaders use, covering identifiers and keywords, numbers with their
-  `f`/`h` suffixes, single- and multi-character operators, swizzles, line and block comments,
-  and source positions, and reports an unexpected character with its offset. Covered by
-  10 tests.
-- Added the generated visualizer texture bank. The `noise_lq` (32 x 32), `noise_mq`
-  (256 x 256), and `noise_hq` (512 x 512) textures and the sixteen `rand00`-`rand15` (32 x 32)
-  textures are produced deterministically from fixed seeds, so no third party image is
-  bundled and every run yields the same textures. Sampling is bilinear with repeat, clamp, and
-  mirror wrap modes, and generation is lazy so a session that never opens the visualizer
-  allocates nothing. Covered by 10 tests.
-- Milkdrop preset keys now act as the per-frame starting values: every numeric key (including
-  the `nWaveMode`, `bWaveDots`, `bWaveThick`, `bAdditiveWaves`, `bDarkenCenter`,
-  `bMotionVectors`, and `nMotionVectorsX/Y` spellings) seeds the matching variable, so real
-  presets that carry their settings as keys instead of code work as written.
-- The visualizer draws the full Milkdrop wave and post-processing set: the circular, doubled,
-  and single-line wave modes with dots, thick, additive, mystery, and colour/position keys,
-  the four declared waveform slots, the outer and inner borders, a motion-vector grid derived
-  from the actual motion field, and the video echo with its zoom, alpha, and orientation.
-  Covered by 11 tests.
-- The preset engine now runs the full Milkdrop stage order. It parses the `per_frame_init`,
-  `per_pixel_init`, `wave_0`-`wave_3` and `shape_N_init` blocks, registers the complete
-  standard variable set (`bass_att`/`mid_att`/`treb_att`, `aspectx`/`aspecty`,
-  `pixelsx`/`pixelsy`, `monitor`, `zoomexp`, `rot`, `cx`/`cy`, `dx`/`dy`, `sx`/`sy`,
-  `blur1`-`blur3`, `darken_center`, `fGammaAdj`, the wave, border, motion-vector and echo
-  groups, `q1`-`q32`, and `b1`-`b8`), and applies the motion parameters, the blur passes, the
-  centre darkening, and the gamma adjustment. The per-pixel block now sees the already warped
-  sampling position in `x`/`y`/`rad`/`ang`, so a real preset can offset or replace it.
-  Covered by 16 tests.
-- The **Visualisierung** settings section gained an **Always show text and controls** toggle.
-  When it is off, the title, hint, and playback buttons appear only while the mouse moves
-  over the visualizer and hide again after three idle seconds; pointer movement is tracked
-  through the window's own events, so moving the mouse on another monitor never reveals them.
-- Added a **Visualisierung** settings section with the render resolution (320 x 180 up to
-  1280 x 720), the target frame rate (24, 30, 60, or 120), and the user preset folder that
-  previously lived under the output device. The window renders at the configured size and
-  lets the image control scale the frame up, so a lower resolution keeps the CPU cost down.
 
 - Added a shared playlist provider layer for local and remote Orynivo Server
   libraries so track/album/folder context menus use the same playlist actions
   while persisting entries to the correct local database or remote server.
 
-- The karaoke view now highlights the active word of enhanced-LRC lyrics.
-  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
-  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
-  already-sung words keep the accent colour. Plain synchronized lines keep the
-  line-level highlight, so nothing changes for ordinary LRC files.
-- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
-  now stripped from the line text instead of appearing as literal `<00:12.00>`
-  fragments.
-- Added bulk genre editing for the shared Tracks table. The bulk action bar gained
-  a genre field that stores the value for every selected **local** track through
-  `AudioDatabase.SetTrackGenres`, which writes the library-only
-  `track_genre_overrides` table in one transaction and reapplies it on every later
-  scan. Source media files are never modified, and an empty value removes the
-  override so the next scan restores the embedded genre. Selected Orynivo Server
-  tracks are updated on their owning server through the new authenticated
-  `PUT /api/tracks/{id}/genre`, which records the same library-only override.
-- Podcast episodes can be downloaded for offline playback. Episode rows gained a
-  **Download episode** / **Delete download** context menu and a download marker in
-  the status column, playback prefers the cached file, and Settings > Library sets
-  the cache size limit in megabytes. Eviction removes the least recently used
-  downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
-  the most recently used episode is always kept.
 ### Fixed
 
 - FFmpeg and FFprobe child processes now always receive a valid working
@@ -9322,28 +2912,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [0.17.0] - 2026-06-28
 
-- The karaoke view now highlights the active word of enhanced-LRC lyrics.
-  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
-  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
-  already-sung words keep the accent colour. Plain synchronized lines keep the
-  line-level highlight, so nothing changes for ordinary LRC files.
-- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
-  now stripped from the line text instead of appearing as literal `<00:12.00>`
-  fragments.
-- Added bulk genre editing for the shared Tracks table. The bulk action bar gained
-  a genre field that stores the value for every selected **local** track through
-  `AudioDatabase.SetTrackGenres`, which writes the library-only
-  `track_genre_overrides` table in one transaction and reapplies it on every later
-  scan. Source media files are never modified, and an empty value removes the
-  override so the next scan restores the embedded genre. Selected Orynivo Server
-  tracks are updated on their owning server through the new authenticated
-  `PUT /api/tracks/{id}/genre`, which records the same library-only override.
-- Podcast episodes can be downloaded for offline playback. Episode rows gained a
-  **Download episode** / **Delete download** context menu and a download marker in
-  the status column, playback prefers the cached file, and Settings > Library sets
-  the cache size limit in megabytes. Eviction removes the least recently used
-  downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
-  the most recently used episode is always kept.
 ### Fixed
 
 - Automatic FFmpeg download on Windows now stores downloaded binaries in
@@ -9357,97 +2925,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.16.0] - 2026-06-28
 
 ### Added
-- The visualizer's per-pixel path no longer does work the preset never asked for. The compiled
-  programs now report the variables they reference (`PresetProgram.ReferencedVariables` and
-  `Uses`), the warp stage resolves the `x`, `y`, `rad`, and `ang` slots once instead of looking
-  each name up in the layout for every pixel, and it only computes the polar pair, the motion
-  grid, and the seeded sampling position when the preset's own code needs them. A rendered frame
-  is allocation-free, which is now asserted by a test. Covered by 5 tests.
-- The visualizer renders on its own thread now. A frame used to be produced from a
-  `DispatcherTimer`, so a heavy preset blocked the interface for its whole duration; the loop
-  now runs on a background thread, hands a finished copy of the frame to the UI thread through a
-  presentation buffer, and queues at most one present at a time, so a busy interface can never
-  build up a backlog of frames. Preset switching, the reset key, and the overlay follow as
-  thread-safe requests, and the frame pacing lives in the tested `FramePacing` helper. Covered by
-  5 tests.
-- The visualizer now measures where its frame time goes. `PresetRenderer` reports a
-  `RenderTimings` breakdown (warp, blur, post-processing, overlay, composite, comp shaders, and
-  the frame total) per frame and as an average over a window, and the window's diagnostic line in
-  `logs/seek.log` carries those averages once per second, so the cost per stage can be read
-  instead of guessed. A warp shader runs inside the per-pixel loop, so its cost stays part of
-  `warp`; timing it per pixel would cost more than the measurement is worth. The frame budget now
-  compares the complete frame rather than only the shaders. Covered by 8 tests.
-- Milkdrop `.milk` files are read as the multi-preset files they are: `VisualizerPreset.ParseSections`
-  splits the text at its `[presetNN]` headers and the preset folder loads every section as its
-  own preset instead of only the last one surviving. The declared format version
-  (`MILKDROP_PRESET_VERSION`, `PSVERSION`, or `preset_version`) is reported on
-  `VisualizerPreset.Version`; every version is accepted. Skipped presets now carry a reason
-  through `VisualizerPresetLibrary.RejectedReasons`, naming the file or section and the parse
-  error. A hand-written corpus of presets in the real format, including a multi-section file and
-  shader source, guards the format handling; third-party presets stay unbundled because they are
-  licensed by their authors. Covered by 13 tests.
-- The visualizer now runs preset shaders. The numbered `warp_N` and `comp_N` keys are parsed
-  together with their optional `_enabled`, `_per_frame`, and `_per_pixel` companions, and the
-  preset reader keeps the newlines inside a shader's source, because Milkdrop stores the code
-  as a multi-line value. A shader that does not parse is skipped so one broken shader degrades a
-  preset instead of rejecting it. The renderer implements `IShaderSampler`, so shaders can
-  sample `sampler_main`, `sampler_pc_main`, `sampler_fc_main`, `GetBlur1`-`GetBlur3`, and
-  `GetPixel`, and it binds `uv`, `uv_orig`, `texsize`, the audio bands, the smoothed bands, the
-  frame counters, and the aspect ratio. A per-frame time budget (20 ms by default) skips the
-  shaders for a while when they cost too much, so a heavy preset keeps a smooth picture instead
-  of stalling playback. Covered by 11 tests.
-- Added the HLSL interpreter for the shader runtime: `ShaderInterpreter` evaluates the parsed
-  `ps_2_0` tree with scalar and `float2`/`float3`/`float4` values (`ShaderValue`), covering
-  arithmetic with the C precedence, variables and the assignment operators, swizzles read and
-  written, vector constructors with concatenation and broadcast, the ternary operator,
-  `if`/`else`, `for`, and the usual intrinsics (`abs`, `ceil`, `clamp`, `cos`, `dot`, `exp`,
-  `floor`, `frac`, `length`, `lerp`, `log`, `max`, `min`, `mul`, `normalize`, `pow`, `saturate`,
-  `sign`, `sin`, `smoothstep`, `sqrt`, `step`, `tan`). Sampling goes through the
-  `IShaderSampler` contract, so the interpreter carries no render state, and division by zero
-  yields zero instead of an infinity. A loop budget of 4096 iterations and a call depth limit of
-  32 keep a runaway shader from stalling a frame. Covered by 14 tests.
-- Added the HLSL parser and its syntax tree: `ShaderParser` and `ShaderNode` turn the
-  `ps_2_0` subset into a tagged-union tree covering declarations, expression statements,
-  `if`/`else`, `for`, `return`, swizzles, calls, the ternary operator, and the C operator
-  precedence. Function signatures and bare statement bodies are both accepted, and a sampler
-  declaration without a type is tolerated. Covered by 10 tests.
-- Added the HLSL front end for the upcoming shader runtime: `ShaderLexer` tokenizes the
-  `ps_2_0` subset Milkdrop shaders use, covering identifiers and keywords, numbers with their
-  `f`/`h` suffixes, single- and multi-character operators, swizzles, line and block comments,
-  and source positions, and reports an unexpected character with its offset. Covered by
-  10 tests.
-- Added the generated visualizer texture bank. The `noise_lq` (32 x 32), `noise_mq`
-  (256 x 256), and `noise_hq` (512 x 512) textures and the sixteen `rand00`-`rand15` (32 x 32)
-  textures are produced deterministically from fixed seeds, so no third party image is
-  bundled and every run yields the same textures. Sampling is bilinear with repeat, clamp, and
-  mirror wrap modes, and generation is lazy so a session that never opens the visualizer
-  allocates nothing. Covered by 10 tests.
-- Milkdrop preset keys now act as the per-frame starting values: every numeric key (including
-  the `nWaveMode`, `bWaveDots`, `bWaveThick`, `bAdditiveWaves`, `bDarkenCenter`,
-  `bMotionVectors`, and `nMotionVectorsX/Y` spellings) seeds the matching variable, so real
-  presets that carry their settings as keys instead of code work as written.
-- The visualizer draws the full Milkdrop wave and post-processing set: the circular, doubled,
-  and single-line wave modes with dots, thick, additive, mystery, and colour/position keys,
-  the four declared waveform slots, the outer and inner borders, a motion-vector grid derived
-  from the actual motion field, and the video echo with its zoom, alpha, and orientation.
-  Covered by 11 tests.
-- The preset engine now runs the full Milkdrop stage order. It parses the `per_frame_init`,
-  `per_pixel_init`, `wave_0`-`wave_3` and `shape_N_init` blocks, registers the complete
-  standard variable set (`bass_att`/`mid_att`/`treb_att`, `aspectx`/`aspecty`,
-  `pixelsx`/`pixelsy`, `monitor`, `zoomexp`, `rot`, `cx`/`cy`, `dx`/`dy`, `sx`/`sy`,
-  `blur1`-`blur3`, `darken_center`, `fGammaAdj`, the wave, border, motion-vector and echo
-  groups, `q1`-`q32`, and `b1`-`b8`), and applies the motion parameters, the blur passes, the
-  centre darkening, and the gamma adjustment. The per-pixel block now sees the already warped
-  sampling position in `x`/`y`/`rad`/`ang`, so a real preset can offset or replace it.
-  Covered by 16 tests.
-- The **Visualisierung** settings section gained an **Always show text and controls** toggle.
-  When it is off, the title, hint, and playback buttons appear only while the mouse moves
-  over the visualizer and hide again after three idle seconds; pointer movement is tracked
-  through the window's own events, so moving the mouse on another monitor never reveals them.
-- Added a **Visualisierung** settings section with the render resolution (320 x 180 up to
-  1280 x 720), the target frame rate (24, 30, 60, or 120), and the user preset folder that
-  previously lived under the output device. The window renders at the configured size and
-  lets the image control scale the frame up, so a lower resolution keeps the CPU cost down.
 
 - The transport favourite (heart) button now works while playing a remote
   Orynivo Server track and toggles the client-side favourite for that track
@@ -9558,28 +3035,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   Library > Orynivo Server entry instead of Settings > Streaming services or
   the local directories page.
 
-- The karaoke view now highlights the active word of enhanced-LRC lyrics.
-  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
-  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
-  already-sung words keep the accent colour. Plain synchronized lines keep the
-  line-level highlight, so nothing changes for ordinary LRC files.
-- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
-  now stripped from the line text instead of appearing as literal `<00:12.00>`
-  fragments.
-- Added bulk genre editing for the shared Tracks table. The bulk action bar gained
-  a genre field that stores the value for every selected **local** track through
-  `AudioDatabase.SetTrackGenres`, which writes the library-only
-  `track_genre_overrides` table in one transaction and reapplies it on every later
-  scan. Source media files are never modified, and an empty value removes the
-  override so the next scan restores the embedded genre. Selected Orynivo Server
-  tracks are updated on their owning server through the new authenticated
-  `PUT /api/tracks/{id}/genre`, which records the same library-only override.
-- Podcast episodes can be downloaded for offline playback. Episode rows gained a
-  **Download episode** / **Delete download** context menu and a download marker in
-  the status column, playback prefers the cached file, and Settings > Library sets
-  the cache size limit in megabytes. Eviction removes the least recently used
-  downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
-  the most recently used episode is always kept.
 ### Fixed
 
 - Remote Orynivo Server (and other HTTP-streamed) tracks now start much faster.
@@ -9653,97 +3108,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.15.0] - 2026-06-27
 
 ### Added
-- The visualizer's per-pixel path no longer does work the preset never asked for. The compiled
-  programs now report the variables they reference (`PresetProgram.ReferencedVariables` and
-  `Uses`), the warp stage resolves the `x`, `y`, `rad`, and `ang` slots once instead of looking
-  each name up in the layout for every pixel, and it only computes the polar pair, the motion
-  grid, and the seeded sampling position when the preset's own code needs them. A rendered frame
-  is allocation-free, which is now asserted by a test. Covered by 5 tests.
-- The visualizer renders on its own thread now. A frame used to be produced from a
-  `DispatcherTimer`, so a heavy preset blocked the interface for its whole duration; the loop
-  now runs on a background thread, hands a finished copy of the frame to the UI thread through a
-  presentation buffer, and queues at most one present at a time, so a busy interface can never
-  build up a backlog of frames. Preset switching, the reset key, and the overlay follow as
-  thread-safe requests, and the frame pacing lives in the tested `FramePacing` helper. Covered by
-  5 tests.
-- The visualizer now measures where its frame time goes. `PresetRenderer` reports a
-  `RenderTimings` breakdown (warp, blur, post-processing, overlay, composite, comp shaders, and
-  the frame total) per frame and as an average over a window, and the window's diagnostic line in
-  `logs/seek.log` carries those averages once per second, so the cost per stage can be read
-  instead of guessed. A warp shader runs inside the per-pixel loop, so its cost stays part of
-  `warp`; timing it per pixel would cost more than the measurement is worth. The frame budget now
-  compares the complete frame rather than only the shaders. Covered by 8 tests.
-- Milkdrop `.milk` files are read as the multi-preset files they are: `VisualizerPreset.ParseSections`
-  splits the text at its `[presetNN]` headers and the preset folder loads every section as its
-  own preset instead of only the last one surviving. The declared format version
-  (`MILKDROP_PRESET_VERSION`, `PSVERSION`, or `preset_version`) is reported on
-  `VisualizerPreset.Version`; every version is accepted. Skipped presets now carry a reason
-  through `VisualizerPresetLibrary.RejectedReasons`, naming the file or section and the parse
-  error. A hand-written corpus of presets in the real format, including a multi-section file and
-  shader source, guards the format handling; third-party presets stay unbundled because they are
-  licensed by their authors. Covered by 13 tests.
-- The visualizer now runs preset shaders. The numbered `warp_N` and `comp_N` keys are parsed
-  together with their optional `_enabled`, `_per_frame`, and `_per_pixel` companions, and the
-  preset reader keeps the newlines inside a shader's source, because Milkdrop stores the code
-  as a multi-line value. A shader that does not parse is skipped so one broken shader degrades a
-  preset instead of rejecting it. The renderer implements `IShaderSampler`, so shaders can
-  sample `sampler_main`, `sampler_pc_main`, `sampler_fc_main`, `GetBlur1`-`GetBlur3`, and
-  `GetPixel`, and it binds `uv`, `uv_orig`, `texsize`, the audio bands, the smoothed bands, the
-  frame counters, and the aspect ratio. A per-frame time budget (20 ms by default) skips the
-  shaders for a while when they cost too much, so a heavy preset keeps a smooth picture instead
-  of stalling playback. Covered by 11 tests.
-- Added the HLSL interpreter for the shader runtime: `ShaderInterpreter` evaluates the parsed
-  `ps_2_0` tree with scalar and `float2`/`float3`/`float4` values (`ShaderValue`), covering
-  arithmetic with the C precedence, variables and the assignment operators, swizzles read and
-  written, vector constructors with concatenation and broadcast, the ternary operator,
-  `if`/`else`, `for`, and the usual intrinsics (`abs`, `ceil`, `clamp`, `cos`, `dot`, `exp`,
-  `floor`, `frac`, `length`, `lerp`, `log`, `max`, `min`, `mul`, `normalize`, `pow`, `saturate`,
-  `sign`, `sin`, `smoothstep`, `sqrt`, `step`, `tan`). Sampling goes through the
-  `IShaderSampler` contract, so the interpreter carries no render state, and division by zero
-  yields zero instead of an infinity. A loop budget of 4096 iterations and a call depth limit of
-  32 keep a runaway shader from stalling a frame. Covered by 14 tests.
-- Added the HLSL parser and its syntax tree: `ShaderParser` and `ShaderNode` turn the
-  `ps_2_0` subset into a tagged-union tree covering declarations, expression statements,
-  `if`/`else`, `for`, `return`, swizzles, calls, the ternary operator, and the C operator
-  precedence. Function signatures and bare statement bodies are both accepted, and a sampler
-  declaration without a type is tolerated. Covered by 10 tests.
-- Added the HLSL front end for the upcoming shader runtime: `ShaderLexer` tokenizes the
-  `ps_2_0` subset Milkdrop shaders use, covering identifiers and keywords, numbers with their
-  `f`/`h` suffixes, single- and multi-character operators, swizzles, line and block comments,
-  and source positions, and reports an unexpected character with its offset. Covered by
-  10 tests.
-- Added the generated visualizer texture bank. The `noise_lq` (32 x 32), `noise_mq`
-  (256 x 256), and `noise_hq` (512 x 512) textures and the sixteen `rand00`-`rand15` (32 x 32)
-  textures are produced deterministically from fixed seeds, so no third party image is
-  bundled and every run yields the same textures. Sampling is bilinear with repeat, clamp, and
-  mirror wrap modes, and generation is lazy so a session that never opens the visualizer
-  allocates nothing. Covered by 10 tests.
-- Milkdrop preset keys now act as the per-frame starting values: every numeric key (including
-  the `nWaveMode`, `bWaveDots`, `bWaveThick`, `bAdditiveWaves`, `bDarkenCenter`,
-  `bMotionVectors`, and `nMotionVectorsX/Y` spellings) seeds the matching variable, so real
-  presets that carry their settings as keys instead of code work as written.
-- The visualizer draws the full Milkdrop wave and post-processing set: the circular, doubled,
-  and single-line wave modes with dots, thick, additive, mystery, and colour/position keys,
-  the four declared waveform slots, the outer and inner borders, a motion-vector grid derived
-  from the actual motion field, and the video echo with its zoom, alpha, and orientation.
-  Covered by 11 tests.
-- The preset engine now runs the full Milkdrop stage order. It parses the `per_frame_init`,
-  `per_pixel_init`, `wave_0`-`wave_3` and `shape_N_init` blocks, registers the complete
-  standard variable set (`bass_att`/`mid_att`/`treb_att`, `aspectx`/`aspecty`,
-  `pixelsx`/`pixelsy`, `monitor`, `zoomexp`, `rot`, `cx`/`cy`, `dx`/`dy`, `sx`/`sy`,
-  `blur1`-`blur3`, `darken_center`, `fGammaAdj`, the wave, border, motion-vector and echo
-  groups, `q1`-`q32`, and `b1`-`b8`), and applies the motion parameters, the blur passes, the
-  centre darkening, and the gamma adjustment. The per-pixel block now sees the already warped
-  sampling position in `x`/`y`/`rad`/`ang`, so a real preset can offset or replace it.
-  Covered by 16 tests.
-- The **Visualisierung** settings section gained an **Always show text and controls** toggle.
-  When it is off, the title, hint, and playback buttons appear only while the mouse moves
-  over the visualizer and hide again after three idle seconds; pointer movement is tracked
-  through the window's own events, so moving the mouse on another monitor never reveals them.
-- Added a **Visualisierung** settings section with the render resolution (320 x 180 up to
-  1280 x 720), the target frame rate (24, 30, 60, or 120), and the user preset folder that
-  previously lived under the output device. The window renders at the configured size and
-  lets the image control scale the frame up, so a lower resolution keeps the CPU cost down.
 
 - **Orynivo.Core** — extracted the cross-platform library layer from the
   Windows player into a standalone `net8.0` class library.  `Orynivo.Core`
@@ -9813,28 +3177,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   Appearance.  API keys are stored in `settings.json` (the same policy as
   the embedded AI chat key).
 
-- The karaoke view now highlights the active word of enhanced-LRC lyrics.
-  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
-  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
-  already-sung words keep the accent colour. Plain synchronized lines keep the
-  line-level highlight, so nothing changes for ordinary LRC files.
-- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
-  now stripped from the line text instead of appearing as literal `<00:12.00>`
-  fragments.
-- Added bulk genre editing for the shared Tracks table. The bulk action bar gained
-  a genre field that stores the value for every selected **local** track through
-  `AudioDatabase.SetTrackGenres`, which writes the library-only
-  `track_genre_overrides` table in one transaction and reapplies it on every later
-  scan. Source media files are never modified, and an empty value removes the
-  override so the next scan restores the embedded genre. Selected Orynivo Server
-  tracks are updated on their owning server through the new authenticated
-  `PUT /api/tracks/{id}/genre`, which records the same library-only override.
-- Podcast episodes can be downloaded for offline playback. Episode rows gained a
-  **Download episode** / **Delete download** context menu and a download marker in
-  the status column, playback prefers the cached file, and Settings > Library sets
-  the cache size limit in megabytes. Eviction removes the least recently used
-  downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
-  the most recently used episode is always kept.
 ### Fixed
 
 - The Orynivo Server settings and remote directory browser dialogs now use
@@ -9859,97 +3201,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.14.0] - 2026-06-26
 
 ### Added
-- The visualizer's per-pixel path no longer does work the preset never asked for. The compiled
-  programs now report the variables they reference (`PresetProgram.ReferencedVariables` and
-  `Uses`), the warp stage resolves the `x`, `y`, `rad`, and `ang` slots once instead of looking
-  each name up in the layout for every pixel, and it only computes the polar pair, the motion
-  grid, and the seeded sampling position when the preset's own code needs them. A rendered frame
-  is allocation-free, which is now asserted by a test. Covered by 5 tests.
-- The visualizer renders on its own thread now. A frame used to be produced from a
-  `DispatcherTimer`, so a heavy preset blocked the interface for its whole duration; the loop
-  now runs on a background thread, hands a finished copy of the frame to the UI thread through a
-  presentation buffer, and queues at most one present at a time, so a busy interface can never
-  build up a backlog of frames. Preset switching, the reset key, and the overlay follow as
-  thread-safe requests, and the frame pacing lives in the tested `FramePacing` helper. Covered by
-  5 tests.
-- The visualizer now measures where its frame time goes. `PresetRenderer` reports a
-  `RenderTimings` breakdown (warp, blur, post-processing, overlay, composite, comp shaders, and
-  the frame total) per frame and as an average over a window, and the window's diagnostic line in
-  `logs/seek.log` carries those averages once per second, so the cost per stage can be read
-  instead of guessed. A warp shader runs inside the per-pixel loop, so its cost stays part of
-  `warp`; timing it per pixel would cost more than the measurement is worth. The frame budget now
-  compares the complete frame rather than only the shaders. Covered by 8 tests.
-- Milkdrop `.milk` files are read as the multi-preset files they are: `VisualizerPreset.ParseSections`
-  splits the text at its `[presetNN]` headers and the preset folder loads every section as its
-  own preset instead of only the last one surviving. The declared format version
-  (`MILKDROP_PRESET_VERSION`, `PSVERSION`, or `preset_version`) is reported on
-  `VisualizerPreset.Version`; every version is accepted. Skipped presets now carry a reason
-  through `VisualizerPresetLibrary.RejectedReasons`, naming the file or section and the parse
-  error. A hand-written corpus of presets in the real format, including a multi-section file and
-  shader source, guards the format handling; third-party presets stay unbundled because they are
-  licensed by their authors. Covered by 13 tests.
-- The visualizer now runs preset shaders. The numbered `warp_N` and `comp_N` keys are parsed
-  together with their optional `_enabled`, `_per_frame`, and `_per_pixel` companions, and the
-  preset reader keeps the newlines inside a shader's source, because Milkdrop stores the code
-  as a multi-line value. A shader that does not parse is skipped so one broken shader degrades a
-  preset instead of rejecting it. The renderer implements `IShaderSampler`, so shaders can
-  sample `sampler_main`, `sampler_pc_main`, `sampler_fc_main`, `GetBlur1`-`GetBlur3`, and
-  `GetPixel`, and it binds `uv`, `uv_orig`, `texsize`, the audio bands, the smoothed bands, the
-  frame counters, and the aspect ratio. A per-frame time budget (20 ms by default) skips the
-  shaders for a while when they cost too much, so a heavy preset keeps a smooth picture instead
-  of stalling playback. Covered by 11 tests.
-- Added the HLSL interpreter for the shader runtime: `ShaderInterpreter` evaluates the parsed
-  `ps_2_0` tree with scalar and `float2`/`float3`/`float4` values (`ShaderValue`), covering
-  arithmetic with the C precedence, variables and the assignment operators, swizzles read and
-  written, vector constructors with concatenation and broadcast, the ternary operator,
-  `if`/`else`, `for`, and the usual intrinsics (`abs`, `ceil`, `clamp`, `cos`, `dot`, `exp`,
-  `floor`, `frac`, `length`, `lerp`, `log`, `max`, `min`, `mul`, `normalize`, `pow`, `saturate`,
-  `sign`, `sin`, `smoothstep`, `sqrt`, `step`, `tan`). Sampling goes through the
-  `IShaderSampler` contract, so the interpreter carries no render state, and division by zero
-  yields zero instead of an infinity. A loop budget of 4096 iterations and a call depth limit of
-  32 keep a runaway shader from stalling a frame. Covered by 14 tests.
-- Added the HLSL parser and its syntax tree: `ShaderParser` and `ShaderNode` turn the
-  `ps_2_0` subset into a tagged-union tree covering declarations, expression statements,
-  `if`/`else`, `for`, `return`, swizzles, calls, the ternary operator, and the C operator
-  precedence. Function signatures and bare statement bodies are both accepted, and a sampler
-  declaration without a type is tolerated. Covered by 10 tests.
-- Added the HLSL front end for the upcoming shader runtime: `ShaderLexer` tokenizes the
-  `ps_2_0` subset Milkdrop shaders use, covering identifiers and keywords, numbers with their
-  `f`/`h` suffixes, single- and multi-character operators, swizzles, line and block comments,
-  and source positions, and reports an unexpected character with its offset. Covered by
-  10 tests.
-- Added the generated visualizer texture bank. The `noise_lq` (32 x 32), `noise_mq`
-  (256 x 256), and `noise_hq` (512 x 512) textures and the sixteen `rand00`-`rand15` (32 x 32)
-  textures are produced deterministically from fixed seeds, so no third party image is
-  bundled and every run yields the same textures. Sampling is bilinear with repeat, clamp, and
-  mirror wrap modes, and generation is lazy so a session that never opens the visualizer
-  allocates nothing. Covered by 10 tests.
-- Milkdrop preset keys now act as the per-frame starting values: every numeric key (including
-  the `nWaveMode`, `bWaveDots`, `bWaveThick`, `bAdditiveWaves`, `bDarkenCenter`,
-  `bMotionVectors`, and `nMotionVectorsX/Y` spellings) seeds the matching variable, so real
-  presets that carry their settings as keys instead of code work as written.
-- The visualizer draws the full Milkdrop wave and post-processing set: the circular, doubled,
-  and single-line wave modes with dots, thick, additive, mystery, and colour/position keys,
-  the four declared waveform slots, the outer and inner borders, a motion-vector grid derived
-  from the actual motion field, and the video echo with its zoom, alpha, and orientation.
-  Covered by 11 tests.
-- The preset engine now runs the full Milkdrop stage order. It parses the `per_frame_init`,
-  `per_pixel_init`, `wave_0`-`wave_3` and `shape_N_init` blocks, registers the complete
-  standard variable set (`bass_att`/`mid_att`/`treb_att`, `aspectx`/`aspecty`,
-  `pixelsx`/`pixelsy`, `monitor`, `zoomexp`, `rot`, `cx`/`cy`, `dx`/`dy`, `sx`/`sy`,
-  `blur1`-`blur3`, `darken_center`, `fGammaAdj`, the wave, border, motion-vector and echo
-  groups, `q1`-`q32`, and `b1`-`b8`), and applies the motion parameters, the blur passes, the
-  centre darkening, and the gamma adjustment. The per-pixel block now sees the already warped
-  sampling position in `x`/`y`/`rad`/`ang`, so a real preset can offset or replace it.
-  Covered by 16 tests.
-- The **Visualisierung** settings section gained an **Always show text and controls** toggle.
-  When it is off, the title, hint, and playback buttons appear only while the mouse moves
-  over the visualizer and hide again after three idle seconds; pointer movement is tracked
-  through the window's own events, so moving the mouse on another monitor never reveals them.
-- Added a **Visualisierung** settings section with the render resolution (320 x 180 up to
-  1280 x 720), the target frame rate (24, 30, 60, or 120), and the user preset folder that
-  previously lived under the output device. The window renders at the configured size and
-  lets the image control scale the frame up, so a lower resolution keeps the CPU cost down.
 
 - Added a Windows installer and portable ZIP built via GitHub Actions.
   Pushing a version tag (e.g. `v0.14.0`) triggers the release workflow
@@ -9963,97 +3214,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.13.0] - 2026-06-26
 
 ### Added
-- The visualizer's per-pixel path no longer does work the preset never asked for. The compiled
-  programs now report the variables they reference (`PresetProgram.ReferencedVariables` and
-  `Uses`), the warp stage resolves the `x`, `y`, `rad`, and `ang` slots once instead of looking
-  each name up in the layout for every pixel, and it only computes the polar pair, the motion
-  grid, and the seeded sampling position when the preset's own code needs them. A rendered frame
-  is allocation-free, which is now asserted by a test. Covered by 5 tests.
-- The visualizer renders on its own thread now. A frame used to be produced from a
-  `DispatcherTimer`, so a heavy preset blocked the interface for its whole duration; the loop
-  now runs on a background thread, hands a finished copy of the frame to the UI thread through a
-  presentation buffer, and queues at most one present at a time, so a busy interface can never
-  build up a backlog of frames. Preset switching, the reset key, and the overlay follow as
-  thread-safe requests, and the frame pacing lives in the tested `FramePacing` helper. Covered by
-  5 tests.
-- The visualizer now measures where its frame time goes. `PresetRenderer` reports a
-  `RenderTimings` breakdown (warp, blur, post-processing, overlay, composite, comp shaders, and
-  the frame total) per frame and as an average over a window, and the window's diagnostic line in
-  `logs/seek.log` carries those averages once per second, so the cost per stage can be read
-  instead of guessed. A warp shader runs inside the per-pixel loop, so its cost stays part of
-  `warp`; timing it per pixel would cost more than the measurement is worth. The frame budget now
-  compares the complete frame rather than only the shaders. Covered by 8 tests.
-- Milkdrop `.milk` files are read as the multi-preset files they are: `VisualizerPreset.ParseSections`
-  splits the text at its `[presetNN]` headers and the preset folder loads every section as its
-  own preset instead of only the last one surviving. The declared format version
-  (`MILKDROP_PRESET_VERSION`, `PSVERSION`, or `preset_version`) is reported on
-  `VisualizerPreset.Version`; every version is accepted. Skipped presets now carry a reason
-  through `VisualizerPresetLibrary.RejectedReasons`, naming the file or section and the parse
-  error. A hand-written corpus of presets in the real format, including a multi-section file and
-  shader source, guards the format handling; third-party presets stay unbundled because they are
-  licensed by their authors. Covered by 13 tests.
-- The visualizer now runs preset shaders. The numbered `warp_N` and `comp_N` keys are parsed
-  together with their optional `_enabled`, `_per_frame`, and `_per_pixel` companions, and the
-  preset reader keeps the newlines inside a shader's source, because Milkdrop stores the code
-  as a multi-line value. A shader that does not parse is skipped so one broken shader degrades a
-  preset instead of rejecting it. The renderer implements `IShaderSampler`, so shaders can
-  sample `sampler_main`, `sampler_pc_main`, `sampler_fc_main`, `GetBlur1`-`GetBlur3`, and
-  `GetPixel`, and it binds `uv`, `uv_orig`, `texsize`, the audio bands, the smoothed bands, the
-  frame counters, and the aspect ratio. A per-frame time budget (20 ms by default) skips the
-  shaders for a while when they cost too much, so a heavy preset keeps a smooth picture instead
-  of stalling playback. Covered by 11 tests.
-- Added the HLSL interpreter for the shader runtime: `ShaderInterpreter` evaluates the parsed
-  `ps_2_0` tree with scalar and `float2`/`float3`/`float4` values (`ShaderValue`), covering
-  arithmetic with the C precedence, variables and the assignment operators, swizzles read and
-  written, vector constructors with concatenation and broadcast, the ternary operator,
-  `if`/`else`, `for`, and the usual intrinsics (`abs`, `ceil`, `clamp`, `cos`, `dot`, `exp`,
-  `floor`, `frac`, `length`, `lerp`, `log`, `max`, `min`, `mul`, `normalize`, `pow`, `saturate`,
-  `sign`, `sin`, `smoothstep`, `sqrt`, `step`, `tan`). Sampling goes through the
-  `IShaderSampler` contract, so the interpreter carries no render state, and division by zero
-  yields zero instead of an infinity. A loop budget of 4096 iterations and a call depth limit of
-  32 keep a runaway shader from stalling a frame. Covered by 14 tests.
-- Added the HLSL parser and its syntax tree: `ShaderParser` and `ShaderNode` turn the
-  `ps_2_0` subset into a tagged-union tree covering declarations, expression statements,
-  `if`/`else`, `for`, `return`, swizzles, calls, the ternary operator, and the C operator
-  precedence. Function signatures and bare statement bodies are both accepted, and a sampler
-  declaration without a type is tolerated. Covered by 10 tests.
-- Added the HLSL front end for the upcoming shader runtime: `ShaderLexer` tokenizes the
-  `ps_2_0` subset Milkdrop shaders use, covering identifiers and keywords, numbers with their
-  `f`/`h` suffixes, single- and multi-character operators, swizzles, line and block comments,
-  and source positions, and reports an unexpected character with its offset. Covered by
-  10 tests.
-- Added the generated visualizer texture bank. The `noise_lq` (32 x 32), `noise_mq`
-  (256 x 256), and `noise_hq` (512 x 512) textures and the sixteen `rand00`-`rand15` (32 x 32)
-  textures are produced deterministically from fixed seeds, so no third party image is
-  bundled and every run yields the same textures. Sampling is bilinear with repeat, clamp, and
-  mirror wrap modes, and generation is lazy so a session that never opens the visualizer
-  allocates nothing. Covered by 10 tests.
-- Milkdrop preset keys now act as the per-frame starting values: every numeric key (including
-  the `nWaveMode`, `bWaveDots`, `bWaveThick`, `bAdditiveWaves`, `bDarkenCenter`,
-  `bMotionVectors`, and `nMotionVectorsX/Y` spellings) seeds the matching variable, so real
-  presets that carry their settings as keys instead of code work as written.
-- The visualizer draws the full Milkdrop wave and post-processing set: the circular, doubled,
-  and single-line wave modes with dots, thick, additive, mystery, and colour/position keys,
-  the four declared waveform slots, the outer and inner borders, a motion-vector grid derived
-  from the actual motion field, and the video echo with its zoom, alpha, and orientation.
-  Covered by 11 tests.
-- The preset engine now runs the full Milkdrop stage order. It parses the `per_frame_init`,
-  `per_pixel_init`, `wave_0`-`wave_3` and `shape_N_init` blocks, registers the complete
-  standard variable set (`bass_att`/`mid_att`/`treb_att`, `aspectx`/`aspecty`,
-  `pixelsx`/`pixelsy`, `monitor`, `zoomexp`, `rot`, `cx`/`cy`, `dx`/`dy`, `sx`/`sy`,
-  `blur1`-`blur3`, `darken_center`, `fGammaAdj`, the wave, border, motion-vector and echo
-  groups, `q1`-`q32`, and `b1`-`b8`), and applies the motion parameters, the blur passes, the
-  centre darkening, and the gamma adjustment. The per-pixel block now sees the already warped
-  sampling position in `x`/`y`/`rad`/`ang`, so a real preset can offset or replace it.
-  Covered by 16 tests.
-- The **Visualisierung** settings section gained an **Always show text and controls** toggle.
-  When it is off, the title, hint, and playback buttons appear only while the mouse moves
-  over the visualizer and hide again after three idle seconds; pointer movement is tracked
-  through the window's own events, so moving the mouse on another monitor never reveals them.
-- Added a **Visualisierung** settings section with the render resolution (320 x 180 up to
-  1280 x 720), the target frame rate (24, 30, 60, or 120), and the user preset folder that
-  previously lived under the output device. The window renders at the configured size and
-  lets the image control scale the frame up, so a lower resolution keeps the CPU cost down.
 
 - **Embedded AI Chat** — a new **AI Chat** sidebar view that sends
   natural-language questions about the music library to any
@@ -10079,97 +3239,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.12.0] - 2026-06-26
 
 ### Added
-- The visualizer's per-pixel path no longer does work the preset never asked for. The compiled
-  programs now report the variables they reference (`PresetProgram.ReferencedVariables` and
-  `Uses`), the warp stage resolves the `x`, `y`, `rad`, and `ang` slots once instead of looking
-  each name up in the layout for every pixel, and it only computes the polar pair, the motion
-  grid, and the seeded sampling position when the preset's own code needs them. A rendered frame
-  is allocation-free, which is now asserted by a test. Covered by 5 tests.
-- The visualizer renders on its own thread now. A frame used to be produced from a
-  `DispatcherTimer`, so a heavy preset blocked the interface for its whole duration; the loop
-  now runs on a background thread, hands a finished copy of the frame to the UI thread through a
-  presentation buffer, and queues at most one present at a time, so a busy interface can never
-  build up a backlog of frames. Preset switching, the reset key, and the overlay follow as
-  thread-safe requests, and the frame pacing lives in the tested `FramePacing` helper. Covered by
-  5 tests.
-- The visualizer now measures where its frame time goes. `PresetRenderer` reports a
-  `RenderTimings` breakdown (warp, blur, post-processing, overlay, composite, comp shaders, and
-  the frame total) per frame and as an average over a window, and the window's diagnostic line in
-  `logs/seek.log` carries those averages once per second, so the cost per stage can be read
-  instead of guessed. A warp shader runs inside the per-pixel loop, so its cost stays part of
-  `warp`; timing it per pixel would cost more than the measurement is worth. The frame budget now
-  compares the complete frame rather than only the shaders. Covered by 8 tests.
-- Milkdrop `.milk` files are read as the multi-preset files they are: `VisualizerPreset.ParseSections`
-  splits the text at its `[presetNN]` headers and the preset folder loads every section as its
-  own preset instead of only the last one surviving. The declared format version
-  (`MILKDROP_PRESET_VERSION`, `PSVERSION`, or `preset_version`) is reported on
-  `VisualizerPreset.Version`; every version is accepted. Skipped presets now carry a reason
-  through `VisualizerPresetLibrary.RejectedReasons`, naming the file or section and the parse
-  error. A hand-written corpus of presets in the real format, including a multi-section file and
-  shader source, guards the format handling; third-party presets stay unbundled because they are
-  licensed by their authors. Covered by 13 tests.
-- The visualizer now runs preset shaders. The numbered `warp_N` and `comp_N` keys are parsed
-  together with their optional `_enabled`, `_per_frame`, and `_per_pixel` companions, and the
-  preset reader keeps the newlines inside a shader's source, because Milkdrop stores the code
-  as a multi-line value. A shader that does not parse is skipped so one broken shader degrades a
-  preset instead of rejecting it. The renderer implements `IShaderSampler`, so shaders can
-  sample `sampler_main`, `sampler_pc_main`, `sampler_fc_main`, `GetBlur1`-`GetBlur3`, and
-  `GetPixel`, and it binds `uv`, `uv_orig`, `texsize`, the audio bands, the smoothed bands, the
-  frame counters, and the aspect ratio. A per-frame time budget (20 ms by default) skips the
-  shaders for a while when they cost too much, so a heavy preset keeps a smooth picture instead
-  of stalling playback. Covered by 11 tests.
-- Added the HLSL interpreter for the shader runtime: `ShaderInterpreter` evaluates the parsed
-  `ps_2_0` tree with scalar and `float2`/`float3`/`float4` values (`ShaderValue`), covering
-  arithmetic with the C precedence, variables and the assignment operators, swizzles read and
-  written, vector constructors with concatenation and broadcast, the ternary operator,
-  `if`/`else`, `for`, and the usual intrinsics (`abs`, `ceil`, `clamp`, `cos`, `dot`, `exp`,
-  `floor`, `frac`, `length`, `lerp`, `log`, `max`, `min`, `mul`, `normalize`, `pow`, `saturate`,
-  `sign`, `sin`, `smoothstep`, `sqrt`, `step`, `tan`). Sampling goes through the
-  `IShaderSampler` contract, so the interpreter carries no render state, and division by zero
-  yields zero instead of an infinity. A loop budget of 4096 iterations and a call depth limit of
-  32 keep a runaway shader from stalling a frame. Covered by 14 tests.
-- Added the HLSL parser and its syntax tree: `ShaderParser` and `ShaderNode` turn the
-  `ps_2_0` subset into a tagged-union tree covering declarations, expression statements,
-  `if`/`else`, `for`, `return`, swizzles, calls, the ternary operator, and the C operator
-  precedence. Function signatures and bare statement bodies are both accepted, and a sampler
-  declaration without a type is tolerated. Covered by 10 tests.
-- Added the HLSL front end for the upcoming shader runtime: `ShaderLexer` tokenizes the
-  `ps_2_0` subset Milkdrop shaders use, covering identifiers and keywords, numbers with their
-  `f`/`h` suffixes, single- and multi-character operators, swizzles, line and block comments,
-  and source positions, and reports an unexpected character with its offset. Covered by
-  10 tests.
-- Added the generated visualizer texture bank. The `noise_lq` (32 x 32), `noise_mq`
-  (256 x 256), and `noise_hq` (512 x 512) textures and the sixteen `rand00`-`rand15` (32 x 32)
-  textures are produced deterministically from fixed seeds, so no third party image is
-  bundled and every run yields the same textures. Sampling is bilinear with repeat, clamp, and
-  mirror wrap modes, and generation is lazy so a session that never opens the visualizer
-  allocates nothing. Covered by 10 tests.
-- Milkdrop preset keys now act as the per-frame starting values: every numeric key (including
-  the `nWaveMode`, `bWaveDots`, `bWaveThick`, `bAdditiveWaves`, `bDarkenCenter`,
-  `bMotionVectors`, and `nMotionVectorsX/Y` spellings) seeds the matching variable, so real
-  presets that carry their settings as keys instead of code work as written.
-- The visualizer draws the full Milkdrop wave and post-processing set: the circular, doubled,
-  and single-line wave modes with dots, thick, additive, mystery, and colour/position keys,
-  the four declared waveform slots, the outer and inner borders, a motion-vector grid derived
-  from the actual motion field, and the video echo with its zoom, alpha, and orientation.
-  Covered by 11 tests.
-- The preset engine now runs the full Milkdrop stage order. It parses the `per_frame_init`,
-  `per_pixel_init`, `wave_0`-`wave_3` and `shape_N_init` blocks, registers the complete
-  standard variable set (`bass_att`/`mid_att`/`treb_att`, `aspectx`/`aspecty`,
-  `pixelsx`/`pixelsy`, `monitor`, `zoomexp`, `rot`, `cx`/`cy`, `dx`/`dy`, `sx`/`sy`,
-  `blur1`-`blur3`, `darken_center`, `fGammaAdj`, the wave, border, motion-vector and echo
-  groups, `q1`-`q32`, and `b1`-`b8`), and applies the motion parameters, the blur passes, the
-  centre darkening, and the gamma adjustment. The per-pixel block now sees the already warped
-  sampling position in `x`/`y`/`rad`/`ang`, so a real preset can offset or replace it.
-  Covered by 16 tests.
-- The **Visualisierung** settings section gained an **Always show text and controls** toggle.
-  When it is off, the title, hint, and playback buttons appear only while the mouse moves
-  over the visualizer and hide again after three idle seconds; pointer movement is tracked
-  through the window's own events, so moving the mouse on another monitor never reveals them.
-- Added a **Visualisierung** settings section with the render resolution (320 x 180 up to
-  1280 x 720), the target frame rate (24, 30, 60, or 120), and the user preset folder that
-  previously lived under the output device. The window renders at the configured size and
-  lets the image control scale the frame up, so a lower resolution keeps the CPU cost down.
 
 - Internet Radio, Podcasts, and **Up Next** sidebar items can
   now be hidden individually in Settings > Appearance, consistent with the
@@ -10192,28 +3261,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   the AI assistant knows the capability is unavailable; the active set is
   persisted in `AppSettings.DisabledMcpTools`.
 
-- The karaoke view now highlights the active word of enhanced-LRC lyrics.
-  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
-  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
-  already-sung words keep the accent colour. Plain synchronized lines keep the
-  line-level highlight, so nothing changes for ordinary LRC files.
-- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
-  now stripped from the line text instead of appearing as literal `<00:12.00>`
-  fragments.
-- Added bulk genre editing for the shared Tracks table. The bulk action bar gained
-  a genre field that stores the value for every selected **local** track through
-  `AudioDatabase.SetTrackGenres`, which writes the library-only
-  `track_genre_overrides` table in one transaction and reapplies it on every later
-  scan. Source media files are never modified, and an empty value removes the
-  override so the next scan restores the embedded genre. Selected Orynivo Server
-  tracks are updated on their owning server through the new authenticated
-  `PUT /api/tracks/{id}/genre`, which records the same library-only override.
-- Podcast episodes can be downloaded for offline playback. Episode rows gained a
-  **Download episode** / **Delete download** context menu and a download marker in
-  the status column, playback prefers the cached file, and Settings > Library sets
-  the cache size limit in megabytes. Eviction removes the least recently used
-  downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
-  the most recently used episode is always kept.
 ### Fixed
 
 - Fixed numbered circle labels on the equalizer frequency-response graph being
@@ -10229,97 +3276,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.11.0] - 2026-06-25
 
 ### Added
-- The visualizer's per-pixel path no longer does work the preset never asked for. The compiled
-  programs now report the variables they reference (`PresetProgram.ReferencedVariables` and
-  `Uses`), the warp stage resolves the `x`, `y`, `rad`, and `ang` slots once instead of looking
-  each name up in the layout for every pixel, and it only computes the polar pair, the motion
-  grid, and the seeded sampling position when the preset's own code needs them. A rendered frame
-  is allocation-free, which is now asserted by a test. Covered by 5 tests.
-- The visualizer renders on its own thread now. A frame used to be produced from a
-  `DispatcherTimer`, so a heavy preset blocked the interface for its whole duration; the loop
-  now runs on a background thread, hands a finished copy of the frame to the UI thread through a
-  presentation buffer, and queues at most one present at a time, so a busy interface can never
-  build up a backlog of frames. Preset switching, the reset key, and the overlay follow as
-  thread-safe requests, and the frame pacing lives in the tested `FramePacing` helper. Covered by
-  5 tests.
-- The visualizer now measures where its frame time goes. `PresetRenderer` reports a
-  `RenderTimings` breakdown (warp, blur, post-processing, overlay, composite, comp shaders, and
-  the frame total) per frame and as an average over a window, and the window's diagnostic line in
-  `logs/seek.log` carries those averages once per second, so the cost per stage can be read
-  instead of guessed. A warp shader runs inside the per-pixel loop, so its cost stays part of
-  `warp`; timing it per pixel would cost more than the measurement is worth. The frame budget now
-  compares the complete frame rather than only the shaders. Covered by 8 tests.
-- Milkdrop `.milk` files are read as the multi-preset files they are: `VisualizerPreset.ParseSections`
-  splits the text at its `[presetNN]` headers and the preset folder loads every section as its
-  own preset instead of only the last one surviving. The declared format version
-  (`MILKDROP_PRESET_VERSION`, `PSVERSION`, or `preset_version`) is reported on
-  `VisualizerPreset.Version`; every version is accepted. Skipped presets now carry a reason
-  through `VisualizerPresetLibrary.RejectedReasons`, naming the file or section and the parse
-  error. A hand-written corpus of presets in the real format, including a multi-section file and
-  shader source, guards the format handling; third-party presets stay unbundled because they are
-  licensed by their authors. Covered by 13 tests.
-- The visualizer now runs preset shaders. The numbered `warp_N` and `comp_N` keys are parsed
-  together with their optional `_enabled`, `_per_frame`, and `_per_pixel` companions, and the
-  preset reader keeps the newlines inside a shader's source, because Milkdrop stores the code
-  as a multi-line value. A shader that does not parse is skipped so one broken shader degrades a
-  preset instead of rejecting it. The renderer implements `IShaderSampler`, so shaders can
-  sample `sampler_main`, `sampler_pc_main`, `sampler_fc_main`, `GetBlur1`-`GetBlur3`, and
-  `GetPixel`, and it binds `uv`, `uv_orig`, `texsize`, the audio bands, the smoothed bands, the
-  frame counters, and the aspect ratio. A per-frame time budget (20 ms by default) skips the
-  shaders for a while when they cost too much, so a heavy preset keeps a smooth picture instead
-  of stalling playback. Covered by 11 tests.
-- Added the HLSL interpreter for the shader runtime: `ShaderInterpreter` evaluates the parsed
-  `ps_2_0` tree with scalar and `float2`/`float3`/`float4` values (`ShaderValue`), covering
-  arithmetic with the C precedence, variables and the assignment operators, swizzles read and
-  written, vector constructors with concatenation and broadcast, the ternary operator,
-  `if`/`else`, `for`, and the usual intrinsics (`abs`, `ceil`, `clamp`, `cos`, `dot`, `exp`,
-  `floor`, `frac`, `length`, `lerp`, `log`, `max`, `min`, `mul`, `normalize`, `pow`, `saturate`,
-  `sign`, `sin`, `smoothstep`, `sqrt`, `step`, `tan`). Sampling goes through the
-  `IShaderSampler` contract, so the interpreter carries no render state, and division by zero
-  yields zero instead of an infinity. A loop budget of 4096 iterations and a call depth limit of
-  32 keep a runaway shader from stalling a frame. Covered by 14 tests.
-- Added the HLSL parser and its syntax tree: `ShaderParser` and `ShaderNode` turn the
-  `ps_2_0` subset into a tagged-union tree covering declarations, expression statements,
-  `if`/`else`, `for`, `return`, swizzles, calls, the ternary operator, and the C operator
-  precedence. Function signatures and bare statement bodies are both accepted, and a sampler
-  declaration without a type is tolerated. Covered by 10 tests.
-- Added the HLSL front end for the upcoming shader runtime: `ShaderLexer` tokenizes the
-  `ps_2_0` subset Milkdrop shaders use, covering identifiers and keywords, numbers with their
-  `f`/`h` suffixes, single- and multi-character operators, swizzles, line and block comments,
-  and source positions, and reports an unexpected character with its offset. Covered by
-  10 tests.
-- Added the generated visualizer texture bank. The `noise_lq` (32 x 32), `noise_mq`
-  (256 x 256), and `noise_hq` (512 x 512) textures and the sixteen `rand00`-`rand15` (32 x 32)
-  textures are produced deterministically from fixed seeds, so no third party image is
-  bundled and every run yields the same textures. Sampling is bilinear with repeat, clamp, and
-  mirror wrap modes, and generation is lazy so a session that never opens the visualizer
-  allocates nothing. Covered by 10 tests.
-- Milkdrop preset keys now act as the per-frame starting values: every numeric key (including
-  the `nWaveMode`, `bWaveDots`, `bWaveThick`, `bAdditiveWaves`, `bDarkenCenter`,
-  `bMotionVectors`, and `nMotionVectorsX/Y` spellings) seeds the matching variable, so real
-  presets that carry their settings as keys instead of code work as written.
-- The visualizer draws the full Milkdrop wave and post-processing set: the circular, doubled,
-  and single-line wave modes with dots, thick, additive, mystery, and colour/position keys,
-  the four declared waveform slots, the outer and inner borders, a motion-vector grid derived
-  from the actual motion field, and the video echo with its zoom, alpha, and orientation.
-  Covered by 11 tests.
-- The preset engine now runs the full Milkdrop stage order. It parses the `per_frame_init`,
-  `per_pixel_init`, `wave_0`-`wave_3` and `shape_N_init` blocks, registers the complete
-  standard variable set (`bass_att`/`mid_att`/`treb_att`, `aspectx`/`aspecty`,
-  `pixelsx`/`pixelsy`, `monitor`, `zoomexp`, `rot`, `cx`/`cy`, `dx`/`dy`, `sx`/`sy`,
-  `blur1`-`blur3`, `darken_center`, `fGammaAdj`, the wave, border, motion-vector and echo
-  groups, `q1`-`q32`, and `b1`-`b8`), and applies the motion parameters, the blur passes, the
-  centre darkening, and the gamma adjustment. The per-pixel block now sees the already warped
-  sampling position in `x`/`y`/`rad`/`ang`, so a real preset can offset or replace it.
-  Covered by 16 tests.
-- The **Visualisierung** settings section gained an **Always show text and controls** toggle.
-  When it is off, the title, hint, and playback buttons appear only while the mouse moves
-  over the visualizer and hide again after three idle seconds; pointer movement is tracked
-  through the window's own events, so moving the mouse on another monitor never reveals them.
-- Added a **Visualisierung** settings section with the render resolution (320 x 180 up to
-  1280 x 720), the target frame rate (24, 30, 60, or 120), and the user preset folder that
-  previously lived under the output device. The window renders at the configured size and
-  lets the image control scale the frame up, so a lower resolution keeps the CPU cost down.
 
 - Added **EQ** and **Output** quick-pick buttons to the right side of the
   transport bar (below the volume control). The EQ button opens a popup with
@@ -10344,28 +3300,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   (`OutputProfile`, `OutputProfileDialog`, `AppSettings.OutputProfiles`,
   `AppSettings.SelectedOutputProfileName`, `SettingsStore.NormalizeOutputProfiles`)
 
-- The karaoke view now highlights the active word of enhanced-LRC lyrics.
-  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
-  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
-  already-sung words keep the accent colour. Plain synchronized lines keep the
-  line-level highlight, so nothing changes for ordinary LRC files.
-- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
-  now stripped from the line text instead of appearing as literal `<00:12.00>`
-  fragments.
-- Added bulk genre editing for the shared Tracks table. The bulk action bar gained
-  a genre field that stores the value for every selected **local** track through
-  `AudioDatabase.SetTrackGenres`, which writes the library-only
-  `track_genre_overrides` table in one transaction and reapplies it on every later
-  scan. Source media files are never modified, and an empty value removes the
-  override so the next scan restores the embedded genre. Selected Orynivo Server
-  tracks are updated on their owning server through the new authenticated
-  `PUT /api/tracks/{id}/genre`, which records the same library-only override.
-- Podcast episodes can be downloaded for offline playback. Episode rows gained a
-  **Download episode** / **Delete download** context menu and a download marker in
-  the status column, playback prefers the cached file, and Settings > Library sets
-  the cache size limit in megabytes. Eviction removes the least recently used
-  downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
-  the most recently used episode is always kept.
 ### Fixed
 
 - Switching the output profile via the transport quick-pick popup now resumes
@@ -10416,97 +3350,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.10.0] - 2026-06-22
 
 ### Added
-- The visualizer's per-pixel path no longer does work the preset never asked for. The compiled
-  programs now report the variables they reference (`PresetProgram.ReferencedVariables` and
-  `Uses`), the warp stage resolves the `x`, `y`, `rad`, and `ang` slots once instead of looking
-  each name up in the layout for every pixel, and it only computes the polar pair, the motion
-  grid, and the seeded sampling position when the preset's own code needs them. A rendered frame
-  is allocation-free, which is now asserted by a test. Covered by 5 tests.
-- The visualizer renders on its own thread now. A frame used to be produced from a
-  `DispatcherTimer`, so a heavy preset blocked the interface for its whole duration; the loop
-  now runs on a background thread, hands a finished copy of the frame to the UI thread through a
-  presentation buffer, and queues at most one present at a time, so a busy interface can never
-  build up a backlog of frames. Preset switching, the reset key, and the overlay follow as
-  thread-safe requests, and the frame pacing lives in the tested `FramePacing` helper. Covered by
-  5 tests.
-- The visualizer now measures where its frame time goes. `PresetRenderer` reports a
-  `RenderTimings` breakdown (warp, blur, post-processing, overlay, composite, comp shaders, and
-  the frame total) per frame and as an average over a window, and the window's diagnostic line in
-  `logs/seek.log` carries those averages once per second, so the cost per stage can be read
-  instead of guessed. A warp shader runs inside the per-pixel loop, so its cost stays part of
-  `warp`; timing it per pixel would cost more than the measurement is worth. The frame budget now
-  compares the complete frame rather than only the shaders. Covered by 8 tests.
-- Milkdrop `.milk` files are read as the multi-preset files they are: `VisualizerPreset.ParseSections`
-  splits the text at its `[presetNN]` headers and the preset folder loads every section as its
-  own preset instead of only the last one surviving. The declared format version
-  (`MILKDROP_PRESET_VERSION`, `PSVERSION`, or `preset_version`) is reported on
-  `VisualizerPreset.Version`; every version is accepted. Skipped presets now carry a reason
-  through `VisualizerPresetLibrary.RejectedReasons`, naming the file or section and the parse
-  error. A hand-written corpus of presets in the real format, including a multi-section file and
-  shader source, guards the format handling; third-party presets stay unbundled because they are
-  licensed by their authors. Covered by 13 tests.
-- The visualizer now runs preset shaders. The numbered `warp_N` and `comp_N` keys are parsed
-  together with their optional `_enabled`, `_per_frame`, and `_per_pixel` companions, and the
-  preset reader keeps the newlines inside a shader's source, because Milkdrop stores the code
-  as a multi-line value. A shader that does not parse is skipped so one broken shader degrades a
-  preset instead of rejecting it. The renderer implements `IShaderSampler`, so shaders can
-  sample `sampler_main`, `sampler_pc_main`, `sampler_fc_main`, `GetBlur1`-`GetBlur3`, and
-  `GetPixel`, and it binds `uv`, `uv_orig`, `texsize`, the audio bands, the smoothed bands, the
-  frame counters, and the aspect ratio. A per-frame time budget (20 ms by default) skips the
-  shaders for a while when they cost too much, so a heavy preset keeps a smooth picture instead
-  of stalling playback. Covered by 11 tests.
-- Added the HLSL interpreter for the shader runtime: `ShaderInterpreter` evaluates the parsed
-  `ps_2_0` tree with scalar and `float2`/`float3`/`float4` values (`ShaderValue`), covering
-  arithmetic with the C precedence, variables and the assignment operators, swizzles read and
-  written, vector constructors with concatenation and broadcast, the ternary operator,
-  `if`/`else`, `for`, and the usual intrinsics (`abs`, `ceil`, `clamp`, `cos`, `dot`, `exp`,
-  `floor`, `frac`, `length`, `lerp`, `log`, `max`, `min`, `mul`, `normalize`, `pow`, `saturate`,
-  `sign`, `sin`, `smoothstep`, `sqrt`, `step`, `tan`). Sampling goes through the
-  `IShaderSampler` contract, so the interpreter carries no render state, and division by zero
-  yields zero instead of an infinity. A loop budget of 4096 iterations and a call depth limit of
-  32 keep a runaway shader from stalling a frame. Covered by 14 tests.
-- Added the HLSL parser and its syntax tree: `ShaderParser` and `ShaderNode` turn the
-  `ps_2_0` subset into a tagged-union tree covering declarations, expression statements,
-  `if`/`else`, `for`, `return`, swizzles, calls, the ternary operator, and the C operator
-  precedence. Function signatures and bare statement bodies are both accepted, and a sampler
-  declaration without a type is tolerated. Covered by 10 tests.
-- Added the HLSL front end for the upcoming shader runtime: `ShaderLexer` tokenizes the
-  `ps_2_0` subset Milkdrop shaders use, covering identifiers and keywords, numbers with their
-  `f`/`h` suffixes, single- and multi-character operators, swizzles, line and block comments,
-  and source positions, and reports an unexpected character with its offset. Covered by
-  10 tests.
-- Added the generated visualizer texture bank. The `noise_lq` (32 x 32), `noise_mq`
-  (256 x 256), and `noise_hq` (512 x 512) textures and the sixteen `rand00`-`rand15` (32 x 32)
-  textures are produced deterministically from fixed seeds, so no third party image is
-  bundled and every run yields the same textures. Sampling is bilinear with repeat, clamp, and
-  mirror wrap modes, and generation is lazy so a session that never opens the visualizer
-  allocates nothing. Covered by 10 tests.
-- Milkdrop preset keys now act as the per-frame starting values: every numeric key (including
-  the `nWaveMode`, `bWaveDots`, `bWaveThick`, `bAdditiveWaves`, `bDarkenCenter`,
-  `bMotionVectors`, and `nMotionVectorsX/Y` spellings) seeds the matching variable, so real
-  presets that carry their settings as keys instead of code work as written.
-- The visualizer draws the full Milkdrop wave and post-processing set: the circular, doubled,
-  and single-line wave modes with dots, thick, additive, mystery, and colour/position keys,
-  the four declared waveform slots, the outer and inner borders, a motion-vector grid derived
-  from the actual motion field, and the video echo with its zoom, alpha, and orientation.
-  Covered by 11 tests.
-- The preset engine now runs the full Milkdrop stage order. It parses the `per_frame_init`,
-  `per_pixel_init`, `wave_0`-`wave_3` and `shape_N_init` blocks, registers the complete
-  standard variable set (`bass_att`/`mid_att`/`treb_att`, `aspectx`/`aspecty`,
-  `pixelsx`/`pixelsy`, `monitor`, `zoomexp`, `rot`, `cx`/`cy`, `dx`/`dy`, `sx`/`sy`,
-  `blur1`-`blur3`, `darken_center`, `fGammaAdj`, the wave, border, motion-vector and echo
-  groups, `q1`-`q32`, and `b1`-`b8`), and applies the motion parameters, the blur passes, the
-  centre darkening, and the gamma adjustment. The per-pixel block now sees the already warped
-  sampling position in `x`/`y`/`rad`/`ang`, so a real preset can offset or replace it.
-  Covered by 16 tests.
-- The **Visualisierung** settings section gained an **Always show text and controls** toggle.
-  When it is off, the title, hint, and playback buttons appear only while the mouse moves
-  over the visualizer and hide again after three idle seconds; pointer movement is tracked
-  through the window's own events, so moving the mouse on another monitor never reveals them.
-- Added a **Visualisierung** settings section with the render resolution (320 x 180 up to
-  1280 x 720), the target frame rate (24, 30, 60, or 120), and the user preset folder that
-  previously lived under the output device. The window renders at the configured size and
-  lets the image control scale the frame up, so a lower resolution keeps the CPU cost down.
 
 - Added a persisted **Always convert DSD files to PCM** option. When enabled,
   DSF and DFF playback uses the FFmpeg PCM path with ASIO/cwASIO as well as
@@ -10529,28 +3372,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   per-profile import and editing, and confirmed deletion. Existing single-EQ
   settings migrate automatically into the profile list.
 
-- The karaoke view now highlights the active word of enhanced-LRC lyrics.
-  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
-  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
-  already-sung words keep the accent colour. Plain synchronized lines keep the
-  line-level highlight, so nothing changes for ordinary LRC files.
-- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
-  now stripped from the line text instead of appearing as literal `<00:12.00>`
-  fragments.
-- Added bulk genre editing for the shared Tracks table. The bulk action bar gained
-  a genre field that stores the value for every selected **local** track through
-  `AudioDatabase.SetTrackGenres`, which writes the library-only
-  `track_genre_overrides` table in one transaction and reapplies it on every later
-  scan. Source media files are never modified, and an empty value removes the
-  override so the next scan restores the embedded genre. Selected Orynivo Server
-  tracks are updated on their owning server through the new authenticated
-  `PUT /api/tracks/{id}/genre`, which records the same library-only override.
-- Podcast episodes can be downloaded for offline playback. Episode rows gained a
-  **Download episode** / **Delete download** context menu and a download marker in
-  the status column, playback prefers the cached file, and Settings > Library sets
-  the cache size limit in megabytes. Eviction removes the least recently used
-  downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
-  the most recently used episode is always kept.
 ### Fixed
 
 - Enabled the A–Z index in the Plex folder view. Available letters now come
@@ -10613,97 +3434,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.9.0] - 2026-06-21
 
 ### Added
-- The visualizer's per-pixel path no longer does work the preset never asked for. The compiled
-  programs now report the variables they reference (`PresetProgram.ReferencedVariables` and
-  `Uses`), the warp stage resolves the `x`, `y`, `rad`, and `ang` slots once instead of looking
-  each name up in the layout for every pixel, and it only computes the polar pair, the motion
-  grid, and the seeded sampling position when the preset's own code needs them. A rendered frame
-  is allocation-free, which is now asserted by a test. Covered by 5 tests.
-- The visualizer renders on its own thread now. A frame used to be produced from a
-  `DispatcherTimer`, so a heavy preset blocked the interface for its whole duration; the loop
-  now runs on a background thread, hands a finished copy of the frame to the UI thread through a
-  presentation buffer, and queues at most one present at a time, so a busy interface can never
-  build up a backlog of frames. Preset switching, the reset key, and the overlay follow as
-  thread-safe requests, and the frame pacing lives in the tested `FramePacing` helper. Covered by
-  5 tests.
-- The visualizer now measures where its frame time goes. `PresetRenderer` reports a
-  `RenderTimings` breakdown (warp, blur, post-processing, overlay, composite, comp shaders, and
-  the frame total) per frame and as an average over a window, and the window's diagnostic line in
-  `logs/seek.log` carries those averages once per second, so the cost per stage can be read
-  instead of guessed. A warp shader runs inside the per-pixel loop, so its cost stays part of
-  `warp`; timing it per pixel would cost more than the measurement is worth. The frame budget now
-  compares the complete frame rather than only the shaders. Covered by 8 tests.
-- Milkdrop `.milk` files are read as the multi-preset files they are: `VisualizerPreset.ParseSections`
-  splits the text at its `[presetNN]` headers and the preset folder loads every section as its
-  own preset instead of only the last one surviving. The declared format version
-  (`MILKDROP_PRESET_VERSION`, `PSVERSION`, or `preset_version`) is reported on
-  `VisualizerPreset.Version`; every version is accepted. Skipped presets now carry a reason
-  through `VisualizerPresetLibrary.RejectedReasons`, naming the file or section and the parse
-  error. A hand-written corpus of presets in the real format, including a multi-section file and
-  shader source, guards the format handling; third-party presets stay unbundled because they are
-  licensed by their authors. Covered by 13 tests.
-- The visualizer now runs preset shaders. The numbered `warp_N` and `comp_N` keys are parsed
-  together with their optional `_enabled`, `_per_frame`, and `_per_pixel` companions, and the
-  preset reader keeps the newlines inside a shader's source, because Milkdrop stores the code
-  as a multi-line value. A shader that does not parse is skipped so one broken shader degrades a
-  preset instead of rejecting it. The renderer implements `IShaderSampler`, so shaders can
-  sample `sampler_main`, `sampler_pc_main`, `sampler_fc_main`, `GetBlur1`-`GetBlur3`, and
-  `GetPixel`, and it binds `uv`, `uv_orig`, `texsize`, the audio bands, the smoothed bands, the
-  frame counters, and the aspect ratio. A per-frame time budget (20 ms by default) skips the
-  shaders for a while when they cost too much, so a heavy preset keeps a smooth picture instead
-  of stalling playback. Covered by 11 tests.
-- Added the HLSL interpreter for the shader runtime: `ShaderInterpreter` evaluates the parsed
-  `ps_2_0` tree with scalar and `float2`/`float3`/`float4` values (`ShaderValue`), covering
-  arithmetic with the C precedence, variables and the assignment operators, swizzles read and
-  written, vector constructors with concatenation and broadcast, the ternary operator,
-  `if`/`else`, `for`, and the usual intrinsics (`abs`, `ceil`, `clamp`, `cos`, `dot`, `exp`,
-  `floor`, `frac`, `length`, `lerp`, `log`, `max`, `min`, `mul`, `normalize`, `pow`, `saturate`,
-  `sign`, `sin`, `smoothstep`, `sqrt`, `step`, `tan`). Sampling goes through the
-  `IShaderSampler` contract, so the interpreter carries no render state, and division by zero
-  yields zero instead of an infinity. A loop budget of 4096 iterations and a call depth limit of
-  32 keep a runaway shader from stalling a frame. Covered by 14 tests.
-- Added the HLSL parser and its syntax tree: `ShaderParser` and `ShaderNode` turn the
-  `ps_2_0` subset into a tagged-union tree covering declarations, expression statements,
-  `if`/`else`, `for`, `return`, swizzles, calls, the ternary operator, and the C operator
-  precedence. Function signatures and bare statement bodies are both accepted, and a sampler
-  declaration without a type is tolerated. Covered by 10 tests.
-- Added the HLSL front end for the upcoming shader runtime: `ShaderLexer` tokenizes the
-  `ps_2_0` subset Milkdrop shaders use, covering identifiers and keywords, numbers with their
-  `f`/`h` suffixes, single- and multi-character operators, swizzles, line and block comments,
-  and source positions, and reports an unexpected character with its offset. Covered by
-  10 tests.
-- Added the generated visualizer texture bank. The `noise_lq` (32 x 32), `noise_mq`
-  (256 x 256), and `noise_hq` (512 x 512) textures and the sixteen `rand00`-`rand15` (32 x 32)
-  textures are produced deterministically from fixed seeds, so no third party image is
-  bundled and every run yields the same textures. Sampling is bilinear with repeat, clamp, and
-  mirror wrap modes, and generation is lazy so a session that never opens the visualizer
-  allocates nothing. Covered by 10 tests.
-- Milkdrop preset keys now act as the per-frame starting values: every numeric key (including
-  the `nWaveMode`, `bWaveDots`, `bWaveThick`, `bAdditiveWaves`, `bDarkenCenter`,
-  `bMotionVectors`, and `nMotionVectorsX/Y` spellings) seeds the matching variable, so real
-  presets that carry their settings as keys instead of code work as written.
-- The visualizer draws the full Milkdrop wave and post-processing set: the circular, doubled,
-  and single-line wave modes with dots, thick, additive, mystery, and colour/position keys,
-  the four declared waveform slots, the outer and inner borders, a motion-vector grid derived
-  from the actual motion field, and the video echo with its zoom, alpha, and orientation.
-  Covered by 11 tests.
-- The preset engine now runs the full Milkdrop stage order. It parses the `per_frame_init`,
-  `per_pixel_init`, `wave_0`-`wave_3` and `shape_N_init` blocks, registers the complete
-  standard variable set (`bass_att`/`mid_att`/`treb_att`, `aspectx`/`aspecty`,
-  `pixelsx`/`pixelsy`, `monitor`, `zoomexp`, `rot`, `cx`/`cy`, `dx`/`dy`, `sx`/`sy`,
-  `blur1`-`blur3`, `darken_center`, `fGammaAdj`, the wave, border, motion-vector and echo
-  groups, `q1`-`q32`, and `b1`-`b8`), and applies the motion parameters, the blur passes, the
-  centre darkening, and the gamma adjustment. The per-pixel block now sees the already warped
-  sampling position in `x`/`y`/`rad`/`ang`, so a real preset can offset or replace it.
-  Covered by 16 tests.
-- The **Visualisierung** settings section gained an **Always show text and controls** toggle.
-  When it is off, the title, hint, and playback buttons appear only while the mouse moves
-  over the visualizer and hide again after three idle seconds; pointer movement is tracked
-  through the window's own events, so moving the mouse on another monitor never reveals them.
-- Added a **Visualisierung** settings section with the render resolution (320 x 180 up to
-  1280 x 720), the target frame rate (24, 30, 60, or 120), and the user preset folder that
-  previously lived under the output device. The window renders at the configured size and
-  lets the image control scale the frame up, so a lower resolution keeps the CPU cost down.
 
 - Added CUE-sheet support for large FLAC/WAV images. Library scans expose CUE
   entries as independently searchable virtual tracks with their own metadata,
@@ -10711,124 +3441,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   ASIO PCM and exclusive WASAPI playback seek into the shared source file and
   stop at each track's CUE boundary without creating split files.
 
-- The karaoke view now highlights the active word of enhanced-LRC lyrics.
-  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
-  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
-  already-sung words keep the accent colour. Plain synchronized lines keep the
-  line-level highlight, so nothing changes for ordinary LRC files.
-- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
-  now stripped from the line text instead of appearing as literal `<00:12.00>`
-  fragments.
-- Added bulk genre editing for the shared Tracks table. The bulk action bar gained
-  a genre field that stores the value for every selected **local** track through
-  `AudioDatabase.SetTrackGenres`, which writes the library-only
-  `track_genre_overrides` table in one transaction and reapplies it on every later
-  scan. Source media files are never modified, and an empty value removes the
-  override so the next scan restores the embedded genre. Selected Orynivo Server
-  tracks are updated on their owning server through the new authenticated
-  `PUT /api/tracks/{id}/genre`, which records the same library-only override.
-- Podcast episodes can be downloaded for offline playback. Episode rows gained a
-  **Download episode** / **Delete download** context menu and a download marker in
-  the status column, playback prefers the cached file, and Settings > Library sets
-  the cache size limit in megabytes. Eviction removes the least recently used
-  downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
-  the most recently used episode is always kept.
 ### Fixed
 
 ## [0.8.0] - 2026-06-21
 
 ### Added
-- The visualizer's per-pixel path no longer does work the preset never asked for. The compiled
-  programs now report the variables they reference (`PresetProgram.ReferencedVariables` and
-  `Uses`), the warp stage resolves the `x`, `y`, `rad`, and `ang` slots once instead of looking
-  each name up in the layout for every pixel, and it only computes the polar pair, the motion
-  grid, and the seeded sampling position when the preset's own code needs them. A rendered frame
-  is allocation-free, which is now asserted by a test. Covered by 5 tests.
-- The visualizer renders on its own thread now. A frame used to be produced from a
-  `DispatcherTimer`, so a heavy preset blocked the interface for its whole duration; the loop
-  now runs on a background thread, hands a finished copy of the frame to the UI thread through a
-  presentation buffer, and queues at most one present at a time, so a busy interface can never
-  build up a backlog of frames. Preset switching, the reset key, and the overlay follow as
-  thread-safe requests, and the frame pacing lives in the tested `FramePacing` helper. Covered by
-  5 tests.
-- The visualizer now measures where its frame time goes. `PresetRenderer` reports a
-  `RenderTimings` breakdown (warp, blur, post-processing, overlay, composite, comp shaders, and
-  the frame total) per frame and as an average over a window, and the window's diagnostic line in
-  `logs/seek.log` carries those averages once per second, so the cost per stage can be read
-  instead of guessed. A warp shader runs inside the per-pixel loop, so its cost stays part of
-  `warp`; timing it per pixel would cost more than the measurement is worth. The frame budget now
-  compares the complete frame rather than only the shaders. Covered by 8 tests.
-- Milkdrop `.milk` files are read as the multi-preset files they are: `VisualizerPreset.ParseSections`
-  splits the text at its `[presetNN]` headers and the preset folder loads every section as its
-  own preset instead of only the last one surviving. The declared format version
-  (`MILKDROP_PRESET_VERSION`, `PSVERSION`, or `preset_version`) is reported on
-  `VisualizerPreset.Version`; every version is accepted. Skipped presets now carry a reason
-  through `VisualizerPresetLibrary.RejectedReasons`, naming the file or section and the parse
-  error. A hand-written corpus of presets in the real format, including a multi-section file and
-  shader source, guards the format handling; third-party presets stay unbundled because they are
-  licensed by their authors. Covered by 13 tests.
-- The visualizer now runs preset shaders. The numbered `warp_N` and `comp_N` keys are parsed
-  together with their optional `_enabled`, `_per_frame`, and `_per_pixel` companions, and the
-  preset reader keeps the newlines inside a shader's source, because Milkdrop stores the code
-  as a multi-line value. A shader that does not parse is skipped so one broken shader degrades a
-  preset instead of rejecting it. The renderer implements `IShaderSampler`, so shaders can
-  sample `sampler_main`, `sampler_pc_main`, `sampler_fc_main`, `GetBlur1`-`GetBlur3`, and
-  `GetPixel`, and it binds `uv`, `uv_orig`, `texsize`, the audio bands, the smoothed bands, the
-  frame counters, and the aspect ratio. A per-frame time budget (20 ms by default) skips the
-  shaders for a while when they cost too much, so a heavy preset keeps a smooth picture instead
-  of stalling playback. Covered by 11 tests.
-- Added the HLSL interpreter for the shader runtime: `ShaderInterpreter` evaluates the parsed
-  `ps_2_0` tree with scalar and `float2`/`float3`/`float4` values (`ShaderValue`), covering
-  arithmetic with the C precedence, variables and the assignment operators, swizzles read and
-  written, vector constructors with concatenation and broadcast, the ternary operator,
-  `if`/`else`, `for`, and the usual intrinsics (`abs`, `ceil`, `clamp`, `cos`, `dot`, `exp`,
-  `floor`, `frac`, `length`, `lerp`, `log`, `max`, `min`, `mul`, `normalize`, `pow`, `saturate`,
-  `sign`, `sin`, `smoothstep`, `sqrt`, `step`, `tan`). Sampling goes through the
-  `IShaderSampler` contract, so the interpreter carries no render state, and division by zero
-  yields zero instead of an infinity. A loop budget of 4096 iterations and a call depth limit of
-  32 keep a runaway shader from stalling a frame. Covered by 14 tests.
-- Added the HLSL parser and its syntax tree: `ShaderParser` and `ShaderNode` turn the
-  `ps_2_0` subset into a tagged-union tree covering declarations, expression statements,
-  `if`/`else`, `for`, `return`, swizzles, calls, the ternary operator, and the C operator
-  precedence. Function signatures and bare statement bodies are both accepted, and a sampler
-  declaration without a type is tolerated. Covered by 10 tests.
-- Added the HLSL front end for the upcoming shader runtime: `ShaderLexer` tokenizes the
-  `ps_2_0` subset Milkdrop shaders use, covering identifiers and keywords, numbers with their
-  `f`/`h` suffixes, single- and multi-character operators, swizzles, line and block comments,
-  and source positions, and reports an unexpected character with its offset. Covered by
-  10 tests.
-- Added the generated visualizer texture bank. The `noise_lq` (32 x 32), `noise_mq`
-  (256 x 256), and `noise_hq` (512 x 512) textures and the sixteen `rand00`-`rand15` (32 x 32)
-  textures are produced deterministically from fixed seeds, so no third party image is
-  bundled and every run yields the same textures. Sampling is bilinear with repeat, clamp, and
-  mirror wrap modes, and generation is lazy so a session that never opens the visualizer
-  allocates nothing. Covered by 10 tests.
-- Milkdrop preset keys now act as the per-frame starting values: every numeric key (including
-  the `nWaveMode`, `bWaveDots`, `bWaveThick`, `bAdditiveWaves`, `bDarkenCenter`,
-  `bMotionVectors`, and `nMotionVectorsX/Y` spellings) seeds the matching variable, so real
-  presets that carry their settings as keys instead of code work as written.
-- The visualizer draws the full Milkdrop wave and post-processing set: the circular, doubled,
-  and single-line wave modes with dots, thick, additive, mystery, and colour/position keys,
-  the four declared waveform slots, the outer and inner borders, a motion-vector grid derived
-  from the actual motion field, and the video echo with its zoom, alpha, and orientation.
-  Covered by 11 tests.
-- The preset engine now runs the full Milkdrop stage order. It parses the `per_frame_init`,
-  `per_pixel_init`, `wave_0`-`wave_3` and `shape_N_init` blocks, registers the complete
-  standard variable set (`bass_att`/`mid_att`/`treb_att`, `aspectx`/`aspecty`,
-  `pixelsx`/`pixelsy`, `monitor`, `zoomexp`, `rot`, `cx`/`cy`, `dx`/`dy`, `sx`/`sy`,
-  `blur1`-`blur3`, `darken_center`, `fGammaAdj`, the wave, border, motion-vector and echo
-  groups, `q1`-`q32`, and `b1`-`b8`), and applies the motion parameters, the blur passes, the
-  centre darkening, and the gamma adjustment. The per-pixel block now sees the already warped
-  sampling position in `x`/`y`/`rad`/`ang`, so a real preset can offset or replace it.
-  Covered by 16 tests.
-- The **Visualisierung** settings section gained an **Always show text and controls** toggle.
-  When it is off, the title, hint, and playback buttons appear only while the mouse moves
-  over the visualizer and hide again after three idle seconds; pointer movement is tracked
-  through the window's own events, so moving the mouse on another monitor never reveals them.
-- Added a **Visualisierung** settings section with the render resolution (320 x 180 up to
-  1280 x 720), the target frame rate (24, 30, 60, or 120), and the user preset folder that
-  previously lived under the output device. The window renders at the configured size and
-  lets the image control scale the frame up, so a lower resolution keeps the CPU cost down.
 
 - Added a localized, editable **Up next** view backed by the active playback
   queue. Tracks, albums, folders, search results, playlist entries, and Plex
@@ -10847,28 +3464,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   card now spans the available content width, with the favorite action directly
   before the album title and the cover/playlist actions aligned side by side.
 
-- The karaoke view now highlights the active word of enhanced-LRC lyrics.
-  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
-  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
-  already-sung words keep the accent colour. Plain synchronized lines keep the
-  line-level highlight, so nothing changes for ordinary LRC files.
-- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
-  now stripped from the line text instead of appearing as literal `<00:12.00>`
-  fragments.
-- Added bulk genre editing for the shared Tracks table. The bulk action bar gained
-  a genre field that stores the value for every selected **local** track through
-  `AudioDatabase.SetTrackGenres`, which writes the library-only
-  `track_genre_overrides` table in one transaction and reapplies it on every later
-  scan. Source media files are never modified, and an empty value removes the
-  override so the next scan restores the embedded genre. Selected Orynivo Server
-  tracks are updated on their owning server through the new authenticated
-  `PUT /api/tracks/{id}/genre`, which records the same library-only override.
-- Podcast episodes can be downloaded for offline playback. Episode rows gained a
-  **Download episode** / **Delete download** context menu and a download marker in
-  the status column, playback prefers the cached file, and Settings > Library sets
-  the cache size limit in megabytes. Eviction removes the least recently used
-  downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
-  the most recently used episode is always kept.
 ### Fixed
 
 - Preserved manual artist renames across watcher updates and later library
@@ -10917,28 +3512,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [0.7.2] - 2026-06-21
 
-- The karaoke view now highlights the active word of enhanced-LRC lyrics.
-  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
-  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
-  already-sung words keep the accent colour. Plain synchronized lines keep the
-  line-level highlight, so nothing changes for ordinary LRC files.
-- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
-  now stripped from the line text instead of appearing as literal `<00:12.00>`
-  fragments.
-- Added bulk genre editing for the shared Tracks table. The bulk action bar gained
-  a genre field that stores the value for every selected **local** track through
-  `AudioDatabase.SetTrackGenres`, which writes the library-only
-  `track_genre_overrides` table in one transaction and reapplies it on every later
-  scan. Source media files are never modified, and an empty value removes the
-  override so the next scan restores the embedded genre. Selected Orynivo Server
-  tracks are updated on their owning server through the new authenticated
-  `PUT /api/tracks/{id}/genre`, which records the same library-only override.
-- Podcast episodes can be downloaded for offline playback. Episode rows gained a
-  **Download episode** / **Delete download** context menu and a download marker in
-  the status column, playback prefers the cached file, and Settings > Library sets
-  the cache size limit in megabytes. Eviction removes the least recently used
-  downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
-  the most recently used episode is always kept.
 ### Fixed
 
 - Fixed the application failing during startup because the lyrics
@@ -10964,28 +3537,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [0.7.1] - 2026-06-21
 
-- The karaoke view now highlights the active word of enhanced-LRC lyrics.
-  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
-  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
-  already-sung words keep the accent colour. Plain synchronized lines keep the
-  line-level highlight, so nothing changes for ordinary LRC files.
-- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
-  now stripped from the line text instead of appearing as literal `<00:12.00>`
-  fragments.
-- Added bulk genre editing for the shared Tracks table. The bulk action bar gained
-  a genre field that stores the value for every selected **local** track through
-  `AudioDatabase.SetTrackGenres`, which writes the library-only
-  `track_genre_overrides` table in one transaction and reapplies it on every later
-  scan. Source media files are never modified, and an empty value removes the
-  override so the next scan restores the embedded genre. Selected Orynivo Server
-  tracks are updated on their owning server through the new authenticated
-  `PUT /api/tracks/{id}/genre`, which records the same library-only override.
-- Podcast episodes can be downloaded for offline playback. Episode rows gained a
-  **Download episode** / **Delete download** context menu and a download marker in
-  the status column, playback prefers the cached file, and Settings > Library sets
-  the cache size limit in megabytes. Eviction removes the least recently used
-  downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
-  the most recently used episode is always kept.
 ### Fixed
 
 - Added the theme-aware now-playing highlight to tracks in the Plex folder
@@ -11006,97 +3557,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.7.0] - 2026-06-21
 
 ### Added
-- The visualizer's per-pixel path no longer does work the preset never asked for. The compiled
-  programs now report the variables they reference (`PresetProgram.ReferencedVariables` and
-  `Uses`), the warp stage resolves the `x`, `y`, `rad`, and `ang` slots once instead of looking
-  each name up in the layout for every pixel, and it only computes the polar pair, the motion
-  grid, and the seeded sampling position when the preset's own code needs them. A rendered frame
-  is allocation-free, which is now asserted by a test. Covered by 5 tests.
-- The visualizer renders on its own thread now. A frame used to be produced from a
-  `DispatcherTimer`, so a heavy preset blocked the interface for its whole duration; the loop
-  now runs on a background thread, hands a finished copy of the frame to the UI thread through a
-  presentation buffer, and queues at most one present at a time, so a busy interface can never
-  build up a backlog of frames. Preset switching, the reset key, and the overlay follow as
-  thread-safe requests, and the frame pacing lives in the tested `FramePacing` helper. Covered by
-  5 tests.
-- The visualizer now measures where its frame time goes. `PresetRenderer` reports a
-  `RenderTimings` breakdown (warp, blur, post-processing, overlay, composite, comp shaders, and
-  the frame total) per frame and as an average over a window, and the window's diagnostic line in
-  `logs/seek.log` carries those averages once per second, so the cost per stage can be read
-  instead of guessed. A warp shader runs inside the per-pixel loop, so its cost stays part of
-  `warp`; timing it per pixel would cost more than the measurement is worth. The frame budget now
-  compares the complete frame rather than only the shaders. Covered by 8 tests.
-- Milkdrop `.milk` files are read as the multi-preset files they are: `VisualizerPreset.ParseSections`
-  splits the text at its `[presetNN]` headers and the preset folder loads every section as its
-  own preset instead of only the last one surviving. The declared format version
-  (`MILKDROP_PRESET_VERSION`, `PSVERSION`, or `preset_version`) is reported on
-  `VisualizerPreset.Version`; every version is accepted. Skipped presets now carry a reason
-  through `VisualizerPresetLibrary.RejectedReasons`, naming the file or section and the parse
-  error. A hand-written corpus of presets in the real format, including a multi-section file and
-  shader source, guards the format handling; third-party presets stay unbundled because they are
-  licensed by their authors. Covered by 13 tests.
-- The visualizer now runs preset shaders. The numbered `warp_N` and `comp_N` keys are parsed
-  together with their optional `_enabled`, `_per_frame`, and `_per_pixel` companions, and the
-  preset reader keeps the newlines inside a shader's source, because Milkdrop stores the code
-  as a multi-line value. A shader that does not parse is skipped so one broken shader degrades a
-  preset instead of rejecting it. The renderer implements `IShaderSampler`, so shaders can
-  sample `sampler_main`, `sampler_pc_main`, `sampler_fc_main`, `GetBlur1`-`GetBlur3`, and
-  `GetPixel`, and it binds `uv`, `uv_orig`, `texsize`, the audio bands, the smoothed bands, the
-  frame counters, and the aspect ratio. A per-frame time budget (20 ms by default) skips the
-  shaders for a while when they cost too much, so a heavy preset keeps a smooth picture instead
-  of stalling playback. Covered by 11 tests.
-- Added the HLSL interpreter for the shader runtime: `ShaderInterpreter` evaluates the parsed
-  `ps_2_0` tree with scalar and `float2`/`float3`/`float4` values (`ShaderValue`), covering
-  arithmetic with the C precedence, variables and the assignment operators, swizzles read and
-  written, vector constructors with concatenation and broadcast, the ternary operator,
-  `if`/`else`, `for`, and the usual intrinsics (`abs`, `ceil`, `clamp`, `cos`, `dot`, `exp`,
-  `floor`, `frac`, `length`, `lerp`, `log`, `max`, `min`, `mul`, `normalize`, `pow`, `saturate`,
-  `sign`, `sin`, `smoothstep`, `sqrt`, `step`, `tan`). Sampling goes through the
-  `IShaderSampler` contract, so the interpreter carries no render state, and division by zero
-  yields zero instead of an infinity. A loop budget of 4096 iterations and a call depth limit of
-  32 keep a runaway shader from stalling a frame. Covered by 14 tests.
-- Added the HLSL parser and its syntax tree: `ShaderParser` and `ShaderNode` turn the
-  `ps_2_0` subset into a tagged-union tree covering declarations, expression statements,
-  `if`/`else`, `for`, `return`, swizzles, calls, the ternary operator, and the C operator
-  precedence. Function signatures and bare statement bodies are both accepted, and a sampler
-  declaration without a type is tolerated. Covered by 10 tests.
-- Added the HLSL front end for the upcoming shader runtime: `ShaderLexer` tokenizes the
-  `ps_2_0` subset Milkdrop shaders use, covering identifiers and keywords, numbers with their
-  `f`/`h` suffixes, single- and multi-character operators, swizzles, line and block comments,
-  and source positions, and reports an unexpected character with its offset. Covered by
-  10 tests.
-- Added the generated visualizer texture bank. The `noise_lq` (32 x 32), `noise_mq`
-  (256 x 256), and `noise_hq` (512 x 512) textures and the sixteen `rand00`-`rand15` (32 x 32)
-  textures are produced deterministically from fixed seeds, so no third party image is
-  bundled and every run yields the same textures. Sampling is bilinear with repeat, clamp, and
-  mirror wrap modes, and generation is lazy so a session that never opens the visualizer
-  allocates nothing. Covered by 10 tests.
-- Milkdrop preset keys now act as the per-frame starting values: every numeric key (including
-  the `nWaveMode`, `bWaveDots`, `bWaveThick`, `bAdditiveWaves`, `bDarkenCenter`,
-  `bMotionVectors`, and `nMotionVectorsX/Y` spellings) seeds the matching variable, so real
-  presets that carry their settings as keys instead of code work as written.
-- The visualizer draws the full Milkdrop wave and post-processing set: the circular, doubled,
-  and single-line wave modes with dots, thick, additive, mystery, and colour/position keys,
-  the four declared waveform slots, the outer and inner borders, a motion-vector grid derived
-  from the actual motion field, and the video echo with its zoom, alpha, and orientation.
-  Covered by 11 tests.
-- The preset engine now runs the full Milkdrop stage order. It parses the `per_frame_init`,
-  `per_pixel_init`, `wave_0`-`wave_3` and `shape_N_init` blocks, registers the complete
-  standard variable set (`bass_att`/`mid_att`/`treb_att`, `aspectx`/`aspecty`,
-  `pixelsx`/`pixelsy`, `monitor`, `zoomexp`, `rot`, `cx`/`cy`, `dx`/`dy`, `sx`/`sy`,
-  `blur1`-`blur3`, `darken_center`, `fGammaAdj`, the wave, border, motion-vector and echo
-  groups, `q1`-`q32`, and `b1`-`b8`), and applies the motion parameters, the blur passes, the
-  centre darkening, and the gamma adjustment. The per-pixel block now sees the already warped
-  sampling position in `x`/`y`/`rad`/`ang`, so a real preset can offset or replace it.
-  Covered by 16 tests.
-- The **Visualisierung** settings section gained an **Always show text and controls** toggle.
-  When it is off, the title, hint, and playback buttons appear only while the mouse moves
-  over the visualizer and hide again after three idle seconds; pointer movement is tracked
-  through the window's own events, so moving the mouse on another monitor never reveals them.
-- Added a **Visualisierung** settings section with the render resolution (320 x 180 up to
-  1280 x 720), the target frame rate (24, 30, 60, or 120), and the user preset folder that
-  previously lived under the output device. The window renders at the configured size and
-  lets the image control scale the frame up, so a lower resolution keeps the CPU cost down.
 
 - Expanded smart playlists with a dedicated localized editor for year, artist,
   album, duration, recently added or played windows, never-played tracks,
@@ -11148,28 +3608,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Matched the album detail header to the shared radio, podcast, and library
   card design with the accent-colored border and asymmetric rounded corners.
 
-- The karaoke view now highlights the active word of enhanced-LRC lyrics.
-  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
-  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
-  already-sung words keep the accent colour. Plain synchronized lines keep the
-  line-level highlight, so nothing changes for ordinary LRC files.
-- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
-  now stripped from the line text instead of appearing as literal `<00:12.00>`
-  fragments.
-- Added bulk genre editing for the shared Tracks table. The bulk action bar gained
-  a genre field that stores the value for every selected **local** track through
-  `AudioDatabase.SetTrackGenres`, which writes the library-only
-  `track_genre_overrides` table in one transaction and reapplies it on every later
-  scan. Source media files are never modified, and an empty value removes the
-  override so the next scan restores the embedded genre. Selected Orynivo Server
-  tracks are updated on their owning server through the new authenticated
-  `PUT /api/tracks/{id}/genre`, which records the same library-only override.
-- Podcast episodes can be downloaded for offline playback. Episode rows gained a
-  **Download episode** / **Delete download** context menu and a download marker in
-  the status column, playback prefers the cached file, and Settings > Library sets
-  the cache size limit in megabytes. Eviction removes the least recently used
-  downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
-  the most recently used episode is always kept.
 ### Fixed
 
 - Added a theme-aware background highlight for the currently audible item in
@@ -11205,97 +3643,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.6.0] - 2026-06-19
 
 ### Added
-- The visualizer's per-pixel path no longer does work the preset never asked for. The compiled
-  programs now report the variables they reference (`PresetProgram.ReferencedVariables` and
-  `Uses`), the warp stage resolves the `x`, `y`, `rad`, and `ang` slots once instead of looking
-  each name up in the layout for every pixel, and it only computes the polar pair, the motion
-  grid, and the seeded sampling position when the preset's own code needs them. A rendered frame
-  is allocation-free, which is now asserted by a test. Covered by 5 tests.
-- The visualizer renders on its own thread now. A frame used to be produced from a
-  `DispatcherTimer`, so a heavy preset blocked the interface for its whole duration; the loop
-  now runs on a background thread, hands a finished copy of the frame to the UI thread through a
-  presentation buffer, and queues at most one present at a time, so a busy interface can never
-  build up a backlog of frames. Preset switching, the reset key, and the overlay follow as
-  thread-safe requests, and the frame pacing lives in the tested `FramePacing` helper. Covered by
-  5 tests.
-- The visualizer now measures where its frame time goes. `PresetRenderer` reports a
-  `RenderTimings` breakdown (warp, blur, post-processing, overlay, composite, comp shaders, and
-  the frame total) per frame and as an average over a window, and the window's diagnostic line in
-  `logs/seek.log` carries those averages once per second, so the cost per stage can be read
-  instead of guessed. A warp shader runs inside the per-pixel loop, so its cost stays part of
-  `warp`; timing it per pixel would cost more than the measurement is worth. The frame budget now
-  compares the complete frame rather than only the shaders. Covered by 8 tests.
-- Milkdrop `.milk` files are read as the multi-preset files they are: `VisualizerPreset.ParseSections`
-  splits the text at its `[presetNN]` headers and the preset folder loads every section as its
-  own preset instead of only the last one surviving. The declared format version
-  (`MILKDROP_PRESET_VERSION`, `PSVERSION`, or `preset_version`) is reported on
-  `VisualizerPreset.Version`; every version is accepted. Skipped presets now carry a reason
-  through `VisualizerPresetLibrary.RejectedReasons`, naming the file or section and the parse
-  error. A hand-written corpus of presets in the real format, including a multi-section file and
-  shader source, guards the format handling; third-party presets stay unbundled because they are
-  licensed by their authors. Covered by 13 tests.
-- The visualizer now runs preset shaders. The numbered `warp_N` and `comp_N` keys are parsed
-  together with their optional `_enabled`, `_per_frame`, and `_per_pixel` companions, and the
-  preset reader keeps the newlines inside a shader's source, because Milkdrop stores the code
-  as a multi-line value. A shader that does not parse is skipped so one broken shader degrades a
-  preset instead of rejecting it. The renderer implements `IShaderSampler`, so shaders can
-  sample `sampler_main`, `sampler_pc_main`, `sampler_fc_main`, `GetBlur1`-`GetBlur3`, and
-  `GetPixel`, and it binds `uv`, `uv_orig`, `texsize`, the audio bands, the smoothed bands, the
-  frame counters, and the aspect ratio. A per-frame time budget (20 ms by default) skips the
-  shaders for a while when they cost too much, so a heavy preset keeps a smooth picture instead
-  of stalling playback. Covered by 11 tests.
-- Added the HLSL interpreter for the shader runtime: `ShaderInterpreter` evaluates the parsed
-  `ps_2_0` tree with scalar and `float2`/`float3`/`float4` values (`ShaderValue`), covering
-  arithmetic with the C precedence, variables and the assignment operators, swizzles read and
-  written, vector constructors with concatenation and broadcast, the ternary operator,
-  `if`/`else`, `for`, and the usual intrinsics (`abs`, `ceil`, `clamp`, `cos`, `dot`, `exp`,
-  `floor`, `frac`, `length`, `lerp`, `log`, `max`, `min`, `mul`, `normalize`, `pow`, `saturate`,
-  `sign`, `sin`, `smoothstep`, `sqrt`, `step`, `tan`). Sampling goes through the
-  `IShaderSampler` contract, so the interpreter carries no render state, and division by zero
-  yields zero instead of an infinity. A loop budget of 4096 iterations and a call depth limit of
-  32 keep a runaway shader from stalling a frame. Covered by 14 tests.
-- Added the HLSL parser and its syntax tree: `ShaderParser` and `ShaderNode` turn the
-  `ps_2_0` subset into a tagged-union tree covering declarations, expression statements,
-  `if`/`else`, `for`, `return`, swizzles, calls, the ternary operator, and the C operator
-  precedence. Function signatures and bare statement bodies are both accepted, and a sampler
-  declaration without a type is tolerated. Covered by 10 tests.
-- Added the HLSL front end for the upcoming shader runtime: `ShaderLexer` tokenizes the
-  `ps_2_0` subset Milkdrop shaders use, covering identifiers and keywords, numbers with their
-  `f`/`h` suffixes, single- and multi-character operators, swizzles, line and block comments,
-  and source positions, and reports an unexpected character with its offset. Covered by
-  10 tests.
-- Added the generated visualizer texture bank. The `noise_lq` (32 x 32), `noise_mq`
-  (256 x 256), and `noise_hq` (512 x 512) textures and the sixteen `rand00`-`rand15` (32 x 32)
-  textures are produced deterministically from fixed seeds, so no third party image is
-  bundled and every run yields the same textures. Sampling is bilinear with repeat, clamp, and
-  mirror wrap modes, and generation is lazy so a session that never opens the visualizer
-  allocates nothing. Covered by 10 tests.
-- Milkdrop preset keys now act as the per-frame starting values: every numeric key (including
-  the `nWaveMode`, `bWaveDots`, `bWaveThick`, `bAdditiveWaves`, `bDarkenCenter`,
-  `bMotionVectors`, and `nMotionVectorsX/Y` spellings) seeds the matching variable, so real
-  presets that carry their settings as keys instead of code work as written.
-- The visualizer draws the full Milkdrop wave and post-processing set: the circular, doubled,
-  and single-line wave modes with dots, thick, additive, mystery, and colour/position keys,
-  the four declared waveform slots, the outer and inner borders, a motion-vector grid derived
-  from the actual motion field, and the video echo with its zoom, alpha, and orientation.
-  Covered by 11 tests.
-- The preset engine now runs the full Milkdrop stage order. It parses the `per_frame_init`,
-  `per_pixel_init`, `wave_0`-`wave_3` and `shape_N_init` blocks, registers the complete
-  standard variable set (`bass_att`/`mid_att`/`treb_att`, `aspectx`/`aspecty`,
-  `pixelsx`/`pixelsy`, `monitor`, `zoomexp`, `rot`, `cx`/`cy`, `dx`/`dy`, `sx`/`sy`,
-  `blur1`-`blur3`, `darken_center`, `fGammaAdj`, the wave, border, motion-vector and echo
-  groups, `q1`-`q32`, and `b1`-`b8`), and applies the motion parameters, the blur passes, the
-  centre darkening, and the gamma adjustment. The per-pixel block now sees the already warped
-  sampling position in `x`/`y`/`rad`/`ang`, so a real preset can offset or replace it.
-  Covered by 16 tests.
-- The **Visualisierung** settings section gained an **Always show text and controls** toggle.
-  When it is off, the title, hint, and playback buttons appear only while the mouse moves
-  over the visualizer and hide again after three idle seconds; pointer movement is tracked
-  through the window's own events, so moving the mouse on another monitor never reveals them.
-- Added a **Visualisierung** settings section with the render resolution (320 x 180 up to
-  1280 x 720), the target frame rate (24, 30, 60, or 120), and the user preset folder that
-  previously lived under the output device. The window renders at the configured size and
-  lets the image control scale the frame up, so a lower resolution keeps the CPU cost down.
 
 - Licensed Orynivo's original source code and documentation under Apache
   License 2.0, with repository and release copies of `LICENSE`, `NOTICE`,
@@ -11310,28 +3657,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   French, and Spanish when DSD is being converted to PCM, including the active
   PCM output sample rate.
 
-- The karaoke view now highlights the active word of enhanced-LRC lyrics.
-  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
-  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
-  already-sung words keep the accent colour. Plain synchronized lines keep the
-  line-level highlight, so nothing changes for ordinary LRC files.
-- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
-  now stripped from the line text instead of appearing as literal `<00:12.00>`
-  fragments.
-- Added bulk genre editing for the shared Tracks table. The bulk action bar gained
-  a genre field that stores the value for every selected **local** track through
-  `AudioDatabase.SetTrackGenres`, which writes the library-only
-  `track_genre_overrides` table in one transaction and reapplies it on every later
-  scan. Source media files are never modified, and an empty value removes the
-  override so the next scan restores the embedded genre. Selected Orynivo Server
-  tracks are updated on their owning server through the new authenticated
-  `PUT /api/tracks/{id}/genre`, which records the same library-only override.
-- Podcast episodes can be downloaded for offline playback. Episode rows gained a
-  **Download episode** / **Delete download** context menu and a download marker in
-  the status column, playback prefers the cached file, and Settings > Library sets
-  the cache size limit in megabytes. Eviction removes the least recently used
-  downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
-  the most recently used episode is always kept.
 ### Fixed
 
 - Fixed the table-header column chooser not opening on right-click and then
@@ -11365,97 +3690,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   New NuGet packages: `Avalonia.Fonts.Inter`, `SkiaSharp`.
 
 ### Added
-- The visualizer's per-pixel path no longer does work the preset never asked for. The compiled
-  programs now report the variables they reference (`PresetProgram.ReferencedVariables` and
-  `Uses`), the warp stage resolves the `x`, `y`, `rad`, and `ang` slots once instead of looking
-  each name up in the layout for every pixel, and it only computes the polar pair, the motion
-  grid, and the seeded sampling position when the preset's own code needs them. A rendered frame
-  is allocation-free, which is now asserted by a test. Covered by 5 tests.
-- The visualizer renders on its own thread now. A frame used to be produced from a
-  `DispatcherTimer`, so a heavy preset blocked the interface for its whole duration; the loop
-  now runs on a background thread, hands a finished copy of the frame to the UI thread through a
-  presentation buffer, and queues at most one present at a time, so a busy interface can never
-  build up a backlog of frames. Preset switching, the reset key, and the overlay follow as
-  thread-safe requests, and the frame pacing lives in the tested `FramePacing` helper. Covered by
-  5 tests.
-- The visualizer now measures where its frame time goes. `PresetRenderer` reports a
-  `RenderTimings` breakdown (warp, blur, post-processing, overlay, composite, comp shaders, and
-  the frame total) per frame and as an average over a window, and the window's diagnostic line in
-  `logs/seek.log` carries those averages once per second, so the cost per stage can be read
-  instead of guessed. A warp shader runs inside the per-pixel loop, so its cost stays part of
-  `warp`; timing it per pixel would cost more than the measurement is worth. The frame budget now
-  compares the complete frame rather than only the shaders. Covered by 8 tests.
-- Milkdrop `.milk` files are read as the multi-preset files they are: `VisualizerPreset.ParseSections`
-  splits the text at its `[presetNN]` headers and the preset folder loads every section as its
-  own preset instead of only the last one surviving. The declared format version
-  (`MILKDROP_PRESET_VERSION`, `PSVERSION`, or `preset_version`) is reported on
-  `VisualizerPreset.Version`; every version is accepted. Skipped presets now carry a reason
-  through `VisualizerPresetLibrary.RejectedReasons`, naming the file or section and the parse
-  error. A hand-written corpus of presets in the real format, including a multi-section file and
-  shader source, guards the format handling; third-party presets stay unbundled because they are
-  licensed by their authors. Covered by 13 tests.
-- The visualizer now runs preset shaders. The numbered `warp_N` and `comp_N` keys are parsed
-  together with their optional `_enabled`, `_per_frame`, and `_per_pixel` companions, and the
-  preset reader keeps the newlines inside a shader's source, because Milkdrop stores the code
-  as a multi-line value. A shader that does not parse is skipped so one broken shader degrades a
-  preset instead of rejecting it. The renderer implements `IShaderSampler`, so shaders can
-  sample `sampler_main`, `sampler_pc_main`, `sampler_fc_main`, `GetBlur1`-`GetBlur3`, and
-  `GetPixel`, and it binds `uv`, `uv_orig`, `texsize`, the audio bands, the smoothed bands, the
-  frame counters, and the aspect ratio. A per-frame time budget (20 ms by default) skips the
-  shaders for a while when they cost too much, so a heavy preset keeps a smooth picture instead
-  of stalling playback. Covered by 11 tests.
-- Added the HLSL interpreter for the shader runtime: `ShaderInterpreter` evaluates the parsed
-  `ps_2_0` tree with scalar and `float2`/`float3`/`float4` values (`ShaderValue`), covering
-  arithmetic with the C precedence, variables and the assignment operators, swizzles read and
-  written, vector constructors with concatenation and broadcast, the ternary operator,
-  `if`/`else`, `for`, and the usual intrinsics (`abs`, `ceil`, `clamp`, `cos`, `dot`, `exp`,
-  `floor`, `frac`, `length`, `lerp`, `log`, `max`, `min`, `mul`, `normalize`, `pow`, `saturate`,
-  `sign`, `sin`, `smoothstep`, `sqrt`, `step`, `tan`). Sampling goes through the
-  `IShaderSampler` contract, so the interpreter carries no render state, and division by zero
-  yields zero instead of an infinity. A loop budget of 4096 iterations and a call depth limit of
-  32 keep a runaway shader from stalling a frame. Covered by 14 tests.
-- Added the HLSL parser and its syntax tree: `ShaderParser` and `ShaderNode` turn the
-  `ps_2_0` subset into a tagged-union tree covering declarations, expression statements,
-  `if`/`else`, `for`, `return`, swizzles, calls, the ternary operator, and the C operator
-  precedence. Function signatures and bare statement bodies are both accepted, and a sampler
-  declaration without a type is tolerated. Covered by 10 tests.
-- Added the HLSL front end for the upcoming shader runtime: `ShaderLexer` tokenizes the
-  `ps_2_0` subset Milkdrop shaders use, covering identifiers and keywords, numbers with their
-  `f`/`h` suffixes, single- and multi-character operators, swizzles, line and block comments,
-  and source positions, and reports an unexpected character with its offset. Covered by
-  10 tests.
-- Added the generated visualizer texture bank. The `noise_lq` (32 x 32), `noise_mq`
-  (256 x 256), and `noise_hq` (512 x 512) textures and the sixteen `rand00`-`rand15` (32 x 32)
-  textures are produced deterministically from fixed seeds, so no third party image is
-  bundled and every run yields the same textures. Sampling is bilinear with repeat, clamp, and
-  mirror wrap modes, and generation is lazy so a session that never opens the visualizer
-  allocates nothing. Covered by 10 tests.
-- Milkdrop preset keys now act as the per-frame starting values: every numeric key (including
-  the `nWaveMode`, `bWaveDots`, `bWaveThick`, `bAdditiveWaves`, `bDarkenCenter`,
-  `bMotionVectors`, and `nMotionVectorsX/Y` spellings) seeds the matching variable, so real
-  presets that carry their settings as keys instead of code work as written.
-- The visualizer draws the full Milkdrop wave and post-processing set: the circular, doubled,
-  and single-line wave modes with dots, thick, additive, mystery, and colour/position keys,
-  the four declared waveform slots, the outer and inner borders, a motion-vector grid derived
-  from the actual motion field, and the video echo with its zoom, alpha, and orientation.
-  Covered by 11 tests.
-- The preset engine now runs the full Milkdrop stage order. It parses the `per_frame_init`,
-  `per_pixel_init`, `wave_0`-`wave_3` and `shape_N_init` blocks, registers the complete
-  standard variable set (`bass_att`/`mid_att`/`treb_att`, `aspectx`/`aspecty`,
-  `pixelsx`/`pixelsy`, `monitor`, `zoomexp`, `rot`, `cx`/`cy`, `dx`/`dy`, `sx`/`sy`,
-  `blur1`-`blur3`, `darken_center`, `fGammaAdj`, the wave, border, motion-vector and echo
-  groups, `q1`-`q32`, and `b1`-`b8`), and applies the motion parameters, the blur passes, the
-  centre darkening, and the gamma adjustment. The per-pixel block now sees the already warped
-  sampling position in `x`/`y`/`rad`/`ang`, so a real preset can offset or replace it.
-  Covered by 16 tests.
-- The **Visualisierung** settings section gained an **Always show text and controls** toggle.
-  When it is off, the title, hint, and playback buttons appear only while the mouse moves
-  over the visualizer and hide again after three idle seconds; pointer movement is tracked
-  through the window's own events, so moving the mouse on another monitor never reveals them.
-- Added a **Visualisierung** settings section with the render resolution (320 x 180 up to
-  1280 x 720), the target frame rate (24, 30, 60, or 120), and the user preset folder that
-  previously lived under the output device. The window renders at the configured size and
-  lets the image control scale the frame up, so a lower resolution keeps the CPU cost down.
 
 - Automatic FFmpeg download: when `ffmpeg.exe` and `ffprobe.exe` are not found in
   the application directory or the system PATH, Orynivo downloads the BtbN
@@ -11465,28 +3699,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   screen. If the download fails, a warning dialog is displayed and the application
   starts without audio playback capability.
 
-- The karaoke view now highlights the active word of enhanced-LRC lyrics.
-  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
-  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
-  already-sung words keep the accent colour. Plain synchronized lines keep the
-  line-level highlight, so nothing changes for ordinary LRC files.
-- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
-  now stripped from the line text instead of appearing as literal `<00:12.00>`
-  fragments.
-- Added bulk genre editing for the shared Tracks table. The bulk action bar gained
-  a genre field that stores the value for every selected **local** track through
-  `AudioDatabase.SetTrackGenres`, which writes the library-only
-  `track_genre_overrides` table in one transaction and reapplies it on every later
-  scan. Source media files are never modified, and an empty value removes the
-  override so the next scan restores the embedded genre. Selected Orynivo Server
-  tracks are updated on their owning server through the new authenticated
-  `PUT /api/tracks/{id}/genre`, which records the same library-only override.
-- Podcast episodes can be downloaded for offline playback. Episode rows gained a
-  **Download episode** / **Delete download** context menu and a download marker in
-  the status column, playback prefers the cached file, and Settings > Library sets
-  the cache size limit in megabytes. Eviction removes the least recently used
-  downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
-  the most recently used episode is always kept.
 ### Fixed
 
 - Restored visible text in Avalonia table/list navigation and restored vector
@@ -11577,28 +3789,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [0.4.0] - 2026-06-15
 
-- The karaoke view now highlights the active word of enhanced-LRC lyrics.
-  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
-  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
-  already-sung words keep the accent colour. Plain synchronized lines keep the
-  line-level highlight, so nothing changes for ordinary LRC files.
-- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
-  now stripped from the line text instead of appearing as literal `<00:12.00>`
-  fragments.
-- Added bulk genre editing for the shared Tracks table. The bulk action bar gained
-  a genre field that stores the value for every selected **local** track through
-  `AudioDatabase.SetTrackGenres`, which writes the library-only
-  `track_genre_overrides` table in one transaction and reapplies it on every later
-  scan. Source media files are never modified, and an empty value removes the
-  override so the next scan restores the embedded genre. Selected Orynivo Server
-  tracks are updated on their owning server through the new authenticated
-  `PUT /api/tracks/{id}/genre`, which records the same library-only override.
-- Podcast episodes can be downloaded for offline playback. Episode rows gained a
-  **Download episode** / **Delete download** context menu and a download marker in
-  the status column, playback prefers the cached file, and Settings > Library sets
-  the cache size limit in megabytes. Eviction removes the least recently used
-  downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
-  the most recently used episode is always kept.
 ### Fixed
 
 - Plex folder playback now queues only the tracks on the selected file's
@@ -11626,97 +3816,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   automatically.
 
 ### Added
-- The visualizer's per-pixel path no longer does work the preset never asked for. The compiled
-  programs now report the variables they reference (`PresetProgram.ReferencedVariables` and
-  `Uses`), the warp stage resolves the `x`, `y`, `rad`, and `ang` slots once instead of looking
-  each name up in the layout for every pixel, and it only computes the polar pair, the motion
-  grid, and the seeded sampling position when the preset's own code needs them. A rendered frame
-  is allocation-free, which is now asserted by a test. Covered by 5 tests.
-- The visualizer renders on its own thread now. A frame used to be produced from a
-  `DispatcherTimer`, so a heavy preset blocked the interface for its whole duration; the loop
-  now runs on a background thread, hands a finished copy of the frame to the UI thread through a
-  presentation buffer, and queues at most one present at a time, so a busy interface can never
-  build up a backlog of frames. Preset switching, the reset key, and the overlay follow as
-  thread-safe requests, and the frame pacing lives in the tested `FramePacing` helper. Covered by
-  5 tests.
-- The visualizer now measures where its frame time goes. `PresetRenderer` reports a
-  `RenderTimings` breakdown (warp, blur, post-processing, overlay, composite, comp shaders, and
-  the frame total) per frame and as an average over a window, and the window's diagnostic line in
-  `logs/seek.log` carries those averages once per second, so the cost per stage can be read
-  instead of guessed. A warp shader runs inside the per-pixel loop, so its cost stays part of
-  `warp`; timing it per pixel would cost more than the measurement is worth. The frame budget now
-  compares the complete frame rather than only the shaders. Covered by 8 tests.
-- Milkdrop `.milk` files are read as the multi-preset files they are: `VisualizerPreset.ParseSections`
-  splits the text at its `[presetNN]` headers and the preset folder loads every section as its
-  own preset instead of only the last one surviving. The declared format version
-  (`MILKDROP_PRESET_VERSION`, `PSVERSION`, or `preset_version`) is reported on
-  `VisualizerPreset.Version`; every version is accepted. Skipped presets now carry a reason
-  through `VisualizerPresetLibrary.RejectedReasons`, naming the file or section and the parse
-  error. A hand-written corpus of presets in the real format, including a multi-section file and
-  shader source, guards the format handling; third-party presets stay unbundled because they are
-  licensed by their authors. Covered by 13 tests.
-- The visualizer now runs preset shaders. The numbered `warp_N` and `comp_N` keys are parsed
-  together with their optional `_enabled`, `_per_frame`, and `_per_pixel` companions, and the
-  preset reader keeps the newlines inside a shader's source, because Milkdrop stores the code
-  as a multi-line value. A shader that does not parse is skipped so one broken shader degrades a
-  preset instead of rejecting it. The renderer implements `IShaderSampler`, so shaders can
-  sample `sampler_main`, `sampler_pc_main`, `sampler_fc_main`, `GetBlur1`-`GetBlur3`, and
-  `GetPixel`, and it binds `uv`, `uv_orig`, `texsize`, the audio bands, the smoothed bands, the
-  frame counters, and the aspect ratio. A per-frame time budget (20 ms by default) skips the
-  shaders for a while when they cost too much, so a heavy preset keeps a smooth picture instead
-  of stalling playback. Covered by 11 tests.
-- Added the HLSL interpreter for the shader runtime: `ShaderInterpreter` evaluates the parsed
-  `ps_2_0` tree with scalar and `float2`/`float3`/`float4` values (`ShaderValue`), covering
-  arithmetic with the C precedence, variables and the assignment operators, swizzles read and
-  written, vector constructors with concatenation and broadcast, the ternary operator,
-  `if`/`else`, `for`, and the usual intrinsics (`abs`, `ceil`, `clamp`, `cos`, `dot`, `exp`,
-  `floor`, `frac`, `length`, `lerp`, `log`, `max`, `min`, `mul`, `normalize`, `pow`, `saturate`,
-  `sign`, `sin`, `smoothstep`, `sqrt`, `step`, `tan`). Sampling goes through the
-  `IShaderSampler` contract, so the interpreter carries no render state, and division by zero
-  yields zero instead of an infinity. A loop budget of 4096 iterations and a call depth limit of
-  32 keep a runaway shader from stalling a frame. Covered by 14 tests.
-- Added the HLSL parser and its syntax tree: `ShaderParser` and `ShaderNode` turn the
-  `ps_2_0` subset into a tagged-union tree covering declarations, expression statements,
-  `if`/`else`, `for`, `return`, swizzles, calls, the ternary operator, and the C operator
-  precedence. Function signatures and bare statement bodies are both accepted, and a sampler
-  declaration without a type is tolerated. Covered by 10 tests.
-- Added the HLSL front end for the upcoming shader runtime: `ShaderLexer` tokenizes the
-  `ps_2_0` subset Milkdrop shaders use, covering identifiers and keywords, numbers with their
-  `f`/`h` suffixes, single- and multi-character operators, swizzles, line and block comments,
-  and source positions, and reports an unexpected character with its offset. Covered by
-  10 tests.
-- Added the generated visualizer texture bank. The `noise_lq` (32 x 32), `noise_mq`
-  (256 x 256), and `noise_hq` (512 x 512) textures and the sixteen `rand00`-`rand15` (32 x 32)
-  textures are produced deterministically from fixed seeds, so no third party image is
-  bundled and every run yields the same textures. Sampling is bilinear with repeat, clamp, and
-  mirror wrap modes, and generation is lazy so a session that never opens the visualizer
-  allocates nothing. Covered by 10 tests.
-- Milkdrop preset keys now act as the per-frame starting values: every numeric key (including
-  the `nWaveMode`, `bWaveDots`, `bWaveThick`, `bAdditiveWaves`, `bDarkenCenter`,
-  `bMotionVectors`, and `nMotionVectorsX/Y` spellings) seeds the matching variable, so real
-  presets that carry their settings as keys instead of code work as written.
-- The visualizer draws the full Milkdrop wave and post-processing set: the circular, doubled,
-  and single-line wave modes with dots, thick, additive, mystery, and colour/position keys,
-  the four declared waveform slots, the outer and inner borders, a motion-vector grid derived
-  from the actual motion field, and the video echo with its zoom, alpha, and orientation.
-  Covered by 11 tests.
-- The preset engine now runs the full Milkdrop stage order. It parses the `per_frame_init`,
-  `per_pixel_init`, `wave_0`-`wave_3` and `shape_N_init` blocks, registers the complete
-  standard variable set (`bass_att`/`mid_att`/`treb_att`, `aspectx`/`aspecty`,
-  `pixelsx`/`pixelsy`, `monitor`, `zoomexp`, `rot`, `cx`/`cy`, `dx`/`dy`, `sx`/`sy`,
-  `blur1`-`blur3`, `darken_center`, `fGammaAdj`, the wave, border, motion-vector and echo
-  groups, `q1`-`q32`, and `b1`-`b8`), and applies the motion parameters, the blur passes, the
-  centre darkening, and the gamma adjustment. The per-pixel block now sees the already warped
-  sampling position in `x`/`y`/`rad`/`ang`, so a real preset can offset or replace it.
-  Covered by 16 tests.
-- The **Visualisierung** settings section gained an **Always show text and controls** toggle.
-  When it is off, the title, hint, and playback buttons appear only while the mouse moves
-  over the visualizer and hide again after three idle seconds; pointer movement is tracked
-  through the window's own events, so moving the mouse on another monitor never reveals them.
-- Added a **Visualisierung** settings section with the render resolution (320 x 180 up to
-  1280 x 720), the target frame rate (24, 30, 60, or 120), and the user preset folder that
-  previously lived under the output device. The window renders at the configured size and
-  lets the image control scale the frame up, so a lower resolution keeps the CPU cost down.
 
 - Plex music-library browsing with switchable artist, album, track, and lazy
   folder views, artist/album drill-down, paginated large result sets, and

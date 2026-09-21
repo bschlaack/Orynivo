@@ -181,7 +181,9 @@ public sealed class VisualizerPreset
             while (lineIndex + 1 < lines.Length && !LooksLikeKey(lines[lineIndex + 1]))
                 value.Append('\n').Append(lines[++lineIndex].TrimEnd());
 
-            var valueText = value.ToString();
+            // Blank lines belong to a shader's source, so they are kept above, but the trailing
+            // newline of a section must not become part of a scalar value like the name.
+            var valueText = value.ToString().TrimEnd();
             values[key] = valueText;
             if (string.Equals(key, "name", StringComparison.OrdinalIgnoreCase) && valueText.Length > 0)
                 name = valueText;

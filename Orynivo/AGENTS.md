@@ -524,9 +524,15 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
   `Orynivo.Visualization.FramePacing`.
   `VisualizerPresetLibrary` loads the built-in presets plus `.oryvis` and `.milk` files from
   `AppSettings.VisualizerPresetDirectory` (default: a `visualizer-presets` folder below the
-  data root); every `[presetNN]` section of a `.milk` file becomes its own preset, a file that
+  data root, including its subfolders, because preset collections are sorted into directories;
+  every `[presetNN]` section of a `.milk` file becomes its own preset, a file that
   fails to parse is skipped and reported with its reason through `RejectedReasons`, never fatal, and preset
-  files stay user data like equalizer profiles. Preset stages share one slot layout, so a
+  files stay user data like equalizer profiles. User presets are discovered eagerly but parsed
+  lazily in `At`, one at a time, because compiling a preset builds and JIT-compiles its
+  expression trees; a collection of several hundred presets must never be compiled when the
+  window opens. Keep the discovered count (`Count`) separate from the parsed presets, report a
+  failure on first use through `RejectedReasons`, and fall back to the first built-in so one
+  broken file can never stop the visualizer. Preset stages share one slot layout, so a
   stage-local built-in such as `x` or `rad` is one slot that each stage seeds and reads back
   for itself: the per-pixel stage seeds it per pixel, a shape seeds it per shape and per
   vertex. Never let a stage assume another stage's value is still in place.
