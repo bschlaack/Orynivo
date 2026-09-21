@@ -538,12 +538,16 @@ public static class ShaderTranspiler
 
         if (target > source)
         {
-            // Widening a smaller vector is deliberately not done. Padding it with zeros was tried
-            // three times and rejected every time: the engine does not read a missing component as
-            // zero, so the padded shader and the interpreter disagree, which the CPU/GPU comparison
-            // test catches. The widening is left unexpressed instead, so that shader keeps its
-            // fallback to the interpreter rather than rendering something else.
-            return $"{to}({text})";
+            // A scalar broadcasts, because ShaderValue.Scalar stores the same value in all four
+            // components, so the single-argument constructor is right for it. A vector does not: its
+            // missing components read as zero, so it is padded with zeros. Treating both the same way
+            // turned "colour * 0.5" into "colour * float3(0.5, 0, 0)", which the CPU/GPU comparison
+            // test caught three times before the cause was found.
+            if (source == 1)
+                return $"{to}({text})";
+
+            var fill = string.Join(", ", Enumerable.Repeat("0.0", target - source));
+            return $"{to}({text}, {fill})";
         }
 
         return $"{text}.{"xyzw"[..target]}";

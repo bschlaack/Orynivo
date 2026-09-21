@@ -173,6 +173,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   rather than in the file, which is recorded as roadmap item 39i.
 
 ### Fixed
+- Fixed the SkSL emitter widening a scalar as if it were a vector. A scalar broadcasts, because
+  `ShaderValue.Scalar` stores the same value in all four components, while a vector's missing
+  components read as zero; treating both the same way turned `colour * 0.5` into
+  `colour * float3(0.5, 0, 0)`. The CPU/GPU comparison test rejected the padding three times before
+  the cause was found in the value type. A scalar now widens with the single-argument constructor
+  and a vector is padded with zeros. Over a 500-file sample the share of shaders that translate and
+  are accepted by Skia rose from 382 to 395 of 764, that is to 52 percent.
 - Fixed a declaration that names several variables, as in `float3 ret1, neu, blur;`, keeping only
   the first name. Every other name stayed undeclared, so the interpreter read it as zero and the
   SkSL emitter failed on an unknown identifier — a survey found 57 warp shaders declaring
