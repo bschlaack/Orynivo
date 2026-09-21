@@ -723,9 +723,13 @@ affordable. This is a project of its own and must keep the CPU path as the fallb
   by Skia. Anything else keeps the interpreter. The two emitters share the `SkSL` naming and type
   helpers. The comp shader's own per-pixel block is emitted into the comp effect too
   (`ShaderTranspiler.TranspileComp`), so the comp pass no longer requires it to be empty; it has no
-  effect on a compiled shader, so the picture is unchanged. What remains is the warp shader's
-  `per_frame` block, which is deferred because its writes carry into the next pixel's global
-  per-pixel block and need a disjointness check.
+  effect on a compiled shader, so the picture is unchanged. The shared `q1`-`q32` and `t1`-`t8`
+  variables are now seeded from the preset slots on both CPU shader paths, which is what the GPU
+  path already did, so the two execution paths agree on the whole shader vocabulary.
+  What remains is the warp shader's `per_frame` block, which is deferred: a survey of the whole
+  9795-file collection found no `warp_N_per_frame`, `comp_N_per_frame`, `warp_N_per_pixel`, or
+  `comp_N_per_pixel` key at all, and its writes would carry into the next pixel's global per-pixel
+  block, which needs a disjointness check before it can run on the GPU.
   The comp pass binds the composited frame, its blur levels, and the previous frame per sampler, and
   scales each sampler by its own `texsize_*`, so the noise textures are sampled at their real size.
   It stays opt-in because the Skia path carries the frame through eight-bit textures and differs

@@ -61,6 +61,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   stays the fallback, and the CPU/GPU tests keep the two within a level.
 
 ### Fixed
+- Seeded the shared `q1`-`q32` and `t1`-`t8` variables from the preset slots on both CPU shader
+  paths. Milkdrop keeps one variable universe for the expression blocks and the shader, so a shader
+  now reads the values the per-frame block computed instead of zero; the GPU path already seeded
+  them, so the two paths agree. The compiled path seeds them once per frame and the interpreter path
+  per pixel, matching the GPU's once-per-draw seeding.
 - Matched the SkSL frame-sampler coordinate convention to the renderer's. `PixelBuffer.SampleBilinear`
   maps a normalised coordinate to `zero..size-1`, while the generated textures map it to
   `zero..size`, so a `tex2D`, `GetBlur1`-`GetBlur3`, or `GetPixel` on a frame now scales by

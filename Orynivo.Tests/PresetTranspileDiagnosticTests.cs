@@ -123,6 +123,8 @@ public sealed class PresetTranspileDiagnosticTests
         var globalTranslated = 0;
         var shaderBlocks = 0;
         var shaderTranslated = 0;
+        var warpPerFrameBlocks = 0;
+        var warpPerFrameShared = 0;
         var failures = new Dictionary<string, int>(StringComparer.Ordinal);
         foreach (var file in Directory
             .EnumerateFiles(folder, "*.milk", SearchOption.AllDirectories)
@@ -163,12 +165,25 @@ public sealed class PresetTranspileDiagnosticTests
                     if (TryTranspileBlock(shader.PerPixel, failures))
                         shaderTranslated++;
                 }
+
+                foreach (var shader in preset.WarpShaders)
+                {
+                    if (shader.PerFrame.IsEmpty)
+                        continue;
+
+                    warpPerFrameBlocks++;
+                    // A warp per-frame block needs the same value the global per-pixel block writes,
+                    // which the GPU pass has to share rather than keep in separate locals.
+                    if (shader.PerFrame.ReferencedVariables.Intersect(preset.PerPixel.WrittenVariables).Any())
+                        warpPerFrameShared++;
+                }
             }
         }
 
         _output.WriteLine(
             $"global per-pixel blocks: {globalBlocks}   GPU-eligible: {globalEligible}   translated+accepted: {globalTranslated}");
         _output.WriteLine($"shader per-pixel blocks: {shaderBlocks}   translated: {shaderTranslated}");
+        _output.WriteLine($"warp per-frame blocks: {warpPerFrameBlocks}   sharing a global write: {warpPerFrameShared}");
         _output.WriteLine("top reasons:");
         foreach (var (reason, count) in failures.OrderByDescending(pair => pair.Value).Take(MaxReported))
             _output.WriteLine($"{count,6}  {reason}");

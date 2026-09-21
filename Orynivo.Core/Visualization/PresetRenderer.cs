@@ -1208,22 +1208,28 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
         // outright when only the two scalars were bound, which disabled that shader.
         values[14] = ShaderValue.Vector(Read("aspectx", 1f), Read("aspecty", 1f), 0f, 0f, 2);
         foreach (var compiled in _compiledWarp)
-        {
-            if (!compiled.IsCompiled)
-                continue;
-
-            for (var index = 0; index < compiled.FrameIndices.Length; index++)
-                compiled.SetAt(compiled.FrameIndices[index], values[index]);
-        }
+            SeedCompiledShader(compiled, values);
 
         foreach (var compiled in _compiledComp)
-        {
-            if (!compiled.IsCompiled)
-                continue;
+            SeedCompiledShader(compiled, values);
+    }
 
-            for (var index = 0; index < compiled.FrameIndices.Length; index++)
-                compiled.SetAt(compiled.FrameIndices[index], values[index]);
-        }
+    /// <summary>
+    /// Seeds one compiled shader's frame variables and the shared q and t values. The latter are
+    /// read from the preset slots, because Milkdrop keeps one variable universe for the expression
+    /// blocks and the shader; the GPU path seeds the same set.
+    /// </summary>
+    /// <param name="compiled">Shader to seed.</param>
+    /// <param name="values">Frame-variable values, aligned with <see cref="CompiledShader.FrameVariables"/>.</param>
+    private void SeedCompiledShader(CompiledShader compiled, ReadOnlySpan<ShaderValue> values)
+    {
+        if (!compiled.IsCompiled)
+            return;
+
+        for (var index = 0; index < compiled.FrameIndices.Length; index++)
+            compiled.SetAt(compiled.FrameIndices[index], values[index]);
+        for (var index = 0; index < compiled.PresetIndices.Length; index++)
+            compiled.SetAt(compiled.PresetIndices[index], ShaderValue.Scalar(Read(CompiledShader.PresetVariables[index], 0f)));
     }
 
     /// <summary>Runs every comp shader over the shader grid.</summary>
@@ -1479,6 +1485,12 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
         interpreter.SetVariable("bass_att", Read("bass_att", 0f));
         interpreter.SetVariable("mid_att", Read("mid_att", 0f));
         interpreter.SetVariable("treb_att", Read("treb_att", 0f));
+        // Milkdrop shaders share q1..q32 and t1..t8 with the expression blocks, so the values the
+        // per-frame block computed reach the shader. The GPU path seeds the same set from the slots.
+        for (var index = 1; index <= 32; index++)
+            interpreter.SetVariable("q" + index, Read("q" + index, 0f));
+        for (var index = 1; index <= 8; index++)
+            interpreter.SetVariable("t" + index, Read("t" + index, 0f));
         interpreter.SetVariable("aspectx", Read("aspectx", 1f));
         interpreter.SetVariable("aspecty", Read("aspecty", 1f));
         interpreter.SetVariable(
@@ -1504,6 +1516,23 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
             "bass_att", "mid_att", "treb_att", "aspectx", "aspecty", "texsize", "rand_frame", "aspect"
         ];
 
+        /// <summary>
+        /// The shared <c>q1</c>-<c>q32</c> and <c>t1</c>-<c>t8</c> variables a shader reads from the
+        /// preset slots. Milkdrop keeps them in one universe for the expression blocks and the
+        /// shader, so they are seeded rather than left at zero.
+        /// </summary>
+        public static readonly string[] PresetVariables = BuildPresetVariables();
+
+        private static string[] BuildPresetVariables()
+        {
+            var names = new string[40];
+            for (var index = 0; index < 32; index++)
+                names[index] = "q" + (index + 1);
+            for (var index = 0; index < 8; index++)
+                names[32 + index] = "t" + (index + 1);
+            return names;
+        }
+
         private readonly ShaderProgram? _program;
         private readonly ShaderValue[]? _slots;
 
@@ -1512,6 +1541,7 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
             _program = program;
             _slots = program is null ? null : new ShaderValue[program.SlotCount];
             FrameIndices = program is null ? [] : Array.ConvertAll(FrameVariables, program.IndexOf);
+            PresetIndices = program is null ? [] : Array.ConvertAll(PresetVariables, program.IndexOf);
             UvIndex = program?.IndexOf("uv") ?? -1;
             UvOrigIndex = program?.IndexOf("uv_orig") ?? -1;
             RadIndex = program?.IndexOf("rad") ?? -1;
@@ -1520,6 +1550,9 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
 
         /// <summary>Gets the resolved slots of the frame variables, aligned with the name list.</summary>
         public int[] FrameIndices { get; }
+
+        /// <summary>Gets the resolved slots of the shared q and t variables, aligned with the name list.</summary>
+        public int[] PresetIndices { get; }
 
         /// <summary>Gets the resolved slot of the sampling coordinate.</summary>
         public int UvIndex { get; }

@@ -93,10 +93,15 @@ This file applies to `Orynivo.Core/` and supplements `../AGENTS.md`.
   same values; `ShaderCompilerTests` asserts exactly that and must keep passing. `ShaderTranspiler`
   is the SkSL back end for the GPU path and must stay honest against the same reference: the GPU and
   the interpreter have to agree on one variable universe, so the emitter knows the engine-bound
-  per-pixel variables (`uv`, `uv_orig`, `rad`, `ang`), infers an intrinsic's return type from its
+    per-pixel variables (`uv`, `uv_orig`, `rad`, `ang`), infers an intrinsic's return type from its
   arguments, declares a sampler from the shader's own `tex2D`/`tex3D` call instead of a fixed list,
   reads an undeclared variable as a zero constant the way the interpreter does, gives a written
-  uniform a writable copy in main, and renames a name SkSL reserves. `SkiaShaderRunner` must bind a
+  uniform a writable copy in main, and renames a name SkSL reserves. Milkdrop keeps one variable
+  universe for the expression blocks and the shader, so `q1`-`q32` and `t1`-`t8` are seeded from the
+  preset slots on both CPU paths (`BindShaderVariables` per pixel and `SeedCompiledShaderFrame` once
+  per frame) and on the GPU; keep the two sides seeding the same set, because a shader that reads a
+  variable the interpreter leaves at zero renders a different picture on the two paths.
+ `SkiaShaderRunner` must bind a
   child shader for every sampler `Transpile` reports, and the CPU/GPU comparison tests must keep
   passing. Its `CompPass` runs a comp shader, with its own per-pixel block emitted into the same
   effect, as a runtime effect over the

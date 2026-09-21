@@ -76,6 +76,26 @@ public sealed class SkiaWarpPassTests
         Assert.InRange(difference, 0.0001f, 0.01f);
     }
 
+    /// <summary>The shared q and t values reach the shader on both paths.</summary>
+    [Fact]
+    public void RenderFrame_SeedsTheSharedQAndTVariables()
+    {
+        const string Preset =
+            "fDecay=1\nwave_a=0\n" +
+            "per_frame_1=q1 = 0.5; t1 = 0.25;\n" +
+            "warp_1=float4 main(float2 uv : TEXCOORD0) : COLOR { ret = float3(q1, t1, 0.0); }";
+
+        var cpu = Render(Preset, skia: false, frames: 1);
+        var gpu = Render(Preset, skia: true, frames: 1);
+
+        // Both paths read the per-frame values, so the picture is the shader's output rather than
+        // the zero the interpreter used to bind.
+        Assert.Contains(cpu, value => value > 0.1f);
+        Assert.Contains(gpu, value => value > 0.1f);
+        var difference = MeanAbsoluteDifference(cpu, gpu);
+        Assert.InRange(difference, 0.0001f, 0.02f);
+    }
+
     /// <summary>A warp shader runs on the Skia path and matches the interpreter.</summary>
     [Fact]
     public void RenderFrame_SkiaWarpShaderMatchesTheInterpreter()
