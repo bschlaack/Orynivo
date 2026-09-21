@@ -7,6 +7,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Fixed
+- Fixed a shader whose body writes the output variable `ret` instead of returning a value being
+  applied as black, which left the preset without any picture. Milkdrop's own shaders use that
+  form, so a real preset such as `Jc - Crystal Shards` rendered nothing at all; the interpreter now
+  reports whether the body returned a value and the renderer falls back to `ret`. Covered by a test.
+- Fixed `GetPixel` rejecting the `float2` spelling. It required two scalars, so a preset that wrote
+  `GetPixel(float2(x, y))` failed with "sampled a texture without a sampler", and a failed comp
+  shader is disabled, which silently costs that preset its picture.
+- Fixed the shader variable `aspect` missing. Milkdrop shaders use it as the float2 pair, and
+  binding only `aspectx`/`aspecty` made every shader that swizzled it fail and get disabled. The
+  reason a shader was disabled is now readable through `ShaderError` instead of being swallowed.
+- Fixed the motion vector flag being merged into its length. `bMotionVectors` (the enable flag,
+  default off) was written into `mv_l` (the length, default one), so every preset that only set a
+  length got a grid of stray lines that Milkdrop does not draw. Covered by a test.
 - Fixed the visualizer window hanging on a preset whose per-pixel program loops. That program runs
   once per screen pixel, so a loop multiplied by 129,600 pixels made a single frame take seconds and
   froze the picture until the window was closed. The warp stage now has its own ceiling

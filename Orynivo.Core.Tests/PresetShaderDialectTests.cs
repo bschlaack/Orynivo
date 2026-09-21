@@ -132,6 +132,29 @@ public sealed class PresetShaderDialectTests
         Assert.True(renderer.LastShaderMilliseconds > 0d);
     }
 
+    /// <summary>A comp shader that writes ret instead of returning a value is still applied.</summary>
+    [Fact]
+    public void RenderFrame_UsesTheRetVariableWhenNothingIsReturned()
+    {
+        // Milkdrop's own shaders assign the output variable, so reading only the return value wrote
+        // black and the preset never showed a picture.
+        var preset = VisualizerPreset.Parse("""
+            fDecay=1
+            wave_a=0
+            PSVERSION_COMP=2
+            comp_1=`shader_body
+            comp_2=`{
+            comp_3=`    ret = float4(0.25, 0.5, 0.75, 1);
+            comp_4=`}
+            """);
+        var renderer = new PresetRenderer(preset, 8, 8) { ShaderTimeBudgetMilliseconds = 100_000d };
+
+        renderer.RenderFrame(new Silent(), 1d / 60d);
+
+        Assert.Equal(0.25f, renderer.Output.Pixels[0], 3);
+        Assert.Equal(0.5f, renderer.Output.Pixels[1], 3);
+        Assert.Equal(0.75f, renderer.Output.Pixels[2], 3);
+    }
     /// <summary>An audio source that reports silence.</summary>
     private sealed class Silent : IVisualizerAudioSource
     {

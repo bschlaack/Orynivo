@@ -78,8 +78,16 @@ public sealed class ShaderInterpreter
     {
         _iterations = 0;
         var result = ExecuteBlock(_program.Items, 0);
+        ReturnedValue = result is not null;
         return result ?? ShaderValue.Scalar(0f);
     }
+
+    /// <summary>
+    /// Gets a value indicating whether the shader body returned a value. Milkdrop shaders often
+    /// write their result into the <c>ret</c> variable instead, so a caller that needs the output
+    /// colour has to fall back to that variable when nothing was returned.
+    /// </summary>
+    public bool ReturnedValue { get; private set; }
 
     /// <summary>Executes a statement list.</summary>
     /// <param name="statements">Statements to run.</param>

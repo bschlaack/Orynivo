@@ -321,10 +321,17 @@ public sealed class MilkdropCompatibilityTests
     [Fact]
     public void RenderFrame_MotionVectorsDrawWhenEnabled()
     {
-        var plain = RenderFeedback("mv_l=0");
-        var vectors = RenderFeedback("mv_l=1");
+        // These are per-frame expressions, so they write the engine variable directly; the preset
+        // key bMotionVectors is mapped onto it when a preset declares it as a key.
+        var plain = RenderFeedback("mv_enabled=0; mv_l=1;");
+        var vectors = RenderFeedback("mv_enabled=1; mv_l=1;");
+        var lengthOnly = RenderFeedback("mv_l=1;");
 
         Assert.True(MeanDifference(plain, vectors) > 0.0005f);
+
+        // A length without the enable flag must stay invisible. Sharing one variable for the flag
+        // and the length drew a grid of stray lines on real presets that only set a length.
+        Assert.True(MeanDifference(plain, lengthOnly) <= 0.0005f);
     }
 
     /// <summary>A deterministic audio source with content on every band.</summary>

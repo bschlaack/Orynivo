@@ -626,7 +626,11 @@ public sealed class VisualizerPreset
         ["bAdditiveWaves"] = "wave_additive",
         ["bWaveBrighten"] = "wave_brighten",
         ["bDarkenCenter"] = "darken_center",
-        ["bMotionVectors"] = "mv_l",
+        // Milkdrop keeps the enable flag and the length apart: bMotionVectors turns the vectors on
+        // and defaults to off, while mv_l is only their length and defaults to one. Writing the flag
+        // into the length drew a grid of stray lines on every preset that set a length but never
+        // asked for vectors.
+        ["bMotionVectors"] = "mv_enabled",
         ["nMotionVectorsX"] = "mv_x",
         ["nMotionVectorsY"] = "mv_y"
     };

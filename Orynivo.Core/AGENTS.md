@@ -71,7 +71,12 @@ This file applies to `Orynivo.Core/` and supplements `../AGENTS.md`.
   frame. When the stage passes that ceiling the program is left out for the rest of the frame and
   retried a moment later, so the frame still draws with the per-frame motion values. Never let that
   path become a per-frame hang, and never make a frame wait for a per-pixel program that cannot
-  finish. The interpreter
+  finish. A disabled shader silently costs a preset its picture, so keep `ShaderError` carrying the
+  reason, and keep the three bindings real presets depend on: `ret` is the output variable when a
+  body returns nothing (`ShaderInterpreter.ReturnedValue` says which case applies), `GetPixel`
+  accepts both `GetPixel(x, y)` and `GetPixel(float2(x, y))`, and `aspect` is bound as the float2
+  pair next to the `aspectx`/`aspecty` scalars. Motion vectors are gated by `bMotionVectors`
+  (`mv_enabled`, default off), never by `mv_l`, which is only their length. The interpreter
   walks the tree per pixel, which is the known cost limit; a JIT compiler for shaders is the
   documented follow-up if the CPU cost proves too high.
   `PresetRenderer.Timings` and `AverageTimings` carry the `RenderTimings` breakdown per frame and

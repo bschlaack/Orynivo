@@ -258,6 +258,13 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler
     /// </summary>
     public bool ShaderGridReduced => _shaderGridReduced;
 
+    /// <summary>
+    /// Gets the reason a shader was disabled, or <see langword="null"/> while every shader runs.
+    /// A disabled shader silently costs a preset its picture, so the reason stays readable instead
+    /// of only being swallowed.
+    /// </summary>
+    public string? ShaderError { get; private set; }
+
     /// <summary>The motion variables a per-pixel program may change for the following pixel.</summary>
     private static readonly string[] MotionVariables =
         ["zoom", "zoomexp", "rot", "cx", "cy", "dx", "dy", "sx", "sy"];
@@ -538,7 +545,7 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler
         // when the preset's own code or the zoom exponent actually needs it.
         var needsRadius = _perPixelUsesRadius || zoomExp != 1f;
         var needsAngle = _perPixelUsesAngle;
-        var recordMotion = Read("mv_l", 0f) > 0f;
+        var recordMotion = Read("mv_enabled", 0f) >= 0.5f;
         if (!recordMotion)
         {
             // Stale samples would otherwise survive into the next time the grid is drawn.
@@ -900,10 +907,11 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler
         {
             RunWarpShadersCore(u, v, originalU, originalV);
         }
-        catch (PresetExpressionException)
+        catch (PresetExpressionException exception)
         {
             // A preset shader may call something the engine does not implement. Disabling the
             // shaders is the only safe answer: the alternative is a dead render thread.
+            ShaderError = "warp: " + exception.Message;
             _warpShadersFailed = true;
             _warpShaders.Clear();
             _compiledWarp.Clear();
@@ -936,6 +944,8 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler
             {
                 BindShaderVariables(interpreter, u, v, originalU, originalV);
                 colour = interpreter.Run();
+                if (!interpreter.ReturnedValue && interpreter.Variables.TryGetValue("ret", out var written))
+                    colour = written;
             }
 
             _sample[0] = colour.X;
@@ -986,6 +996,9 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler
         values[11] = ShaderValue.Scalar(Read("aspecty", 1f));
         values[12] = ShaderValue.Vector(width, height, 1f / Math.Max(1, width), 1f / Math.Max(1, height), 4);
         values[13] = ShaderValue.Vector(_randFrame[0], _randFrame[1], _randFrame[2], _randFrame[3], 4);
+        // Milkdrop shaders use "aspect" as the float2 pair, and a preset that swizzles it failed
+        // outright when only the two scalars were bound, which disabled that shader.
+        values[14] = ShaderValue.Vector(Read("aspectx", 1f), Read("aspecty", 1f), 0f, 0f, 2);
         foreach (var compiled in _compiledWarp)
         {
             if (!compiled.IsCompiled)
@@ -1034,6 +1047,8 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler
                     {
                         BindShaderVariables(interpreter, u, v, u, v);
                         colour = interpreter.Run();
+                        if (!interpreter.ReturnedValue && interpreter.Variables.TryGetValue("ret", out var written))
+                            colour = written;
                     }
 
                     var offset = (((y * shaderWidth) + x) * 4);
@@ -1078,10 +1093,11 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler
         {
             RunCompShaders(output, shaderWidth, shaderHeight);
         }
-        catch (PresetExpressionException)
+        catch (PresetExpressionException exception)
         {
             // A preset shader may call something the engine does not implement. Disabling the
             // shaders is the only safe answer: the alternative is a dead render thread.
+            ShaderError = "comp: " + exception.Message;
             _compShadersFailed = true;
             _compShaders.Clear();
             return;
@@ -1138,6 +1154,9 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler
         interpreter.SetVariable("treb_att", Read("treb_att", 0f));
         interpreter.SetVariable("aspectx", Read("aspectx", 1f));
         interpreter.SetVariable("aspecty", Read("aspecty", 1f));
+        interpreter.SetVariable(
+            "aspect",
+            ShaderValue.Vector(Read("aspectx", 1f), Read("aspecty", 1f), 0f, 0f, 2));
         interpreter.SetVariable("rand_frame", ShaderValue.Vector(_randFrame[0], _randFrame[1], _randFrame[2], _randFrame[3], 4));
         var x = (u * 2f) - 1f;
         var y = (v * 2f) - 1f;
@@ -1155,7 +1174,7 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler
         public static readonly string[] FrameVariables =
         [
             "time", "frame", "fps", "bass", "mid", "treb", "vol",
-            "bass_att", "mid_att", "treb_att", "aspectx", "aspecty", "texsize", "rand_frame"
+            "bass_att", "mid_att", "treb_att", "aspectx", "aspecty", "texsize", "rand_frame", "aspect"
         ];
 
         private readonly ShaderProgram? _program;
@@ -1463,7 +1482,7 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler
     /// <summary>Draws the recorded motion field as a grid of vectors.</summary>
     private void DrawMotionVectors()
     {
-        var length = Math.Clamp(Read("mv_l", 0f), 0f, 1f);
+        var length = Math.Clamp(Read("mv_l", 1f), 0f, 1f);
         if (length <= 0f)
             return;
 

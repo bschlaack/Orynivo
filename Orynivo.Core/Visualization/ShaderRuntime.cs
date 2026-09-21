@@ -469,10 +469,15 @@ internal static class ShaderRuntime
         IShaderSampler? sampler,
         int position)
     {
-        if (sampler is null || count < 2)
+        if (sampler is null || count < 1)
             throw new PresetExpressionException("The shader sampled a texture without a sampler.", position);
 
-        return sampler.SamplePixel((int)a.X, (int)b.X);
+        // Milkdrop spells this both ways: GetPixel(x, y) and GetPixel(float2(x, y)). Requiring two
+        // scalars made every preset that used the float2 form fail, and a failed comp shader is
+        // silently disabled, which costs that preset its picture.
+        var x = a.X;
+        var y = count >= 2 ? b.X : a.Y;
+        return sampler.SamplePixel((int)x, (int)y);
     }
 
     /// <summary>Builds a vector from a constructor call.</summary>
