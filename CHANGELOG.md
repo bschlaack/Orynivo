@@ -9,6 +9,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Fixed
 - Added Milkdrop's eight general-purpose `t1`-`t8` variables to the preset variable set.
   They sit next to the 32 `q` variables, and presets that keep state in them now work.
+- Added the `progress`, `meshx`, and `meshy` variables as well: the mesh is our sampling grid,
+  and `progress` stays zero because there is no preset playlist time here.
 - Fixed real preset collections loading no shader at all. Milkdrop 2 stores a shader one
   source line per numbered key, each line carrying a backtick marker, and the reader used to
   take the first key alone, which is only the `` `shader_body `` marker; the lines are joined

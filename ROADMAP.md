@@ -748,6 +748,15 @@ affordable. This is a project of its own and must keep the CPU path as the fallb
   (`#if` and friends) and the macro constants such as `M_INV_PI_2`, which account for the rest, plus
   the blur and edge parameter keys (`b1n`, `b1x`, `b1ed`, and the `b2`/`b3` family) that need our own
   documented approximation because their semantics are not in the presets.
+  Comparing the variable sets against the reference implementation closed three more gaps and
+  exposed one semantic difference. Added: the eight `t1`-`t8` variables, plus `progress`, `meshx`,
+  and `meshy`. The difference is bigger than a missing name: in Milkdrop the motion variables
+  (`zoom`, `zoomexp`, `rot`, `warp`, `cx`, `cy`, `dx`, `dy`, `sx`, `sy`) are per-vertex variables
+  that a per-pixel program may change, and the changed value carries into the next pixel. Our warp
+  reads them once per frame as constants, so a preset that writes any of them inside `per_pixel`
+  has no effect here, and the reference notes that some presets depend on that. Moving those reads
+  into the pixel loop is the next fidelity step; it is a behaviour change to the warp, so it needs
+  its own verification.
 **Tests**: each phase adds its own; 39a is the prerequisite for claiming any speed-up.
 
 **Commit**: `perf(visualizer): add render measurement` (39a), then one commit per phase

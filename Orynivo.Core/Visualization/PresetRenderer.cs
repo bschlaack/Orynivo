@@ -378,6 +378,11 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler
         Write("aspecty", 1f);
         Write("pixelsx", width);
         Write("pixelsy", height);
+        // Milkdrop's mesh is the sampling grid, and the progress through a preset's playlist time.
+        // There is no playlist time here, so progress stays zero and the grid is the frame.
+        Write("meshx", width);
+        Write("meshy", height);
+        Write("progress", 0f);
         // The per-frame defaults a preset can override before the warp reads them back.
         Write("decay", Preset.Decay);
         Write("fDecay", Preset.Decay);
