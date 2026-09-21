@@ -155,6 +155,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 
 ### Fixed
+- Fixed the visualizer freezing the whole application when it was opened with a large
+  preset folder. The recursive discovery read every file while the window was being
+  constructed, which blocked the UI thread for as long as the collection was large; a
+  real collection holds thousands of files. The window now opens with the built-in
+  presets immediately and enumerates the folder in the background, recording file paths
+  without reading them; a file is read the first time one of its presets is shown, and a
+  multi-section file exposes its remaining sections then. The discovery duration is
+  reported in the visualizer log line.
 - Fixed scalar preset values keeping the trailing newline of their section, which made a
   preset's `name` end with a line break.
 - The visualizer writes one bounded diagnostic line per second to the seek log (rendered

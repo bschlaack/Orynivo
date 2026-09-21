@@ -532,7 +532,13 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
   expression trees; a collection of several hundred presets must never be compiled when the
   window opens. Keep the discovered count (`Count`) separate from the parsed presets, report a
   failure on first use through `RejectedReasons`, and fall back to the first built-in so one
-  broken file can never stop the visualizer. Preset stages share one slot layout, so a
+  broken file can never stop the visualizer. `LoadBuiltIns` is the only thing the window
+  constructor may call: it touches no disk, so the window opens and renders while `Discover`
+  enumerates the folder on a worker thread. Discovery records file paths only, never file
+  contents, because a real collection holds thousands of files and reading them up front froze
+  the whole application; a file is read the first time one of its presets is shown, and a
+  multi-section file exposes its remaining sections then. Never move discovery back onto the UI
+  thread, and keep `Count` and `At` usable while it runs. Preset stages share one slot layout, so a
   stage-local built-in such as `x` or `rad` is one slot that each stage seeds and reads back
   for itself: the per-pixel stage seeds it per pixel, a shape seeds it per shape and per
   vertex. Never let a stage assume another stage's value is still in place.

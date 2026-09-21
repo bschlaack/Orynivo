@@ -28,6 +28,10 @@ public partial class VisualizerWindow : Window
     private readonly int _renderHeight;
     private readonly TimeSpan _frameInterval;
     private readonly bool _alwaysShowOverlay;
+    private readonly string? _presetDirectory;
+    private bool _discoveryStarted;
+    private bool _discoveryLogged;
+    private int _discoveryMilliseconds = -1;
     private DateTimeOffset _lastPointerActivity = DateTimeOffset.MinValue;
 
     private readonly WriteableBitmap _bitmap;
@@ -73,7 +77,11 @@ public partial class VisualizerWindow : Window
         _renderWidth = Math.Clamp(options.Width, 160, 3840);
         _renderHeight = Math.Clamp(options.Height, 90, 2160);
         _frameInterval = TimeSpan.FromMilliseconds(1000.0 / Math.Clamp(options.FrameRate, 5, 240));
-        _library.Reload(options.PresetDirectory);
+        // Only the built-ins are available here. Enumerating a real preset collection is a disk
+        // walk over thousands of files and must never run while the window is being constructed,
+        // because that would block the interface for as long as it takes.
+        _presetDirectory = options.PresetDirectory;
+        _library.LoadBuiltIns();
         _renderer = new PresetRenderer(_library.At(_presetIndex), _renderWidth, _renderHeight);
         _bitmap = new WriteableBitmap(
             new Avalonia.PixelSize(_renderWidth, _renderHeight),
@@ -263,6 +271,19 @@ public partial class VisualizerWindow : Window
         else
             _renderer.RenderFrame(audio, deltaSeconds);
 
+        // The preset collection is enumerated once, on a worker thread, after the first frame has
+        // been shown; the built-ins keep the visualizer usable while that runs.
+        if (!_discoveryStarted && _renderer.FrameCount >= 1)
+        {
+            _discoveryStarted = true;
+            var folder = _presetDirectory;
+            _ = Task.Run(() =>
+            {
+                var elapsed = _library.Discover(folder);
+                Interlocked.Exchange(ref _discoveryMilliseconds, (int)elapsed.TotalMilliseconds);
+            });
+        }
+
         // Hand a finished copy to the UI thread instead of the live buffer, so the next frame can
         // start immediately without the two threads ever touching the same pixels.
         lock (_presentLock)
@@ -306,6 +327,15 @@ public partial class VisualizerWindow : Window
                 {
                     _pendingDiagnostics = null;
                     SeekDiagnostics.Log("visualizer", message);
+                }
+
+                if (!_discoveryLogged && _discoveryMilliseconds >= 0)
+                {
+                    _discoveryLogged = true;
+                    SeekDiagnostics.Log(
+                        "visualizer",
+                        $"presetDiscoveryMs={_discoveryMilliseconds} "
+                        + $"userPresets={_library.Count - VisualizerPresets.BuiltIn.Count}");
                 }
             },
             DispatcherPriority.Normal);

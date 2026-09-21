@@ -44,7 +44,10 @@ public sealed class VisualizerPresetLibraryTests : IDisposable
         Assert.Empty(library.RejectedFiles);
     }
 
-    /// <summary>Every section of a multi-preset .milk file becomes its own preset.</summary>
+    /// <summary>
+    /// Every section of a multi-preset .milk file becomes its own preset. Discovery only records
+    /// the file, so the extra sections appear once the file has been read for the first time.
+    /// </summary>
     [Fact]
     public void Reload_LoadsEverySectionOfAMilkFile()
     {
@@ -55,9 +58,43 @@ public sealed class VisualizerPresetLibraryTests : IDisposable
 
         library.Reload(_directory);
 
-        Assert.Equal(BuiltInCount + 2, library.Count);
+        // Discovery records the file without reading it, so it counts as one preset until then.
+        Assert.Equal(BuiltInCount + 1, library.Count);
         Assert.Equal("First", library.At(BuiltInCount).Name);
         Assert.Equal("Second", library.At(BuiltInCount + 1).Name);
+        Assert.Empty(library.RejectedFiles);
+    }
+
+    /// <summary>
+    /// The built-ins are available without any folder, which is what lets the window open and
+    /// render immediately while the collection is still being discovered in the background.
+    /// </summary>
+    [Fact]
+    public void LoadBuiltIns_WorksWithoutAnyFolder()
+    {
+        var library = new VisualizerPresetLibrary();
+
+        library.LoadBuiltIns();
+
+        Assert.Equal(BuiltInCount, library.Count);
+        Assert.Equal(VisualizerPresets.BuiltIn[0].Name, library.At(0).Name);
+        Assert.False(library.IsDiscovered);
+    }
+
+    /// <summary>Discovery records file paths without reading a single file.</summary>
+    [Fact]
+    public void Discover_DoesNotReadTheFiles()
+    {
+        var nested = Directory.CreateDirectory(Path.Combine(_directory, "a", "b", "c"));
+        for (var index = 0; index < 25; index++)
+            File.WriteAllText(Path.Combine(nested.FullName, $"p{index:D2}.milk"), "name=P" + index);
+
+        var library = new VisualizerPresetLibrary();
+        var elapsed = library.Discover(_directory);
+
+        Assert.True(library.IsDiscovered);
+        Assert.Equal(BuiltInCount + 25, library.Count);
+        Assert.True(elapsed >= TimeSpan.Zero);
         Assert.Empty(library.RejectedFiles);
     }
 
