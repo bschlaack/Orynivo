@@ -173,6 +173,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   rather than in the file, which is recorded as roadmap item 39i.
 
 ### Fixed
+- Recorded every declared variable's type before emitting anything, so a use that stands before its
+  declaration still knows what it is; the type table used to be filled as declarations were written
+  out, which made the conversion that keeps the two execution paths identical impossible to choose.
+  This changed no measured coverage, and the remaining `float2 * float3` failures have a different
+  cause: the variable on the other side is still of unknown type.
 - Fixed the SkSL emitter widening a scalar as if it were a vector. A scalar broadcasts, because
   `ShaderValue.Scalar` stores the same value in all four components, while a vector's missing
   components read as zero; treating both the same way turned `colour * 0.5` into

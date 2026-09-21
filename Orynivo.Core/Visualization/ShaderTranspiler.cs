@@ -164,6 +164,12 @@ public static class ShaderTranspiler
         foreach (var (uniform, count) in UniformComponents)
             _types[uniform] = count switch { 1 => "float", 2 => "float2", 4 => "float4", _ => "float" };
 
+        // Every declaration is recorded before anything is emitted. A preset may use a variable
+        // before its declaration, and without the type the conversion that keeps the two execution
+        // paths identical cannot be chosen, which leaves the expression in a shape SkSL rejects.
+        foreach (var statement in program.Items)
+            CollectDeclarations(statement);
+
         // A helper is emitted as a function before the entry point, so a call resolves to it instead
         // of running its body where it is defined. Their return types are collected first, because a
         // helper may be called from another helper that is emitted before it.
@@ -552,6 +558,34 @@ public static class ShaderTranspiler
 
         return $"{text}.{"xyzw"[..target]}";
     }
+    /// <summary>
+    /// Records the type of every variable a statement tree declares, so a use that stands before its
+    /// declaration still knows what it is.
+    /// </summary>
+    /// <param name="statement">Statement to walk.</param>
+    private static void CollectDeclarations(ShaderNode statement)
+    {
+        if (statement.Kind == ShaderNodeKind.Declaration && _types is not null)
+        {
+            var declared = MapType(statement.Text);
+            foreach (var item in statement.Items)
+            {
+                if (item.Text.Length > 0)
+                    _types[item.Text] = declared;
+            }
+        }
+
+        foreach (var child in statement.Items)
+            CollectDeclarations(child);
+
+        if (statement.Left is not null)
+            CollectDeclarations(statement.Left);
+        if (statement.Right is not null)
+            CollectDeclarations(statement.Right);
+        if (statement.Third is not null)
+            CollectDeclarations(statement.Third);
+    }
+
     /// <summary>
     /// Emits a helper function as SkSL, with the parameter types the parser kept. Its return type is
     /// read from its own return statement, because the engine does not track declared return types.
