@@ -21,6 +21,9 @@ public enum ShaderNodeKind
     /// <summary>A <c>for</c> loop.</summary>
     For,
 
+    /// <summary>A <c>while</c> loop.</summary>
+    While,
+
     /// <summary>A <c>return</c> statement.</summary>
     Return,
 
@@ -41,6 +44,9 @@ public enum ShaderNodeKind
 
     /// <summary>A binary operator.</summary>
     Binary,
+
+    /// <summary>An element or row access with <c>[...]</c>.</summary>
+    Index,
 
     /// <summary>The ternary conditional operator.</summary>
     Ternary

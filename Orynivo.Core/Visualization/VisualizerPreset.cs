@@ -363,7 +363,7 @@ public sealed class VisualizerPreset
             var trimmed = line.TrimStart();
             if (trimmed.StartsWith('#'))
             {
-                var directive = trimmed[1..].TrimStart();
+                var directive = StripLineComment(trimmed[1..].TrimStart());
                 if (directive.StartsWith("define", StringComparison.Ordinal))
                 {
                     var rest = directive[6..].Trim();
@@ -429,6 +429,29 @@ public sealed class VisualizerPreset
         }
 
         return builder.ToString();
+    }
+
+    /// <summary>
+    /// Removes a trailing <c>//</c> comment from a preprocessor line. A macro definition ends at its
+    /// line comment, and presets write them, for example
+    /// <c>#define MyGet GetPixel //GetBlur1</c>. Keeping the comment would expand it into the middle
+    /// of a call, where it swallows the rest of that line and turns the following line into a
+    /// syntax error.
+    /// </summary>
+    /// <param name="line">Preprocessor line without its leading hash.</param>
+    /// <returns>The line without a trailing line comment.</returns>
+    private static string StripLineComment(string line)
+    {
+        var quoted = false;
+        for (var index = 0; index < line.Length - 1; index++)
+        {
+            if (line[index] == '"')
+                quoted = !quoted;
+            else if (!quoted && line[index] == '/' && line[index + 1] == '/')
+                return line[..index].TrimEnd();
+        }
+
+        return line;
     }
 
     /// <summary>Returns the first word of a preprocessor expression.</summary>

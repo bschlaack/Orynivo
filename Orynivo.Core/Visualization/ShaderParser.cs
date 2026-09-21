@@ -13,7 +13,10 @@ public static class ShaderParser
     {
         "void", "bool", "int", "uint", "half", "half2", "half3", "half4",
         "float", "float1", "float2", "float3", "float4", "float2x2", "float3x3", "float4x4",
-        "half1",
+        "half1", "half2x2", "half3x3", "half4x4",
+        "double", "double2", "double3", "double4",
+        "int2", "int3", "int4", "uint2", "uint3", "uint4",
+        "bool2", "bool3", "bool4",
         "sampler", "sampler2D", "sampler3D", "texture"
     };
 
@@ -122,6 +125,8 @@ public static class ShaderParser
                         return ParseIf();
                     case "for":
                         return ParseFor();
+                    case "while":
+                        return ParseWhile();
                     case "return":
                         return ParseReturn();
                 }
@@ -158,7 +163,7 @@ public static class ShaderParser
                 }
             }
 
-            var expression = ParseExpression();
+            var expression = ParseCommaExpression();
             Expect(";");
             return new ShaderNode(ShaderNodeKind.ExpressionStatement, expression.Position, Left: expression);
         }
@@ -179,6 +184,56 @@ public static class ShaderParser
             return statements;
         }
 
+        /// <summary>
+        /// Parses what follows the <c>=</c> of a declaration. Besides a plain expression this
+        /// covers the two braced forms presets use: a state block such as
+        /// <c>sampler s = sampler_state { AddressU = WRAP; };</c>, which carries no value, and an
+        /// initializer list such as <c>float2x2 rot = { a, b, c, d };</c>, which is the same
+        /// constructor the explicit <c>float2x2(a, b, c, d)</c> spelling builds.
+        /// </summary>
+        /// <param name="type">Declared type, used as the constructor name for an initializer list.</param>
+        /// <returns>The initializer, or <see langword="null"/> when the declaration has none.</returns>
+        private ShaderNode? ParseInitializer(ShaderToken type)
+        {
+            var next = _tokens[Math.Min(_index + 1, _tokens.Count - 1)];
+            if (next.Text == "{" && Current.Kind is ShaderTokenKind.Identifier or ShaderTokenKind.Keyword)
+            {
+                Advance();
+                SkipBracedBlock();
+                return null;
+            }
+
+            if (Current.Text != "{")
+                return ParseExpression();
+
+            Advance();
+            var arguments = new List<ShaderNode>();
+            if (Current.Text != "}")
+            {
+                arguments.Add(ParseExpression());
+                while (TryConsume(","))
+                    arguments.Add(ParseExpression());
+            }
+
+            Expect("}");
+            return new ShaderNode(ShaderNodeKind.Call, type.Position, type.Text, 0f, null, null, null, arguments);
+        }
+
+        /// <summary>Consumes a brace-delimited region without interpreting it.</summary>
+        private void SkipBracedBlock()
+        {
+            Expect("{");
+            var depth = 1;
+            while (Current.Kind != ShaderTokenKind.End && depth > 0)
+            {
+                if (Current.Text == "{")
+                    depth++;
+                else if (Current.Text == "}")
+                    depth--;
+                Advance();
+            }
+        }
+
         /// <summary>Parses a declaration, continuing after the type and name were consumed.</summary>
         /// <param name="type">Type token.</param>
         /// <param name="name">Declared name.</param>
@@ -187,7 +242,7 @@ public static class ShaderParser
         {
             ShaderNode? initializer = null;
             if (TryConsume("="))
-                initializer = ParseExpression();
+                initializer = ParseInitializer(type);
             SkipAnnotation();
             while (TryConsume(","))
             {
@@ -264,10 +319,23 @@ public static class ShaderParser
 
             ShaderNode? increment = null;
             if (Current.Text != ")")
-                increment = ParseExpression();
+                increment = ParseCommaExpression();
             Expect(")");
             var body = ParseStatement() ?? new ShaderNode(ShaderNodeKind.Block, token.Position, Children: []);
             return new ShaderNode(ShaderNodeKind.For, token.Position, Left: initializer, Right: condition, Third: increment, Children: [body]);
+        }
+
+        /// <summary>Parses a <c>while</c> loop.</summary>
+        /// <returns>The while node.</returns>
+        private ShaderNode ParseWhile()
+        {
+            var token = Current;
+            Advance();
+            Expect("(");
+            var condition = ParseExpression();
+            Expect(")");
+            var body = ParseStatement() ?? new ShaderNode(ShaderNodeKind.Block, token.Position, Children: []);
+            return new ShaderNode(ShaderNodeKind.While, token.Position, Left: condition, Children: [body]);
         }
 
         /// <summary>Parses a <c>return</c> statement.</summary>
@@ -290,7 +358,7 @@ public static class ShaderParser
         /// <returns>The statement node.</returns>
         private ShaderNode ParseExpressionStatement()
         {
-            var expression = ParseExpression();
+            var expression = ParseCommaExpression();
             Expect(";");
             return new ShaderNode(ShaderNodeKind.ExpressionStatement, expression.Position, Left: expression);
         }
@@ -298,6 +366,26 @@ public static class ShaderParser
         /// <summary>Parses an expression with the C operator precedence.</summary>
         /// <returns>The expression node.</returns>
         public ShaderNode ParseExpression() => ParseAssignment();
+
+        /// <summary>
+        /// Parses a comma expression, which is C's lowest-precedence operator. Presets write
+        /// <c>a = x, b = y;</c> where a semicolon was probably intended, and a comma expression
+        /// evaluates both sides and yields the right one, so accepting it keeps the statement
+        /// meaningful instead of dropping the block. Only statements use this level; call
+        /// arguments stay assignment expressions so their commas keep separating arguments.
+        /// </summary>
+        /// <returns>The expression node.</returns>
+        private ShaderNode ParseCommaExpression()
+        {
+            var expression = ParseExpression();
+            while (TryConsume(","))
+            {
+                var right = ParseExpression();
+                expression = new ShaderNode(ShaderNodeKind.Binary, expression.Position, ",", 0f, expression, right);
+            }
+
+            return expression;
+        }
 
         private ShaderNode ParseAssignment()
         {
@@ -382,6 +470,14 @@ public static class ShaderParser
                     continue;
                 }
 
+                if (TryConsume("["))
+                {
+                    var index = ParseExpression();
+                    Expect("]");
+                    expression = new ShaderNode(ShaderNodeKind.Index, expression.Position, "[]", 0f, expression, index);
+                    continue;
+                }
+
                 if (TryConsume("("))
                 {
                     var arguments = new List<ShaderNode>();
@@ -421,7 +517,9 @@ public static class ShaderParser
 
             if (TryConsume("("))
             {
-                var inner = ParseExpression();
+                // A parenthesised expression is a comma expression in C, and presets rely on it:
+                // "texsize.zx*(q3,q3)" means the same as "texsize.zx*q3".
+                var inner = ParseCommaExpression();
                 Expect(")");
                 return inner;
             }

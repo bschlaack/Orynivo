@@ -126,6 +126,8 @@ public sealed class ShaderInterpreter
                 return statement.Third is null ? null : ExecuteStatement(statement.Third, depth);
             case ShaderNodeKind.For:
                 return ExecuteFor(statement, depth);
+            case ShaderNodeKind.While:
+                return ExecuteWhile(statement, depth);
             case ShaderNodeKind.Return:
                 return statement.Left is null ? ShaderValue.Scalar(0f) : Evaluate(statement.Left, depth);
             default:
@@ -144,18 +146,47 @@ public sealed class ShaderInterpreter
 
         while (loop.Right is null || Evaluate(loop.Right, depth).IsTrue)
         {
-            if (++_iterations > MaxLoopIterations)
-                throw new PresetExpressionException("The shader looped too often.", loop.Position);
-
-            foreach (var body in loop.Items)
-            {
-                var result = ExecuteStatement(body, depth);
-                if (result is not null)
-                    return result;
-            }
+            var result = ExecuteLoopBody(loop, depth);
+            if (result is not null)
+                return result;
 
             if (loop.Third is not null)
                 Evaluate(loop.Third, depth);
+        }
+
+        return null;
+    }
+
+    /// <summary>Executes a <c>while</c> loop with a bounded iteration count.</summary>
+    /// <param name="loop">Loop node.</param>
+    /// <param name="depth">Current call depth.</param>
+    /// <returns>The returned value, or <see langword="null"/> when the loop finished.</returns>
+    private ShaderValue? ExecuteWhile(ShaderNode loop, int depth)
+    {
+        while (loop.Left is not null && Evaluate(loop.Left, depth).IsTrue)
+        {
+            var result = ExecuteLoopBody(loop, depth);
+            if (result is not null)
+                return result;
+        }
+
+        return null;
+    }
+
+    /// <summary>Runs one iteration of a loop body against the shared iteration budget.</summary>
+    /// <param name="loop">Loop node holding the body.</param>
+    /// <param name="depth">Current call depth.</param>
+    /// <returns>The returned value, or <see langword="null"/> when the iteration finished.</returns>
+    private ShaderValue? ExecuteLoopBody(ShaderNode loop, int depth)
+    {
+        if (++_iterations > MaxLoopIterations)
+            throw new PresetExpressionException("The shader looped too often.", loop.Position);
+
+        foreach (var body in loop.Items)
+        {
+            var result = ExecuteStatement(body, depth);
+            if (result is not null)
+                return result;
         }
 
         return null;
@@ -181,6 +212,8 @@ public sealed class ShaderInterpreter
                 return EvaluateUnary(expression, depth);
             case ShaderNodeKind.Binary:
                 return EvaluateBinary(expression, depth);
+            case ShaderNodeKind.Index:
+                return EvaluateIndex(expression, depth);
             case ShaderNodeKind.Ternary:
                 return Evaluate(expression.Left!, depth).IsTrue
                     ? Evaluate(expression.Right!, depth)
@@ -188,6 +221,24 @@ public sealed class ShaderInterpreter
             default:
                 return ShaderValue.Scalar(0f);
         }
+    }
+
+    /// <summary>
+    /// Evaluates an element access with <c>[...]</c>. Milkdrop presets use it for the components of
+    /// a vector and for the rows of a matrix; only the vector form is modelled, so an out-of-range
+    /// index yields zero instead of failing the shader.
+    /// </summary>
+    /// <param name="expression">Index node.</param>
+    /// <param name="depth">Current call depth.</param>
+    /// <returns>The selected component.</returns>
+    private ShaderValue EvaluateIndex(ShaderNode expression, int depth)
+    {
+        var target = Evaluate(expression.Left!, depth);
+        var index = (int)Evaluate(expression.Right!, depth).X;
+        if (index < 0 || index >= target.Count)
+            return ShaderValue.Scalar(0f);
+
+        return ShaderValue.Scalar(target.Get(index));
     }
 
     /// <summary>Evaluates a prefix or postfix unary operator.</summary>
@@ -225,6 +276,12 @@ public sealed class ShaderInterpreter
     private ShaderValue EvaluateBinary(ShaderNode expression, int depth)
     {
         var name = expression.Text;
+        if (name == ",")
+        {
+            Evaluate(expression.Left!, depth);
+            return Evaluate(expression.Right!, depth);
+        }
+
         if (name is "=" or "+=" or "-=" or "*=" or "/=")
         {
             var current = name == "=" ? ShaderValue.Scalar(0f) : Evaluate(expression.Left!, depth);

@@ -1697,8 +1697,13 @@ blocks plus `decay`, `zoom`, `warp`, `blur_level`, `wave_alpha`, and `wave_scale
 `rad`, `ang`, fill and border colours, `additive`) add regular polygons with their own
 `per_frame` and `per_point` programs. The
 supported expression subset is arithmetic, comparisons, logical operators, the ternary
-operator, `if(...)`, the usual math functions, `pi`, `rand(n)`, and `//` comments; unknown
-keys are ignored so third-party presets degrade instead of failing. Own presets go into the
+operator, `if(...)`, the usual math functions, `pi`, `rand(n)`, the compound assignments
+`+=`, `-=`, `*=`, `/=`, and `%=`, `loop(count, statements)`, the shared `megabuf`/`gmegabuf`
+tables, and `//` comments; unknown
+keys are ignored so third-party presets degrade instead of failing. Milkdrop's
+`warp_N`/`comp_N` HLSL shader blocks run when they parse, with the per-pixel comp pass drawn on
+a reduced-resolution grid and left out for the rest of the frame when it would exceed the
+frame budget. Own presets go into the
 folder configured under **Preset folder** as `.oryvis` or `.milk` files (default: a
 `visualizer-presets` folder below the per-user data directory); a file that cannot be parsed
 is skipped and counted in the on-screen label. Five presets ship with the application.

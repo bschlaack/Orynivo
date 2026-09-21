@@ -48,6 +48,9 @@ internal enum PresetTokenKind
     /// <summary>Assignment.</summary>
     Assign,
 
+    /// <summary>A compound assignment such as <c>+=</c>, whose operator is in the token text.</summary>
+    AssignCompound,
+
     /// <summary>Logical negation.</summary>
     Not,
 

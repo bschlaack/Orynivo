@@ -74,6 +74,14 @@ internal sealed class PresetLexer
                 ('!', '=') => PresetTokenKind.NotEqual,
                 ('<', '=') => PresetTokenKind.LessOrEqual,
                 ('>', '=') => PresetTokenKind.GreaterOrEqual,
+                // Presets write "n += 1" and "zoom -= 0.03" constantly, so the compound
+                // assignments must lex as one token; splitting them into an operator and an
+                // "=" leaves the statement parser with a stray assignment it cannot place.
+                ('+', '=') => PresetTokenKind.AssignCompound,
+                ('-', '=') => PresetTokenKind.AssignCompound,
+                ('*', '=') => PresetTokenKind.AssignCompound,
+                ('/', '=') => PresetTokenKind.AssignCompound,
+                ('%', '=') => PresetTokenKind.AssignCompound,
                 _ => null
             };
             if (doubled is { } kind)

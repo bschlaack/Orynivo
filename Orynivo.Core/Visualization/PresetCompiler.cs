@@ -104,17 +104,21 @@ public static class PresetCompiler
                     throw new PresetExpressionException("Expected ')' after the buffer index", position);
 
                 current = lexer.Next();
-                if (current.Kind != PresetTokenKind.Assign)
+                if (current.Kind is not (PresetTokenKind.Assign or PresetTokenKind.AssignCompound))
                     return Expression.Call(typeof(PresetCompiler), nameof(ReadMegaBuffer), null, index);
 
+                var compound = current;
                 current = lexer.Next();
                 var stored = ParseExpression(state, lexer, ref current);
+                var target = Expression.Call(typeof(PresetCompiler), nameof(ReadMegaBuffer), null, index);
                 return Expression.Call(
                     typeof(PresetCompiler),
                     nameof(WriteMegaBufferValue),
                     null,
                     index,
-                    stored);
+                    compound.Kind == PresetTokenKind.AssignCompound
+                        ? Apply(CompoundOperator(compound), target, stored)
+                        : stored);
             }
 
             if (next.Kind == PresetTokenKind.OpenParenthesis &&
@@ -126,11 +130,15 @@ public static class PresetCompiler
                 return ParseLoop(state, lexer, ref current, position);
             }
 
-            if (next.Kind == PresetTokenKind.Assign)
+            if (next.Kind is PresetTokenKind.Assign or PresetTokenKind.AssignCompound)
             {
+                var compound = next;
                 current = lexer.Next();
                 var value = ParseExpression(state, lexer, ref current);
-                return Expression.Assign(state.WriteSlot(name), value);
+                var slot = state.WriteSlot(name);
+                return compound.Kind == PresetTokenKind.AssignCompound
+                    ? Expression.Assign(slot, Apply(CompoundOperator(compound), state.Slot(name), value))
+                    : Expression.Assign(slot, value);
             }
 
             // Not an assignment: rewind by re-parsing the identifier as a primary expression.
@@ -444,6 +452,21 @@ public static class PresetCompiler
         PresetTokenKind.GreaterOrEqual => Comparison(Expression.GreaterThanOrEqual, left, right),
         _ => throw new PresetExpressionException($"Unsupported operator '{operation.Text}'", operation.Position)
     };
+
+    /// <summary>Maps a compound assignment onto the binary operator it applies.</summary>
+    /// <param name="operation">Compound assignment token, for example <c>+=</c>.</param>
+    /// <returns>The matching binary operator token.</returns>
+    private static PresetToken CompoundOperator(PresetToken operation) => new(
+        operation.Text[0] switch
+        {
+            '+' => PresetTokenKind.Plus,
+            '-' => PresetTokenKind.Minus,
+            '*' => PresetTokenKind.Star,
+            '/' => PresetTokenKind.Slash,
+            _ => PresetTokenKind.Percent
+        },
+        operation.Text[..1],
+        operation.Position);
 
     /// <summary>Builds a comparison that yields one or zero.</summary>
     private static Expression Comparison(

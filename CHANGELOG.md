@@ -7,6 +7,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Fixed
+- Fixed the preset expression language failing on compound assignments. `PresetLexer` split
+  `+=` into `+` and `=`, so every block containing `n += 1` or `zoom -= 0.03` — which is most
+  real presets — was reported as `Unexpected '='` and dropped, silently losing that preset's
+  motion. Compound assignments now lex as one token and are applied by the compiler, including
+  for the `gmegabuf(i) += x` buffer form. Covered by 3 tests.
+- Fixed the shader parser rejecting five more forms real presets use: `while` loops, the comma
+  operator inside parentheses (`texsize.zx*(q3,q3)`) and at statement level
+  (`ret = a.x, ret = b;`), a declaration initialized with a braced list
+  (`float2x2 rot = { a, b, c, d };`) or a state block (`sampler s = sampler_state { ... };`),
+  vector element access (`retish[0]`), and the integer and double vector types (`int2 k1 = ...`).
+  Across a 2000-file collection the skipped shader slots fell from 326 to 10 and the failed
+  expression blocks from 345 to 13. Covered by 5 tests.
+- Fixed a macro definition keeping its trailing line comment, so
+  `#define MyGet GetPixel //GetBlur1` expanded the comment into the middle of a call, swallowed
+  the rest of that line, and turned the next line into a syntax error. Covered by a test.
 - Fixed the shader parser rejecting two forms real presets use: `float1`/`half1` as a type
   name, and the `const`/`static`/`inline` qualifiers in front of a declaration. Across a
   2000-file collection the skipped shader slots fell from 697 to 326, and from the original
@@ -61,6 +76,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   rather than in the file, which is recorded as roadmap item 39i.
 
 ### Added
+- Added `ShaderStatementFormTests`, which pin the statement forms real presets use inside a
+  shader body: an inline block after a condition, an `else` glued to its block with a
+  trailing semicolon, a block on the following line, a `while` loop, the comma operator
+  inside parentheses, a braced or state-block declaration initializer, and element access on
+  a vector. Control flow stays with the interpreter, so those cases assert the parse; the
+  `while` loop and the comma operator are asserted through the interpreter's result.
+- Added `PresetCompoundAssignmentTests`, which cover `+=`, `-=`, `*=`, `/=`, and `%=` in the
+  preset expression language, a compound assignment that reads its own target inside a loop,
+  and the `gmegabuf(i) += x` buffer form.
 - The visualizer compiles straight-line shader bodies instead of interpreting them. `ShaderCompiler`
   turns a shader with local declarations and a single return into a delegate over a slot array, and
   both the compiled path and the interpreter call the same `ShaderRuntime` operations, so

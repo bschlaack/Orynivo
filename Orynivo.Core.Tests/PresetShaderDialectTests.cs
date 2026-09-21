@@ -47,6 +47,24 @@ public sealed class PresetShaderDialectTests
         Assert.True(renderer.LastShaderMilliseconds > 0d);
     }
 
+    /// <summary>A define ends at its line comment, so the macro does not swallow the call.</summary>
+    [Fact]
+    public void Parse_IgnoresATrailingCommentOnAShaderDefine()
+    {
+        var preset = VisualizerPreset.Parse("""
+            PSVERSION_WARP=2
+            warp_1=`shader_body
+            warp_2=`{
+            warp_3=`#define MyGet GetPixel //GetBlur1
+            warp_4=`    float3 c = MyGet(uv);
+            warp_5=`    return float4(c, 1);
+            warp_6=`}
+            """);
+
+        Assert.Empty(preset.FailedBlocks);
+        Assert.Single(preset.WarpShaders);
+    }
+
     /// <summary>A preset that stores a whole shader in one key still works.</summary>
     [Fact]
     public void Parse_KeepsTheSingleKeyForm()

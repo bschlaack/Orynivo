@@ -777,6 +777,34 @@ affordable. This is a project of its own and must keep the CPU path as the fallb
   original 50,707 to 326 overall. The remainder, in order of frequency, is a `{` where a statement
   is expected (123), multiple declarations without a separator (73), array indexing (50), and a few
   single cases; each needs its source read, the way the `float1` and `const` cases did.
+  The most frequent remaining class, a brace where a statement is expected, was checked against the
+  sources and is not the `if (condition) { ... }` form: `ShaderStatementFormTests` proves that form
+  parses, including an inline block, an `else` glued to its block with a trailing semicolon, and a
+  block on the next line. The compiler deliberately leaves those bodies to the interpreter, which is
+  why only the parser is asserted there. The 123 brace failures therefore come from another shape
+  and need the same source-by-source treatment that found `float1` and `const`.
+  Reading the sources for the four remaining classes paid off again, and this time every cause was a
+  dialect gap rather than an oddity. `while` loops were simply unknown, which is the whole
+  `Expected ';' but found '{'` class: the parser read the keyword as a name and then demanded a
+  semicolon before the block. The comma operator was missing at the two places C allows it, so both
+  `ret = a.x, ret = b;` and `texsize.zx*(q3,q3)` failed; it is now parsed at statement level and
+  inside parentheses, while call arguments keep their commas as separators. A declaration may now be
+  initialized with a braced list (`float2x2 rot = { a, b, c, d };`, built as the same constructor the
+  explicit spelling produces) or with a state block (`sampler s = sampler_state { AddressU = WRAP; };`),
+  which is what the two `Unexpected '{'` classes were. Vector element access (`retish[0]`) and the
+  integer and double vector types (`int2 k1 = ...`) are accepted, and a macro definition now ends at
+  its line comment: `#define MyGet GetPixel //GetBlur1` used to expand that comment into the middle
+  of a call, where it swallowed the rest of the line and turned the next line into a syntax error.
+  The preset expression language had the same kind of gap on the other side of the boundary:
+  `PresetLexer` split `+=` into `+` and `=`, so every block containing `n += 1` or `zoom -= 0.03` —
+  which is most of them — failed as `Unexpected '='`. The lexer now emits one compound-assignment
+  token and the compiler applies it, including for the `gmegabuf(i) += x` buffer form.
+  Against the same 2,000 files this took the skipped shader slots from 326 to 10 and the failed
+  expression blocks from 345 to 13. What is left is array declarations such as
+  `const float4 samples[5] = { ... }` indexed as `samples[i]` (8), a `loop(...)` that does not close
+  (2), and four single cases. Arrays stay a hard failure rather than a declaration that is ignored,
+  because an unknown array name would render a wrong picture instead of dropping the block; modelling
+  them needs its own value kind in the interpreter.
 **Tests**: each phase adds its own; 39a is the prerequisite for claiming any speed-up.
 
 **Commit**: `perf(visualizer): add render measurement` (39a), then one commit per phase

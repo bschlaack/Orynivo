@@ -107,6 +107,17 @@ This file applies to `Orynivo.Core/` and supplements `../AGENTS.md`.
   `gmegabuf(i) = value`) must keep working, because presets build their lookup tables with them. Keep the
   interpreter off the audio thread and bound its per-frame cost so a heavy shader degrades the
   render resolution instead of stalling playback.
+  The expression language also has compound assignments: `PresetLexer` must emit `+=`, `-=`, `*=`,
+  `/=`, and `%=` as one token, because splitting them leaves the statement parser with a stray `=`
+  and fails the whole block, and the compiler applies them to the variable and to the
+  `gmegabuf(i) += x` buffer form. On the shader side the parser accepts `while` loops, the comma
+  operator at statement level and inside parentheses (never in a call argument list, where the
+  commas separate arguments), a declaration initialized with a braced list or a `sampler_state`
+  block, element access on a vector, and the integer and double vector types. A macro definition
+  ends at its line comment, so `#define a b //comment` must not expand the comment into the middle
+  of a call. Array declarations such as `const float4 samples[5] = { ... }` stay a deliberate hard
+  failure rather than an ignored declaration: an unknown array name would render a wrong picture,
+  and modelling arrays needs its own value kind in the interpreter.
 - Keep the project cross-platform `net10.0`; do not introduce Avalonia, Windows,
   DPAPI, WASAPI, ASIO, or other platform-specific dependencies.
 - Put shared library scanning, SQLite persistence, search, streaming models and
