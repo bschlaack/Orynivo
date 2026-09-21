@@ -91,9 +91,6 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
     private PixelBuffer? _shaderOutput;
     private SkiaShaderRunner.CompPass? _skiaComp;
     private bool _skiaCompTried;
-    private PixelBuffer? _skiaBlur1;
-    private PixelBuffer? _skiaBlur2;
-    private PixelBuffer? _skiaBlur3;
     private bool _warpShadersFailed;
     private bool _compShadersFailed;
     private readonly float[] _slots;
@@ -1244,7 +1241,9 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
         {
             _skiaCompTried = true;
             _skiaComp = SkiaShaderRunner.CompPass.TryCreate(_compShaders[0].Shader.Program, _textures, out var error);
-            if (_skiaComp is null)
+            if (_skiaComp is not null)
+                _skiaComp.GpuBlur = true;
+            else
                 ShaderError = "comp (skia): " + error;
         }
 
@@ -1260,22 +1259,8 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
                 ["sampler_pc_main"] = new(_previous.RawPixels, width, height)
             };
 
-            if (UsesBlurSampler())
-            {
-                _skiaBlur1 ??= new PixelBuffer(width, height);
-                _skiaBlur2 ??= new PixelBuffer(width, height);
-                _skiaBlur3 ??= new PixelBuffer(width, height);
-                _skiaBlur1.CopyFrom(_frameCopy);
-                _skiaBlur1.Blur();
-                _skiaBlur2.CopyFrom(_skiaBlur1);
-                _skiaBlur2.Blur();
-                _skiaBlur3.CopyFrom(_skiaBlur2);
-                _skiaBlur3.Blur();
-                sources["sampler_blur1"] = new(_skiaBlur1.RawPixels, width, height);
-                sources["sampler_blur2"] = new(_skiaBlur2.RawPixels, width, height);
-                sources["sampler_blur3"] = new(_skiaBlur3.RawPixels, width, height);
-            }
-
+            // The blur levels are built on the GPU from sampler_main, so the renderer only has to
+            // supply the frame copies.
             _skiaComp.Render(_fresh, width, height, sources, BuildSkiaScalars(), BuildSkiaVectors());
             return true;
         }
@@ -1287,14 +1272,6 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
             return false;
         }
     }
-
-    /// <summary>Reports whether the comp shader reads one of the blurred frame levels.</summary>
-    /// <returns><see langword="true"/> when a blur sampler is declared.</returns>
-    private bool UsesBlurSampler() =>
-        _skiaComp is not null &&
-        (_skiaComp.Samplers.Contains("sampler_blur1", StringComparer.Ordinal) ||
-         _skiaComp.Samplers.Contains("sampler_blur2", StringComparer.Ordinal) ||
-         _skiaComp.Samplers.Contains("sampler_blur3", StringComparer.Ordinal));
 
     /// <summary>Collects the scalar uniforms the shader reads from the seeded slots.</summary>
     /// <returns>The scalar uniforms.</returns>

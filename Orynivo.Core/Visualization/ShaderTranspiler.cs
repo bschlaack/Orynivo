@@ -1222,11 +1222,11 @@ public static class ShaderTranspiler
                     ? $"float4({MainSampler}.eval(float2({arguments[0]}, {arguments[1]}))).rgb"
                     : $"float4({MainSampler}.eval({Coordinate(call, arguments[0], 0)})).rgb";
             case "getblur1":
-                return $"float4(sampler_blur1.eval({Coordinate(call, arguments[0], 0)})).rgb";
+                return $"float4(sampler_blur1.eval({Coordinate(call, arguments[0], 0)} * texsize.xy)).rgb";
             case "getblur2":
-                return $"float4(sampler_blur2.eval({Coordinate(call, arguments[0], 0)})).rgb";
+                return $"float4(sampler_blur2.eval({Coordinate(call, arguments[0], 0)} * texsize.xy)).rgb";
             case "getblur3":
-                return $"float4(sampler_blur3.eval({Coordinate(call, arguments[0], 0)})).rgb";
+                return $"float4(sampler_blur3.eval({Coordinate(call, arguments[0], 0)} * texsize.xy)).rgb";
             case "saturate":
                 return $"clamp({arguments[0]}, 0.0, 1.0)";
             case "atan2":

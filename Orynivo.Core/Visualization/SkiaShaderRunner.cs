@@ -285,6 +285,57 @@ public static class SkiaShaderRunner
         return pixels;
     }
 
+    /// <summary>
+    /// Blurs a frame in place with the same 3x3 box filter <see cref="PixelBuffer.Blur"/> applies, run
+    /// as a Skia runtime effect. The frame travels through an eight-bit bitmap, so the result differs
+    /// from the CPU blur by at most a level or two.
+    /// </summary>
+    /// <param name="frame">Frame to blur in place.</param>
+    /// <param name="passes">Number of box-blur passes.</param>
+    /// <exception cref="PresetExpressionException">Skia rejects the blur effect.</exception>
+    public static void BlurFrame(PixelBuffer frame, int passes)
+    {
+        ArgumentNullException.ThrowIfNull(frame);
+        passes = Math.Clamp(passes, 0, 8);
+        if (passes == 0)
+            return;
+
+        using var effect = SKRuntimeEffect.CreateShader(CompPass.BlurSkSL, out var errors)
+            ?? throw new PresetExpressionException($"SkSL was rejected: {errors}", 0);
+        using var sourceBitmap = CreateBitmap(frame.Pixels, frame.Width, frame.Height);
+        using var sourceShader = sourceBitmap.ToShader(SKShaderTileMode.Clamp, SKShaderTileMode.Clamp, LinearSampling);
+
+        var owned = new List<SKShader>();
+        try
+        {
+            SKShader current = sourceShader;
+            for (var pass = 0; pass < passes; pass++)
+            {
+                var uniforms = new SKRuntimeEffectUniforms(effect);
+                uniforms["size"] = new float[] { frame.Width, frame.Height };
+                var children = new SKRuntimeEffectChildren(effect) { ["source"] = current };
+                var next = effect.ToShader(uniforms, children);
+                owned.Add(next);
+                current = next;
+            }
+
+            using var target = CreateBitmap(new float[frame.Width * frame.Height * 4], frame.Width, frame.Height);
+            using var surface = SKSurface.Create(target.Info, target.GetPixels(), target.RowBytes);
+            var canvas = surface.Canvas;
+            canvas.Clear(SKColors.Black);
+            using (var paint = new SKPaint { Shader = current })
+                canvas.DrawRect(new SKRect(0, 0, frame.Width, frame.Height), paint);
+
+            canvas.Flush();
+            ReadPixels(target, frame.Width, frame.Height).AsSpan().CopyTo(frame.Pixels);
+        }
+        finally
+        {
+            foreach (var shader in owned)
+                shader.Dispose();
+        }
+    }
+
     /// <summary>Converts a zero-to-one component into a byte.</summary>
     /// <param name="value">Component value.</param>
     /// <returns>The byte value.</returns>
@@ -300,6 +351,7 @@ public static class SkiaShaderRunner
     {
         private readonly SKRuntimeEffect _effect;
         private readonly IReadOnlyList<string> _samplers;
+        private readonly SKRuntimeEffect? _blurEffect;
         private readonly Dictionary<string, SKShader> _static = new(StringComparer.Ordinal);
         private readonly List<SKBitmap> _bitmaps = [];
         private readonly List<SKShader> _shaders = [];
@@ -312,6 +364,7 @@ public static class SkiaShaderRunner
         {
             _effect = effect;
             _samplers = samplers;
+            _blurEffect = SKRuntimeEffect.CreateShader(BlurSkSL, out _);
 
             foreach (var name in samplers)
             {
@@ -339,6 +392,32 @@ public static class SkiaShaderRunner
 
         /// <summary>Gets the samplers the effect declares.</summary>
         public IReadOnlyList<string> Samplers => _samplers;
+
+        /// <summary>
+        /// Gets or sets a value indicating whether the blur levels are built on the GPU as a chain of
+        /// box-blur passes over the composited frame instead of being supplied as pre-blurred frames.
+        /// </summary>
+        public bool GpuBlur { get; set; }
+
+        /// <summary>
+        /// The SkSL of one 3x3 box-blur pass. It reproduces <see cref="PixelBuffer.Blur"/> exactly:
+        /// nine clamped taps averaged per channel.
+        /// </summary>
+        internal const string BlurSkSL = """
+            uniform shader source;
+            uniform float2 size;
+            half4 main(float2 coord) {
+                float4 total = float4(0.0);
+                for (int dy = 0; dy < 3; dy++) {
+                    for (int dx = 0; dx < 3; dx++) {
+                        float2 offset = float2(float(dx) - 1.0, float(dy) - 1.0);
+                        float2 p = clamp(coord + offset, float2(0.0), size - 1.0);
+                        total += float4(source.eval(p));
+                    }
+                }
+                return half4(total * (1.0 / 9.0));
+            }
+            """;
 
         /// <summary>Compiles a comp shader, or reports why it cannot run on the GPU.</summary>
         /// <param name="program">Parsed comp shader body.</param>
@@ -388,6 +467,18 @@ public static class SkiaShaderRunner
             {
                 using var sourceBitmap = CreateBitmap(output.Pixels, width, height);
                 using var sourceShader = sourceBitmap.ToShader(SKShaderTileMode.Clamp, SKShaderTileMode.Clamp, LinearSampling);
+
+                // The blur levels are blurred copies of the composited frame, which is sampler_main.
+                var mainShader = sourceShader;
+                if (samplerSources.TryGetValue("sampler_main", out var mainSource))
+                {
+                    var mainBitmap = CreateBitmap(mainSource.Pixels, mainSource.Width, mainSource.Height);
+                    ownedBitmaps.Add(mainBitmap);
+                    mainShader = mainBitmap.ToShader(SKShaderTileMode.Clamp, SKShaderTileMode.Clamp, LinearSampling);
+                    ownedShaders.Add(mainShader);
+                }
+
+                var blurCache = new Dictionary<int, SKShader>();
                 var children = new SKRuntimeEffectChildren(_effect);
                 foreach (var name in _samplers)
                 {
@@ -397,8 +488,22 @@ public static class SkiaShaderRunner
                         continue;
                     }
 
+                    if (GpuBlur && _blurEffect is not null &&
+                        name.StartsWith("sampler_blur", StringComparison.Ordinal) &&
+                        int.TryParse(name.AsSpan("sampler_blur".Length), out var level) &&
+                        level is >= 1 and <= 3)
+                    {
+                        children[name] = new SKRuntimeEffectChild(
+                            BuildBlurShader(blurCache, mainShader, width, height, level, ownedShaders));
+                        continue;
+                    }
+
                     SKShader child;
-                    if (samplerSources.TryGetValue(name, out var source))
+                    if (name == "sampler_main")
+                    {
+                        child = mainShader;
+                    }
+                    else if (samplerSources.TryGetValue(name, out var source))
                     {
                         var bitmap = CreateBitmap(source.Pixels, source.Width, source.Height);
                         ownedBitmaps.Add(bitmap);
@@ -450,6 +555,35 @@ public static class SkiaShaderRunner
             }
         }
 
+        /// <summary>Builds the blur shader for one level, reusing the previous level as its input.</summary>
+        /// <param name="cache">Blur shaders built for this draw, by level.</param>
+        /// <param name="source">Unblurred frame shader.</param>
+        /// <param name="width">Frame width.</param>
+        /// <param name="height">Frame height.</param>
+        /// <param name="level">Blur level from one to three.</param>
+        /// <param name="owned">Receives the shaders the caller has to dispose.</param>
+        /// <returns>The blurred shader.</returns>
+        private SKShader BuildBlurShader(
+            Dictionary<int, SKShader> cache,
+            SKShader source,
+            int width,
+            int height,
+            int level,
+            List<SKShader> owned)
+        {
+            if (cache.TryGetValue(level, out var existing))
+                return existing;
+
+            var input = level == 1 ? source : BuildBlurShader(cache, source, width, height, level - 1, owned);
+            var uniforms = new SKRuntimeEffectUniforms(_blurEffect!);
+            uniforms["size"] = new float[] { width, height };
+            var children = new SKRuntimeEffectChildren(_blurEffect!) { ["source"] = input };
+            var blurred = _blurEffect!.ToShader(uniforms, children);
+            owned.Add(blurred);
+            cache[level] = blurred;
+            return blurred;
+        }
+
         /// <inheritdoc/>
         public void Dispose()
         {
@@ -460,6 +594,7 @@ public static class SkiaShaderRunner
             _static.Clear();
             _shaders.Clear();
             _bitmaps.Clear();
+            _blurEffect?.Dispose();
             _effect.Dispose();
         }
     }

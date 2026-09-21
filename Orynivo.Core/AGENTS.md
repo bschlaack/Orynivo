@@ -102,7 +102,10 @@ This file applies to `Orynivo.Core/` and supplements `../AGENTS.md`.
   renderer's frames; it binds the composited frame, its blur levels, and the previous frame per
   sampler and scales each sampler by its own `texsize_*`, and `PresetRenderer.UseSkiaCompPass` gates
   it because the eight-bit Skia surface differs from the float interpreter by up to one level. Keep
-  the interpreter as the fallback and keep the pass off until 40e validates the cutover. Only
+  the interpreter as the fallback and keep the pass off until 40e validates the cutover.
+  `SkiaShaderRunner.BlurFrame` is the GPU blur pass and must keep reproducing `PixelBuffer.Blur`'s
+  nine-tap clamped filter; the comp pass builds its blur levels from it, and the frame helpers
+  (`GetBlur1`-`GetBlur3`) must keep scaling their normalised coordinate by `texsize`. Only
   straight-line
   bodies (declarations and one return) are compiled — branches, loops, and swizzle assignments stay
   on the interpreter, because a wrong picture is worse than a slow one — and the compiled path must

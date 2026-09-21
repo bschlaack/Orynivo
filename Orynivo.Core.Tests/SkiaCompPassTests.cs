@@ -45,6 +45,42 @@ public sealed class SkiaCompPassTests
         Assert.Contains(gpu, value => value > 0.05f);
     }
 
+    /// <summary>The Skia box blur matches the CPU one within the eight-bit quantisation.</summary>
+    [Fact]
+    public void BlurFrame_MatchesTheCpuBlur()
+    {
+        var gpu = CreatePattern();
+        var cpu = CreatePattern();
+        SkiaShaderRunner.BlurFrame(gpu, 2);
+        cpu.Blur();
+        cpu.Blur();
+
+        var difference = MeanAbsoluteDifference(cpu.Pixels.ToArray(), gpu.Pixels.ToArray());
+        Assert.InRange(difference, 0.0001f, 0.01f);
+    }
+
+    /// <summary>Builds a frame with structure, so a blur visibly changes it.</summary>
+    /// <returns>The frame.</returns>
+    private static PixelBuffer CreatePattern()
+    {
+        var buffer = new PixelBuffer(32, 18);
+        var pixels = buffer.Pixels;
+        for (var y = 0; y < buffer.Height; y++)
+        {
+            for (var x = 0; x < buffer.Width; x++)
+            {
+                var offset = ((y * buffer.Width) + x) * 4;
+                var value = ((x * 7) + (y * 13)) % 17 / 16f;
+                pixels[offset] = value;
+                pixels[offset + 1] = 1f - value;
+                pixels[offset + 2] = value * 0.5f;
+                pixels[offset + 3] = 1f;
+            }
+        }
+
+        return buffer;
+    }
+
     /// <summary>Renders a preset with the Skia comp pass enabled or disabled.</summary>
     /// <param name="preset">Preset source.</param>
     /// <param name="skia">Whether the Skia comp pass is enabled.</param>

@@ -7,6 +7,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Added
+- Moved the blur pass onto the GPU. `SkiaShaderRunner.BlurFrame` reproduces `PixelBuffer.Blur`'s
+  nine-tap clamped box filter as a Skia runtime effect, and the Skia comp pass now builds its blur
+  levels as a chain of those passes over the composited frame instead of pre-blurring on the CPU.
+  The frame-helper translation also scales the `GetBlur1`-`GetBlur3` coordinate by `texsize`, which
+  is what the interpreter's normalised sample expects; the missing scale made the GPU read the wrong
+  texels whenever the frame was not the same size as the blur buffer.
 - Added the first GPU pass: a comp shader with no per-pixel block now runs as a Skia runtime effect
   over the renderer's frames instead of the CPU interpreter. `SkiaShaderRunner` binds one frame per
   sampler (the composited frame, its blur levels, and the previous frame), the generated noise and
