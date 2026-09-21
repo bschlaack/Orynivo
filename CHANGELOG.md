@@ -7,6 +7,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Fixed
+- Added the samplers `sampler_pw_main`, `sampler_pw_noise_lq`, and `sampler_worms`, which presets
+  name frequently and the prelude did not declare. Over a 500-file sample the share of shaders that
+  translate and are accepted by Skia rose from 374 to 377 of 764. The remaining sampler names are
+  long-tailed — `sampler_fw_main` appeared next — so enumerating them is the wrong shape and the next
+  step is to declare a sampler the shader mentions instead of listing them.
 - Made the SkSL emitter's operand conversion assignment-aware: the target of an assignment is never
   converted, only the value it is given. Converting both sides turned `x = y` into `x.xy = y`, which
   Skia rejects with "cannot assign to this expression". Over a 500-file sample the share of shaders

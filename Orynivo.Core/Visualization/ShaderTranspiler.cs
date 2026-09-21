@@ -136,6 +136,9 @@ public static class ShaderTranspiler
         uniform shader sampler_pc_main;
         uniform shader sampler_noisevol_lq;
         uniform shader sampler_noisevol_hq;
+        uniform shader sampler_pw_main;
+        uniform shader sampler_pw_noise_lq;
+        uniform shader sampler_worms;
         float4 toColour(float3 c) { return float4(c, 1.0); }
         float4 toColour(float4 c) { return c; }
         float4 toColour(float c) { return float4(c, c, c, 1.0); }
