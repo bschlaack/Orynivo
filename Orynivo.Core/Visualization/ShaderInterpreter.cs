@@ -117,6 +117,9 @@ public sealed class ShaderInterpreter
         switch (statement.Kind)
         {
             case ShaderNodeKind.Block:
+            case ShaderNodeKind.Function:
+                // Until the entry point is marked, a definition still runs where it stands, which is
+                // the behaviour this refactor deliberately preserves.
                 return ExecuteBlock(statement.Items, depth);
             case ShaderNodeKind.Declaration:
                 var name = statement.Items.Count > 0 ? statement.Items[0].Text : string.Empty;

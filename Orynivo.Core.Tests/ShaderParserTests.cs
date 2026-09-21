@@ -26,7 +26,7 @@ public sealed class ShaderParserTests
 
         Assert.Equal(ShaderNodeKind.Program, program.Kind);
         var body = Assert.Single(program.Items);
-        Assert.Equal(ShaderNodeKind.Block, body.Kind);
+        Assert.Equal(ShaderNodeKind.Function, body.Kind);
         Assert.Equal(3, body.Items.Count);
     }
 

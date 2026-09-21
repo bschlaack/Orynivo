@@ -9,6 +9,13 @@ public enum ShaderNodeKind
     /// <summary>A brace-delimited block of statements.</summary>
     Block,
 
+    /// <summary>
+    /// A function definition. It is kept apart from <see cref="Block"/> because the entry point is
+    /// itself a named block, so the two are otherwise indistinguishable: a helper must be callable
+    /// while the entry point is the code that runs.
+    /// </summary>
+    Function,
+
     /// <summary>A variable declaration.</summary>
     Declaration,
 

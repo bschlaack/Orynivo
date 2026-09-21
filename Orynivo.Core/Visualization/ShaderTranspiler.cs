@@ -190,6 +190,9 @@ public static class ShaderTranspiler
         switch (statement.Kind)
         {
             case ShaderNodeKind.Block:
+            case ShaderNodeKind.Function:
+                // A definition is still emitted where it stands until the entry point is marked; that
+                // keeps this refactor free of behaviour change.
                 builder.Append(indent).Append("{\n");
                 foreach (var child in statement.Items)
                     EmitStatement(builder, child, depth + 1);

@@ -26,7 +26,7 @@ public sealed class ShaderStatementFormTests
         // The parser must accept the form; the compiler deliberately leaves control flow to the
         // interpreter, so it is allowed to report the body as uncompiled.
         Assert.NotNull(node);
-        Assert.Contains(node.Items, item => item.Kind == ShaderNodeKind.Block);
+        Assert.Contains(node.Items, item => item.Kind == ShaderNodeKind.Function);
     }
 
     /// <summary>An else glued to its block, with a trailing semicolon, parses.</summary>

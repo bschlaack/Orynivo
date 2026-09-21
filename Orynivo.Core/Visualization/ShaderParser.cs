@@ -274,7 +274,7 @@ public static class ShaderParser
 
             SkipAnnotation();
             Expect("{");
-            return new ShaderNode(ShaderNodeKind.Block, type.Position, name.Text, 0f, null, null, null, ParseBlock());
+            return new ShaderNode(ShaderNodeKind.Function, type.Position, name.Text, 0f, null, null, null, ParseBlock());
         }
 
         /// <summary>Parses an <c>if</c> statement with its optional <c>else</c> branch.</summary>

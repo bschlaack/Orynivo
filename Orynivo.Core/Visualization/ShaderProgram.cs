@@ -62,7 +62,7 @@ internal static class ShaderCompiler
         var statements = new List<ShaderNode>();
         foreach (var statement in program.Items)
         {
-            if (statement.Kind == ShaderNodeKind.Block)
+            if (statement.Kind is ShaderNodeKind.Block or ShaderNodeKind.Function)
                 statements.AddRange(statement.Items);
             else
                 statements.Add(statement);
