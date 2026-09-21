@@ -21,6 +21,14 @@ public interface IShaderSampler
     /// <returns>The sampled colour.</returns>
     ShaderValue SampleBlur(int level, float u, float v);
 
+    /// <summary>Samples a cubic volume texture, which is what <c>tex3D</c> reads.</summary>
+    /// <param name="sampler">Sampler name, for example <c>sampler_noisevol_hq</c>.</param>
+    /// <param name="x">X coordinate.</param>
+    /// <param name="y">Y coordinate.</param>
+    /// <param name="z">Z coordinate.</param>
+    /// <returns>The sampled colour.</returns>
+    ShaderValue SampleVolume(string sampler, float x, float y, float z);
+
     /// <summary>Reads one pixel of the frame by integer coordinate.</summary>
     /// <param name="x">Column index.</param>
     /// <param name="y">Row index.</param>

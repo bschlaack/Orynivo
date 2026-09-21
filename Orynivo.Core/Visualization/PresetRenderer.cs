@@ -1343,6 +1343,21 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler
     }
 
     /// <inheritdoc/>
+    public ShaderValue SampleVolume(string sampler, float x, float y, float z)
+    {
+        // Milkdrop's tex3D reads one of the generated cubic volumes. An unexpected sampler name
+        // falls back to the two dimensional path so the shader keeps a sensible picture.
+        if (VisualizerTextureBank.TryResolve(sampler, out var texture) &&
+            VisualizerTextureBank.IsVolume(texture))
+        {
+            _textures.SampleVolume(texture, x, y, z, VisualizerTextureWrap.Repeat).CopyTo(_sample);
+            return ShaderValue.Vector(_sample[0], _sample[1], _sample[2], _sample[3], 4);
+        }
+
+        return Sample(sampler, x, y);
+    }
+
+    /// <inheritdoc/>
     public ShaderValue SamplePixel(int x, int y)
     {
         var column = Math.Clamp(x, 0, _warped.Width - 1);
