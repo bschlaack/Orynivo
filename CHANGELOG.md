@@ -6,6 +6,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added
+- Added the first GPU pass: a comp shader with no per-pixel block now runs as a Skia runtime effect
+  over the renderer's frames instead of the CPU interpreter. `SkiaShaderRunner` binds one frame per
+  sampler (the composited frame, its blur levels, and the previous frame), the generated noise and
+  volume textures, and the scalar and vector uniforms, and each sampler is scaled by its own
+  `texsize_*` so the noise textures are sampled at their real size instead of the frame size. It is
+  opt-in through `PresetRenderer.UseSkiaCompPass` because the Skia path carries the frame through
+  eight-bit textures and therefore differs from the interpreter by up to one level; the interpreter
+  stays the fallback, and the CPU/GPU tests keep the two within a level.
+
 ### Fixed
 - Made the SkSL emitter carry the whole Milkdrop variable and function vocabulary. A call's return
   type is now inferred from its arguments instead of staying unknown, which had left an intrinsic

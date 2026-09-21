@@ -1143,6 +1143,22 @@ public static class ShaderTranspiler
     private static string Coordinate(ShaderNode call, string text, int index) =>
         index < call.Items.Count ? Convert(text, TypeOf(call.Items[index]), "float2") : text;
 
+    /// <summary>Returns the texture-size uniform that belongs to a sampler.</summary>
+    /// <param name="sampler">Emitted sampler name.</param>
+    /// <returns>The uniform name, or <c>texsize</c> for a sampler without its own size.</returns>
+    private static string TexSizeUniform(string sampler) => sampler switch
+    {
+        "sampler_main" => "texsize_main",
+        "sampler_fc_main" => "texsize_fc_main",
+        "sampler_pc_main" => "texsize_pc_main",
+        "sampler_noise_lq" => "texsize_noise_lq",
+        "sampler_noise_mq" => "texsize_noise_mq",
+        "sampler_noise_hq" => "texsize_noise_hq",
+        "sampler_noisevol_lq" => "texsize_noisevol_lq",
+        "sampler_noisevol_hq" => "texsize_noisevol_hq",
+        _ => "texsize"
+    };
+
     /// <summary>Emits a call, translating the sampler accessors and the renamed intrinsics.</summary>
     /// <param name="call">Call node.</param>
     /// <returns>The expression text.</returns>
@@ -1184,10 +1200,10 @@ public static class ShaderTranspiler
                     throw new PresetExpressionException("tex2D needs a sampler and a coordinate.", call.Position);
 
                 // A Skia shader evaluates to half4, so the result is widened to the float4 the
-                // presets expect from tex2D. The coordinate is normalised, so only the size half of
-                // texsize applies to it; Skia's eval only takes a float2, so a wider coordinate is
-                // narrowed the way the interpreter reads it.
-                return $"float4({arguments[0]}.eval({Coordinate(call, arguments[1], 1)} * texsize.xy))";
+                // presets expect from tex2D. The coordinate is normalised, so it is scaled back by the
+                // sampler's own size; the noise and volume textures are not frame-sized, and using the
+                // frame size for them would sample the wrong texels.
+                return $"float4({arguments[0]}.eval({Coordinate(call, arguments[1], 1)} * {TexSizeUniform(arguments[0])}.xy))";
             case "tex3d":
                 // Milkdrop samples a 3D noise volume. Skia's runtime effects only sample 2D
                 // shaders, so the volume travels as a slice atlas and the generated helper does the

@@ -290,6 +290,7 @@ public partial class VisualizerWindow : Window
             _renderedPresetIndex = _presetIndex;
             var preset = _library.At(_presetIndex);
             var loadMs = switchClock.ElapsedMilliseconds;
+            _renderer.Dispose();
             _renderer = new PresetRenderer(preset, _renderWidth, _renderHeight);
             // The first frames are traced stage by stage so a frozen frame names its own stage.
             _renderer.StageLogger = message => SeekDiagnostics.Log("visualizer", message);

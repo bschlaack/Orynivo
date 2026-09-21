@@ -118,6 +118,49 @@ public sealed class SkiaShaderRunnerTests
         AssertMatchesInterpreter(Source, new VisualizerTextureBank());
     }
 
+    /// <summary>A noise texture is sampled at its own size, not at the frame size.</summary>
+    [Fact]
+    public void Render_MatchesTheInterpreterForANoiseTexture()
+    {
+        const string Source = """
+            float3 n = tex2D(sampler_noise_lq, uv * 3).rgb;
+            ret = n * 0.5;
+            """;
+
+        AssertMatchesInterpreter(Source, new VisualizerTextureBank());
+    }
+
+    /// <summary>Each sampler reads its own frame, which is what a comp pass needs.</summary>
+    [Fact]
+    public void Render_MatchesTheInterpreterForSamplerSources()
+    {
+        const string Source = """
+            float3 a = tex2D(sampler_blur1, uv).rgb;
+            float3 b = tex2D(sampler_main, uv).rgb;
+            ret = mix(a, b, bass);
+            """;
+
+        var node = ShaderParser.Parse(Source);
+        var uniforms = new Dictionary<string, float>(StringComparer.Ordinal) { ["bass"] = 0.6f };
+        var main = new SkiaShaderRunner.SamplerSource(GreySource, Width, Height);
+        var blur = new SkiaShaderRunner.SamplerSource(CreateConstantSource(0.2f, 0.4f, 0.6f), Width, Height);
+        var samplers = new Dictionary<string, SkiaShaderRunner.SamplerSource>(StringComparer.Ordinal)
+        {
+            ["sampler_main"] = main,
+            ["sampler_blur1"] = blur
+        };
+        var colours = new Dictionary<string, ShaderValue>(StringComparer.Ordinal)
+        {
+            ["sampler_main"] = ShaderValue.Vector(0.5f, 0.25f, 0.75f, 1f, 4),
+            ["sampler_blur1"] = ShaderValue.Vector(0.2f, 0.4f, 0.6f, 1f, 4)
+        };
+
+        var gpu = SkiaShaderRunner.Render(node, main, Width, Height, uniforms, null, samplers);
+        var cpu = RenderOnCpu(node, uniforms, new NamedSampler(colours));
+
+        AssertWithinOneByte(gpu, cpu, Source);
+    }
+
     /// <summary>A helper function is called with its arguments, not run where it is defined.</summary>
     [Fact]
     public void Render_CallsAHelperFunction()
@@ -185,6 +228,15 @@ public sealed class SkiaShaderRunnerTests
             uniforms,
             textures is null ? null : new BankSampler(textures, 0.5f, 0.25f, 0.75f));
 
+        AssertWithinOneByte(gpu, cpu, source);
+    }
+
+    /// <summary>Asserts that two rendered frames agree within one byte per channel.</summary>
+    /// <param name="gpu">GPU frame.</param>
+    /// <param name="cpu">CPU frame.</param>
+    /// <param name="source">Source, for the failure message.</param>
+    private static void AssertWithinOneByte(float[] gpu, float[] cpu, string source)
+    {
         var worst = 0f;
         for (var index = 0; index < gpu.Length; index += 4)
         {
@@ -305,7 +357,17 @@ public sealed class SkiaShaderRunnerTests
         }
 
         /// <inheritdoc/>
-        public ShaderValue Sample(string sampler, float u, float v) => _colour;
+        public ShaderValue Sample(string sampler, float u, float v)
+        {
+            if (VisualizerTextureBank.TryResolve(sampler, out var texture) &&
+                !VisualizerTextureBank.IsVolume(texture))
+            {
+                _bank.Sample(texture, u, v, VisualizerTextureWrap.Repeat).CopyTo(_sample);
+                return ShaderValue.Vector(_sample[0], _sample[1], _sample[2], _sample[3], 4);
+            }
+
+            return _colour;
+        }
 
         /// <inheritdoc/>
         public ShaderValue SampleBlur(int level, float u, float v) => _colour;
@@ -325,5 +387,28 @@ public sealed class SkiaShaderRunnerTests
 
         /// <inheritdoc/>
         public ShaderValue SamplePixel(int x, int y) => _colour;
+    }
+
+    /// <summary>A sampler that returns a different colour per sampler name.</summary>
+    private sealed class NamedSampler : IShaderSampler
+    {
+        private readonly Dictionary<string, ShaderValue> _colours;
+
+        /// <summary>Creates the sampler.</summary>
+        /// <param name="colours">Colour per sampler name.</param>
+        public NamedSampler(Dictionary<string, ShaderValue> colours) => _colours = colours;
+
+        /// <inheritdoc/>
+        public ShaderValue Sample(string sampler, float u, float v) =>
+            _colours.TryGetValue(sampler, out var colour) ? colour : ShaderValue.Vector(0f, 0f, 0f, 1f, 4);
+
+        /// <inheritdoc/>
+        public ShaderValue SampleBlur(int level, float u, float v) => Sample($"sampler_blur{level}", u, v);
+
+        /// <inheritdoc/>
+        public ShaderValue SampleVolume(string sampler, float x, float y, float z) => Sample(sampler, x, y);
+
+        /// <inheritdoc/>
+        public ShaderValue SamplePixel(int x, int y) => Sample("sampler_main", x, y);
     }
 }

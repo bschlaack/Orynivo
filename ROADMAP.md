@@ -703,9 +703,13 @@ affordable. This is a project of its own and must keep the CPU path as the fallb
   500-file sample of the preset collection (98 percent, up from 25 percent at the phase start),
   and the CPU/GPU comparison tests agree within one byte. A shader that cannot be translated keeps
   the CPU path for that preset.
-- 40c GPU passes - `In progress`: the comp-shader grid and the per-pixel programs run on the GPU
-  through `SKRuntimeEffect`; the `tex3D` volume texture now exists and warp, blur, video echo,
-  borders, and composite still need GPU passes.
+- 40c GPU passes - `In progress`: a comp shader without a per-pixel block runs as a Skia runtime
+  effect over the renderer's frames when `PresetRenderer.UseSkiaCompPass` is enabled, with the
+  interpreter as the fallback; warp, blur, video echo, borders, and composite still need GPU passes.
+  The comp pass binds the composited frame, its blur levels, and the previous frame per sampler, and
+  scales each sampler by its own `texsize_*`, so the noise textures are sampled at their real size.
+  It stays opt-in because the Skia path carries the frame through eight-bit textures and differs
+  from the interpreter by up to one level; the cutover belongs to 40e.
   The volume texture is the single source of truth for both paths, not a GPU-only addition: the
   CPU `tex3D` used to evaluate a procedural sine hash
   (`sin(x*127.1 + y*311.7 + z*74.7) * 43758.5453`, fractional part), and that hash could not be

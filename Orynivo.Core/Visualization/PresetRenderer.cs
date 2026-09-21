@@ -34,7 +34,7 @@ public interface IVisualizerAudioSource
 /// touches this renderer's own buffers, so a visualization can never interfere with audio
 /// output.
 /// </summary>
-public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler
+public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDisposable
 {
     private readonly PixelBuffer _previous;
     private readonly PixelBuffer _warped;
@@ -89,6 +89,11 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler
     private readonly float[] _randFrame = new float[4];
     private bool _samplerMainIsWarped;
     private PixelBuffer? _shaderOutput;
+    private SkiaShaderRunner.CompPass? _skiaComp;
+    private bool _skiaCompTried;
+    private PixelBuffer? _skiaBlur1;
+    private PixelBuffer? _skiaBlur2;
+    private PixelBuffer? _skiaBlur3;
     private bool _warpShadersFailed;
     private bool _compShadersFailed;
     private readonly float[] _slots;
@@ -294,6 +299,14 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler
     public bool HasShaders => _warpShaders.Count > 0 || _compShaders.Count > 0;
 
     /// <summary>
+    /// Gets or sets a value indicating whether a comp shader runs as a Skia runtime effect instead of
+    /// the interpreter. It is off by default because the Skia path carries the frame through eight-bit
+    /// textures, so its picture differs from the interpreter by up to one level; the cutover waits
+    /// until the result has been validated against the interpreter.
+    /// </summary>
+    public bool UseSkiaCompPass { get; set; }
+
+    /// <summary>
     /// Gets or sets a value indicating whether full-frame passes may use more than one thread.
     /// It exists so a test can compare both paths and prove they render identical frames.
     /// </summary>
@@ -463,6 +476,13 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler
         Bass = Mid = Treble = Volume = 0f;
         Timings = default;
         ResetTimings();
+    }
+
+    /// <summary>Releases the native resources the Skia comp pass holds.</summary>
+    public void Dispose()
+    {
+        _skiaComp?.Dispose();
+        _skiaComp = null;
     }
 
     /// <summary>Keeps the smoothed <c>*_att</c> bands the presets read alongside the raw bands.</summary>
@@ -1139,6 +1159,11 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler
         _frameCopy.CopyFrom(_fresh);
         _samplerMainIsWarped = true;
 
+        // A comp shader whose per-pixel block is empty is a pure post-process, so it can run as a
+        // Skia runtime effect over the frame instead of the interpreter.
+        if (TryApplySkiaCompShader(width, height))
+            return;
+
         // A comp shader is a post-processing pass, so it may run on a smaller grid than the frame
         // and be scaled back up afterwards. That is what keeps a per-pixel shader inside the frame
         // budget on the CPU; sampling still reads the full-resolution frame, so the effect stays
@@ -1199,6 +1224,105 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler
             }
         }
     }
+
+    /// <summary>
+    /// Runs the single comp shader as a Skia runtime effect when it has no per-pixel block and
+    /// translates, which is what moves the comp pass off the CPU interpreter. It returns
+    /// <see langword="false"/> so the caller keeps the interpreter whenever anything is unsupported.
+    /// </summary>
+    /// <param name="width">Frame width.</param>
+    /// <param name="height">Frame height.</param>
+    /// <returns><see langword="true"/> when the pass ran on the Skia path.</returns>
+    private bool TryApplySkiaCompShader(int width, int height)
+    {
+        if (!UseSkiaCompPass)
+            return false;
+        if (_compShaders.Count != 1 || !_compShaders[0].Shader.PerPixel.IsEmpty)
+            return false;
+
+        if (!_skiaCompTried)
+        {
+            _skiaCompTried = true;
+            _skiaComp = SkiaShaderRunner.CompPass.TryCreate(_compShaders[0].Shader.Program, _textures, out var error);
+            if (_skiaComp is null)
+                ShaderError = "comp (skia): " + error;
+        }
+
+        if (_skiaComp is null)
+            return false;
+
+        try
+        {
+            var sources = new Dictionary<string, SkiaShaderRunner.SamplerSource>(StringComparer.Ordinal)
+            {
+                ["sampler_main"] = new(_frameCopy.RawPixels, width, height),
+                ["sampler_fc_main"] = new(_warped.RawPixels, width, height),
+                ["sampler_pc_main"] = new(_previous.RawPixels, width, height)
+            };
+
+            if (UsesBlurSampler())
+            {
+                _skiaBlur1 ??= new PixelBuffer(width, height);
+                _skiaBlur2 ??= new PixelBuffer(width, height);
+                _skiaBlur3 ??= new PixelBuffer(width, height);
+                _skiaBlur1.CopyFrom(_frameCopy);
+                _skiaBlur1.Blur();
+                _skiaBlur2.CopyFrom(_skiaBlur1);
+                _skiaBlur2.Blur();
+                _skiaBlur3.CopyFrom(_skiaBlur2);
+                _skiaBlur3.Blur();
+                sources["sampler_blur1"] = new(_skiaBlur1.RawPixels, width, height);
+                sources["sampler_blur2"] = new(_skiaBlur2.RawPixels, width, height);
+                sources["sampler_blur3"] = new(_skiaBlur3.RawPixels, width, height);
+            }
+
+            _skiaComp.Render(_fresh, width, height, sources, BuildSkiaScalars(), BuildSkiaVectors());
+            return true;
+        }
+        catch (Exception exception)
+        {
+            ShaderError = "comp (skia): " + exception.GetType().Name + ": " + exception.Message;
+            _skiaComp.Dispose();
+            _skiaComp = null;
+            return false;
+        }
+    }
+
+    /// <summary>Reports whether the comp shader reads one of the blurred frame levels.</summary>
+    /// <returns><see langword="true"/> when a blur sampler is declared.</returns>
+    private bool UsesBlurSampler() =>
+        _skiaComp is not null &&
+        (_skiaComp.Samplers.Contains("sampler_blur1", StringComparer.Ordinal) ||
+         _skiaComp.Samplers.Contains("sampler_blur2", StringComparer.Ordinal) ||
+         _skiaComp.Samplers.Contains("sampler_blur3", StringComparer.Ordinal));
+
+    /// <summary>Collects the scalar uniforms the shader reads from the seeded slots.</summary>
+    /// <returns>The scalar uniforms.</returns>
+    private IReadOnlyDictionary<string, float> BuildSkiaScalars()
+    {
+        var scalars = new Dictionary<string, float>(StringComparer.Ordinal);
+        var layout = Preset.Layout;
+        foreach (var (name, count) in ShaderTranspiler.UniformComponents)
+        {
+            if (count != 1)
+                continue;
+
+            var slot = layout.IndexOf(name);
+            if (slot >= 0 && slot < _slots.Length)
+                scalars[name] = _slots[slot];
+        }
+
+        return scalars;
+    }
+
+    /// <summary>Collects the vector uniforms the shader reads.</summary>
+    /// <returns>The vector uniforms.</returns>
+    private IReadOnlyDictionary<string, float[]> BuildSkiaVectors() =>
+        new Dictionary<string, float[]>(StringComparer.Ordinal)
+        {
+            ["aspect"] = [Read("aspectx", 1f), Read("aspecty", 1f)],
+            ["rand_frame"] = _randFrame
+        };
 
     /// <summary>Writes the variables every shader can read for this pixel.</summary>
     /// <param name="interpreter">Shader about to run.</param>

@@ -32,6 +32,9 @@ public sealed class PixelBuffer
     /// <summary>Gets the raw RGBA samples in the range zero to one.</summary>
     public Span<float> Pixels => _pixels;
 
+    /// <summary>Gets the backing array, for a caller that needs a stable reference to it.</summary>
+    internal float[] RawPixels => _pixels;
+
     /// <summary>Sets every sample to zero.</summary>
     public void Clear() => Array.Clear(_pixels);
 
