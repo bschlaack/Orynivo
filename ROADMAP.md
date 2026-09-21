@@ -772,6 +772,11 @@ affordable. This is a project of its own and must keep the CPU path as the fallb
   `rand_frame` is bound now as well: a random four-component vector, refreshed once per frame and
   available to both shader paths. Still missing from that family are the random translation and
   rotation vectors the reference keeps per preset.
+  The shader front end now accepts `float1`/`half1` and the `const`/`static`/`inline` qualifiers,
+  which took the skipped shader slots against the same 2,000 files from 697 to 326 and from the
+  original 50,707 to 326 overall. The remainder, in order of frequency, is a `{` where a statement
+  is expected (123), multiple declarations without a separator (73), array indexing (50), and a few
+  single cases; each needs its source read, the way the `float1` and `const` cases did.
 **Tests**: each phase adds its own; 39a is the prerequisite for claiming any speed-up.
 
 **Commit**: `perf(visualizer): add render measurement` (39a), then one commit per phase

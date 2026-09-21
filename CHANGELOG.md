@@ -7,6 +7,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Fixed
+- Fixed the shader parser rejecting two forms real presets use: `float1`/`half1` as a type
+  name, and the `const`/`static`/`inline` qualifiers in front of a declaration. Across a
+  2000-file collection the skipped shader slots fell from 697 to 326, and from the original
+  50,707 to 326 overall. What is left is array indexing, multiple declarations without a
+  separator, and a few statement forms that need to be read case by case.
 - Fixed `rand_frame` not being bound. Milkdrop keeps a random four-component vector per
   frame, and a shader that used it rendered black because the variable did not exist; it is
   now seeded once per frame for both the compiled and the interpreted shader path, and it

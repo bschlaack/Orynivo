@@ -12,7 +12,8 @@ public static class ShaderParser
     private static readonly HashSet<string> Types = new(StringComparer.Ordinal)
     {
         "void", "bool", "int", "uint", "half", "half2", "half3", "half4",
-        "float", "float2", "float3", "float4", "float2x2", "float3x3", "float4x4",
+        "float", "float1", "float2", "float3", "float4", "float2x2", "float3x3", "float4x4",
+        "half1",
         "sampler", "sampler2D", "sampler3D", "texture"
     };
 
@@ -133,6 +134,13 @@ public static class ShaderParser
                 while (Current.Kind != ShaderTokenKind.End && !TryConsume(";"))
                     Advance();
                 return null;
+            }
+
+            // Qualifiers do not change what a declaration means here, so they are skipped.
+            while (Current.Kind == ShaderTokenKind.Keyword &&
+                   Current.Text is "const" or "static" or "inline")
+            {
+                Advance();
             }
 
             // A type keyword starts either a declaration or a function signature.

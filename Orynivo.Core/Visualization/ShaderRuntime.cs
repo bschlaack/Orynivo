@@ -64,7 +64,9 @@ internal static class ShaderRuntime
     private static readonly Dictionary<string, Opcode> Opcodes = new(StringComparer.OrdinalIgnoreCase)
     {
         ["float"] = Opcode.Cast,
+        ["float1"] = Opcode.Cast,
         ["half"] = Opcode.Cast,
+        ["half1"] = Opcode.Cast,
         ["int"] = Opcode.Cast,
         ["uint"] = Opcode.Cast,
         ["bool"] = Opcode.Cast,
