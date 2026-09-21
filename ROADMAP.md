@@ -668,6 +668,12 @@ affordable. This is a project of its own and must keep the CPU path as the fallb
   the CPU path stays the fallback, and a comparison harness validates both against the same
   reference frames.
 
+- 39h Remaining preset-block failures - `Pending`: against a 2000-file collection, 96 expression
+  blocks still fail, dominated by `Unexpected ';'` (57, a statement form the compiler does not
+  accept yet) and the Milkdrop memory buffers `megabuf`/`gmegabuf` (31, which need a shared buffer
+  and must then keep the parallel warp on one thread). `PresetFolderDiagnosticTests` lists the
+  current reasons; keep the diagnostic test updated as the compiler grows.
+
 **Tests**: each phase adds its own; 39a is the prerequisite for claiming any speed-up.
 
 **Commit**: `perf(visualizer): add render measurement` (39a), then one commit per phase

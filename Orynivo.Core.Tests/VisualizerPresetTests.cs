@@ -85,14 +85,30 @@ public sealed class VisualizerPresetTests
         Assert.Equal(4, preset.BlurLevel);
     }
 
-    /// <summary>An invalid expression block reports its position.</summary>
+    /// <summary>
+    /// An invalid expression block is skipped and recorded instead of rejecting the preset, so one
+    /// unsupported construct cannot replace a whole preset with the fallback.
+    /// </summary>
     [Fact]
-    public void Parse_RejectsAnInvalidExpression()
+    public void Parse_SkipsAnInvalidExpressionBlock()
     {
-        var exception = Assert.Throws<PresetExpressionException>(() =>
-            VisualizerPreset.Parse("per_pixel_1=x = unknown(1);"));
+        var preset = VisualizerPreset.Parse("per_frame_1=zoom = 1.01;\nper_pixel_1=x = unknown(1);");
 
-        Assert.True(exception.Position >= 0);
+        Assert.Contains(
+            preset.FailedBlocks,
+            block => block.StartsWith("per_pixel", StringComparison.Ordinal));
+        Assert.True(preset.PerPixel.IsEmpty);
+        // The block that does compile still works.
+        Assert.False(preset.PerFrame.IsEmpty);
+    }
+
+    /// <summary>A preset whose blocks all compile reports no failure.</summary>
+    [Fact]
+    public void Parse_ReportsNoFailedBlocksWhenEverythingCompiles()
+    {
+        var preset = VisualizerPreset.Parse("per_frame_1=zoom = 1.01;\nper_pixel_1=x = x + 0.01;");
+
+        Assert.Empty(preset.FailedBlocks);
     }
 
     /// <summary>An empty document still produces a usable preset.</summary>

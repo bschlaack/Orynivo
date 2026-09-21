@@ -124,6 +124,14 @@ public sealed class VisualizerPreset
     public int Version { get; init; }
 
     /// <summary>
+    /// Gets the names of the expression blocks this preset declares but could not compile. A block
+    /// that uses a construct the engine does not support is skipped so the rest of the preset still
+    /// renders; real Milkdrop presets rely on that, because a single unsupported expression must
+    /// not replace the whole preset with the fallback.
+    /// </summary>
+    public IReadOnlyList<string> FailedBlocks { get; init; } = [];
+
+    /// <summary>
     /// Splits preset text into its sections. A Milkdrop <c>.milk</c> file usually holds several
     /// presets, one per <c>[presetNN]</c> header; text before the first header forms a section of
     /// its own, so a single-preset file yields exactly one entry.
@@ -191,27 +199,29 @@ public sealed class VisualizerPreset
 
         var layout = PresetVariableLayout.RegisterStandardVariables(new PresetVariableLayout());
 
+        var failed = new List<string>();
         return new VisualizerPreset(
             name,
             layout,
-            PresetCompiler.Compile(Join(values, "per_frame_init"), layout),
-            PresetCompiler.Compile(Join(values, "per_frame"), layout),
-            PresetCompiler.Compile(Join(values, "per_pixel_init"), layout),
-            PresetCompiler.Compile(Join(values, "per_pixel"), layout),
+            CompileBlock(values, layout, "per_frame_init", failed),
+            CompileBlock(values, layout, "per_frame", failed),
+            CompileBlock(values, layout, "per_pixel_init", failed),
+            CompileBlock(values, layout, "per_pixel", failed),
             Math.Clamp(ReadFloat(values, "decay", 0.96f), 0f, 1f),
             Math.Max(0.05f, ReadFloat(values, "zoom", 1f)),
             ReadFloat(values, "warp", 1f),
             (int)Math.Clamp(ReadFloat(values, "blur_level", 0f), 0f, 4f),
             Math.Clamp(ReadFloat(values, "wave_alpha", 0.8f), 0f, 1f),
             Math.Clamp(ReadFloat(values, "wave_scale", 0.25f), 0f, 1f),
-            PresetCompiler.Compile(Join(values, "per_point"), layout),
-            ParseShapes(values, layout),
-            ParseWaves(values, layout),
+            CompileBlock(values, layout, "per_point", failed),
+            ParseShapes(values, layout, failed),
+            ParseWaves(values, layout, failed),
             ParseDefaults(values),
             ParseShaders(values, layout, "warp"),
             ParseShaders(values, layout, "comp"))
         {
-            Version = ReadVersion(values)
+            Version = ReadVersion(values),
+            FailedBlocks = failed
         };
     }
 
@@ -239,7 +249,7 @@ public sealed class VisualizerPreset
             0.25f,
             PresetProgram.Empty,
             [],
-            ParseWaves(new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase), layout),
+            ParseWaves(new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase), layout, []),
             new Dictionary<string, float>(StringComparer.OrdinalIgnoreCase),
             [],
             []);
@@ -297,7 +307,8 @@ public sealed class VisualizerPreset
     /// <returns>The declared shapes.</returns>
     private static IReadOnlyList<VisualizerShape> ParseShapes(
         Dictionary<string, string> values,
-        PresetVariableLayout layout)
+        PresetVariableLayout layout,
+        List<string> failed)
     {
         var shapes = new List<VisualizerShape>();
         for (var index = 0; index < 32; index++)
@@ -326,12 +337,37 @@ public sealed class VisualizerPreset
                 Math.Clamp(ReadShape(values, prefix, "border_b", 1f), 0f, 1f),
                 Math.Clamp(ReadShape(values, prefix, "border_a", 1f), 0f, 1f),
                 ReadShape(values, prefix, "additive", 0f) >= 0.5f,
-                PresetCompiler.Compile(Join(values, prefix + "init"), layout),
-                PresetCompiler.Compile(Join(values, prefix + "per_frame"), layout),
-                PresetCompiler.Compile(Join(values, prefix + "per_point"), layout)));
+                CompileBlock(values, layout, prefix + "init", failed),
+                CompileBlock(values, layout, prefix + "per_frame", failed),
+                CompileBlock(values, layout, prefix + "per_point", failed)));
         }
 
         return shapes;
+    }
+
+    /// <summary>
+    /// Compiles one expression block, recording its name and skipping it when it cannot compile.
+    /// </summary>
+    /// <param name="values">Parsed preset values.</param>
+    /// <param name="layout">Shared slot layout.</param>
+    /// <param name="prefix">Block prefix, for example <c>per_frame</c>.</param>
+    /// <param name="failed">Collects the names of the blocks that could not compile.</param>
+    /// <returns>The compiled program, or an empty program when the block was skipped.</returns>
+    private static PresetProgram CompileBlock(
+        Dictionary<string, string> values,
+        PresetVariableLayout layout,
+        string prefix,
+        List<string> failed)
+    {
+        try
+        {
+            return PresetCompiler.Compile(Join(values, prefix), layout);
+        }
+        catch (PresetExpressionException exception)
+        {
+            failed.Add($"{prefix}: {exception.Message}");
+            return PresetProgram.Empty;
+        }
     }
 
     /// <summary>Maps the Milkdrop key spellings onto the variable names the engine uses.</summary>
@@ -377,16 +413,17 @@ public sealed class VisualizerPreset
     /// <returns>The four waveform programs.</returns>
     private static IReadOnlyList<VisualizerWave> ParseWaves(
         Dictionary<string, string> values,
-        PresetVariableLayout layout)
+        PresetVariableLayout layout,
+        List<string> failed)
     {
         var waves = new List<VisualizerWave>(4);
         for (var index = 0; index < 4; index++)
         {
             var prefix = $"wave_{index}_";
             waves.Add(new VisualizerWave(
-                PresetCompiler.Compile(Join(values, prefix + "init"), layout),
-                PresetCompiler.Compile(Join(values, prefix + "per_frame"), layout),
-                PresetCompiler.Compile(Join(values, prefix + "per_point"), layout)));
+                CompileBlock(values, layout, prefix + "init", failed),
+                CompileBlock(values, layout, prefix + "per_frame", failed),
+                CompileBlock(values, layout, prefix + "per_point", failed)));
         }
 
         return waves;

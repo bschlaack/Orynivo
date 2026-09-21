@@ -80,7 +80,14 @@ This file applies to `Orynivo.Core/` and supplements `../AGENTS.md`.
   value written by one pixel and read by another would make the picture depend on the split; a
   warp shader or an active motion grid keeps it sequential for the same reason. Never give two
   workers the same slot array, and never claim a speed-up without the identical-frame test in
-  `ParallelWarpTests`. Keep the
+  `ParallelWarpTests`.
+  The preset compiler must accept the Milkdrop function set, because a block it cannot compile is
+  dropped and takes that preset's motion with it: `above`, `below`, and `equal` yield one or zero
+  (never a boolean), and `sqr`, `sigmoid`, `band`, `bor`, and `bnot` belong to it too. Names are
+  case-insensitive, and a block that still fails is skipped and recorded on
+  `VisualizerPreset.FailedBlocks` instead of rejecting the preset, so one unsupported construct
+  costs a block rather than a preset. `PresetFolderDiagnosticTests` reports what still fails
+  against a real collection; run it after touching the compiler. Keep the
   interpreter off the audio thread and bound its per-frame cost so a heavy shader degrades the
   render resolution instead of stalling playback.
 - Keep the project cross-platform `net10.0`; do not introduce Avalonia, Windows,

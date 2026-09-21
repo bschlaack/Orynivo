@@ -212,7 +212,7 @@ public static class PresetCompiler
     {
         if (current.Kind != PresetTokenKind.OpenParenthesis)
         {
-            if (string.Equals(name, "pi", StringComparison.Ordinal))
+            if (string.Equals(name, "pi", StringComparison.OrdinalIgnoreCase))
                 return Expression.Constant(MathF.PI);
             return state.Slot(name);
         }
@@ -245,10 +245,24 @@ public static class PresetCompiler
             return build(arguments[0]);
         }
 
-        if (string.Equals(name, "if", StringComparison.Ordinal))
+        if (string.Equals(name, "if", StringComparison.OrdinalIgnoreCase))
         {
             Require(arguments, 3, name, position);
             return Expression.Condition(IsTrue(arguments[0]), arguments[1], arguments[2]);
+        }
+
+        // Milkdrop preset expressions are case-insensitive, so "Sin" and "sin" are the same call.
+        name = name.ToLowerInvariant();
+        if (name == "sigmoid")
+        {
+            // Some presets pass a second argument; only the value matters.
+            if (arguments.Count == 0)
+                throw new PresetExpressionException("'sigmoid' expects 1 argument", position);
+            return Expression.Divide(
+                Expression.Constant(1f),
+                Expression.Add(
+                    Expression.Constant(1f),
+                    MathCall(nameof(MathF.Exp), Expression.Negate(arguments[0]))));
         }
 
         return name switch
@@ -274,8 +288,59 @@ public static class PresetCompiler
             "pow" => Binary(arguments, name, position, nameof(MathF.Pow)),
             "atan2" => Binary(arguments, name, position, nameof(MathF.Atan2)),
             "fmod" => Binary(arguments, name, position, null),
+            "sqr" => Unary(value => Expression.Multiply(value, value)),
+            // Milkdrop's comparisons yield one or zero instead of a boolean.
+            "above" => Comparison(arguments, name, position, ExpressionType.GreaterThan),
+            "below" => Comparison(arguments, name, position, ExpressionType.LessThan),
+            "equal" => Comparison(arguments, name, position, ExpressionType.Equal),
+            "band" => Bitwise(arguments, name, position, ExpressionType.And),
+            "bor" => Bitwise(arguments, name, position, ExpressionType.Or),
+            "bnot" => Bitwise(arguments, name, position, ExpressionType.Not),
             _ => throw new PresetExpressionException($"Unknown function '{name}'", position)
         };
+    }
+
+    /// <summary>
+    /// Builds a comparison that yields one or zero. Milkdrop's <c>above</c>, <c>below</c>, and
+    /// <c>equal</c> are used as numbers in its expressions, so they must not produce a boolean.
+    /// </summary>
+    /// <param name="arguments">Evaluated arguments.</param>
+    /// <param name="name">Function name, for the error message.</param>
+    /// <param name="position">Source position, for the error message.</param>
+    /// <param name="comparison">Comparison to apply.</param>
+    /// <returns>The conditional expression.</returns>
+    private static Expression Comparison(
+        List<Expression> arguments,
+        string name,
+        int position,
+        ExpressionType comparison)
+    {
+        Require(arguments, 2, name, position);
+        return Expression.Condition(
+            Expression.MakeBinary(comparison, arguments[0], arguments[1]),
+            Expression.Constant(1f),
+            Expression.Constant(0f));
+    }
+
+    /// <summary>Builds a bitwise operation on the integer view of its arguments.</summary>
+    /// <param name="arguments">Evaluated arguments.</param>
+    /// <param name="name">Function name, for the error message.</param>
+    /// <param name="position">Source position, for the error message.</param>
+    /// <param name="operation">Bitwise operation to apply.</param>
+    /// <returns>The converted result.</returns>
+    private static Expression Bitwise(
+        List<Expression> arguments,
+        string name,
+        int position,
+        ExpressionType operation)
+    {
+        var unary = operation == ExpressionType.Not;
+        Require(arguments, unary ? 1 : 2, name, position);
+        var value = Expression.Convert(arguments[0], typeof(int));
+        Expression result = unary
+            ? Expression.Not(value)
+            : Expression.MakeBinary(operation, value, Expression.Convert(arguments[1], typeof(int)));
+        return Expression.Convert(result, typeof(float));
     }
 
     private static Expression Binary(

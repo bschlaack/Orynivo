@@ -110,28 +110,27 @@ public sealed class VisualizerPresetLibraryTests : IDisposable
     }
 
     /// <summary>
-    /// A broken preset is only reported once it is shown, which is what keeps a large collection
-    /// from being compiled when the window opens.
+    /// A preset with an unsupported expression block still loads: the block is skipped and
+    /// reported on the preset instead of replacing the whole preset with a fallback, which is what
+    /// makes real Milkdrop presets usable.
     /// </summary>
     [Fact]
-    public void At_ReportsWhyAPresetWasSkipped()
+    public void At_KeepsAPresetWithAnUnsupportedBlock()
     {
-        File.WriteAllText(Path.Combine(_directory, "broken.oryvis"), "name=Broken\nper_pixel_1=x = ;");
+        File.WriteAllText(
+            Path.Combine(_directory, "partial.oryvis"),
+            "name=Partial\nper_frame_1=zoom = 1.01;\nper_pixel_1=x = unknown(1);");
         var library = new VisualizerPresetLibrary();
         library.Reload(_directory);
 
-        Assert.Empty(library.RejectedReasons);
         var preset = library.At(BuiltInCount);
 
-        Assert.Contains("broken.oryvis", library.RejectedFiles);
-        var reason = Assert.Single(library.RejectedReasons);
-        Assert.Contains("broken.oryvis", reason, StringComparison.Ordinal);
-        Assert.Contains("position", reason, StringComparison.OrdinalIgnoreCase);
-        // The window keeps working: a broken preset falls back to the first built-in.
-        Assert.Equal(VisualizerPresets.BuiltIn[0].Name, preset.Name);
-        // A second visit does not report the same failure again.
-        library.At(BuiltInCount);
-        Assert.Single(library.RejectedReasons);
+        Assert.Equal("Partial", preset.Name);
+        Assert.Contains(preset.FailedBlocks, block => block.StartsWith("per_pixel", StringComparison.Ordinal));
+        Assert.False(preset.PerFrame.IsEmpty);
+        Assert.Empty(library.RejectedFiles);
+        // The preset is parsed once and then reused.
+        Assert.Same(preset, library.At(BuiltInCount));
     }
 
     /// <summary>Preset files are added after the built-ins.</summary>
@@ -163,19 +162,21 @@ public sealed class VisualizerPresetLibraryTests : IDisposable
         Assert.DoesNotContain("Ignored", new[] { library.At(BuiltInCount).Name, library.At(BuiltInCount + 1).Name });
     }
 
-    /// <summary>A file with an invalid expression is skipped and reported.</summary>
+    /// <summary>A preset with an unsupported block does not cost the collection the other presets.</summary>
     [Fact]
-    public void Reload_SkipsAndReportsBrokenPresets()
+    public void Reload_KeepsPresetsWithUnsupportedBlocks()
     {
-        File.WriteAllText(Path.Combine(_directory, "broken.oryvis"), "name=Broken\nper_pixel_1=x = unknown(1);");
+        File.WriteAllText(Path.Combine(_directory, "partial.oryvis"), "name=Partial\nper_pixel_1=x = unknown(1);");
         File.WriteAllText(Path.Combine(_directory, "good.oryvis"), "name=Good");
         var library = new VisualizerPresetLibrary();
 
         library.Reload(_directory);
-        library.At(BuiltInCount);
 
         Assert.Equal(BuiltInCount + 2, library.Count);
-        Assert.Contains("broken.oryvis", library.RejectedFiles);
+        Assert.Empty(library.RejectedFiles);
+        var names = new[] { library.At(BuiltInCount).Name, library.At(BuiltInCount + 1).Name };
+        Assert.Contains("Partial", names);
+        Assert.Contains("Good", names);
     }
 
     /// <summary>A missing folder leaves the built-ins available.</summary>

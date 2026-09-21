@@ -7,6 +7,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Added
+- Added the Milkdrop functions real presets rely on: `above`, `below`, and `equal`
+  (which yield one or zero, not a boolean), `sqr`, `sigmoid`, and the bitwise `band`,
+  `bor`, and `bnot`. Function and constant names are matched case-insensitively now, as
+  in Milkdrop, and `sigmoid` tolerates the second argument some presets pass. Across a
+  2000-file preset collection this took the number of skipped expression blocks from 1267
+  to 96, which is what gives those presets their motion back.
 - The visualizer's warp stage now runs on several threads. A pass may only be
   parallelised when everything the per-pixel code writes is re-seeded for every pixel,
   so `x = x + ...` and `rad = ...` run in parallel while a preset that accumulates in
@@ -155,6 +161,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 
 ### Fixed
+- Fixed every downloaded preset rendering the same picture. An expression block that
+  used a function the engine did not know was dropped together with the whole preset,
+  so those presets lost the per-frame and per-pixel code that carries their movement and
+  only the shared waveform and spectrum overlay was left. A block that cannot compile is
+  now skipped and recorded on the preset (`FailedBlocks`) instead of rejecting it, and the
+  missing functions are implemented, so the preset renders its own picture.
 - Fixed the visualizer freezing the whole application when it was opened with a large
   preset folder. The recursive discovery read every file while the window was being
   constructed, which blocked the UI thread for as long as the collection was large; a
