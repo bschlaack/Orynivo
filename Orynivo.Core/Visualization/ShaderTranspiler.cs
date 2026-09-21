@@ -260,6 +260,24 @@ public static class ShaderTranspiler
     }
 
     /// <summary>
+    /// Translates a comp shader together with its own per-pixel expression block into SkSL. The
+    /// block runs before the shader body with the same frame vocabulary; the engine re-seeds
+    /// <c>x</c>, <c>y</c>, <c>rad</c>, and <c>ang</c> from the pixel position.
+    /// </summary>
+    /// <param name="program">Parsed comp shader body.</param>
+    /// <param name="perPixel">Per-pixel expression block that runs alongside the shader, or <see langword="null"/>.</param>
+    /// <param name="samplers">The samplers the generated SkSL declares.</param>
+    /// <param name="perPixelUniforms">Preset variables the per-pixel block reads, which the caller has to seed.</param>
+    /// <returns>SkSL source for a <c>half4 main(float2 fragCoord)</c> runtime effect.</returns>
+    /// <exception cref="PresetExpressionException">The body or block uses something SkSL cannot express here.</exception>
+    public static string TranspileComp(
+        ShaderNode program,
+        PresetProgram? perPixel,
+        out IReadOnlyList<string> samplers,
+        out IReadOnlyList<string> perPixelUniforms) =>
+        TranspileCore(program, perPixel, warpedUv: false, out samplers, out perPixelUniforms);
+
+    /// <summary>
     /// Translates a warp shader together with the preset's per-pixel expression block into SkSL. The
     /// difference from <see cref="Transpile"/> is the entry point: the sampling coordinate comes from
     /// the Milkdrop motion transform (and the per-pixel block) instead of the fragment position, and
@@ -395,7 +413,7 @@ public static class ShaderTranspiler
 
         if (!warpedUv)
         {
-            EmitCompMain(builder, program);
+            EmitCompMain(builder, program, perPixelBody);
             return builder.ToString();
         }
 
@@ -406,7 +424,8 @@ public static class ShaderTranspiler
     /// <summary>Emits the comp entry point, which samples <c>uv</c> straight from the fragment position.</summary>
     /// <param name="builder">Output.</param>
     /// <param name="program">Parsed shader body.</param>
-    private static void EmitCompMain(StringBuilder builder, ShaderNode? program)
+    /// <param name="perPixelBody">Emitted per-pixel statements.</param>
+    private static void EmitCompMain(StringBuilder builder, ShaderNode? program, string perPixelBody)
     {
         builder.Append("half4 main(float2 fragCoord) {\n");
         builder.Append("    float2 uv_orig = fragCoord / texsize.xy;\n");
@@ -415,6 +434,17 @@ public static class ShaderTranspiler
         builder.Append("    float rad = length(centred);\n");
         builder.Append("    float ang = atan(centred.y, centred.x);\n");
         builder.Append("    float3 ret = float3(0.0);\n");
+        if (perPixelBody.Length > 0)
+        {
+            // The block's engine locals are seeded from the pixel position, the way the CPU stage
+            // gives it the current mesh point; its writes stay inside the block.
+            builder.Append("    float ").Append(PresetExpressionTranspiler.LocalX).Append(" = centred.x;\n");
+            builder.Append("    float ").Append(PresetExpressionTranspiler.LocalY).Append(" = centred.y;\n");
+            builder.Append("    float ").Append(PresetExpressionTranspiler.LocalRadius).Append(" = rad;\n");
+            builder.Append("    float ").Append(PresetExpressionTranspiler.LocalAngle).Append(" = ang;\n");
+            builder.Append(perPixelBody);
+        }
+
         EmitMutableUniforms(builder);
         EmitEntryStatements(builder, program);
         builder.Append("    return half4(toColour(ret));\n");

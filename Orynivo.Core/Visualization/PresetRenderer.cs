@@ -903,18 +903,8 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
     /// <summary>Collects the scalar uniforms the warp shader and its per-pixel block read.</summary>
     /// <param name="pass">Warp pass whose per-pixel variables are seeded.</param>
     /// <returns>The scalar uniforms.</returns>
-    private Dictionary<string, float> BuildSkiaWarpScalars(SkiaShaderRunner.WarpPass pass)
-    {
-        var scalars = BuildSkiaScalars();
-        foreach (var name in pass.PerPixelUniforms)
-        {
-            var slot = Preset.Layout.IndexOf(name);
-            scalars[PresetExpressionTranspiler.UniformName(name)] =
-                slot >= 0 && slot < _slots.Length ? _slots[slot] : 0f;
-        }
-
-        return scalars;
-    }
+    private Dictionary<string, float> BuildSkiaWarpScalars(SkiaShaderRunner.WarpPass pass) =>
+        BuildSkiaScalars(pass.PerPixelUniforms);
 
     /// <summary>Runs the warp shaders on the adaptive grid and scales the result over the frame.</summary>
     /// <param name="computeSample">Sampling-position evaluator shared with the per-pixel path.</param>
@@ -1374,9 +1364,10 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
     }
 
     /// <summary>
-    /// Runs the single comp shader as a Skia runtime effect when it has no per-pixel block and
-    /// translates, which is what moves the comp pass off the CPU interpreter. It returns
-    /// <see langword="false"/> so the caller keeps the interpreter whenever anything is unsupported.
+    /// Runs the single comp shader as a Skia runtime effect when it translates, which is what moves
+    /// the comp pass off the CPU interpreter. Its own per-pixel block is emitted into the same
+    /// effect. It returns <see langword="false"/> so the caller keeps the interpreter whenever
+    /// anything is unsupported.
     /// </summary>
     /// <param name="width">Frame width.</param>
     /// <param name="height">Frame height.</param>
@@ -1385,13 +1376,15 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
     {
         if (!UseSkiaPasses)
             return false;
-        if (_compShaders.Count != 1 || !_compShaders[0].Shader.PerPixel.IsEmpty)
+        if (_compShaders.Count != 1)
             return false;
 
         if (!_skiaCompTried)
         {
             _skiaCompTried = true;
-            _skiaComp = SkiaShaderRunner.CompPass.TryCreate(_compShaders[0].Shader.Program, _textures, out var error);
+            var shader = _compShaders[0].Shader;
+            var perPixel = shader.PerPixel.IsEmpty ? null : shader.PerPixel;
+            _skiaComp = SkiaShaderRunner.CompPass.TryCreate(shader.Program, perPixel, _textures, out var error);
             if (_skiaComp is not null)
                 _skiaComp.GpuBlur = true;
             else
@@ -1412,7 +1405,7 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
 
             // The blur levels are built on the GPU from sampler_main, so the renderer only has to
             // supply the frame copies.
-            _skiaComp.Render(_fresh, width, height, sources, BuildSkiaScalars(), BuildSkiaVectors());
+            _skiaComp.Render(_fresh, width, height, sources, BuildSkiaScalars(_skiaComp.PerPixelUniforms), BuildSkiaVectors());
             return true;
         }
         catch (Exception exception)
@@ -1425,8 +1418,9 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
     }
 
     /// <summary>Collects the scalar uniforms the shader reads from the seeded slots.</summary>
+    /// <param name="perPixelVariables">Per-pixel variables to seed under their emitted names, or <see langword="null"/>.</param>
     /// <returns>The scalar uniforms.</returns>
-    private Dictionary<string, float> BuildSkiaScalars()
+    private Dictionary<string, float> BuildSkiaScalars(IReadOnlyList<string>? perPixelVariables = null)
     {
         var scalars = new Dictionary<string, float>(StringComparer.Ordinal);
         var layout = Preset.Layout;
@@ -1438,6 +1432,16 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
             var slot = layout.IndexOf(name);
             if (slot >= 0 && slot < _slots.Length)
                 scalars[name] = _slots[slot];
+        }
+
+        if (perPixelVariables is not null)
+        {
+            foreach (var name in perPixelVariables)
+            {
+                var slot = layout.IndexOf(name);
+                scalars[PresetExpressionTranspiler.UniformName(name)] =
+                    slot >= 0 && slot < _slots.Length ? _slots[slot] : 0f;
+            }
         }
 
         return scalars;

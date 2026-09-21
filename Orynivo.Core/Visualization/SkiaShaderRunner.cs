@@ -838,6 +838,7 @@ public static class SkiaShaderRunner
     {
         private readonly SKRuntimeEffect _effect;
         private readonly IReadOnlyList<string> _samplers;
+        private readonly IReadOnlyList<string> _perPixelUniforms;
         private readonly SKRuntimeEffect? _blurEffect;
         private readonly Dictionary<string, SKShader> _static = new(StringComparer.Ordinal);
         private readonly List<SKBitmap> _bitmaps = [];
@@ -846,11 +847,17 @@ public static class SkiaShaderRunner
         /// <summary>Creates the pass.</summary>
         /// <param name="effect">Runtime effect to draw with.</param>
         /// <param name="samplers">Samplers the effect declares.</param>
+        /// <param name="perPixelUniforms">Preset variables the per-pixel block reads.</param>
         /// <param name="textures">Texture bank for the static noise and volume samplers.</param>
-        private CompPass(SKRuntimeEffect effect, IReadOnlyList<string> samplers, VisualizerTextureBank textures)
+        private CompPass(
+            SKRuntimeEffect effect,
+            IReadOnlyList<string> samplers,
+            IReadOnlyList<string> perPixelUniforms,
+            VisualizerTextureBank textures)
         {
             _effect = effect;
             _samplers = samplers;
+            _perPixelUniforms = perPixelUniforms;
             _blurEffect = SKRuntimeEffect.CreateShader(BlurSkSL, out _);
 
             foreach (var name in samplers)
@@ -880,6 +887,9 @@ public static class SkiaShaderRunner
         /// <summary>Gets the samplers the effect declares.</summary>
         public IReadOnlyList<string> Samplers => _samplers;
 
+        /// <summary>Gets the preset variables the per-pixel block reads, which the caller has to seed.</summary>
+        public IReadOnlyList<string> PerPixelUniforms => _perPixelUniforms;
+
         /// <summary>
         /// Gets or sets a value indicating whether the blur levels are built on the GPU as a chain of
         /// box-blur passes over the composited frame instead of being supplied as pre-blurred frames.
@@ -908,14 +918,19 @@ public static class SkiaShaderRunner
 
         /// <summary>Compiles a comp shader, or reports why it cannot run on the GPU.</summary>
         /// <param name="program">Parsed comp shader body.</param>
+        /// <param name="perPixel">Per-pixel expression block that runs alongside the shader, or <see langword="null"/>.</param>
         /// <param name="textures">Texture bank for the noise and volume samplers.</param>
         /// <param name="error">Failure reason, or <see langword="null"/> on success.</param>
         /// <returns>The pass, or <see langword="null"/> when the shader stays on the CPU.</returns>
-        public static CompPass? TryCreate(ShaderNode program, VisualizerTextureBank textures, out string? error)
+        public static CompPass? TryCreate(
+            ShaderNode program,
+            PresetProgram? perPixel,
+            VisualizerTextureBank textures,
+            out string? error)
         {
             try
             {
-                var sksl = ShaderTranspiler.Transpile(program, out var samplers);
+                var sksl = ShaderTranspiler.TranspileComp(program, perPixel, out var samplers, out var perPixelUniforms);
                 var effect = SKRuntimeEffect.CreateShader(sksl, out var errors);
                 if (effect is null)
                 {
@@ -924,7 +939,7 @@ public static class SkiaShaderRunner
                 }
 
                 error = null;
-                return new CompPass(effect, samplers, textures);
+                return new CompPass(effect, samplers, perPixelUniforms, textures);
             }
             catch (PresetExpressionException exception)
             {
@@ -1016,6 +1031,15 @@ public static class SkiaShaderRunner
 
                 uniforms["texsize"] = TexSize(width, height);
                 SetSamplerSizes(uniforms, width, height);
+
+                // Every declared uniform has to be set, so the per-pixel variables default to zero
+                // and the caller fills in the slots it knows.
+                foreach (var name in _perPixelUniforms)
+                {
+                    var emitted = PresetExpressionTranspiler.UniformName(name);
+                    uniforms[emitted] = scalars.TryGetValue(emitted, out var value) ? value : 0f;
+                }
+
                 foreach (var (name, value) in scalars)
                     uniforms[name] = value;
                 foreach (var (name, value) in vectors)

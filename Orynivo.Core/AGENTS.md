@@ -98,7 +98,8 @@ This file applies to `Orynivo.Core/` and supplements `../AGENTS.md`.
   reads an undeclared variable as a zero constant the way the interpreter does, gives a written
   uniform a writable copy in main, and renames a name SkSL reserves. `SkiaShaderRunner` must bind a
   child shader for every sampler `Transpile` reports, and the CPU/GPU comparison tests must keep
-  passing. Its `CompPass` runs a comp shader without a per-pixel block as a runtime effect over the
+  passing. Its `CompPass` runs a comp shader, with its own per-pixel block emitted into the same
+  effect, as a runtime effect over the
   renderer's frames; it binds the composited frame, its blur levels, and the previous frame per
   sampler and scales each sampler by its own `texsize_*`, and `PresetRenderer.UseSkiaPasses` gates
   it because the eight-bit Skia surface differs from the float interpreter by up to one level. Keep

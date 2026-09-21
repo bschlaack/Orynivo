@@ -721,8 +721,11 @@ affordable. This is a project of its own and must keep the CPU path as the fallb
   motion recording, and a per-pixel program whose written values are assigned before they are read;
   against the same sample 249 of the 315 global blocks qualify and all 249 translate and are accepted
   by Skia. Anything else keeps the interpreter. The two emitters share the `SkSL` naming and type
-  helpers. What remains is the comp shader's own per-pixel block and the warp shader's per-frame
-  block.
+  helpers. The comp shader's own per-pixel block is emitted into the comp effect too
+  (`ShaderTranspiler.TranspileComp`), so the comp pass no longer requires it to be empty; it has no
+  effect on a compiled shader, so the picture is unchanged. What remains is the warp shader's
+  `per_frame` block, which is deferred because its writes carry into the next pixel's global
+  per-pixel block and need a disjointness check.
   The comp pass binds the composited frame, its blur levels, and the previous frame per sampler, and
   scales each sampler by its own `texsize_*`, so the noise textures are sampled at their real size.
   It stays opt-in because the Skia path carries the frame through eight-bit textures and differs

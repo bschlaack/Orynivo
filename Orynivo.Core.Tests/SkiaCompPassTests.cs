@@ -28,6 +28,25 @@ public sealed class SkiaCompPassTests
         Assert.Contains(gpu, value => value > 0.1f);
     }
 
+    /// <summary>A comp shader with a per-pixel block runs on the Skia path and matches the interpreter.</summary>
+    [Fact]
+    public void RenderFrame_SkiaCompPassMatchesTheInterpreterWithAPerPixelBlock()
+    {
+        const string Preset =
+            "fDecay=1\nwave_a=0\n" +
+            "comp_1_per_pixel=num = rad * 0.5; q1 = num + bass;\n" +
+            "comp_1=float4 main(float2 uv : TEXCOORD0) : COLOR { ret = float3(uv.x, uv.y, 0.5); }";
+
+        var cpu = Render(Preset, skia: false);
+        var gpu = Render(Preset, skia: true);
+
+        // A non-zero difference proves the Skia pass actually ran with the block; the bound keeps it
+        // to the eight-bit quantisation instead of a wrong picture.
+        var difference = MeanAbsoluteDifference(cpu, gpu);
+        Assert.InRange(difference, 0.0002f, 0.002f);
+        Assert.Contains(gpu, value => value > 0.1f);
+    }
+
     /// <summary>The Skia pass resolves the noise sampler the way the interpreter does.</summary>
     [Fact]
     public void RenderFrame_SkiaCompPassResolvesTheNoiseSampler()

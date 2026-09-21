@@ -7,6 +7,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Added
+- Moved the comp shader's own per-pixel expression block onto the GPU. `ShaderTranspiler.TranspileComp`
+  emits `comp_N_per_pixel` into the same runtime effect as the comp shader, seeding its `x`, `y`,
+  `rad`, and `ang` from the pixel position, and `SkiaShaderRunner.CompPass` seeds the block's
+  uniforms. `PresetRenderer` no longer requires the block to be empty, so a comp shader with a
+  per-pixel block runs on the Skia path; a block that cannot be emitted still keeps the interpreter.
+  The block has no effect on a compiled (straight-line) shader, which is the reference the Skia path
+  uses, so the picture is unchanged.
 - Emitted the preset per-pixel expression block as SkSL so the warp stage can run on the GPU without
   the per-pixel-block condition. `PresetCompiler` now parses a block once into a `PresetSyntaxNode`
   tree that both the LINQ interpreter back end and the new `PresetExpressionTranspiler` consume, so
