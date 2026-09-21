@@ -38,6 +38,17 @@ public static class SkiaShaderRunner
         using var sourceShader = sourceBitmap.ToShader(SKShaderTileMode.Clamp, SKShaderTileMode.Clamp);
 
         var effectUniforms = new SKRuntimeEffectUniforms(effect);
+
+        // Skia requires every declared uniform to be set, so the whole shader vocabulary starts at
+        // zero and the caller plus the frame size fill in what they know.
+        foreach (var (name, count) in ShaderTranspiler.UniformComponents)
+        {
+            if (count == 1)
+                effectUniforms[name] = 0f;
+            else
+                effectUniforms[name] = new float[count];
+        }
+
         effectUniforms["texsize"] = new float[] { width, height };
         if (uniforms is not null)
         {

@@ -19,6 +19,76 @@ public static class ShaderTranspiler
     /// </summary>
     private const int MaxTranslatedIterations = 32;
 
+    /// <summary>
+    /// Every uniform the prelude declares, with its component count. The runner seeds all of them,
+    /// because Skia requires each declared uniform to be set, and the shader vocabulary of Milkdrop
+    /// includes variables the engine has to supply: the 32 <c>q</c> and 8 <c>t</c> slots, and the
+    /// texture size of each sampler, which shaders read as <c>texsize_noise_lq.zw</c>.
+    /// </summary>
+    public static IReadOnlyDictionary<string, int> UniformComponents { get; } = BuildUniformComponents();
+
+    /// <summary>The uniforms the literal prelude already spells out.</summary>
+    private static readonly HashSet<string> LiteralUniforms = new(StringComparer.Ordinal)
+    {
+        "texsize", "time", "frame", "fps", "bass", "mid", "treb", "vol",
+        "bass_att", "mid_att", "treb_att", "aspect", "rand_frame"
+    };
+
+    /// <summary>Builds the uniform table.</summary>
+    /// <returns>The uniform names with their component counts.</returns>
+    private static Dictionary<string, int> BuildUniformComponents()
+    {
+        var uniforms = new Dictionary<string, int>(StringComparer.Ordinal)
+        {
+            ["texsize"] = 2,
+            ["time"] = 1,
+            ["frame"] = 1,
+            ["fps"] = 1,
+            ["bass"] = 1,
+            ["mid"] = 1,
+            ["treb"] = 1,
+            ["vol"] = 1,
+            ["bass_att"] = 1,
+            ["mid_att"] = 1,
+            ["treb_att"] = 1,
+            ["aspect"] = 2,
+            ["rand_frame"] = 4
+        };
+        foreach (var name in new[]
+        {
+            "texsize_main", "texsize_fc_main", "texsize_pc_main",
+            "texsize_noise_lq", "texsize_noise_mq", "texsize_noise_hq",
+            "texsize_noisevol_lq", "texsize_noisevol_hq"
+        })
+        {
+            uniforms[name] = 4;
+        }
+
+        for (var index = 1; index <= 32; index++)
+            uniforms["q" + index.ToString(CultureInfo.InvariantCulture)] = 1;
+        for (var index = 1; index <= 8; index++)
+            uniforms["t" + index.ToString(CultureInfo.InvariantCulture)] = 1;
+        return uniforms;
+    }
+
+    /// <summary>Emits the uniform declarations the literal prelude does not carry.</summary>
+    /// <returns>The generated declarations.</returns>
+    private static string GeneratedUniforms()
+    {
+        var builder = new StringBuilder();
+        foreach (var (name, count) in UniformComponents)
+        {
+            if (LiteralUniforms.Contains(name))
+                continue;
+
+            builder.Append("uniform ")
+                .Append(count switch { 2 => "float2", 4 => "float4", _ => "float" })
+                .Append(' ').Append(name).Append(";\n");
+        }
+
+        return builder.ToString();
+    }
+
     /// <summary>The sampler a shader reads when it does not name one.</summary>
     private const string MainSampler = "sampler_main";
 
@@ -77,7 +147,7 @@ public static class ShaderTranspiler
     {
         ArgumentNullException.ThrowIfNull(program);
         var builder = new StringBuilder();
-        builder.Append(Prelude).Append('\n');
+        builder.Append(Prelude).Append(GeneratedUniforms()).Append('\n');
         builder.Append("half4 main(float2 fragCoord) {\n");
         builder.Append("    float2 uv_orig = fragCoord / texsize;\n");
         builder.Append("    float2 uv = uv_orig;\n");
