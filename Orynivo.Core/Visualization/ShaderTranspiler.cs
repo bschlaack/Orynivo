@@ -313,16 +313,8 @@ public static class ShaderTranspiler
     private static string EmitInitializer(string type, ShaderNode expression)
     {
         var mapped = MapType(type);
-        if (expression.Kind == ShaderNodeKind.Literal)
-        {
-            if (mapped is "int" or "uint" or "bool")
-                return ((int)expression.Number).ToString(CultureInfo.InvariantCulture);
-
-            if (IsVectorType(mapped))
-                return $"{mapped}({EmitExpression(expression)})";
-        }
-
-        return EmitExpression(expression);
+        var text = EmitExpression(expression);
+        return Convert(text, TypeOf(expression), mapped);
     }
 
     /// <summary>Reports whether a type name is a vector or matrix with more than one component.</summary>
@@ -376,16 +368,117 @@ public static class ShaderTranspiler
         ShaderNodeKind.Identifier => _types is not null && _types.TryGetValue(expression.Text, out var declared)
             ? declared
             : null,
-        ShaderNodeKind.Member => expression.Text.Length switch
-        {
-            1 => "float",
-            2 => "float2",
-            3 => "float3",
-            _ => "float4"
-        },
-        ShaderNodeKind.Call => IsVectorConstructor(expression.Text) ? MapType(expression.Text) : null,
+        ShaderNodeKind.Member => ComponentType(expression.Text.Length),
+        ShaderNodeKind.Call => CallType(expression),
+        ShaderNodeKind.Unary => TypeOf(expression.Left!),
+        ShaderNodeKind.Index => "float",
+        ShaderNodeKind.Ternary => Wider(TypeOf(expression.Right!), TypeOf(expression.Third!)),
+        ShaderNodeKind.Binary => BinaryType(expression),
         _ => null
     };
+
+    /// <summary>The type name for a component count.</summary>
+    /// <param name="count">Component count.</param>
+    /// <returns>The SkSL type name.</returns>
+    private static string ComponentType(int count) => count switch
+    {
+        <= 1 => "float",
+        2 => "float2",
+        3 => "float3",
+        _ => "float4"
+    };
+
+    /// <summary>Returns the wider of two types, or nothing when either is unknown.</summary>
+    /// <param name="left">First type.</param>
+    /// <param name="right">Second type.</param>
+    /// <returns>The wider type name, or <see langword="null"/>.</returns>
+    private static string? Wider(string? left, string? right)
+    {
+        if (left is null || right is null)
+            return null;
+
+        return ComponentCount(left) >= ComponentCount(right) ? left : right;
+    }
+
+    /// <summary>Counts the components of a mapped type name.</summary>
+    /// <param name="type">Type name.</param>
+    /// <returns>The component count.</returns>
+    private static int ComponentCount(string type)
+    {
+        foreach (var character in type)
+        {
+            if (character is '2' or '3' or '4')
+                return character - '0';
+        }
+
+        return 1;
+    }
+
+    /// <summary>Infers the type a call produces.</summary>
+    /// <param name="call">Call node.</param>
+    /// <returns>The type name, or <see langword="null"/>.</returns>
+    private static string? CallType(ShaderNode call)
+    {
+        switch (call.Text.ToLowerInvariant())
+        {
+            case "tex2d":
+            case "tex3d":
+                return "float4";
+            case "getpixel":
+            case "getblur1":
+            case "getblur2":
+            case "getblur3":
+                return "float3";
+            case "length":
+            case "dot":
+            case "lum":
+                return "float";
+        }
+
+        if (IsVectorConstructor(call.Text))
+            return MapType(call.Text);
+
+        // An intrinsic keeps the widest component count of its arguments, which is how pow(float3, …)
+        // and max(float3, …) behave.
+        string? widest = null;
+        foreach (var argument in call.Items)
+            widest = Wider(widest, TypeOf(argument));
+        return widest;
+    }
+
+    /// <summary>Infers the type of a binary expression.</summary>
+    /// <param name="expression">Binary node.</param>
+    /// <returns>The type name, or <see langword="null"/>.</returns>
+    private static string? BinaryType(ShaderNode expression) => expression.Text switch
+    {
+        "=" or "+=" or "-=" or "*=" or "/=" => TypeOf(expression.Left!),
+        "<" or ">" or "<=" or ">=" or "==" or "!=" or "&&" or "||" => "float",
+        _ => Wider(TypeOf(expression.Left!), TypeOf(expression.Right!))
+    };
+
+    /// <summary>
+    /// Converts an expression to a target type. SkSL has no implicit conversion between a scalar and
+    /// a vector, so a value is widened with a constructor or narrowed with a swizzle; an unknown type
+    /// is left alone rather than guessed at.
+    /// </summary>
+    /// <param name="text">Expression text.</param>
+    /// <param name="from">Its inferred type, or nothing.</param>
+    /// <param name="to">The type it has to become.</param>
+    /// <returns>The converted text.</returns>
+    private static string Convert(string text, string? from, string to)
+    {
+        if (from is null || from == to)
+            return text;
+
+        var source = ComponentCount(from);
+        var target = ComponentCount(to);
+        if (source == target)
+            return text;
+        if (target > source)
+            return $"{to}({text})";
+
+        return $"{text}.{"xyzw"[..target]}";
+    }
 
     /// <summary>
     /// Emits an assignment, converting between a scalar and a vector where the engine would allow it
@@ -404,14 +497,8 @@ public static class ShaderTranspiler
                 ? declared
                 : null;
         var valueType = expression.Right is null ? null : TypeOf(expression.Right);
-
-        if (targetType is not null && valueType is not null && targetType != valueType)
-        {
-            if (IsVectorType(targetType) && !IsVectorType(valueType))
-                return $"{left} = {targetType}({right})";
-            if (!IsVectorType(targetType) && IsVectorType(valueType))
-                return $"{left} = {right}.x";
-        }
+        if (targetType is not null && expression.Right is not null)
+            right = Convert(right, valueType, targetType);
 
         return $"{left} = {right}";
     }
@@ -570,8 +657,10 @@ public static class ShaderTranspiler
 
         return type switch
         {
-            "half" => "float",
-            "double" => "float",
+            "half" or "half1" => "float",
+            "double" or "double1" => "float",
+            "float1" => "float",
+            "int" or "int1" or "uint" or "uint1" or "bool" or "bool1" => "float",
             "sampler" or "sampler2D" or "sampler3D" or "texture" => "shader",
             _ => type
         };
