@@ -56,9 +56,15 @@ This file applies to `Orynivo.Core/` and supplements `../AGENTS.md`.
   parse is skipped, never fatal. `VisualizerPreset.ParseSections` splits a `.milk` file at its
   `[presetNN]` headers, so a file that holds several presets yields several presets; the declared
   format version is reported but never gates loading, because Milkdrop versions its presets and
-  every version must stay usable. `PresetRenderer` implements `IShaderSampler` and enforces
-  `ShaderTimeBudgetMilliseconds`: when a frame exceeds the budget the shaders, being the optional
-  the periodic retry, so a heavy preset degrades instead of stalling playback. The interpreter
+  every version must stay usable.   `PresetRenderer` implements `IShaderSampler` and enforces
+  `ShaderTimeBudgetMilliseconds`: the shaders never stop running, they lose resolution. Both the
+  warp shader and the comp shader run on the grid `ShaderGrid` returns and are scaled back over the
+  frame; `AdaptShaderGrid` moves the grid's pixel target between `ShaderPixelFloor` and
+  `ShaderPixelBudget` from the measured shader cost, so a preset that overruns settles at a coarse
+  but visible picture. Never reintroduce a mechanism that switches the shaders off for a frame, and
+  never let the budget compare the whole frame against the shader threshold: that combination is
+  what made a real preset collection render nothing but the shared overlay. `ShaderGridReduced`
+  reports the reduced grid for diagnostics. The interpreter
   walks the tree per pixel, which is the known cost limit; a JIT compiler for shaders is the
   documented follow-up if the CPU cost proves too high.
   `PresetRenderer.Timings` and `AverageTimings` carry the `RenderTimings` breakdown per frame and

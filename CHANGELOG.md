@@ -7,6 +7,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Fixed
+- Fixed the visualizer dropping a preset's shaders whenever the frame exceeded the time budget,
+  which left most of a real collection showing nothing but the shared overlay. A shader that costs
+  too much now loses grid resolution instead of being switched off: the warp shader runs on the
+  same bounded grid as the comp pass and is scaled back over the frame, and the grid size is
+  adapted from the measured shader cost, shrinking towards a floor when a shader overruns and
+  growing back while there is headroom. Measured on real presets at 480 x 270, the warp stage fell
+  from 83-218 ms to 7-27 ms and a frame from 106-233 ms to 19-35 ms, so the collection renders at
+  roughly the configured frame rate with its shaders intact. Covered by tests.
 - Fixed the visualizer frame throwing `IndexOutOfRangeException` as soon as a preset carried a
   shader the compiler leaves to the interpreter, which is the common case because branches and
   loops stay interpreted. The per-frame variable seeding indexed every shader's frame-variable

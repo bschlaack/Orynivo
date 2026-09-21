@@ -43,7 +43,6 @@ public sealed class PresetShaderDialectTests
 
         renderer.RenderFrame(new Silent(), 1d / 60d);
 
-        Assert.False(renderer.ShadersSkipped);
         Assert.True(renderer.LastShaderMilliseconds > 0d);
     }
 
@@ -108,6 +107,29 @@ public sealed class PresetShaderDialectTests
 
         var section = Assert.Single(sections);
         Assert.Contains("fDecay", section, StringComparison.Ordinal);
+    }
+
+    /// <summary>A shader too slow for the budget loses grid resolution instead of being dropped.</summary>
+    [Fact]
+    public void RenderFrame_ReducesTheShaderGridInsteadOfDroppingTheShader()
+    {
+        var preset = VisualizerPreset.Parse("""
+            PSVERSION_WARP=2
+            warp_1=`shader_body
+            warp_2=`{
+            warp_3=`    float3 c = tex2D(sampler_main, uv).rgb;
+            warp_4=`    return float4(c * 1.01, 1);
+            warp_5=`}
+            """);
+        var renderer = new PresetRenderer(preset, 64, 36) { ShaderTimeBudgetMilliseconds = 0.001d };
+
+        for (var frame = 0; frame < 4; frame++)
+            renderer.RenderFrame(new Silent(), 1d / 60d);
+
+        // The shader keeps running at a coarser grid; dropping it entirely is what used to leave a
+        // real preset showing nothing but the shared overlay.
+        Assert.True(renderer.ShaderGridReduced);
+        Assert.True(renderer.LastShaderMilliseconds > 0d);
     }
 
     /// <summary>An audio source that reports silence.</summary>

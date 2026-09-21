@@ -115,7 +115,7 @@ public sealed class VisualizerShaderTests
         renderer.RenderFrame(new SilentAudio(), 1d / 60d);
 
         Assert.True(renderer.HasShaders);
-        Assert.False(renderer.ShadersSkipped);
+        Assert.True(renderer.LastShaderMilliseconds > 0d);
     }
 
     /// <summary>The blur and pixel intrinsics resolve against the frame buffers.</summary>
@@ -135,26 +135,27 @@ public sealed class VisualizerShaderTests
 
         renderer.RenderFrame(new SilentAudio(), 1d / 60d);
 
-        Assert.False(renderer.ShadersSkipped);
+        Assert.True(renderer.LastShaderMilliseconds > 0d);
         Assert.Equal(1f, renderer.Output.Pixels[3], 3);
     }
 
-    /// <summary>Shaders that exceed the budget are skipped until the periodic retry.</summary>
+    /// <summary>A shader that cannot meet the budget keeps running on a coarser grid.</summary>
     [Fact]
-    public void RenderFrame_SkipsShadersOverBudget()
+    public void RenderFrame_KeepsShadersOverBudgetAtACoarserGrid()
     {
         var preset = VisualizerPreset.Parse($"decay=1\nwarp_1={WarpShader}");
-        var renderer = new PresetRenderer(preset, 8, 8)
+        var renderer = new PresetRenderer(preset, 64, 36)
         {
             ShaderTimeBudgetMilliseconds = 0d
         };
 
         renderer.RenderFrame(new SilentAudio(), 1d / 60d);
-        Assert.True(renderer.ShadersSkipped);
-
-        // The skipped frame still renders, just without the shader.
         renderer.RenderFrame(new SilentAudio(), 1d / 60d);
-        Assert.True(renderer.ShadersSkipped);
+
+        // Dropping the shader is what used to leave a real preset showing only the shared overlay,
+        // so an over-budget shader loses resolution and keeps drawing.
+        Assert.True(renderer.ShaderGridReduced);
+        Assert.True(renderer.LastShaderMilliseconds > 0d);
         Assert.Equal(0.5f, renderer.Output.Pixels[1], 3);
     }
 

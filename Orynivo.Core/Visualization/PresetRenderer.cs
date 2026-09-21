@@ -42,6 +42,8 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler
     private readonly PixelBuffer _frameCopy;
     private readonly PixelBuffer _blurred;
     private readonly Stopwatch _shaderClock = new();
+    private readonly Stopwatch _warpShaderClock = new();
+    private double _warpShaderMilliseconds;
     private readonly Stopwatch _clock = new();
     private double _mark;
     private double _sumWarp;
@@ -56,15 +58,26 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler
     private readonly List<(ShaderInterpreter Interpreter, VisualizerShader Shader)> _compShaders = [];
     private readonly List<CompiledShader> _compiledWarp = [];
     private readonly List<CompiledShader> _compiledComp = [];
-    private bool _shadersSkipped;
-    private int _framesSinceSkip;
+    private bool _shaderGridReduced;
     private int _blurLevel;
     /// <summary>
-    /// Upper bound on the pixels a comp shader pass may cost. The pass runs on a grid at or below
-    /// this size and is scaled back up, because a per-pixel shader on the CPU cannot afford the
-    /// full frame at a high resolution.
+    /// Upper bound on the pixels a shader pass may cost. Both the warp and the comp shader run on
+    /// a grid at or below this size and are scaled back up, because a per-pixel shader on the CPU
+    /// cannot afford the full frame at a high resolution.
     /// </summary>
     private const int ShaderPixelBudget = 10_000;
+
+    /// <summary>
+    /// Lower bound on the shader grid. The grid shrinks towards this when a shader is too slow, so
+    /// a heavy preset degrades to a coarse picture instead of losing its shaders completely.
+    /// </summary>
+    private const int ShaderPixelFloor = 1_024;
+
+    /// <summary>Pixels the shader grid currently aims for, adapted from the measured shader cost.</summary>
+    private int _shaderPixelTarget = ShaderPixelBudget;
+
+    /// <summary>Pixels the shader grid used on the last frame that ran shaders.</summary>
+    private int _shaderPixelsUsed;
 
     private readonly VisualizerTextureBank _textures = new();
     private readonly float[] _randFrame = new float[4];
@@ -219,8 +232,11 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler
         AverageTimings = Timings;
     }
 
-    /// <summary>Gets a value indicating whether the shaders are currently being skipped.</summary>
-    public bool ShadersSkipped => _shadersSkipped;
+    /// <summary>
+    /// Gets a value indicating whether the shader grid is below its full size because the shaders
+    /// were too slow. The shaders keep running either way; only their resolution drops.
+    /// </summary>
+    public bool ShaderGridReduced => _shaderGridReduced;
 
     /// <summary>The motion variables a per-pixel program may change for the following pixel.</summary>
     private static readonly string[] MotionVariables =
@@ -294,7 +310,7 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler
             wave.PerFrame.Execute(_slots);
 
         var decay = Math.Clamp(Read("decay", Preset.Decay), 0f, 1f);
-        var useShaders = BeginShaderFrame();
+        var useShaders = HasShaders;
         if (useShaders)
             SeedCompiledShaderFrame();
         Warp(useShaders);
@@ -325,10 +341,10 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler
             shader = _shaderClock.Elapsed.TotalMilliseconds;
         }
 
-        LastShaderMilliseconds = shader;
+        LastShaderMilliseconds = shader + _warpShaderMilliseconds;
         _previous.CopyFrom(_fresh);
         _frame++;
-        RecordTimings(warp, blur, postProcess, overlay, composite, shader);
+        RecordTimings(warp, blur, postProcess, overlay, composite, LastShaderMilliseconds);
     }
 
     /// <summary>
@@ -362,8 +378,9 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler
         _frameCopy.Clear();
         _blurred.Clear();
         _blurLevel = 0;
-        _shadersSkipped = false;
-        _framesSinceSkip = 0;
+        _shaderPixelTarget = ShaderPixelBudget;
+        _shaderPixelsUsed = 0;
+        _shaderGridReduced = false;
         Array.Clear(_slots);
         _audio = null;
         _initialized = false;
@@ -513,6 +530,72 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler
 
         var perPixelMotion = _perPixelWritesMotion && !recordMotion;
 
+        // Centre, stretch, rotate, and zoom the sampling position of one point. A preset that
+        // changes one of these inside per_pixel sees the change here, on the next point, the way
+        // Milkdrop does it. Both the per-pixel fill and the shader grid go through this, so the
+        // two paths cannot drift apart.
+        void ComputeSample(float[] slots, float normalizedX, float normalizedY, out float sampleX, out float sampleY)
+        {
+            var zoomNow = zoom;
+            var zoomExpNow = zoomExp;
+            var cosNow = cosRotation;
+            var sinNow = sinRotation;
+            var centreXNow = centreX;
+            var centreYNow = centreY;
+            var offsetXNow = offsetX;
+            var offsetYNow = offsetY;
+            var stretchXNow = stretchX;
+            var stretchYNow = stretchY;
+            if (perPixelMotion)
+            {
+                zoomNow = Math.Max(0.01f, Read(slots, _slotZoom, zoom));
+                zoomExpNow = Read(slots, _slotZoomExp, zoomExp);
+                var rotationNow = Read(slots, _slotRot, rotation);
+                cosNow = MathF.Cos(rotationNow);
+                sinNow = MathF.Sin(rotationNow);
+                centreXNow = Read(slots, _slotCx, centreX);
+                centreYNow = Read(slots, _slotCy, centreY);
+                offsetXNow = Read(slots, _slotDx, offsetX);
+                offsetYNow = Read(slots, _slotDy, offsetY);
+                stretchXNow = Read(slots, _slotSx, stretchX);
+                stretchYNow = Read(slots, _slotSy, stretchY);
+            }
+
+            var warpedX = (normalizedX - centreXNow) * stretchXNow;
+            var warpedY = (normalizedY - centreYNow) * stretchYNow;
+            var rotatedX = (warpedX * cosNow) - (warpedY * sinNow);
+            var rotatedY = (warpedX * sinNow) + (warpedY * cosNow);
+            if (needsRadius || needsAngle)
+            {
+                var radius = MathF.Sqrt((rotatedX * rotatedX) + (rotatedY * rotatedY));
+                var pixelZoom = needsRadius && zoomExpNow != 1f
+                    ? MathF.Pow(zoomNow, 1f + (zoomExpNow * radius * 2f))
+                    : zoomNow;
+                warpedX = (rotatedX * pixelZoom) + centreXNow + offsetXNow;
+                warpedY = (rotatedY * pixelZoom) + centreYNow + offsetYNow;
+                if (needsRadius)
+                    Write(slots, _slotRad, radius);
+                if (needsAngle)
+                    Write(slots, _slotAng, MathF.Atan2(rotatedY, rotatedX));
+            }
+            else
+            {
+                warpedX = (rotatedX * zoomNow) + centreXNow + offsetXNow;
+                warpedY = (rotatedY * zoomNow) + centreYNow + offsetYNow;
+            }
+
+            if (_perPixelUsesX)
+                Write(slots, _slotX, warpedX);
+            if (_perPixelUsesY)
+                Write(slots, _slotY, warpedY);
+            perPixel.Execute(slots);
+
+            sampleX = _perPixelUsesX ? Read(slots, _slotX, warpedX) : warpedX;
+            sampleY = _perPixelUsesY ? Read(slots, _slotY, warpedY) : warpedY;
+            if (recordMotion)
+                RecordMotion(normalizedX, normalizedY, sampleX, sampleY);
+        }
+
         void WarpRows(int worker, int from, int to)
         {
             // The span is taken inside the body, because a local function cannot capture one.
@@ -527,79 +610,9 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler
                 for (var x = 0; x < width; x++)
                 {
                     var normalizedX = width > 1 ? (x / (float)(width - 1) * 2f) - 1f : 0f;
+                    ComputeSample(slots, normalizedX, normalizedY, out var sampleX, out var sampleY);
 
-                    // Centre, stretch, rotate, and zoom the sampling position. A preset that changes
-                    // one of these inside per_pixel sees the change here, on the next pixel, the way
-                    // Milkdrop does it.
-                    var zoomNow = zoom;
-                    var zoomExpNow = zoomExp;
-                    var cosNow = cosRotation;
-                    var sinNow = sinRotation;
-                    var centreXNow = centreX;
-                    var centreYNow = centreY;
-                    var offsetXNow = offsetX;
-                    var offsetYNow = offsetY;
-                    var stretchXNow = stretchX;
-                    var stretchYNow = stretchY;
-                    if (perPixelMotion)
-                    {
-                        zoomNow = Math.Max(0.01f, Read(slots, _slotZoom, zoom));
-                        zoomExpNow = Read(slots, _slotZoomExp, zoomExp);
-                        var rotationNow = Read(slots, _slotRot, rotation);
-                        cosNow = MathF.Cos(rotationNow);
-                        sinNow = MathF.Sin(rotationNow);
-                        centreXNow = Read(slots, _slotCx, centreX);
-                        centreYNow = Read(slots, _slotCy, centreY);
-                        offsetXNow = Read(slots, _slotDx, offsetX);
-                        offsetYNow = Read(slots, _slotDy, offsetY);
-                        stretchXNow = Read(slots, _slotSx, stretchX);
-                        stretchYNow = Read(slots, _slotSy, stretchY);
-                    }
-
-                    var warpedX = (normalizedX - centreXNow) * stretchXNow;
-                    var warpedY = (normalizedY - centreYNow) * stretchYNow;
-                    var rotatedX = (warpedX * cosNow) - (warpedY * sinNow);
-                    var rotatedY = (warpedX * sinNow) + (warpedY * cosNow);
-                    if (needsRadius || needsAngle)
-                    {
-                        var radius = MathF.Sqrt((rotatedX * rotatedX) + (rotatedY * rotatedY));
-                        var pixelZoom = needsRadius && zoomExpNow != 1f
-                            ? MathF.Pow(zoomNow, 1f + (zoomExpNow * radius * 2f))
-                            : zoomNow;
-                        warpedX = (rotatedX * pixelZoom) + centreXNow + offsetXNow;
-                        warpedY = (rotatedY * pixelZoom) + centreYNow + offsetYNow;
-                        if (needsRadius)
-                            Write(slots, _slotRad, radius);
-                        if (needsAngle)
-                            Write(slots, _slotAng, MathF.Atan2(rotatedY, rotatedX));
-                    }
-                    else
-                    {
-                    warpedX = (rotatedX * zoomNow) + centreXNow + offsetXNow;
-                    warpedY = (rotatedY * zoomNow) + centreYNow + offsetYNow;
-                    }
-
-                    if (_perPixelUsesX)
-                        Write(slots, _slotX, warpedX);
-                    if (_perPixelUsesY)
-                        Write(slots, _slotY, warpedY);
-                    perPixel.Execute(slots);
-
-                    var sampleX = _perPixelUsesX ? Read(slots, _slotX, warpedX) : warpedX;
-                    var sampleY = _perPixelUsesY ? Read(slots, _slotY, warpedY) : warpedY;
-                    if (recordMotion)
-                        RecordMotion(normalizedX, normalizedY, sampleX, sampleY);
-
-                    var sampleU = (sampleX * 0.5f) + 0.5f;
-                    var sampleV = (sampleY * 0.5f) + 0.5f;
-                    if (useShaders)
-                    {
-                        RunWarpShaders(sampleU, sampleV, (normalizedX * 0.5f) + 0.5f, (normalizedY * 0.5f) + 0.5f);
-                    }
-                    else
-                    {
-                        _previous.SampleBilinear(sampleU, sampleV, sample);
-                    }
+                    _previous.SampleBilinear((sampleX * 0.5f) + 0.5f, (sampleY * 0.5f) + 0.5f, sample);
 
                     var offset = (((y * width) + x) * 4);
                     target[offset] = sample[0];
@@ -610,7 +623,20 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler
             }
         }
 
-        if (ParallelismEnabled && _canParallelizeWarp && !useShaders && !recordMotion)
+        if (useShaders && _warpShaders.Count > 0)
+        {
+            // A warp shader is a per-pixel program, which the CPU cannot afford over a full frame
+            // at a useful resolution. It runs on the same bounded grid as the comp pass and is
+            // scaled back up, so the preset keeps its picture instead of losing the shader.
+            _warpShaderClock.Restart();
+            WarpShaderGrid(ComputeSample, width, height);
+            _warpShaderClock.Stop();
+            _warpShaderMilliseconds = _warpShaderClock.Elapsed.TotalMilliseconds;
+            return;
+        }
+
+        _warpShaderMilliseconds = 0d;
+        if (ParallelismEnabled && _canParallelizeWarp && !recordMotion)
         {
             // Each worker starts from the per-frame values, so a per-pixel program sees the same
             // frame variables it would on a single thread.
@@ -624,23 +650,135 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler
         }
     }
 
-    /// <summary>Decides whether the shaders run on this frame, honouring the time budget.</summary>
-    /// <returns><see langword="true"/> when the shaders should run.</returns>
-    private bool BeginShaderFrame()
+    /// <summary>Runs the warp shaders on the adaptive grid and scales the result over the frame.</summary>
+    /// <param name="computeSample">Sampling-position evaluator shared with the per-pixel path.</param>
+    /// <param name="width">Frame width.</param>
+    /// <param name="height">Frame height.</param>
+    private void WarpShaderGrid(
+        SamplePosition computeSample,
+        int width,
+        int height)
     {
-        if (!HasShaders)
-            return false;
+        var (gridWidth, gridHeight) = ShaderGrid(width, height);
+        if (_shaderOutput is null || _shaderOutput.Width != gridWidth || _shaderOutput.Height != gridHeight)
+            _shaderOutput = new PixelBuffer(gridWidth, gridHeight);
 
-        if (!_shadersSkipped)
-            return true;
+        var output = _shaderOutput.Pixels;
+        for (var gridY = 0; gridY < gridHeight; gridY++)
+        {
+            var normalizedY = gridHeight > 1 ? (gridY / (float)(gridHeight - 1) * 2f) - 1f : 0f;
+            for (var gridX = 0; gridX < gridWidth; gridX++)
+            {
+                var normalizedX = gridWidth > 1 ? (gridX / (float)(gridWidth - 1) * 2f) - 1f : 0f;
+                computeSample(_slots, normalizedX, normalizedY, out var sampleX, out var sampleY);
+                RunWarpShaders(
+                    (sampleX * 0.5f) + 0.5f,
+                    (sampleY * 0.5f) + 0.5f,
+                    (normalizedX * 0.5f) + 0.5f,
+                    (normalizedY * 0.5f) + 0.5f);
 
-        // Retry periodically so a preset that became affordable is picked up again.
-        if (++_framesSinceSkip < 120)
-            return false;
+                var offset = ((gridY * gridWidth) + gridX) * 4;
+                output[offset] = _sample[0];
+                output[offset + 1] = _sample[1];
+                output[offset + 2] = _sample[2];
+                output[offset + 3] = _sample[3];
+            }
+        }
 
-        _framesSinceSkip = 0;
-        _shadersSkipped = false;
-        return true;
+        ScaleIntoWarped(_shaderOutput, width, height);
+    }
+
+    /// <summary>Scales a shader grid over the warped frame.</summary>
+    /// <param name="source">Grid buffer.</param>
+    /// <param name="width">Frame width.</param>
+    /// <param name="height">Frame height.</param>
+    private void ScaleIntoWarped(PixelBuffer source, int width, int height)
+    {
+        if (source.Width == width && source.Height == height)
+        {
+            _warped.CopyFrom(source);
+            return;
+        }
+
+        // Nearest-neighbour on purpose: a bilinear pass over the whole frame costs more than the
+        // shader it scales, and the shader's own sampling already smoothed the result.
+        var target = _warped.Pixels;
+        var input = source.Pixels;
+        var sourceWidth = source.Width;
+        var sourceHeight = source.Height;
+        for (var y = 0; y < height; y++)
+        {
+            var sourceY = Math.Min(sourceHeight - 1, (int)((y + 0.5f) * sourceHeight / height));
+            var sourceRow = sourceY * sourceWidth;
+            var targetRow = y * width;
+            for (var x = 0; x < width; x++)
+            {
+                var sourceX = (int)((x + 0.5f) * sourceWidth / width);
+                if (sourceX >= sourceWidth)
+                    sourceX = sourceWidth - 1;
+                var sourceOffset = ((sourceRow + sourceX) * 4);
+                var offset = (targetRow + x) * 4;
+                target[offset] = input[sourceOffset];
+                target[offset + 1] = input[sourceOffset + 1];
+                target[offset + 2] = input[sourceOffset + 2];
+                target[offset + 3] = input[sourceOffset + 3];
+            }
+        }
+    }
+
+    /// <summary>Evaluates the sampling position of one point of the warp.</summary>
+    /// <param name="slots">Variable slots of the stage.</param>
+    /// <param name="normalizedX">Horizontal position in the range minus one to one.</param>
+    /// <param name="normalizedY">Vertical position in the range minus one to one.</param>
+    /// <param name="sampleX">Resulting horizontal sampling position.</param>
+    /// <param name="sampleY">Resulting vertical sampling position.</param>
+    private delegate void SamplePosition(float[] slots, float normalizedX, float normalizedY, out float sampleX, out float sampleY);
+
+    /// <summary>
+    /// Computes the grid a shader pass runs on. A frame larger than the current pixel target is
+    /// reduced proportionally, which is how a shader that costs too much loses resolution instead
+    /// of disappearing.
+    /// </summary>
+    /// <param name="width">Frame width.</param>
+    /// <param name="height">Frame height.</param>
+    /// <returns>The grid size, equal to the frame size when no reduction is needed.</returns>
+    private (int Width, int Height) ShaderGrid(int width, int height)
+    {
+        var pixels = (long)width * height;
+        if (pixels <= _shaderPixelTarget)
+        {
+            _shaderPixelsUsed = width * height;
+            return (width, height);
+        }
+
+        var scale = MathF.Sqrt(_shaderPixelTarget / (float)pixels);
+        var gridWidth = Math.Max(1, (int)(width * scale));
+        var gridHeight = Math.Max(1, (int)(height * scale));
+        _shaderPixelsUsed = gridWidth * gridHeight;
+        _shaderGridReduced = true;
+        return (gridWidth, gridHeight);
+    }
+
+    /// <summary>
+    /// Adapts the shader pixel target from the measured shader cost. A shader that overran the
+    /// budget shrinks the grid, one with headroom grows it back, so a heavy preset settles at a
+    /// resolution it can afford and keeps drawing.
+    /// </summary>
+    /// <param name="shaderMilliseconds">Measured shader cost of the frame.</param>
+    private void AdaptShaderGrid(double shaderMilliseconds)
+    {
+        if (_shaderPixelsUsed <= 0 || shaderMilliseconds <= 0d)
+            return;
+
+        if (shaderMilliseconds > ShaderTimeBudgetMilliseconds)
+        {
+            var scaled = _shaderPixelsUsed * (ShaderTimeBudgetMilliseconds / shaderMilliseconds) * 0.9d;
+            _shaderPixelTarget = (int)Math.Clamp(scaled, ShaderPixelFloor, ShaderPixelBudget);
+        }
+        else if (shaderMilliseconds < ShaderTimeBudgetMilliseconds * 0.5d)
+        {
+            _shaderPixelTarget = Math.Min(ShaderPixelBudget, _shaderPixelTarget * 2);
+        }
     }
 
     /// <summary>Returns the milliseconds since the previous mark and moves the mark.</summary>
@@ -688,9 +826,10 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler
             _sumTotal / _timingFrames);
 
         // A frame that costs more than the budget means the optional shader work is what has to
-        // give, so it is skipped until the periodic retry.
-        if (HasShaders && total > ShaderTimeBudgetMilliseconds)
-            _shadersSkipped = true;
+        // give, so it loses resolution rather than being dropped; a preset that never drew its
+        // shader at all is exactly the empty picture a user reported.
+        if (HasShaders)
+            AdaptShaderGrid(shader);
     }
 
     /// <summary>Runs the warp shaders for one pixel and stores the resulting colour.</summary>
@@ -870,10 +1009,7 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler
         // and be scaled back up afterwards. That is what keeps a per-pixel shader inside the frame
         // budget on the CPU; sampling still reads the full-resolution frame, so the effect stays
         // where the preset put it.
-        var pixels = (long)width * height;
-        var scale = pixels > ShaderPixelBudget ? MathF.Sqrt(ShaderPixelBudget / (float)pixels) : 1f;
-        var shaderWidth = Math.Max(1, (int)(width * scale));
-        var shaderHeight = Math.Max(1, (int)(height * scale));
+        var (shaderWidth, shaderHeight) = ShaderGrid(width, height);
         if (_shaderOutput is null ||
             _shaderOutput.Width != shaderWidth ||
             _shaderOutput.Height != shaderHeight)

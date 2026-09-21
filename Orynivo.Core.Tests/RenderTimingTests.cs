@@ -70,7 +70,7 @@ public sealed class RenderTimingTests
         shaded.RenderFrame(new TimingAudio(), 1d / 60d);
 
         Assert.True(shaded.Timings.Warp > plain.Timings.Warp);
-        Assert.False(shaded.ShadersSkipped);
+        Assert.True(shaded.LastShaderMilliseconds > 0d);
     }
 
     /// <summary>The comp shader stage is measured on its own.</summary>

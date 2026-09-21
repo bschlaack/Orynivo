@@ -373,7 +373,7 @@ public partial class VisualizerWindow : Window
             + $"postMs={timings.PostProcess:F2} overlayMs={timings.Overlay:F2} "
             + $"compositeMs={timings.Composite:F2} compShaderMs={timings.Shader:F2} "
             + $"shaders=warp{_renderer.Preset.WarpShaders.Count}/comp{_renderer.Preset.CompShaders.Count} "
-            + $"skipped={_renderer.ShadersSkipped} "
+            + $"gridReduced={_renderer.ShaderGridReduced} "
             + $"preset={_renderer.Preset.Name} userPresets={_library.Count - VisualizerPresets.BuiltIn.Count}";
         // Start a fresh averaging window so the next line describes its own second.
         _renderer.ResetTimings();

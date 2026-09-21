@@ -820,6 +820,21 @@ affordable. This is a project of its own and must keep the CPU path as the fallb
   reference's work. Moving the per-pixel program and the warp shader onto a mesh grid, and letting
   the budget degrade that grid instead of disabling the shaders, is the next step; it is a
   behaviour change to the warp, so it needs its own identical-frame verification.
+  Done as the first step of that plan: the shader grid is now adaptive and the warp shader runs on
+  it, and the skip mechanism is gone. `ShaderTimeBudgetMilliseconds` no longer decides whether the
+  shaders run at all; `AdaptShaderGrid` scales the grid's pixel target from the measured shader cost
+  (`ShaderTimeBudgetMilliseconds` against the shader milliseconds) between a floor of 1,024 pixels
+  and the 10,000-pixel cap, so a heavy shader settles at a resolution it can afford and keeps
+  drawing while a cheap one returns to full size. The warp stage's per-pixel program is unchanged
+  and still runs per pixel, but the warp shader itself now runs once per grid point through
+  `WarpShaderGrid` and is scaled over the frame, which is what removed the cost. Measured on the
+  same real presets at 480 x 270: warp 83-218 ms to 7-27 ms, frame 106-233 ms to 19-35 ms, with the
+  shaders intact. What is left is the per-pixel program itself, which still runs per screen pixel
+  rather than on Milkdrop's roughly 32 x 24 mesh; moving it needs an interpolated sampling field and
+  is the next fidelity step. A second, unrelated gap showed up while measuring: several real presets
+  lose their shaders at run time to an unimplemented built-in (`conway` is the known one) or to the
+  interpreter's loop budget, so those blocks are disabled after the first frame. Both are recorded
+  as their own work rather than being hidden by the budget.
 **Tests**: each phase adds its own; 39a is the prerequisite for claiming any speed-up.
 
 **Commit**: `perf(visualizer): add render measurement` (39a), then one commit per phase
