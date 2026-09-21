@@ -481,7 +481,12 @@ public static class ShaderTranspiler
         if (source == target)
             return text;
         if (target > source)
+        {
+            // Padding a smaller vector is deliberately not done: for a division it would create
+            // "0.0 / 0.0", which SkSL rejects at compile time. A widening that cannot be expressed
+            // safely is left alone so the shader falls back to the interpreter.
             return $"{to}({text})";
+        }
 
         return $"{text}.{"xyzw"[..target]}";
     }
@@ -542,8 +547,11 @@ public static class ShaderTranspiler
 
         // SkSL wants matching component counts, while a preset mixes them freely: "float3 * float2"
         // and "float4 + float3" both occur. Both operands are brought to the wider type, which is
-        // what the engine's component-wise arithmetic already does.
-        if (leftType is not null && rightType is not null &&
+        // what the engine's component-wise arithmetic already does. An assignment is left alone: its
+        // target must never be converted, only the value it is given, which EmitAssignment does.
+        var isAssignment = expression.Text is "=" or "+=" or "-=" or "*=" or "/=";
+        if (!isAssignment &&
+            leftType is not null && rightType is not null &&
             ComponentCount(leftType) != ComponentCount(rightType) &&
             Wider(leftType, rightType) is { } common)
         {

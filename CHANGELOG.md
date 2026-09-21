@@ -7,6 +7,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Fixed
+- Made the SkSL emitter's operand conversion assignment-aware: the target of an assignment is never
+  converted, only the value it is given. Converting both sides turned `x = y` into `x.xy = y`, which
+  Skia rejects with "cannot assign to this expression". Over a 500-file sample the share of shaders
+  that translate and are accepted by Skia rose from 365 to 374 of 764, that is from 48 to 49 percent.
+  Widening a smaller vector by padding it with zeros was tried for the constructor failures and
+  rejected: for a division it creates `0.0 / 0.0`, which SkSL refuses at compile time, so that
+  widening is left alone and the shader falls back to the interpreter.
 - Converted the operands of a binary expression and the arguments of an intrinsic to matching
   component counts in the SkSL emitter. Presets mix them freely (`float3 * float2`,
   `max(float3, float4)`), which the engine's component-wise arithmetic allows and SkSL rejects. Over
