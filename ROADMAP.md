@@ -706,6 +706,14 @@ affordable. This is a project of its own and must keep the CPU path as the fallb
 - 40c GPU passes - `In progress`: the comp-shader grid and the per-pixel programs run on the GPU
   through `SKRuntimeEffect`; `tex3D` still needs a volume texture (173 of the 369 remaining
   failures), and warp, blur, video echo, borders, and composite still need GPU passes.
+  The volume texture is the single source of truth for both paths, not a GPU-only addition: the
+  CPU `tex3D` currently evaluates a procedural sine hash
+  (`sin(x*127.1 + y*311.7 + z*74.7) * 43758.5453`, fractional part), and that hash cannot be
+  reproduced bit-exactly in SkSL because the GPU's `sin` differs in its low bits and the
+  43758.5453 factor amplifies the difference, which would break the CPU/GPU agreement the
+  comparison tests enforce. Milkdrop itself samples a 3D noise volume here, so both paths must
+  sample one generated volume (`sampler_noisevol_lq`/`sampler_noisevol_hq` are already in the
+  sampler set) and the CPU's procedural substitute is replaced rather than ported.
 - 40d Platform, packaging, and CI - `Pending`: native dependencies for Windows, Linux, and macOS,
   packaging, the signed release manifest, and the CI build matrix.
 - 40e Cutover and validation - `Pending`: the GPU path becomes the default where it is available,
