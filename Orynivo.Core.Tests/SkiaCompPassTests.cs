@@ -211,6 +211,106 @@ public sealed class SkiaCompPassTests
         pixels[offset + 2] = Math.Clamp((pixels[offset + 2] * (1f - band.Alpha)) + (band.Blue * band.Alpha), 0f, 1f);
     }
 
+    /// <summary>The Skia warp runs end to end in the renderer without the interpreter.</summary>
+    [Fact]
+    public void RenderFrame_SkiaWarpRuns()
+    {
+        const string Preset =
+            "fDecay=1\nwave_a=0\nzoom=1.2\nrot=0.2\n" +
+            "comp_1=float4 main(float2 uv : TEXCOORD0) : COLOR { ret = float3(uv.x, uv.y, 0.5); }";
+        var renderer = new PresetRenderer(VisualizerPreset.Parse(Preset), 32, 18)
+        {
+            ShaderTimeBudgetMilliseconds = 100_000d,
+            UseSkiaPasses = true
+        };
+        try
+        {
+            renderer.RenderFrame(new Silent(), 1d / 60d);
+            renderer.RenderFrame(new Silent(), 1d / 60d);
+            Assert.Contains(renderer.Output.Pixels.ToArray(), value => value > 0.1f);
+        }
+        finally
+        {
+            renderer.Dispose();
+        }
+    }
+
+    /// <summary>The Skia warp matches the CPU warp for a plain zoom, rotation, and offset.</summary>
+    [Fact]
+    public void Warp_MatchesTheCpuWarp()
+    {
+        var parameters = new SkiaShaderRunner.WarpParameters(1.3f, 1f, 0.4f, 0.1f, -0.2f, 0.05f, -0.03f, 1.1f, 0.9f);
+        AssertWarpMatches(parameters);
+    }
+
+    /// <summary>The Skia warp matches the CPU warp when the zoom exponent bends the radius.</summary>
+    [Fact]
+    public void Warp_MatchesTheCpuWarpWithZoomExponent()
+    {
+        var parameters = new SkiaShaderRunner.WarpParameters(1.2f, 0.5f, -0.3f, 0f, 0f, 0f, 0f, 1f, 1f);
+        AssertWarpMatches(parameters);
+    }
+
+    /// <summary>Warps a pattern on both paths and compares them.</summary>
+    /// <param name="parameters">Motion parameters.</param>
+    private static void AssertWarpMatches(SkiaShaderRunner.WarpParameters parameters)
+    {
+        var previous = CreatePattern();
+        var gpu = new PixelBuffer(previous.Width, previous.Height);
+        SkiaShaderRunner.Warp(previous, gpu, parameters);
+
+        var cpu = new PixelBuffer(previous.Width, previous.Height);
+        CpuWarp(previous, cpu, parameters);
+
+        var difference = MeanAbsoluteDifference(cpu.Pixels.ToArray(), gpu.Pixels.ToArray());
+        Assert.InRange(difference, 0.0001f, 0.01f);
+    }
+
+    /// <summary>The geometric warp, mirroring the CPU branch of <c>PresetRenderer.Warp</c>.</summary>
+    /// <param name="previous">Frame to sample.</param>
+    /// <param name="target">Frame to write.</param>
+    /// <param name="parameters">Motion parameters.</param>
+    private static void CpuWarp(PixelBuffer previous, PixelBuffer target, SkiaShaderRunner.WarpParameters parameters)
+    {
+        var width = target.Width;
+        var height = target.Height;
+        var cos = MathF.Cos(parameters.Rotation);
+        var sin = MathF.Sin(parameters.Rotation);
+        var needsRadius = parameters.ZoomExp != 1f;
+        var sample = new float[4];
+        for (var y = 0; y < height; y++)
+        {
+            var normalizedY = height > 1 ? (y / (float)(height - 1) * 2f) - 1f : 0f;
+            for (var x = 0; x < width; x++)
+            {
+                var normalizedX = width > 1 ? (x / (float)(width - 1) * 2f) - 1f : 0f;
+                var warpedX = (normalizedX - parameters.CentreX) * parameters.StretchX;
+                var warpedY = (normalizedY - parameters.CentreY) * parameters.StretchY;
+                var rotatedX = (warpedX * cos) - (warpedY * sin);
+                var rotatedY = (warpedX * sin) + (warpedY * cos);
+                if (needsRadius)
+                {
+                    var radius = MathF.Sqrt((rotatedX * rotatedX) + (rotatedY * rotatedY));
+                    var pixelZoom = MathF.Pow(parameters.Zoom, 1f + (parameters.ZoomExp * radius * 2f));
+                    warpedX = (rotatedX * pixelZoom) + parameters.CentreX + parameters.OffsetX;
+                    warpedY = (rotatedY * pixelZoom) + parameters.CentreY + parameters.OffsetY;
+                }
+                else
+                {
+                    warpedX = (rotatedX * parameters.Zoom) + parameters.CentreX + parameters.OffsetX;
+                    warpedY = (rotatedY * parameters.Zoom) + parameters.CentreY + parameters.OffsetY;
+                }
+
+                previous.SampleBilinear((warpedX * 0.5f) + 0.5f, (warpedY * 0.5f) + 0.5f, sample);
+                var offset = (((y * width) + x) * 4);
+                target.Pixels[offset] = sample[0];
+                target.Pixels[offset + 1] = sample[1];
+                target.Pixels[offset + 2] = sample[2];
+                target.Pixels[offset + 3] = sample[3];
+            }
+        }
+    }
+
     /// <summary>Builds a frame with structure, so a blur visibly changes it.</summary>
     /// <param name="shift">Value that makes one pattern differ from another.</param>
     /// <returns>The frame.</returns>

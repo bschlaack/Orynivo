@@ -531,6 +531,106 @@ public static class SkiaShaderRunner
         }
         """;
 
+    /// <summary>The motion parameters of one warp pass.</summary>
+    /// <param name="Zoom">Zoom factor, already bounded below by 0.01.</param>
+    /// <param name="ZoomExp">Zoom exponent, one for a plain zoom.</param>
+    /// <param name="Rotation">Rotation in radians.</param>
+    /// <param name="CentreX">Rotation and zoom centre x.</param>
+    /// <param name="CentreY">Rotation and zoom centre y.</param>
+    /// <param name="OffsetX">Translation x.</param>
+    /// <param name="OffsetY">Translation y.</param>
+    /// <param name="StretchX">Horizontal stretch.</param>
+    /// <param name="StretchY">Vertical stretch.</param>
+    public readonly record struct WarpParameters(
+        float Zoom,
+        float ZoomExp,
+        float Rotation,
+        float CentreX,
+        float CentreY,
+        float OffsetX,
+        float OffsetY,
+        float StretchX,
+        float StretchY);
+
+    /// <summary>
+    /// Warps the previous frame into the target with the Milkdrop motion transform. It reproduces the
+    /// geometric part of <c>PresetRenderer.Warp</c> for a preset whose per-pixel block and warp shader
+    /// are empty: centre, stretch, rotate, and zoom the sampling position, then read the previous frame
+    /// bilinearly, leaving a sample outside the frame black the way <see cref="PixelBuffer.SampleBilinear"/>
+    /// does.
+    /// </summary>
+    /// <param name="previous">Frame to sample.</param>
+    /// <param name="target">Frame to write; must have the same size.</param>
+    /// <param name="parameters">Motion parameters.</param>
+    /// <exception cref="ArgumentException">The frames have different sizes.</exception>
+    /// <exception cref="PresetExpressionException">Skia rejects the warp effect.</exception>
+    public static void Warp(PixelBuffer previous, PixelBuffer target, WarpParameters parameters)
+    {
+        ArgumentNullException.ThrowIfNull(previous);
+        ArgumentNullException.ThrowIfNull(target);
+        if (previous.Width != target.Width || previous.Height != target.Height)
+            throw new ArgumentException("The frames have different sizes.", nameof(target));
+
+        using var effect = SKRuntimeEffect.CreateShader(WarpSkSL, out var errors)
+            ?? throw new PresetExpressionException($"SkSL was rejected: {errors}", 0);
+        using var bitmap = CreateBitmap(previous.Pixels, previous.Width, previous.Height);
+        using var source = bitmap.ToShader(SKShaderTileMode.Clamp, SKShaderTileMode.Clamp, LinearSampling);
+        var uniforms = new SKRuntimeEffectUniforms(effect)
+        {
+            ["size"] = new float[] { target.Width, target.Height },
+            ["zoom"] = parameters.Zoom,
+            ["zoomExp"] = parameters.ZoomExp,
+            ["rotation"] = parameters.Rotation,
+            ["centre"] = new float[] { parameters.CentreX, parameters.CentreY },
+            ["offset"] = new float[] { parameters.OffsetX, parameters.OffsetY },
+            ["stretch"] = new float[] { parameters.StretchX, parameters.StretchY }
+        };
+        var children = new SKRuntimeEffectChildren(effect) { ["frame"] = source };
+        using var shader = effect.ToShader(uniforms, children);
+        using var result = CreateBitmap(new float[target.Width * target.Height * 4], target.Width, target.Height);
+        using var surface = SKSurface.Create(result.Info, result.GetPixels(), result.RowBytes);
+        var canvas = surface.Canvas;
+        canvas.Clear(SKColors.Black);
+        using (var paint = new SKPaint { Shader = shader })
+            canvas.DrawRect(new SKRect(0, 0, target.Width, target.Height), paint);
+
+        canvas.Flush();
+        ReadPixels(result, target.Width, target.Height).AsSpan().CopyTo(target.Pixels);
+    }
+
+    /// <summary>
+    /// The SkSL of the geometric warp. A sample outside the frame is black, because
+    /// <see cref="PixelBuffer.SampleBilinear"/> returns zero there rather than clamping.
+    /// </summary>
+    private const string WarpSkSL = """
+        uniform shader frame;
+        uniform float2 size;
+        uniform float zoom;
+        uniform float zoomExp;
+        uniform float rotation;
+        uniform float2 centre;
+        uniform float2 offset;
+        uniform float2 stretch;
+        half4 main(float2 coord) {
+            float2 normalized = ((coord - 0.5) / (size - 1.0) * 2.0) - 1.0;
+            float2 warped = (normalized - centre) * stretch;
+            float c = cos(rotation);
+            float s = sin(rotation);
+            float2 rotated = float2((warped.x * c) - (warped.y * s), (warped.x * s) + (warped.y * c));
+            float2 sample;
+            if (zoomExp != 1.0) {
+                float radius = length(rotated);
+                float pixelZoom = pow(zoom, 1.0 + (zoomExp * radius * 2.0));
+                sample = (rotated * pixelZoom) + centre + offset;
+            } else {
+                sample = (rotated * zoom) + centre + offset;
+            }
+            float2 uv = (sample * 0.5) + 0.5;
+            if (uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0) return half4(0.0);
+            return half4(frame.eval((uv * (size - 1.0)) + 0.5));
+        }
+        """;
+
     /// <summary>Converts a zero-to-one component into a byte.</summary>
     /// <param name="value">Component value.</param>
     /// <returns>The byte value.</returns>

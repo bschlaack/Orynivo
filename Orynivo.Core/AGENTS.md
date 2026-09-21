@@ -108,8 +108,11 @@ This file applies to `Orynivo.Core/` and supplements `../AGENTS.md`.
   (`GetBlur1`-`GetBlur3`) must keep scaling their normalised coordinate by `texsize`.
   `SkiaShaderRunner.VideoEcho` is the GPU video-echo pass and must keep the CPU pass's zoom, flip,
   alpha blend, and leave-untouched rule.   `SkiaShaderRunner.Composite` is the GPU additive composite
-  and must keep the CPU pass's clamp. `SkiaShaderRunner.Borders` is the GPU border pass and must
-  keep the CPU ring geometry and blend. `PresetRenderer.UseSkiaPasses` gates the comp shader and
+  and must keep the CPU pass's clamp.   `SkiaShaderRunner.Borders` is the GPU border pass and must
+  keep the CPU ring geometry and blend. `SkiaShaderRunner.Warp` is the GPU geometric warp and must
+  keep the CPU motion transform and the black-outside-the-frame rule; it runs only when the preset's
+  per-pixel block and warp shader are empty, because those expressions stay on the interpreter.
+  `PresetRenderer.UseSkiaPasses` gates the comp shader and
   these frame passes together. Only
   straight-line
   bodies (declarations and one return) are compiled — branches, loops, and swizzle assignments stay

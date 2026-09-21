@@ -7,6 +7,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Added
+- Moved the geometric warp onto the GPU. `SkiaShaderRunner.Warp` applies the Milkdrop motion
+  transform (centre, stretch, rotate, zoom, zoom exponent, and offset) and reads the previous frame
+  bilinearly, leaving a sample outside the frame black the way `PixelBuffer.SampleBilinear` does. The
+  renderer uses it for a preset whose per-pixel block and warp shader are empty; a preset that
+  evaluates expressions per pixel keeps the interpreter, which is the reference for those.
 - Moved the borders onto the GPU. `SkiaShaderRunner.Borders` draws the outer and inner Milkdrop
   border bands as a Skia runtime effect, computing each pixel's distance to the inset rectangle the
   way `PresetRenderer.DrawBorderFrame` does, and the renderer uses it when the pass flag is enabled.

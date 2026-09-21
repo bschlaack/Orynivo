@@ -611,6 +611,36 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
             Array.Clear(_motionCount);
         }
 
+        // A preset whose per-pixel block and warp shader are empty has a pure geometric warp, which
+        // the Skia path can run over the full frame; anything that evaluates per pixel stays on the
+        // interpreter, which is the reference for those expressions.
+        if (UseSkiaPasses && Preset.PerPixel.IsEmpty && _warpShaders.Count == 0 &&
+            !_perPixelWritesMotion && !recordMotion)
+        {
+            try
+            {
+                SkiaShaderRunner.Warp(
+                    _previous,
+                    _warped,
+                    new SkiaShaderRunner.WarpParameters(
+                        zoom,
+                        zoomExp,
+                        rotation,
+                        centreX,
+                        centreY,
+                        offsetX,
+                        offsetY,
+                        stretchX,
+                        stretchY));
+                _warpShaderMilliseconds = 0d;
+                return;
+            }
+            catch (Exception exception)
+            {
+                ShaderError = "warp (skia): " + exception.GetType().Name + ": " + exception.Message;
+            }
+        }
+
         var width = _warped.Width;
         var height = _warped.Height;
         var perPixel = Preset.PerPixel;
