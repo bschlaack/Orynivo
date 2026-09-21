@@ -1,0 +1,86 @@
+using Orynivo.Visualization;
+using Xunit;
+
+namespace Orynivo.Core.Tests;
+
+/// <summary>
+/// Verifies Milkdrop's <c>loop(count, statements)</c> construct and writing to the shared memory
+/// buffer by assigning to the call, which is how real presets build their lookup tables.
+/// </summary>
+public sealed class PresetLoopTests
+{
+    /// <summary>A loop repeats its body the requested number of times.</summary>
+    [Fact]
+    public void Parse_RunsALoopBodyRepeatedly()
+    {
+        var preset = VisualizerPreset.Parse("per_frame_1=i = 0;\nper_frame_2=loop(5, i = i + 1);");
+
+        Assert.Empty(preset.FailedBlocks);
+        Assert.Equal(5f, Run(preset, "i"));
+    }
+
+    /// <summary>A loop body may hold several semicolon-separated statements.</summary>
+    [Fact]
+    public void Parse_RunsSeveralStatementsPerIteration()
+    {
+        var preset = VisualizerPreset.Parse("per_frame_1=i = 0; q1 = 0;\nper_frame_2=loop(4, i = i + 1; q1 = q1 + 2;);");
+
+        Assert.Empty(preset.FailedBlocks);
+        Assert.Equal(4f, Run(preset, "i"));
+        Assert.Equal(8f, Run(preset, "q1"));
+    }
+
+    /// <summary>A preset writes a buffer entry by assigning to the call.</summary>
+    [Fact]
+    public void Parse_WritesTheMegaBufferByAssignment()
+    {
+        var preset = VisualizerPreset.Parse(
+            "per_frame_1=loop(3, gmegabuf(7) = gmegabuf(7) + 2);\nper_frame_2=q1 = megabuf(7);");
+
+        Assert.Empty(preset.FailedBlocks);
+        Assert.Equal(6f, Run(preset, "q1"));
+    }
+
+    /// <summary>The iteration count is clamped, so a preset cannot stall a frame.</summary>
+    [Fact]
+    public void Parse_ClampsTheLoopCount()
+    {
+        var preset = VisualizerPreset.Parse("per_frame_1=i = 0;\nper_frame_2=loop(1000000, i = i + 1);");
+
+        Assert.Empty(preset.FailedBlocks);
+        Assert.Equal(100000f, Run(preset, "i"));
+    }
+
+    /// <summary>Runs a parsed preset and returns one of its variables.</summary>
+    /// <param name="preset">Preset to run.</param>
+    /// <param name="variable">Variable to read back.</param>
+    /// <returns>The resulting value.</returns>
+    private static float Run(VisualizerPreset preset, string variable)
+    {
+        var renderer = new PresetRenderer(preset, 16, 9);
+        renderer.RenderFrame(new Silent(), 1d / 60d);
+        return renderer.ReadVariable(variable);
+    }
+
+    /// <summary>An audio source that reports silence.</summary>
+    private sealed class Silent : IVisualizerAudioSource
+    {
+        /// <inheritdoc/>
+        public ReadOnlySpan<float> Bands => [];
+
+        /// <inheritdoc/>
+        public ReadOnlySpan<float> Waveform => [];
+
+        /// <inheritdoc/>
+        public float Bass => 0f;
+
+        /// <inheritdoc/>
+        public float Mid => 0f;
+
+        /// <inheritdoc/>
+        public float Treble => 0f;
+
+        /// <inheritdoc/>
+        public float Volume => 0f;
+    }
+}

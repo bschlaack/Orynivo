@@ -92,7 +92,9 @@ This file applies to `Orynivo.Core/` and supplements `../AGENTS.md`.
   and a part may end with an operator; a semicolon is inserted only when the previous part is
   complete and the next does not bring its own. `megabuf` and `gmegabuf` are Milkdrop's shared
   memory buffers and their accesses are serialised, because a preset writes lookup tables that
-  other pixels read. Keep the
+  other pixels read. `loop(count, statements)` is a statement, not an expression, and its
+  iteration count is clamped; both buffer write spellings presets use (`gmegabuf(i, value)` and
+  `gmegabuf(i) = value`) must keep working, because presets build their lookup tables with them. Keep the
   interpreter off the audio thread and bound its per-frame cost so a heavy shader degrades the
   render resolution instead of stalling playback.
 - Keep the project cross-platform `net10.0`; do not introduce Avalonia, Windows,

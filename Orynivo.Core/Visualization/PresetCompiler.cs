@@ -76,6 +76,56 @@ public static class PresetCompiler
             var name = current.Text;
             var position = current.Position;
             var next = lexer.Next();
+            if (next.Kind == PresetTokenKind.OpenParenthesis &&
+                (string.Equals(name, "megabuf", StringComparison.OrdinalIgnoreCase) ||
+                 string.Equals(name, "gmegabuf", StringComparison.OrdinalIgnoreCase)))
+            {
+                // Presets write a buffer entry by assigning to the call: gmegabuf(i) = value;
+                current = lexer.Next();
+                var index = ParseExpression(state, lexer, ref current);
+                if (current.Kind == PresetTokenKind.Comma)
+                {
+                    // gmegabuf(index, value) writes the entry directly.
+                    current = lexer.Next();
+                    var written = ParseExpression(state, lexer, ref current);
+                    if (current.Kind != PresetTokenKind.CloseParenthesis)
+                        throw new PresetExpressionException("Expected ')' after the buffer value", position);
+
+                    current = lexer.Next();
+                    return Expression.Call(
+                        typeof(PresetCompiler),
+                        nameof(WriteMegaBufferValue),
+                        null,
+                        index,
+                        written);
+                }
+
+                if (current.Kind != PresetTokenKind.CloseParenthesis)
+                    throw new PresetExpressionException("Expected ')' after the buffer index", position);
+
+                current = lexer.Next();
+                if (current.Kind != PresetTokenKind.Assign)
+                    return Expression.Call(typeof(PresetCompiler), nameof(ReadMegaBuffer), null, index);
+
+                current = lexer.Next();
+                var stored = ParseExpression(state, lexer, ref current);
+                return Expression.Call(
+                    typeof(PresetCompiler),
+                    nameof(WriteMegaBufferValue),
+                    null,
+                    index,
+                    stored);
+            }
+
+            if (next.Kind == PresetTokenKind.OpenParenthesis &&
+                string.Equals(name, "loop", StringComparison.OrdinalIgnoreCase))
+            {
+                // Milkdrop's loop(count, statements) repeats a statement list. It is a statement,
+                // not an expression, so it is handled before the expression parser sees the call.
+                current = lexer.Next();
+                return ParseLoop(state, lexer, ref current, position);
+            }
+
             if (next.Kind == PresetTokenKind.Assign)
             {
                 current = lexer.Next();
@@ -484,6 +534,64 @@ public static class PresetCompiler
             null,
             arguments[0],
             arguments[1]);
+    }
+
+    /// <summary>Upper bound on the iterations of one Milkdrop <c>loop</c> call.</summary>
+    private const int MaxLoopIterations = 100000;
+
+    /// <summary>Parses Milkdrop's <c>loop(count, statements)</c> construct.</summary>
+    /// <param name="state">Compile state.</param>
+    /// <param name="lexer">Token source.</param>
+    /// <param name="current">Token after the opening parenthesis.</param>
+    /// <param name="position">Source position of the <c>loop</c> name.</param>
+    /// <returns>The expression that runs the loop.</returns>
+    private static Expression ParseLoop(
+        CompileState state,
+        PresetLexer lexer,
+        ref PresetToken current,
+        int position)
+    {
+        var count = ParseExpression(state, lexer, ref current);
+        if (current.Kind != PresetTokenKind.Comma)
+            throw new PresetExpressionException("Expected ',' after the loop count", position);
+
+        current = lexer.Next();
+        var body = new List<Expression>();
+        while (current.Kind != PresetTokenKind.End && current.Kind != PresetTokenKind.CloseParenthesis)
+        {
+            // The statements of a loop body are separated by semicolons that belong to them.
+            while (current.Kind == PresetTokenKind.Semicolon)
+                current = lexer.Next();
+            if (current.Kind == PresetTokenKind.CloseParenthesis)
+                break;
+            body.Add(ParseStatement(state, lexer, ref current));
+        }
+
+        if (current.Kind != PresetTokenKind.CloseParenthesis)
+            throw new PresetExpressionException("Expected ')' to close loop(...)", current.Position);
+
+        current = lexer.Next();
+        var index = Expression.Variable(typeof(int), "loopIndex");
+        var limit = Expression.Variable(typeof(int), "loopLimit");
+        var done = Expression.Label("loopDone");
+        // The count is clamped, so a preset that asks for a million iterations cannot stall a frame.
+        var clamped = Expression.Condition(
+            Expression.GreaterThan(Expression.Convert(count, typeof(int)), Expression.Constant(MaxLoopIterations)),
+            Expression.Constant(MaxLoopIterations),
+            Expression.Convert(count, typeof(int)));
+        body.Add(Expression.PostIncrementAssign(index));
+        return Expression.Block(
+            typeof(float),
+            [index, limit],
+            Expression.Assign(limit, clamped),
+            Expression.Assign(index, Expression.Constant(0)),
+            Expression.Loop(
+                Expression.IfThenElse(
+                    Expression.LessThan(index, limit),
+                    Expression.Block(body),
+                    Expression.Break(done)),
+                done),
+            Expression.Constant(0f));
     }
 
     /// <summary>Draws the next pseudo-random value in the range zero to one.</summary>

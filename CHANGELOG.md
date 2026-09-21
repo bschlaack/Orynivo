@@ -13,10 +13,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   is not waiting for more input and the next part does not bring its own. This removed the
   `Unexpected ';'` failures entirely.
 - Added Milkdrop's shared memory buffers `megabuf` and `gmegabuf`, which presets use for lookup
-  tables. They are global state, so the accesses are serialised against the parallel warp, and the
-  arities presets use are tolerated. Measured against a real 2000-file collection, the skipped
-  expression blocks fell from 1267 to 68; the remainder is `Expected ')'`-style syntax that is
-  recorded as roadmap item 39h.
+  tables, in both spellings presets use: `gmegabuf(index, value)` and assigning to the call as in
+  `gmegabuf(index) = value`. They are global state, so the accesses are serialised against the
+  parallel warp.
+- Added Milkdrop's `loop(count, statements)` construct, which presets use to build their lookup
+  tables, with the iteration count clamped so a preset cannot stall a frame.
+- Measured against a real 2000-file collection, the skipped expression blocks fell from 1267 to
+  19, which is what finally lets the older presets render their own picture instead of the shared
+  overlay. The remainder is a handful of `Unexpected '='` and `Unexpected '*'` cases that need
+  their parts read one by one.
 
 - Fixed a skipped shader being invisible. When a preset's `warp_N` or `comp_N` value cannot be
   parsed the shader is dropped, which used to leave a preset that renders only the shared overlay

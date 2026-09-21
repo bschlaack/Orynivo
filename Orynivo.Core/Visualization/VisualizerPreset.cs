@@ -523,13 +523,23 @@ public sealed class VisualizerPreset
             if (text.Length == 0)
                 continue;
 
-            if (builder.Length > 0 && text[0] != ';' && !EndsWithContinuation(builder[^1]))
+            if (builder.Length > 0 && text[0] != ';' && !StartsWithContinuation(text[0]) &&
+                !EndsWithContinuation(builder[^1]))
+            {
                 builder.Append(';');
+            }
+
             builder.Append(text);
         }
 
         return builder.Length == 0 ? null : builder.ToString();
     }
+
+    /// <summary>Reports whether a part starts by continuing the previous expression.</summary>
+    /// <param name="character">First character of the part.</param>
+    /// <returns><see langword="true"/> when the part continues an expression.</returns>
+    private static bool StartsWithContinuation(char character) =>
+        character is '+' or '-' or '*' or '/' or '%' or ')' or ']' or ',';
 
     /// <summary>Reports whether a character leaves an expression waiting for more input.</summary>
     /// <param name="character">Last character of the previous part.</param>
