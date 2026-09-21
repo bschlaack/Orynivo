@@ -69,7 +69,7 @@ public sealed class PresetTranspileDiagnosticTests
                 foreach (var shader in preset.WarpShaders.Concat(preset.CompShaders))
                 {
                     shaders++;
-                    var reason = TryTranslate(shader);
+                    var (reason, detail) = TryTranslate(shader);
                     if (reason is null)
                     {
                         compiled++;
@@ -85,7 +85,7 @@ public sealed class PresetTranspileDiagnosticTests
                     }
 
                     if (list.Count < 3)
-                        list.Add(Path.GetFileName(file));
+                        list.Add(detail ?? Path.GetFileName(file));
                 }
             }
         }
@@ -106,18 +106,38 @@ public sealed class PresetTranspileDiagnosticTests
     /// <summary>Translates one shader and reports why it failed, or nothing when it worked.</summary>
     /// <param name="shader">Shader to translate.</param>
     /// <returns>The failure reason, or <see langword="null"/>.</returns>
-    private static string? TryTranslate(VisualizerShader shader)
+    private static (string? Reason, string? Detail) TryTranslate(VisualizerShader shader)
     {
         try
         {
             var sksl = ShaderTranspiler.Transpile(shader.Program);
             using var effect = SKRuntimeEffect.CreateShader(sksl, out var errors);
-            return effect is null ? "SkSL rejected: " + FirstError(errors) : null;
+            if (effect is not null)
+                return (null, null);
+
+            // The offending SkSL line is what turns a Skia message into something actionable, so it
+            // travels with the failure instead of the file name.
+            var error = FirstError(errors);
+            return ("SkSL rejected: " + error, DescribeLine(sksl, error));
         }
         catch (PresetExpressionException exception)
         {
-            return exception.Message;
+            return (exception.Message, null);
         }
+    }
+
+    /// <summary>Returns the generated SkSL line a Skia error points at.</summary>
+    /// <param name="sksl">Generated source.</param>
+    /// <param name="error">Skia error text.</param>
+    /// <returns>The line with its number, or <see langword="null"/>.</returns>
+    private static string? DescribeLine(string sksl, string error)
+    {
+        var colon = error.IndexOf(':');
+        if (colon <= 0 || !int.TryParse(error[(error.IndexOf("error: ", StringComparison.Ordinal) + 7)..].Split(':')[0], out var number))
+            return null;
+
+        var lines = sksl.Split('\n');
+        return number >= 1 && number <= lines.Length ? $"{number}: {lines[number - 1].Trim()}" : null;
     }
 
     /// <summary>Keeps the first Skia error line, which carries the reason.</summary>

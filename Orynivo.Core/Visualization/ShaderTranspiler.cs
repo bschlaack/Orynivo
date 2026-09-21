@@ -40,7 +40,7 @@ public static class ShaderTranspiler
     {
         var uniforms = new Dictionary<string, int>(StringComparer.Ordinal)
         {
-            ["texsize"] = 2,
+            ["texsize"] = 4,
             ["time"] = 1,
             ["frame"] = 1,
             ["fps"] = 1,
@@ -110,7 +110,7 @@ public static class ShaderTranspiler
 
     /// <summary>The uniform block every translated shader starts with.</summary>
     private const string Prelude = """
-        uniform float2 texsize;
+        uniform float4 texsize;
         uniform float time;
         uniform float frame;
         uniform float fps;
@@ -149,12 +149,21 @@ public static class ShaderTranspiler
         var builder = new StringBuilder();
         builder.Append(Prelude).Append(GeneratedUniforms()).Append('\n');
         builder.Append("half4 main(float2 fragCoord) {\n");
-        builder.Append("    float2 uv_orig = fragCoord / texsize;\n");
+        builder.Append("    float2 uv_orig = fragCoord / texsize.xy;\n");
         builder.Append("    float2 uv = uv_orig;\n");
         builder.Append("    float2 centred = (uv * 2.0) - 1.0;\n");
         builder.Append("    float rad = length(centred);\n");
         builder.Append("    float ang = atan(centred.y, centred.x);\n");
         builder.Append("    float3 ret = float3(0.0);\n");
+        // The output variable is declared by the prelude, so it is the one entry the type table
+        // starts with; every other variable is recorded as it is declared.
+        _types = new Dictionary<string, string>(StringComparer.Ordinal) { ["ret"] = "float3" };
+        // The prelude uniforms are part of the vocabulary a body may read, so their types are
+        // known too: that is what narrows "rand_frame * 64.0" into a scalar context.
+        foreach (var (uniform, count) in UniformComponents)
+        {
+            _types[uniform] = count switch { 1 => "float", 2 => "float2", 4 => "float4", _ => "float" };
+        }
         foreach (var statement in program.Items)
             EmitStatement(builder, statement, 1);
         builder.Append("    return half4(toColour(ret));\n");
@@ -191,6 +200,9 @@ public static class ShaderTranspiler
                     // variable to be global, so a sampler declaration inside the body is dropped.
                     if (declared == "shader")
                         return;
+
+                    if (_types is not null)
+                        _types[name] = declared;
 
                     builder.Append(indent).Append(declared).Append(' ').Append(name);
                     if (statement.Left is not null)
@@ -347,22 +359,58 @@ public static class ShaderTranspiler
     };
 
     /// <summary>
-    /// Emits an assignment. The engine stores every value as a float and lets a scalar stand in for
-    /// a colour, so <c>ret = 0;</c> is normal for presets while SkSL refuses to assign a float to a
-    /// float3; the shader's own output variable is therefore widened.
+    /// The declared type of every variable of the shader being translated. SkSL is strictly typed
+    /// while the engine stores every value as a float, so a preset may write <c>float3 x = 0;</c> or
+    /// <c>y = aspect;</c> and SkSL refuses both; knowing the declared types is what lets the emitter
+    /// widen or narrow those. The state is per thread because one translation runs on one thread.
+    /// </summary>
+    [ThreadStatic]
+    private static Dictionary<string, string>? _types;
+
+    /// <summary>Infers the SkSL type of an expression, or nothing when it cannot be known.</summary>
+    /// <param name="expression">Expression node.</param>
+    /// <returns>The type name, or <see langword="null"/>.</returns>
+    private static string? TypeOf(ShaderNode expression) => expression.Kind switch
+    {
+        ShaderNodeKind.Literal => "float",
+        ShaderNodeKind.Identifier => _types is not null && _types.TryGetValue(expression.Text, out var declared)
+            ? declared
+            : null,
+        ShaderNodeKind.Member => expression.Text.Length switch
+        {
+            1 => "float",
+            2 => "float2",
+            3 => "float3",
+            _ => "float4"
+        },
+        ShaderNodeKind.Call => IsVectorConstructor(expression.Text) ? MapType(expression.Text) : null,
+        _ => null
+    };
+
+    /// <summary>
+    /// Emits an assignment, converting between a scalar and a vector where the engine would allow it
+    /// and SkSL would not. It only acts when both types are known, so an unknown expression is never
+    /// rewritten on a guess.
     /// </summary>
     /// <param name="left">Target text.</param>
     /// <param name="right">Value text.</param>
-    /// <param name="expression">Assignment node, used for its source position.</param>
+    /// <param name="expression">Assignment node.</param>
     /// <returns>The assignment text.</returns>
     private static string EmitAssignment(string left, string right, ShaderNode expression)
     {
-        // A vector constructor accepts a vector of the same size and truncates a larger one, so
-        // widening ret unconditionally covers both "ret = 0;" and "ret = tex2D(...).rgb".
-        if (expression.Left is { Kind: ShaderNodeKind.Identifier } target &&
-            string.Equals(target.Text, "ret", StringComparison.Ordinal))
+        var targetType = expression.Left is { Kind: ShaderNodeKind.Identifier } target &&
+            _types is not null &&
+            _types.TryGetValue(target.Text, out var declared)
+                ? declared
+                : null;
+        var valueType = expression.Right is null ? null : TypeOf(expression.Right);
+
+        if (targetType is not null && valueType is not null && targetType != valueType)
         {
-            return $"{left} = float3({right})";
+            if (IsVectorType(targetType) && !IsVectorType(valueType))
+                return $"{left} = {targetType}({right})";
+            if (!IsVectorType(targetType) && IsVectorType(valueType))
+                return $"{left} = {right}.x";
         }
 
         return $"{left} = {right}";
@@ -440,8 +488,9 @@ public static class ShaderTranspiler
                     throw new PresetExpressionException("tex2D needs a sampler and a coordinate.", call.Position);
 
                 // A Skia shader evaluates to half4, so the result is widened to the float4 the
-                // presets expect from tex2D.
-                return $"float4({arguments[0]}.eval({arguments[1]} * texsize))";
+                // presets expect from tex2D. The coordinate is normalised, so only the size half of
+                // texsize applies to it.
+                return $"float4({arguments[0]}.eval({arguments[1]} * texsize.xy))";
             case "tex3d":
                 // Milkdrop samples a 3D noise volume, and Skia's runtime effects only sample 2D
                 // shaders. A procedural replacement was tried and rejected: a sine-based hash is not

@@ -49,7 +49,7 @@ public static class SkiaShaderRunner
                 effectUniforms[name] = new float[count];
         }
 
-        effectUniforms["texsize"] = new float[] { width, height };
+        effectUniforms["texsize"] = new float[] { width, height, 1f / Math.Max(1, width), 1f / Math.Max(1, height) };
         if (uniforms is not null)
         {
             foreach (var (name, value) in uniforms)

@@ -7,6 +7,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Fixed
+- Fixed `texsize` being declared as a `float2` in the generated SkSL. Milkdrop's `texsize` is a
+  `float4` whose `xy` is the frame size and whose `zw` is its reciprocal, and shaders read both, so
+  the wrong width made every `texsize.zw` an invalid swizzle and every `texsize.xy` a vector where a
+  scalar was expected. Over a 500-file sample the share of shaders that translate and are accepted
+  by Skia rose from 191 to 272 of 764, that is from 25 to 36 percent.
+- Added a variable-type table to the SkSL emitter: the declared type of every variable and of every
+  prelude uniform is known, so an assignment between a scalar and a vector is converted instead of
+  being rejected by SkSL's strict typing.
 - Fixed the visualizer freezing on a preset whose comp shader costs milliseconds per pixel. The
   adaptive shader grid could only shrink once a frame had finished, so a pass over a 10,000-pixel
   grid needed minutes and no frame ever completed; a pass that exceeds
