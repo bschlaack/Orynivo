@@ -638,7 +638,11 @@ to a `WriteableBitmap` that Skia scales up.
 - 39e JIT-compiled shaders - `Pending`: compile the parsed shader tree to
   `System.Linq.Expressions` through the existing preset compiler machinery instead of walking it
   per pixel, keep the interpreter as the validation and fallback path, and compare both against
-  the same reference frames.
+  the same reference frames. Measured first, because the target matters: the interpreter costs
+  about 660 ns per pixel, so a comp shader takes 619 ms per frame at 1280 x 720 and the frame
+  budget skips it, which is why no shader runs at all. `ShaderCostDiagnosticTests` reports that
+  number per resolution; the JIT has to bring it to roughly 10 ns per pixel for the shaders to fit
+  inside the budget, and that measurement is the acceptance criterion for this phase.
 - 39f Sharper defaults - `Pending`: raise the default render resolution and frame rate to what
   the measured cost allows, keep the existing settings ranges, and document the recommended
   values in README and the wiki.
@@ -680,7 +684,7 @@ affordable. This is a project of its own and must keep the CPU path as the fallb
   16 `Unexpected '='` and 2 `Unexpected '*'` cases plus one `Expected ')'`; each needs its parts
   read one by one, and they are no longer a class of failure that affects whole preset families.
 
-- 39i Milkdrop 2 shader templates and blur/edge keys - `Pending`: measured against a real
+- 39i Milkdrop 2 shader dialect and blur/edge keys - `Blocked on 39e`: measured against a real
   2000-file collection, 1706 presets (85 percent) declare their `warp_N`/`comp_N` values as
   Milkdrop 2 template references such as `` `shader_body ``, whose actual HLSL lives in Milkdrop 2's
   built-in templates rather than in the file, so no shader is loaded for them and they render only
@@ -689,6 +693,17 @@ affordable. This is a project of its own and must keep the CPU path as the fallb
   bodies and the blur/edge chain, resolve the template markers before parsing, and extend the
   diagnostic to separate template presets from genuinely broken ones. Do not copy Milkdrop's
   sources; the shipped templates stay written here.
+
+  A survey of 3000 collection files sharpened this into a dialect problem rather than a small
+  marker map: the `` ` `` prefix marks Milkdrop 2 shader keywords throughout the source, with
+  `` `ret `` (9140), `` `float2 `` (5558), `` `if `` (5543), `` `shader_body `` (4920), `` `float3 ``,
+  `` `float ``, `` `float4 ``, `` `uv ``, `` `sampler ``, `` `uv2 ``, and `` `GetPixel `` all in the
+  thousands. Translating that dialect is its own project, and it is only worth doing once the
+  shader runtime is fast enough to run the result: a per-pixel comp shader currently costs tens of
+  milliseconds on the CPU interpreter, so the budget skips it and the preset looks unchanged.
+  Phase 39e is therefore the prerequisite. The blur/edge chain is a separate, larger family:
+  `b1n`, `b1x`, and `b1ed` (plus `b2*` and `b3*`) appear in 313 of 400 sampled files, and their
+  exact semantics are not in the presets, so they need our own documented approximation.
 
 **Tests**: each phase adds its own; 39a is the prerequisite for claiming any speed-up.
 
