@@ -658,6 +658,13 @@ to a `WriteableBitmap` that Skia scales up.
   remaining steps are, in order, emitting the arithmetic inline (the ~240 to ~40 ns step), a
   cheaper upscale than the bilinear one, and only then a decision about the default budget or the
   GPU phase 40, which is the real answer for full resolution.
+  The inline step is done for what it can reach: arithmetic now calls one runtime method per
+  operator instead of a delegate, and a swizzle has its components selected at compile time and
+  binds its source to a local so a texture call is evaluated once. Measured, that bought only
+  about ten percent, because the remaining cost is the string dispatch in `ShaderRuntime.Call`,
+  which runs about six times per pixel, plus the full-frame upscale of the smaller comp grid. So
+  the next step is numeric opcodes instead of a name switch — the compiler knows the function at
+  compile time — followed by a cheaper upscale than the bilinear one.
 - 39f Sharper defaults - `Pending`: raise the default render resolution and frame rate to what
   the measured cost allows, keep the existing settings ranges, and document the recommended
   values in README and the wiki.

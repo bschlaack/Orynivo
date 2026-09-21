@@ -48,10 +48,11 @@ public sealed class ShaderProgram
 /// </summary>
 internal static class ShaderCompiler
 {
-    private static readonly Func<float, float, float> Add = (a, b) => a + b;
-    private static readonly Func<float, float, float> Subtract = (a, b) => a - b;
-    private static readonly Func<float, float, float> Multiply = (a, b) => a * b;
     private static readonly Func<float, float> Negate = value => -value;
+
+    /// <summary>The constructor of <see cref="ShaderValue"/> used to build results inline.</summary>
+    private static readonly System.Reflection.ConstructorInfo ShaderValueConstructor =
+        typeof(ShaderValue).GetConstructor([typeof(float), typeof(float), typeof(float), typeof(float), typeof(int)])!;
 
     /// <summary>Compiles a shader body, or reports that it is not supported.</summary>
     /// <param name="program">Parsed shader body.</param>
@@ -160,13 +161,7 @@ internal static class ShaderCompiler
                     slotsParameter,
                     Expression.Constant(Slot(slots, node.Text)));
             case ShaderNodeKind.Member:
-                return Expression.Call(
-                    typeof(ShaderRuntime),
-                    nameof(ShaderRuntime.Swizzle),
-                    null,
-                    BuildExpression(slots, slotsParameter, samplerParameter, node.Left!),
-                    Expression.Constant(node.Text),
-                    Expression.Constant(node.Position));
+                return BuildSwizzle(slots, slotsParameter, samplerParameter, node);
             case ShaderNodeKind.Call:
                 return BuildCall(slots, slotsParameter, samplerParameter, node);
             case ShaderNodeKind.Unary:
@@ -271,15 +266,15 @@ internal static class ShaderCompiler
         switch (node.Text)
         {
             case "+":
-                return ComponentWise(left, right, Expression.Constant(Add));
+                return BinaryCall(nameof(ShaderRuntime.Add), left, right);
             case "-":
-                return ComponentWise(left, right, Expression.Constant(Subtract));
+                return BinaryCall(nameof(ShaderRuntime.Subtract), left, right);
             case "*":
-                return ComponentWise(left, right, Expression.Constant(Multiply));
+                return BinaryCall(nameof(ShaderRuntime.Multiply), left, right);
             case "/":
-                return ComponentWise(left, right, Expression.Constant(SafeDivide));
+                return BinaryCall(nameof(ShaderRuntime.Divide), left, right);
             case "%":
-                return ComponentWise(left, right, Expression.Constant(Modulo));
+                return BinaryCall(nameof(ShaderRuntime.Modulo), left, right);
             case "==":
                 return Compare(left, right, 0);
             case "!=":
@@ -326,25 +321,56 @@ internal static class ShaderCompiler
         }
     }
 
-    private static readonly Func<float, float, float> SafeDivide = ShaderRuntime.SafeDivide;
-    private static readonly Func<float, float, float> Modulo = (a, b) => b == 0f ? 0f : a % b;
-
-    /// <summary>Builds a component-wise combination.</summary>
+    /// <summary>Builds a call to one of the component-wise runtime operations.</summary>
+    /// <param name="method">Runtime method name.</param>
     /// <param name="left">Left operand.</param>
     /// <param name="right">Right operand.</param>
-    /// <param name="combine">Function to apply.</param>
     /// <returns>The call expression.</returns>
-    private static Expression ComponentWise(
-        Expression left,
-        Expression right,
-        Expression combine) =>
-        Expression.Call(
-            typeof(ShaderRuntime),
-            nameof(ShaderRuntime.ComponentWise),
-            null,
-            left,
-            right,
-            combine);
+    private static Expression BinaryCall(string method, Expression left, Expression right) =>
+        Expression.Call(typeof(ShaderRuntime), method, null, left, right);
+
+    /// <summary>
+    /// Builds a swizzle whose components are selected at compile time. The source is bound to a
+    /// local first, so an expression like a texture call is evaluated once instead of once per
+    /// selected component.
+    /// </summary>
+    /// <param name="slots">Slot layout being filled.</param>
+    /// <param name="slotsParameter">Slot array parameter.</param>
+    /// <param name="samplerParameter">Sampler parameter.</param>
+    /// <param name="node">Member access to build.</param>
+    /// <returns>The swizzle expression.</returns>
+    private static Expression BuildSwizzle(
+        Dictionary<string, int> slots,
+        ParameterExpression slotsParameter,
+        ParameterExpression samplerParameter,
+        ShaderNode node)
+    {
+        Span<int> indices = stackalloc int[4];
+        var count = ShaderRuntime.ComponentIndices(node.Text, node.Position, indices);
+        var source = Expression.Variable(typeof(ShaderValue), "swizzleSource");
+        var get = typeof(ShaderValue).GetMethod(nameof(ShaderValue.Get))!;
+        var components = new Expression[4];
+        for (var index = 0; index < 4; index++)
+        {
+            components[index] = Expression.Call(
+                source,
+                get,
+                Expression.Constant(index < count ? indices[index] : 0));
+        }
+
+        return Expression.Block(
+            [source],
+            Expression.Assign(
+                source,
+                BuildExpression(slots, slotsParameter, samplerParameter, node.Left!)),
+            Expression.New(
+                ShaderValueConstructor,
+                components[0],
+                components[1],
+                components[2],
+                components[3],
+                Expression.Constant(count)));
+    }
 
     /// <summary>Builds a component-wise comparison.</summary>
     /// <param name="left">Left operand.</param>

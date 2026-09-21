@@ -87,6 +87,41 @@ internal static class ShaderRuntime
         return new ShaderValue(result[0], result[1], result[2], result[3], count);
     }
 
+    /// <summary>Adds two values component by component.</summary>
+    /// <param name="left">Left operand.</param>
+    /// <param name="right">Right operand.</param>
+    /// <returns>The sum.</returns>
+    public static ShaderValue Add(ShaderValue left, ShaderValue right) =>
+        ComponentWise(left, right, (a, b) => a + b);
+
+    /// <summary>Subtracts two values component by component.</summary>
+    /// <param name="left">Left operand.</param>
+    /// <param name="right">Right operand.</param>
+    /// <returns>The difference.</returns>
+    public static ShaderValue Subtract(ShaderValue left, ShaderValue right) =>
+        ComponentWise(left, right, (a, b) => a - b);
+
+    /// <summary>Multiplies two values component by component.</summary>
+    /// <param name="left">Left operand.</param>
+    /// <param name="right">Right operand.</param>
+    /// <returns>The product.</returns>
+    public static ShaderValue Multiply(ShaderValue left, ShaderValue right) =>
+        ComponentWise(left, right, (a, b) => a * b);
+
+    /// <summary>Divides two values component by component, treating a zero divisor as zero.</summary>
+    /// <param name="left">Left operand.</param>
+    /// <param name="right">Right operand.</param>
+    /// <returns>The quotient.</returns>
+    public static ShaderValue Divide(ShaderValue left, ShaderValue right) =>
+        ComponentWise(left, right, SafeDivide);
+
+    /// <summary>Takes the remainder of two values component by component.</summary>
+    /// <param name="left">Left operand.</param>
+    /// <param name="right">Right operand.</param>
+    /// <returns>The remainder.</returns>
+    public static ShaderValue Modulo(ShaderValue left, ShaderValue right) =>
+        ComponentWise(left, right, (a, b) => b == 0f ? 0f : a % b);
+
     /// <summary>Compares two values component by component, yielding one or zero.</summary>
     /// <param name="left">Left operand.</param>
     /// <param name="right">Right operand.</param>
