@@ -65,13 +65,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   stays the fallback, and the CPU/GPU tests keep the two within a level.
 
 ### Changed
-- Made the Skia runtime-effect passes the visualizer's default. `VisualizerWindow` now creates its
-  `PresetRenderer` with `UseSkiaPasses` enabled, so the warp, blur, video echo, borders, composite,
-  and comp passes run as Skia runtime effects, and anything the Skia path cannot handle still falls
-  back to the interpreter per pass. The frame passes' runtime effects are cached for the process,
-  because their SkSL is constant and Skia compiles an effect when it is created. Measured at the
-  default 480 x 270 with a per-pixel block, a warp shader, and a comp shader, the GPU path costs
-  49 ms per frame against the interpreter's 80 ms.
+- Made the compiled SkSL shader passes the visualizer's default. `VisualizerWindow` now creates its
+  `PresetRenderer` with `UseSkiaPasses` enabled, so a comp shader and a warp shader run as Skia
+  runtime effects; the interpreter stays the fallback for anything the Skia path cannot handle. The
+  full-frame passes (the geometric warp, the video echo, the borders, and the composite) stay on the
+  interpreter: measured on the raster Skia surface they were about 2.6 times slower than the
+  interpreter's in-place float passes, because each one converts the whole frame to an eight-bit
+  bitmap and back, so they are gated by the new `PresetRenderer.UseSkiaFramePasses` and off by
+  default. The frame passes' runtime effects are cached for the process, because their SkSL is
+  constant and Skia compiles an effect when it is created. Measured with the built-in presets at the
+  default 480 x 270, the shader-pass cutover costs 39 ms per frame on average against 57 ms before.
 
 ### Fixed
 - Made the SkSL emitter pass a file-scope variable into a helper that reads it. SkSL runtime effects

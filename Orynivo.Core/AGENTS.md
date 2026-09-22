@@ -130,9 +130,14 @@ This file applies to `Orynivo.Core/` and supplements `../AGENTS.md`.
   sampler and scales each sampler by its own `texsize_*`, and `PresetRenderer.UseSkiaPasses` gates
   it because the eight-bit Skia surface differs from the float interpreter by up to one level. The
   visualizer enables it by default and the interpreter stays the fallback, so a preset or pass the
-  Skia path cannot handle still renders. The frame passes' runtime effects are cached for the
-  process, because their SkSL is constant and Skia compiles an effect when it is created; keep that
-  cache, because rebuilding them every frame cost more than the passes.
+  Skia path cannot handle still renders. `UseSkiaPasses` covers the per-pixel shader passes (the
+  comp shader and a warp shader), whose compiled SkSL is faster than the interpreter; the full-frame
+  passes (the geometric warp, the video echo, the borders, and the composite) are gated separately
+  by `PresetRenderer.UseSkiaFramePasses` and off by default, because on the raster Skia surface each
+  converts the whole frame to an eight-bit bitmap and back and measured slower than the interpreter's
+  in-place float passes. The frame passes' runtime effects are cached for the process, because their
+  SkSL is constant and Skia compiles an effect when it is created; keep that cache, because
+  rebuilding them every frame cost more than the passes.
   `SkiaShaderRunner.BlurFrame` is the GPU blur pass and must keep reproducing `PixelBuffer.Blur`'s
   nine-tap clamped filter; the comp pass builds its blur levels from it, and the frame helpers
   (`GetBlur1`-`GetBlur3`) must keep scaling their normalised coordinate by `texsize`.

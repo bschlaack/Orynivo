@@ -681,7 +681,10 @@ to a `WriteableBitmap` that Skia scales up.
   translated yet.
 - 39f Sharper defaults - `Pending`: raise the default render resolution and frame rate to what
   the measured cost allows, keep the existing settings ranges, and document the recommended
-  values in README and the wiki.
+  values in README and the wiki. Measured after the shader-pass cutover, the built-in presets cost
+  39 ms per frame on average at 480 x 270, 70 ms at 640 x 360, and 156 ms at 960 x 540, so the
+  default resolution cannot be raised yet and stays 480 x 270 at 30 fps. The full-frame passes are
+  the next lever: they are single-threaded and allocate, which 39g addresses.
 - 39g Parallel remaining passes - `Pending`: the blur, decay, gamma, darken, echo, and composite
   passes still run on one thread even though they are row-independent. Give `PixelBuffer` a
   reusable blur scratch (it allocates one array per pass today), split those passes through
@@ -771,12 +774,14 @@ affordable. This is a project of its own and must keep the CPU path as the fallb
   reports as far apart computes the identical value on both paths and only the eight-bit clamp
   differs. The harness therefore still shows large differences for warp and comp presets, but those
   are the eight-bit Skia surface amplified through the feedback and the comp shader's squaring
-  (`ret *= ret`), not a semantic divergence. `VisualizerWindow` now enables `UseSkiaPasses`, and the
-  frame passes' runtime effects are cached for the process because their SkSL is constant and Skia
-  compiles an effect when it is created. Measured at the default 480 x 270 with a per-pixel block, a
-  warp shader, and a comp shader, the GPU path costs 49 ms per frame against the interpreter's 80 ms,
-  so the cutover is also faster at the current resolution; raising the default resolution (39f) is the
-  next step that benefits from it.
+  (`ret *= ret`), not a semantic divergence. `VisualizerWindow` enables `UseSkiaPasses`, so the
+  compiled SkSL runs the comp shader and a warp shader, and the frame passes' runtime effects are
+  cached for the process because their SkSL is constant and Skia compiles an effect when it is
+  created. The full-frame passes stay on the interpreter, gated by the new
+  `PresetRenderer.UseSkiaFramePasses` and off by default: measured on the raster Skia surface they
+  were about 2.6 times slower than the in-place float passes, because each converts the whole frame
+  to an eight-bit bitmap and back. With the shader-pass cutover the built-in presets cost 39 ms per
+  frame on average at 480 x 270 against 57 ms before.
 
 - 39h Remaining preset-block failures - `Done`: the numbered expression parts are joined the
   way Milkdrop does it (concatenation, with a separator only when the previous part is complete),

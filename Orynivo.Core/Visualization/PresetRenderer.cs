@@ -302,12 +302,21 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
     public bool HasShaders => _warpShaders.Count > 0 || _compShaders.Count > 0;
 
     /// <summary>
-    /// Gets or sets a value indicating whether a comp shader runs as a Skia runtime effect instead of
-    /// the interpreter. It is off by default because the Skia path carries the frame through eight-bit
-    /// textures, so its picture differs from the interpreter by up to one level; the cutover waits
-    /// until the result has been validated against the interpreter.
+    /// Gets or sets a value indicating whether the comp shader and a warp shader run as Skia runtime
+    /// effects instead of the interpreter. It is off by default because the Skia path carries the
+    /// frame through eight-bit textures, so its picture differs from the interpreter by up to one
+    /// level. The visualizer enables it: the compiled SkSL is faster than the interpreter for those
+    /// per-pixel passes.
     /// </summary>
     public bool UseSkiaPasses { get; set; }
+
+    /// <summary>
+    /// Gets or sets a value indicating whether the full-frame passes (the geometric warp, the video
+    /// echo, the borders, and the composite) run as Skia runtime effects. It is off by default
+    /// because those passes measured slower on the raster Skia surface than the interpreter's
+    /// in-place float passes, which have no per-frame bitmap conversion.
+    /// </summary>
+    public bool UseSkiaFramePasses { get; set; }
 
     /// <summary>
     /// Gets or sets a value indicating whether full-frame passes may use more than one thread.
@@ -624,39 +633,47 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
             Array.Clear(_motionCount);
         }
 
-        // The Skia path runs the whole warp stage when it can: the geometric warp for a preset with
-        // no per-pixel code and no warp shader, and a warp shader (with or without the per-pixel
-        // expression block) as a runtime effect. A per-pixel program that changes a value another
-        // pixel could read, or that records motion vectors, stays on the interpreter, which is the
-        // reference for those expressions.
-        if (UseSkiaPasses && !_perPixelWritesMotion && !recordMotion)
+        // The Skia path runs the warp stage when it can: the geometric warp for a preset with no
+        // per-pixel code and no warp shader, and a warp shader (with or without the per-pixel
+        // expression block) as a runtime effect. The geometric warp is a frame pass and stays on the
+        // interpreter unless frame passes are enabled; the warp shader is a per-pixel pass and uses
+        // the compiled SkSL. A per-pixel program that changes a value another pixel could read, or
+        // that records motion vectors, stays on the interpreter, which is the reference.
+        if (!_perPixelWritesMotion && !recordMotion)
         {
             if (_warpShaders.Count == 0 && Preset.PerPixel.IsEmpty)
             {
-                try
+                if (!UseSkiaFramePasses)
                 {
-                    SkiaShaderRunner.Warp(
-                        _previous,
-                        _warped,
-                        new SkiaShaderRunner.WarpParameters(
-                            zoom,
-                            zoomExp,
-                            rotation,
-                            centreX,
-                            centreY,
-                            offsetX,
-                            offsetY,
-                            stretchX,
-                            stretchY));
-                    _warpShaderMilliseconds = 0d;
-                    return;
+                    // Fall through to the interpreter's geometric warp.
                 }
-                catch (Exception exception)
+                else
                 {
-                    ShaderError = "warp (skia): " + exception.GetType().Name + ": " + exception.Message;
+                    try
+                    {
+                        SkiaShaderRunner.Warp(
+                            _previous,
+                            _warped,
+                            new SkiaShaderRunner.WarpParameters(
+                                zoom,
+                                zoomExp,
+                                rotation,
+                                centreX,
+                                centreY,
+                                offsetX,
+                                offsetY,
+                                stretchX,
+                                stretchY));
+                        _warpShaderMilliseconds = 0d;
+                        return;
+                    }
+                    catch (Exception exception)
+                    {
+                        ShaderError = "warp (skia): " + exception.GetType().Name + ": " + exception.Message;
+                    }
                 }
             }
-            else if (TrySkiaWarpPass(
+            else if (UseSkiaPasses && TrySkiaWarpPass(
                 zoom,
                 zoomExp,
                 rotation,
@@ -1937,7 +1954,7 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
     /// <summary>Draws the outer and inner Milkdrop borders over the warped frame.</summary>
     private void DrawBorders()
     {
-        if (UseSkiaPasses)
+        if (UseSkiaFramePasses)
         {
             try
             {
@@ -2035,7 +2052,7 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
             Read("echo_orient", Read("nVideoEchoOrientation", 0f)),
             0f,
             3f);
-        if (UseSkiaPasses)
+        if (UseSkiaFramePasses)
         {
             try
             {
@@ -2311,7 +2328,7 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
     /// <summary>Adds the freshly drawn overlay on top of the faded feedback image.</summary>
     private void Composite()
     {
-        if (UseSkiaPasses)
+        if (UseSkiaFramePasses)
         {
             try
             {
