@@ -7,6 +7,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Added
+- Added an OpenGL capability probe to the visualizer. With `ORYNIVO_VISUALIZER_OPENGL_PROBE=1` the
+  visualizer shows `Orynivo.Controls.VisualizerGlProbe` instead of its bitmap, draws a frame ramp, and
+  logs the negotiated GL version and frame count, so it can be confirmed whether the platform hands
+  out a GL context before the preset pipeline is moved onto it. It changes nothing unless that
+  variable is set.
 - Added the per-vertex mesh warp as an opt-in. `PresetRenderer.MeshPerPixelEnabled` makes the warp
   stage evaluate the preset's per-pixel program once per 64 x 48 mesh vertex and interpolate the
   motion it produced across the quad, which is what Milkdrop's per-vertex program does, instead of

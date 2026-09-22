@@ -1,6 +1,7 @@
 <Window x:Class="Orynivo.VisualizerWindow"
         xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:controls="using:Orynivo.Controls"
         Title="{DynamicResource L_Visualizer}"
         Icon="avares://Orynivo/Assets/Orynivo.ico"
         Width="960"
@@ -45,6 +46,9 @@
         <Image x:Name="VisualizerImage"
                Stretch="Fill"
                RenderOptions.BitmapInterpolationMode="HighQuality"/>
+
+        <controls:VisualizerGlProbe x:Name="GlProbe"
+                                    IsVisible="False"/>
 
         <Grid x:Name="OverlayRoot">
             <Border HorizontalAlignment="Left"

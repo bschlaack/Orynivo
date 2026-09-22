@@ -487,6 +487,16 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
   creations enable `PresetRenderer.UseSkiaPasses`, so the comp shader and a warp shader run as
   Skia runtime effects and the interpreter stays the per-pass fallback; the full-frame passes stay
   on the interpreter, and their effects are cached for the process because their SkSL is constant.
+  Be clear about what that is: `SkiaShaderRunner` builds its surfaces with
+  `SKSurface.Create(Info, pixels, rowBytes)`, which is Skia's **raster** constructor, so those
+  "Skia" passes are Skia's CPU runtime-effect JIT and **no part of the preset pipeline runs on the
+  GPU**. The finished frame is copied into a `WriteableBitmap`, and the GPU only blits that bitmap.
+  A comp shader that samples more than one blur level therefore costs tens to hundreds of
+  milliseconds and needs the budget adaptation described below; do not describe the Skia passes as
+  a GPU path, and do not remove the interpreter fallback on the assumption that Skia is
+  hardware-accelerated. `Orynivo.Controls.VisualizerGlProbe` (shown with
+  `ORYNIVO_VISUALIZER_OPENGL_PROBE=1`) is the capability probe for the real GPU pipeline recorded as
+  roadmap 40f; keep it free of renderer state so it stays a pure context check.
   `VisualizerWindow`
   owns `VisualizerAudioHub.IsActive`: while it is false the players skip the tap entirely, so
   a closed visualizer costs nothing. Never render, analyse, or evaluate preset expressions on

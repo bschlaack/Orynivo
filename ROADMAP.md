@@ -768,6 +768,37 @@ affordable. This is a project of its own and must keep the CPU path as the fallb
   managed SkiaSharp surface, so the existing CI matrix (Windows Debug/Release, the `linux-x64`
   artifact, and the macOS `Orynivo.app` bundles), the packaging scripts, and the signed release
   manifest already cover it and needed no change.
+- 40f A real GPU pipeline - `Pending`: section 40 was named "GPU pipeline", but nothing in it
+  reaches the GPU. `SkiaShaderRunner` creates its surfaces with
+  `SKSurface.Create(target.Info, target.GetPixels(), target.RowBytes)`, which is Skia's **raster**
+  constructor over CPU memory, so every "Skia" pass is Skia's CPU runtime-effect JIT; the finished
+  frame is then copied into a `WriteableBitmap` and the GPU only blits that bitmap. Measured on the
+  built-in presets the whole frame costs 6-16 ms at 480 x 270 and 16-59 ms at 960 x 540 with the warp
+  dominating, so 4K is roughly a second per frame. The reference implementation reaches 4K at high
+  frame rates because mesh, blur, and shaders run in DirectX/OpenGL.
+  The sanctioned way in is `Avalonia.OpenGL.Controls.OpenGlControlBase`, which ships in the already
+  referenced `Avalonia` 12.1.2 package (`Avalonia.OpenGL.dll`, verified) and gives a real GL context
+  inside the visual tree; `Avalonia.Win32` also references `Avalonia.Vulkan`. The verified surface is
+  `OnOpenGlInit(GlInterface)`, `OnOpenGlRender(GlInterface, int)`, `OnOpenGlDeinit(GlInterface)`,
+  `OnOpenGlLost()`, `RequestNextFrameRendering()`, and `GlVersion`; `GlInterface` exposes
+  `CreateShader`/`CompileShaderAndGetError`/`CreateProgram`/`LinkProgramAndGetError`/`UseProgram`,
+  `GenBuffer`/`BindBuffer`/`BufferData`, `GenVertexArray`/`BindVertexArray`,
+  `GenTexture`/`BindTexture`/`TexImage2D`/`TexSubImage2D`/`TexParameteri`, `VertexAttribPointer`,
+  `DrawArrays`, `Viewport`, `ClearColor`/`Clear`, and `Flush`.
+  `Orynivo.Controls.VisualizerGlProbe` is the capability probe: with
+  `ORYNIVO_VISUALIZER_OPENGL_PROBE=1` the visualizer shows it instead of the bitmap and it draws a
+  frame ramp, logging `OpenGL probe: GL <version> frames=<n>` through `SeekDiagnostics`, so the
+  context can be confirmed per platform before anything depends on it.
+  The steps after the probe, each behind its own flag with the CPU renderer as the fallback: (1)
+  present the CPU frame as a GL texture instead of the bitmap, which removes the upload path's
+  copies; (2) move the geometric warp to a mesh draw, using the interpolated per-vertex motion the
+  mesh already computes; (3) move the full-frame passes (blur, decay, echo, borders, composite) to
+  ping-pong FBOs in float16, which also removes the eight-bit colour drift the Skia path carries;
+  (4) move the comp and warp shaders to GLSL, retargeting `ShaderTranspiler` from SkSL to GLSL and
+  compiling in the GL context. The GLSL dialect differs per platform (ANGLE's GLES on Windows,
+  desktop GL on Linux, CGL on macOS), so the shader preamble must be chosen from the negotiated
+  version rather than hard-coded.
+
 - 40e Cutover and validation - `Done`: the GPU path is the visualizer's default where it is
   available and the CPU path stays the fallback, and a comparison harness validates both against the
   same reference frames. `PresetSkiaComparisonDiagnosticTests` is that harness. The CPU-side causes

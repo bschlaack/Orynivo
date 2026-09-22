@@ -106,6 +106,21 @@ public partial class VisualizerWindow : Window
         HintTextBlock.Text = LocalizationManager.Current.VisualizerHint;
         UpdatePresetLabel();
 
+        // Capability probe: whether Avalonia hands out an OpenGL context decides whether the preset
+        // pipeline can move off the CPU at all, so it can be checked without changing the renderer.
+        if (Environment.GetEnvironmentVariable("ORYNIVO_VISUALIZER_OPENGL_PROBE") == "1")
+        {
+            VisualizerImage.IsVisible = false;
+            GlProbe.IsVisible = true;
+            GlProbe.FrameRendered += () =>
+            {
+                var info = GlProbe.GlError is { Length: > 0 } error
+                    ? $"OpenGL probe failed: {error}"
+                    : $"OpenGL probe: {GlProbe.GlInfo} frames={GlProbe.Frames}";
+                SeekDiagnostics.Log("visualizer", info);
+            };
+        }
+
         Opened += (_, _) =>
         {
             VisualizerAudioHub.Shared.Clear();
