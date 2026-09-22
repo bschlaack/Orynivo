@@ -7,6 +7,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Added
+- Added the per-vertex mesh warp. `PresetRenderer.MeshPerPixelEnabled` (on by default) makes the warp
+  stage evaluate the preset's per-pixel program once per 64 x 48 mesh vertex and interpolate the
+  motion it produced across the quad, which is what Milkdrop's per-vertex program does, instead of
+  running it for every screen pixel. The interpolation is a lerp, so a program that writes a constant
+  motion is byte-identical to the per-pixel path; a program that writes `x` or `y`, records motion
+  vectors, or feeds a warp shader keeps the per-pixel path, because an interpolated sample position
+  has no meaning. The stage also became cheaper: 3,185 program runs instead of one per screen pixel.
+- Added `scripts/projectm-oracle/`, a local development harness that renders a preset with the
+  reference implementation (projectM) and with Orynivo and reports the per-frame mean channel
+  difference and correlation. It links a projectM checkout the developer builds separately; no
+  projectM source is copied into the repository and no Orynivo artifact contains or links it.
 - Added `PresetSkiaComparisonDiagnosticTests`, which renders a sample of a real collection with and
   without `PresetRenderer.UseSkiaPasses` and reports how far the two pictures drift, grouped by
   whether the preset has a warp shader, a comp shader, a per-pixel block, or none. It is the

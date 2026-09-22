@@ -940,10 +940,24 @@ affordable. This is a project of its own and must keep the CPU path as the fallb
   lose their shaders at run time to an unimplemented built-in (`conway` is the known one) or to the
   interpreter's loop budget, so those blocks are disabled after the first frame. Both are recorded
   as their own work rather than being hidden by the budget.
-  **Remaining.** Two things are still open in this phase. The per-pixel expression program still runs
-  per screen pixel instead of on Milkdrop's roughly 32 x 24 mesh, which is the largest remaining
-  fidelity gap and a behaviour change to the warp that needs identical-frame verification. And the
-  `conway` built-in is unimplemented, so a preset that calls it loses that block.
+  **Remaining.** One thing is still open in this phase. The `conway` built-in is unimplemented, so a
+  preset that calls it loses that block.
+  The per-pixel mesh is done. `PresetRenderer.MeshPerPixelEnabled` (on by default) makes the warp
+  evaluate the per-pixel program once per 64 x 48 mesh vertex — the reference's default grid — and
+  interpolate the motion it produced across the quad, which is what Milkdrop's per-vertex program
+  does; a program that writes `x` or `y`, records motion vectors, or feeds a warp shader keeps the
+  per-pixel path, because an interpolated sample position has no meaning. The interpolation is a
+  lerp, so a constant motion stays byte-identical to the per-pixel path; `PerVertexMeshTests` proves
+  that for zoom, rotation, centre, and stretch, proves that a position-varying motion is
+  interpolated, and proves that a position-writing program ignores the setting. The mesh also makes
+  the stage cheaper: 3,185 program runs instead of one per screen pixel.
+  A comparison harness now exists for the fidelity work that remains:
+  `scripts/projectm-oracle/` builds projectM as the reference, renders a preset with it and with
+  Orynivo, and reports the mean channel difference and the correlation per frame. It is a local
+  development tool, links a projectM checkout the developer builds, and is not part of any build,
+  test run, or release artifact. Against a few presets the correlation is weak but positive where
+  the two renderers draw a similar structure, which is the signal the remaining shader and audio
+  work has to move.
 **Tests**: each phase adds its own; 39a is the prerequisite for claiming any speed-up.
 
 **Commit**: `perf(visualizer): add render measurement` (39a), then one commit per phase

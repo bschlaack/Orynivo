@@ -200,6 +200,15 @@ This file applies to `Orynivo.Core/` and supplements `../AGENTS.md`.
   warp shader or an active motion grid keeps it sequential for the same reason. Never give two
   workers the same slot array, and never claim a speed-up without the identical-frame test in
   `ParallelWarpTests`.
+  `PresetRenderer.MeshPerPixelEnabled` makes the warp evaluate the per-pixel program once per mesh
+  vertex and interpolate the motion it produced across the quad, which is what Milkdrop's per-vertex
+  program does; `BuildMesh` fills the mesh from the per-frame values first, so a program that exceeds
+  the warp budget leaves a plain warp rather than an unfinished mesh, and it restores the per-frame
+  motion afterwards because a later stage means the frame's values, not the last vertex's. The
+  interpolation is a lerp, not a weighted sum, so a constant motion stays byte-identical to the
+  per-pixel path — `PerVertexMeshTests` asserts exactly that and that a varying motion is
+  interpolated. A program that writes `x` or `y`, records motion vectors, or feeds a warp shader
+  keeps the per-pixel path, because an interpolated sample position has no meaning.
   The preset compiler must accept the Milkdrop function set, because a block it cannot compile is
   dropped and takes that preset's motion with it: `above`, `below`, and `equal` yield one or zero
   (never a boolean), and `sqr`, `sigmoid`, `band`, `bor`, and `bnot` belong to it too. Names are

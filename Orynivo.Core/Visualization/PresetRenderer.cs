@@ -109,6 +109,9 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
     // change, and the change carries into the next pixel. That costs a read per pixel, so it is
     // only done for the presets that actually write one of them.
     private readonly bool _perPixelWritesMotion;
+    // Milkdrop evaluates the per-pixel program once per mesh vertex, so a program that writes the
+    // sample position itself cannot be represented by the mesh and keeps the per-pixel path.
+    private readonly bool _perPixelWritesPosition;
     private readonly int _slotZoom;
     private readonly int _slotZoomExp;
     private readonly int _slotRot;
@@ -143,6 +146,18 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
     /// <summary>Motion-vector grid rows.</summary>
     private const int MotionRows = 6;
 
+    /// <summary>Mesh grid columns, matching the reference implementation's default.</summary>
+    private const int MeshGridX = 64;
+
+    /// <summary>Mesh grid rows, matching the reference implementation's default.</summary>
+    private const int MeshGridY = 48;
+
+    /// <summary>Motion values the mesh carries per vertex: zoom, zoomexp, rot, cx, cy, dx, dy, sx, sy.</summary>
+    private const int MeshValues = 9;
+
+    /// <summary>The interpolated motion the per-pixel program produced per mesh vertex.</summary>
+    private readonly float[] _meshMotion = new float[(MeshGridX + 1) * (MeshGridY + 1) * MeshValues];
+
     /// <summary>Creates a renderer for one preset.</summary>
     
     /// <param name="preset">Preset to run.</param>
@@ -166,6 +181,7 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
         _perPixelUsesRadius = preset.PerPixel.Uses("rad");
         _perPixelUsesAngle = preset.PerPixel.Uses("ang");
         _perPixelWritesMotion = MotionVariables.Any(preset.PerPixel.Writes);
+        _perPixelWritesPosition = preset.PerPixel.Writes("x") || preset.PerPixel.Writes("y");
         _slotZoom = preset.Layout.IndexOf("zoom");
         _slotZoomExp = preset.Layout.IndexOf("zoomexp");
         _slotRot = preset.Layout.IndexOf("rot");
@@ -323,6 +339,17 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
     /// It exists so a test can compare both paths and prove they render identical frames.
     /// </summary>
     public bool ParallelismEnabled { get; set; } = true;
+
+    /// <summary>
+    /// Gets or sets a value indicating whether the per-pixel program runs once per mesh vertex and
+    /// its motion is interpolated across the frame, the way Milkdrop evaluates its per-vertex
+    /// program, instead of running for every pixel. It applies only when the program writes motion
+    /// and no sample position; a program that writes <c>x</c> or <c>y</c>, records motion vectors,
+    /// or feeds a warp shader keeps the per-pixel path. The interpolated result equals the
+    /// per-pixel result when the program writes a constant, which is what the identical-frame test
+    /// asserts.
+    /// </summary>
+    public bool MeshPerPixelEnabled { get; set; } = true;
 
     /// <summary>
     /// Gets a value indicating whether this preset's warp stage may run in parallel at all. It is
@@ -829,6 +856,22 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
         }
 
         _warpShaderMilliseconds = 0d;
+
+        // Milkdrop runs the per-pixel program once per mesh vertex and interpolates the motion it
+        // produced across the quad. Our per-pixel path runs it for every pixel, which is finer than
+        // the reference and costs more; the mesh is the faithful one. A program that writes the
+        // sample position has no interpolated meaning, and one that records motion vectors keeps
+        // the per-pixel path.
+        if (MeshPerPixelEnabled && _perPixelWritesMotion && !_perPixelWritesPosition && !recordMotion)
+        {
+            BuildMesh(zoom, zoomExp, rotation, centreX, centreY, offsetX, offsetY, stretchX, stretchY);
+            if (ParallelismEnabled)
+                ParallelRows.For(height, MeshRows);
+            else
+                MeshRows(-1, 0, height);
+            return;
+        }
+
         if (ParallelismEnabled && _canParallelizeWarp && !recordMotion)
         {
             // Each worker starts from the per-frame values, so a per-pixel program sees the same
@@ -841,6 +884,190 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
         {
             WarpRows(-1, 0, height);
         }
+
+        // The mesh carries one motion value per grid vertex; a pixel reads the four vertices around
+        // it and interpolates between them.
+        float MeshValue(int vertexX, int vertexY, int value) =>
+            _meshMotion[(((vertexY * (MeshGridX + 1)) + vertexX) * MeshValues) + value];
+
+        float InterpolateMesh(float meshX, float meshY, int value)
+        {
+            var x0 = (int)meshX;
+            if (x0 >= MeshGridX)
+                x0 = MeshGridX - 1;
+            var y0 = (int)meshY;
+            if (y0 >= MeshGridY)
+                y0 = MeshGridY - 1;
+            var fractionX = meshX - x0;
+            var fractionY = meshY - y0;
+            // A lerp, not a weighted sum: it is exact when the corners agree, which is what makes
+            // the constant-motion case byte-identical to the per-pixel path.
+            var top = MeshValue(x0, y0, value) +
+                      ((MeshValue(x0 + 1, y0, value) - MeshValue(x0, y0, value)) * fractionX);
+            var bottom = MeshValue(x0, y0 + 1, value) +
+                         ((MeshValue(x0 + 1, y0 + 1, value) - MeshValue(x0, y0 + 1, value)) * fractionX);
+            return top + ((bottom - top) * fractionY);
+        }
+
+        void MeshRows(int worker, int from, int to)
+        {
+            var target = _warped.RawPixels;
+            var sample = worker < 0 ? _sample : _workerSample[worker];
+            for (var y = from; y < to; y++)
+            {
+                var normalizedY = height > 1 ? (y / (float)(height - 1) * 2f) - 1f : 0f;
+                var meshY = Math.Clamp((normalizedY + 1f) * 0.5f * MeshGridY, 0f, MeshGridY - 0.0001f);
+                for (var x = 0; x < width; x++)
+                {
+                    var normalizedX = width > 1 ? (x / (float)(width - 1) * 2f) - 1f : 0f;
+                    var meshX = Math.Clamp((normalizedX + 1f) * 0.5f * MeshGridX, 0f, MeshGridX - 0.0001f);
+
+                    var zoomNow = Math.Max(0.01f, InterpolateMesh(meshX, meshY, 0));
+                    var zoomExpNow = InterpolateMesh(meshX, meshY, 1);
+                    var rotationNow = InterpolateMesh(meshX, meshY, 2);
+                    var centreXNow = InterpolateMesh(meshX, meshY, 3);
+                    var centreYNow = InterpolateMesh(meshX, meshY, 4);
+                    var offsetXNow = InterpolateMesh(meshX, meshY, 5);
+                    var offsetYNow = InterpolateMesh(meshX, meshY, 6);
+                    var stretchXNow = InterpolateMesh(meshX, meshY, 7);
+                    var stretchYNow = InterpolateMesh(meshX, meshY, 8);
+
+                    var warpedX = (normalizedX - centreXNow) * stretchXNow;
+                    var warpedY = (normalizedY - centreYNow) * stretchYNow;
+                    var cosNow = MathF.Cos(rotationNow);
+                    var sinNow = MathF.Sin(rotationNow);
+                    var rotatedX = (warpedX * cosNow) - (warpedY * sinNow);
+                    var rotatedY = (warpedX * sinNow) + (warpedY * cosNow);
+                    var pixelZoom = zoomNow;
+                    if (needsRadius && zoomExpNow != 1f)
+                    {
+                        var radius = MathF.Sqrt((rotatedX * rotatedX) + (rotatedY * rotatedY));
+                        pixelZoom = MathF.Pow(zoomNow, 1f + (zoomExpNow * radius * 2f));
+                    }
+
+                    var sampleX = (rotatedX * pixelZoom) + centreXNow + offsetXNow;
+                    var sampleY = (rotatedY * pixelZoom) + centreYNow + offsetYNow;
+                    _previous.SampleBilinear((sampleX * 0.5f) + 0.5f, (sampleY * 0.5f) + 0.5f, sample);
+
+                    var offset = (((y * width) + x) * 4);
+                    target[offset] = sample[0];
+                    target[offset + 1] = sample[1];
+                    target[offset + 2] = sample[2];
+                    target[offset + 3] = sample[3];
+                }
+            }
+        }
+    }
+
+    /// <summary>
+    /// Evaluates the per-pixel program once per mesh vertex and keeps the motion it produced, so the
+    /// warp can interpolate it across the frame the way Milkdrop does. The program shares the
+    /// preset's slot array with the per-frame block, so it runs on the renderer's own slots and the
+    /// per-frame motion values are put back afterwards; a later stage must see the frame's values,
+    /// not the last vertex's. Every vertex starts at the frame values, so a program that exceeds the
+    /// warp budget leaves a plain warp behind instead of an unfinished mesh.
+    /// </summary>
+    /// <param name="zoom">Per-frame zoom factor.</param>
+    /// <param name="zoomExp">Per-frame zoom exponent.</param>
+    /// <param name="rotation">Per-frame rotation in radians.</param>
+    /// <param name="centreX">Per-frame rotation and zoom centre x.</param>
+    /// <param name="centreY">Per-frame rotation and zoom centre y.</param>
+    /// <param name="offsetX">Per-frame translation x.</param>
+    /// <param name="offsetY">Per-frame translation y.</param>
+    /// <param name="stretchX">Per-frame horizontal stretch.</param>
+    /// <param name="stretchY">Per-frame vertical stretch.</param>
+    private void BuildMesh(
+        float zoom,
+        float zoomExp,
+        float rotation,
+        float centreX,
+        float centreY,
+        float offsetX,
+        float offsetY,
+        float stretchX,
+        float stretchY)
+    {
+        var aspectX = Read("aspectx", 1f);
+        var aspectY = Read("aspecty", 1f);
+        for (var vertex = 0; vertex < (MeshGridX + 1) * (MeshGridY + 1); vertex++)
+        {
+            var index = vertex * MeshValues;
+            _meshMotion[index] = zoom;
+            _meshMotion[index + 1] = zoomExp;
+            _meshMotion[index + 2] = rotation;
+            _meshMotion[index + 3] = centreX;
+            _meshMotion[index + 4] = centreY;
+            _meshMotion[index + 5] = offsetX;
+            _meshMotion[index + 6] = offsetY;
+            _meshMotion[index + 7] = stretchX;
+            _meshMotion[index + 8] = stretchY;
+        }
+
+        if (_perPixelSuspended)
+        {
+            // The program is still in its cool-down; the mesh keeps the frame values above. The
+            // cool-down itself is counted where the per-pixel path counts it, earlier in the stage.
+            return;
+        }
+
+        var frameZoom = Read(_slots, _slotZoom, zoom);
+        var frameZoomExp = Read(_slots, _slotZoomExp, zoomExp);
+        var frameRotation = Read(_slots, _slotRot, rotation);
+        var frameCentreX = Read(_slots, _slotCx, centreX);
+        var frameCentreY = Read(_slots, _slotCy, centreY);
+        var frameOffsetX = Read(_slots, _slotDx, offsetX);
+        var frameOffsetY = Read(_slots, _slotDy, offsetY);
+        var frameStretchX = Read(_slots, _slotSx, stretchX);
+        var frameStretchY = Read(_slots, _slotSy, stretchY);
+        var suspended = false;
+        for (var gridY = 0; gridY <= MeshGridY && !suspended; gridY++)
+        {
+            var normalizedY = (gridY / (float)MeshGridY * 2f) - 1f;
+            for (var gridX = 0; gridX <= MeshGridX; gridX++)
+            {
+                if ((gridX & 63) == 0 && _warpClock.Elapsed.TotalMilliseconds > WarpStageBudgetMilliseconds)
+                {
+                    // A looping program can still be too expensive; the vertices left over keep the
+                    // frame values, and the next frames skip the program until the cool-down ends.
+                    _perPixelSuspended = true;
+                    suspended = true;
+                    break;
+                }
+
+                var normalizedX = (gridX / (float)MeshGridX * 2f) - 1f;
+                // Milkdrop hands the program the vertex position and the aspect-scaled polar pair.
+                var aspectVertexX = normalizedX * aspectX;
+                var aspectVertexY = normalizedY * aspectY;
+                Write(_slots, _slotX, normalizedX);
+                Write(_slots, _slotY, normalizedY);
+                Write(_slots, _slotRad, MathF.Sqrt((aspectVertexX * aspectVertexX) + (aspectVertexY * aspectVertexY)));
+                Write(_slots, _slotAng, -MathF.Atan2(aspectVertexY, aspectVertexX));
+                Preset.PerPixel.Execute(_slots);
+
+                var index = (((gridY * (MeshGridX + 1)) + gridX) * MeshValues);
+                _meshMotion[index] = Math.Max(0.01f, Read(_slots, _slotZoom, zoom));
+                _meshMotion[index + 1] = Read(_slots, _slotZoomExp, zoomExp);
+                _meshMotion[index + 2] = Read(_slots, _slotRot, rotation);
+                _meshMotion[index + 3] = Read(_slots, _slotCx, centreX);
+                _meshMotion[index + 4] = Read(_slots, _slotCy, centreY);
+                _meshMotion[index + 5] = Read(_slots, _slotDx, offsetX);
+                _meshMotion[index + 6] = Read(_slots, _slotDy, offsetY);
+                _meshMotion[index + 7] = Read(_slots, _slotSx, stretchX);
+                _meshMotion[index + 8] = Read(_slots, _slotSy, stretchY);
+            }
+        }
+
+        // Put the frame's motion values back: the comp shader and the post-processing stages read
+        // them, and they mean the frame's values there, not the last vertex's.
+        Write(_slots, _slotZoom, frameZoom);
+        Write(_slots, _slotZoomExp, frameZoomExp);
+        Write(_slots, _slotRot, frameRotation);
+        Write(_slots, _slotCx, frameCentreX);
+        Write(_slots, _slotCy, frameCentreY);
+        Write(_slots, _slotDx, frameOffsetX);
+        Write(_slots, _slotDy, frameOffsetY);
+        Write(_slots, _slotSx, frameStretchX);
+        Write(_slots, _slotSy, frameStretchY);
     }
 
     /// <summary>
