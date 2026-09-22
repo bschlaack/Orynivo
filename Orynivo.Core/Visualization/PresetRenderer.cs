@@ -1209,9 +1209,17 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
         values[11] = ShaderValue.Scalar(Read("aspecty", 1f));
         values[12] = ShaderValue.Vector(width, height, 1f / Math.Max(1, width), 1f / Math.Max(1, height), 4);
         values[13] = ShaderValue.Vector(_randFrame[0], _randFrame[1], _randFrame[2], _randFrame[3], 4);
-        // Milkdrop shaders use "aspect" as the float2 pair, and a preset that swizzles it failed
-        // outright when only the two scalars were bound, which disabled that shader.
-        values[14] = ShaderValue.Vector(Read("aspectx", 1f), Read("aspecty", 1f), 0f, 0f, 2);
+        // Milkdrop shaders use "aspect" as the float4 pair, and a preset that swizzles it failed
+        // outright when only the two scalars were bound, which disabled that shader. zw is the
+        // reciprocal the presets read as aspect.zw.
+        var aspectX = Read("aspectx", 1f);
+        var aspectY = Read("aspecty", 1f);
+        values[14] = ShaderValue.Vector(
+            aspectX,
+            aspectY,
+            1f / Math.Max(0.0001f, aspectX),
+            1f / Math.Max(0.0001f, aspectY),
+            4);
         foreach (var compiled in _compiledWarp)
             SeedCompiledShader(compiled, values);
 
@@ -1462,12 +1470,23 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
 
     /// <summary>Collects the vector uniforms the shader reads.</summary>
     /// <returns>The vector uniforms.</returns>
-    private IReadOnlyDictionary<string, float[]> BuildSkiaVectors() =>
-        new Dictionary<string, float[]>(StringComparer.Ordinal)
+    private IReadOnlyDictionary<string, float[]> BuildSkiaVectors()
+    {
+        var aspectX = Read("aspectx", 1f);
+        var aspectY = Read("aspecty", 1f);
+        return new Dictionary<string, float[]>(StringComparer.Ordinal)
         {
-            ["aspect"] = [Read("aspectx", 1f), Read("aspecty", 1f)],
+            // Milkdrop's aspect is a float4 whose zw are the reciprocals presets read as aspect.zw.
+            ["aspect"] =
+            [
+                aspectX,
+                aspectY,
+                1f / Math.Max(0.0001f, aspectX),
+                1f / Math.Max(0.0001f, aspectY)
+            ],
             ["rand_frame"] = _randFrame
         };
+    }
 
     /// <summary>Writes the variables every shader can read for this pixel.</summary>
     /// <param name="interpreter">Shader about to run.</param>
@@ -1500,9 +1519,18 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
             interpreter.SetVariable("t" + index, Read("t" + index, 0f));
         interpreter.SetVariable("aspectx", Read("aspectx", 1f));
         interpreter.SetVariable("aspecty", Read("aspecty", 1f));
+        // Milkdrop's aspect is a float4: xy is the aspect and zw its reciprocal, which presets use
+        // as aspect.zw. projectM binds the same four components to its first shader constant.
+        var aspectX = Read("aspectx", 1f);
+        var aspectY = Read("aspecty", 1f);
         interpreter.SetVariable(
             "aspect",
-            ShaderValue.Vector(Read("aspectx", 1f), Read("aspecty", 1f), 0f, 0f, 2));
+            ShaderValue.Vector(
+                aspectX,
+                aspectY,
+                1f / Math.Max(0.0001f, aspectX),
+                1f / Math.Max(0.0001f, aspectY),
+                4));
         interpreter.SetVariable("rand_frame", ShaderValue.Vector(_randFrame[0], _randFrame[1], _randFrame[2], _randFrame[3], 4));
         var x = (u * 2f) - 1f;
         var y = (v * 2f) - 1f;

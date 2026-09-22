@@ -65,6 +65,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   stays the fallback, and the CPU/GPU tests keep the two within a level.
 
 ### Fixed
+- Made the shader `aspect` variable a `float4` whose `zw` are the reciprocals of `xy`, matching
+  Milkdrop and projectM (whose first shader constant is `(aspectX, aspectY, 1/aspectX, 1/aspectY)`).
+  A preset that read `aspect.zw` failed to translate before, so the share of shaders that translate
+  and are accepted by Skia rose from 748 to 760 of 764.
 - Made the GPU warp pass build `sampler_blur1`-`sampler_blur3` from the previous frame instead of
   binding them to the unblurred picture, and aligned the CPU blur with it: `PresetRenderer.SampleBlur`
   now blurs the same frame `sampler_main` refers to (the previous frame during the warp and the

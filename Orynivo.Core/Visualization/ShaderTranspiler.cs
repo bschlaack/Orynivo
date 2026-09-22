@@ -51,7 +51,7 @@ public static class ShaderTranspiler
             ["bass_att"] = 1,
             ["mid_att"] = 1,
             ["treb_att"] = 1,
-            ["aspect"] = 2,
+            ["aspect"] = 4,
             ["aspectx"] = 1,
             ["aspecty"] = 1,
             ["rand_frame"] = 4,
@@ -198,7 +198,7 @@ public static class ShaderTranspiler
         uniform float bass_att;
         uniform float mid_att;
         uniform float treb_att;
-        uniform float2 aspect;
+        uniform float4 aspect;
         uniform float4 rand_frame;
         uniform float4 rand_preset;
         uniform shader sampler_main;

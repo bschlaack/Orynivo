@@ -115,6 +115,18 @@ public sealed class SkiaWarpPassTests
         }
     }
 
+    /// <summary>A warp shader that reads the reciprocal aspect matches the interpreter.</summary>
+    [Fact]
+    public void RenderFrame_SkiaWarpShaderAspectMatchesTheInterpreter()
+    {
+        const string Preset =
+            "fDecay=1\nwave_a=0\n" +
+            "warp_1=float4 main(float2 uv : TEXCOORD0) : COLOR { ret = float3(uv * aspect.zw, 0.5); }";
+
+        var difference = CompareRendererPaths(Preset, frames: 2);
+        Assert.InRange(difference, 0.0001f, 0.02f);
+    }
+
     /// <summary>A warp shader that samples a blurred frame matches the interpreter.</summary>
     [Fact]
     public void RenderFrame_SkiaWarpShaderBlurMatchesTheInterpreter()

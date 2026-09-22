@@ -749,7 +749,11 @@ affordable. This is a project of its own and must keep the CPU path as the fallb
   indices, bounded `for` loops, and reserved names), which lifted the share of shaders that translate
   and are accepted by Skia from 395 to 748 of 764, that is from 52 to 98 percent. The remaining 16
   are a few `aspect.zw` presets, constant divisions by zero, two shaders whose helper reads a global
-  variable, and a couple of vector comparisons.
+  variable, and a couple of vector comparisons. The `aspect.zw` group is fixed: Milkdrop's `aspect`
+  is a `float4` whose `zw` are the reciprocals of `xy`, which projectM binds as its first shader
+  constant `(aspectX, aspectY, 1/aspectX, 1/aspectY)`. That lifted the share to 760 of 764; what
+  remains are two shaders whose helper reads a global variable, one vector comparison, and one
+  `float3 * float4` mismatch.
 - 40d Platform, packaging, and CI - `Pending`: native dependencies for Windows, Linux, and macOS,
   packaging, the signed release manifest, and the CI build matrix.
 - 40e Cutover and validation - `In progress`: the GPU path becomes the default where it is available,

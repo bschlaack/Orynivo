@@ -78,8 +78,9 @@ This file applies to `Orynivo.Core/` and supplements `../AGENTS.md`.
   finish. A disabled shader silently costs a preset its picture, so keep `ShaderError` carrying the
   reason, and keep the three bindings real presets depend on: `ret` is the output variable when a
   body returns nothing (`ShaderInterpreter.ReturnedValue` says which case applies), `GetPixel`
-  accepts both `GetPixel(x, y)` and `GetPixel(float2(x, y))`, and `aspect` is bound as the float2
-  pair next to the `aspectx`/`aspecty` scalars. Motion vectors are gated by `bMotionVectors`
+  accepts both `GetPixel(x, y)` and `GetPixel(float2(x, y))`, and `aspect` is bound as the float4
+  `(aspectx, aspecty, 1/aspectx, 1/aspecty)` next to the `aspectx`/`aspecty` scalars, because presets
+  read `aspect.zw` and Milkdrop/projectM define it that way. Motion vectors are gated by `bMotionVectors`
   (`mv_enabled`, default off), never by `mv_l`, which is only their length. The interpreter
   walks the tree per pixel, which is the known cost limit; a JIT compiler for shaders is the
   documented follow-up if the CPU cost proves too high.
