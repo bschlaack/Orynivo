@@ -182,7 +182,11 @@ This file applies to `Orynivo.Core/` and supplements `../AGENTS.md`.
   rendered frame allocation-free, which `RenderTimingTests` asserts.
   Full-frame passes may run in parallel only when they are row-independent: a pixel reads the
   source buffer and writes its own pixel, nothing else. `ParallelRows.For` owns the split and
-  keeps small frames on the calling thread. The warp is parallel only when the per-pixel program
+  keeps small frames on the calling thread. The blur, decay, gamma, centre darkening, video echo,
+  and composite passes are row-independent and split the same way, gated by
+  `PresetRenderer.ParallelismEnabled`; `PixelBuffer.Blur` reuses one scratch array instead of
+  allocating a copy per pass, and `PresetRenderer` gives each worker its own sample scratch. The warp
+  is parallel only when the per-pixel program
   writes nothing but the values the engine re-seeds per pixel (`x`, `y`, `rad`, `ang`), because a
   value written by one pixel and read by another would make the picture depend on the split; a
   warp shader or an active motion grid keeps it sequential for the same reason. Never give two

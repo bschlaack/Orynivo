@@ -225,7 +225,7 @@ internal partial class SettingsView : UserControl
         VisualizerResolutionComboBox.SelectedItem = visualizerResolutionChoices
             .FirstOrDefault(choice => choice.Value.Width == settings.VisualizerRenderWidth &&
                                       choice.Value.Height == settings.VisualizerRenderHeight)
-            ?? visualizerResolutionChoices[3];
+            ?? visualizerResolutionChoices[2];
         var visualizerFrameRateChoices = new[]
         {
             new SettingChoice<int>(120, "120"),
@@ -236,7 +236,7 @@ internal partial class SettingsView : UserControl
         VisualizerFrameRateComboBox.ItemsSource = visualizerFrameRateChoices;
         VisualizerFrameRateComboBox.SelectedItem = visualizerFrameRateChoices
             .FirstOrDefault(choice => choice.Value == Math.Clamp(settings.VisualizerFrameRate, 5, 240))
-            ?? visualizerFrameRateChoices[2];
+            ?? visualizerFrameRateChoices[1];
         MaxOutputSampleRateComboBox.ItemsSource = maxOutputSampleRateChoices;
         MaxOutputSampleRateComboBox.SelectedItem = maxOutputSampleRateChoices
             .FirstOrDefault(choice => choice.Value == Math.Clamp(settings.MaxOutputSampleRateHz, 0, 768_000))
@@ -590,17 +590,17 @@ internal partial class SettingsView : UserControl
     public int VisualizerRenderWidthValue =>
         VisualizerResolutionComboBox.SelectedItem is SettingChoice<VisualizerResolution> choice
             ? choice.Value.Width
-            : 480;
+            : 640;
 
     /// <summary>Gets the configured visualizer frame height in pixels.</summary>
     public int VisualizerRenderHeightValue =>
         VisualizerResolutionComboBox.SelectedItem is SettingChoice<VisualizerResolution> choice
             ? choice.Value.Height
-            : 270;
+            : 360;
 
     /// <summary>Gets the configured visualizer target frame rate.</summary>
     public int VisualizerFrameRateValue =>
-        VisualizerFrameRateComboBox.SelectedItem is SettingChoice<int> choice ? choice.Value : 30;
+        VisualizerFrameRateComboBox.SelectedItem is SettingChoice<int> choice ? choice.Value : 60;
 
     /// <summary>Gets the configured maximum PCM output sample rate in hertz, or zero for automatic.</summary>
     public int MaxOutputSampleRateHz =>

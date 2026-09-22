@@ -679,16 +679,18 @@ to a `WriteableBitmap` that Skia scales up.
   remaining blocker for real collections is 39i, which is unblocked now: a preset whose shaders are
   Milkdrop 2 templates still reports `shaders=warp0/comp0` because the template dialect is not
   translated yet.
-- 39f Sharper defaults - `Pending`: raise the default render resolution and frame rate to what
-  the measured cost allows, keep the existing settings ranges, and document the recommended
-  values in README and the wiki. Measured after the shader-pass cutover, the built-in presets cost
-  39 ms per frame on average at 480 x 270, 70 ms at 640 x 360, and 156 ms at 960 x 540, so the
-  default resolution cannot be raised yet and stays 480 x 270 at 30 fps. The full-frame passes are
-  the next lever: they are single-threaded and allocate, which 39g addresses.
-- 39g Parallel remaining passes - `Pending`: the blur, decay, gamma, darken, echo, and composite
-  passes still run on one thread even though they are row-independent. Give `PixelBuffer` a
-  reusable blur scratch (it allocates one array per pass today), split those passes through
-  `ParallelRows.For`, and extend the identical-frame comparison to cover them.
+- 39f Sharper defaults - `Done`: the default render size is now 640 x 360 at 60 frames per second,
+  up from 480 x 270 at 30, and the Settings choices keep their existing ranges. After the parallel
+  frame passes the built-in presets cost 12 ms per frame on average at 480 x 270, 21 ms at 640 x 360,
+  and 43 ms at 960 x 540, so 640 x 360 fits the budget while 960 x 540 is still too slow for a
+  default.
+- 39g Parallel remaining passes - `Done`: `PixelBuffer.Blur` reuses one scratch array instead of
+  allocating a copy per pass, and the blur, decay, gamma, centre darkening, video echo, and composite
+  passes now split into row ranges through `ParallelRows.For`, gated by
+  `PresetRenderer.ParallelismEnabled` like the warp. `ParallelWarpTests` renders both paths and
+  asserts identical frames, including the blur, echo, border, darken, and gamma passes. The
+  parallel split cut the built-in presets from 39 ms per frame to 12 ms at 480 x 270 and from 70 ms
+  to 21 ms at 640 x 360.
 
 ## 40 Visualizer GPU pipeline
 

@@ -65,6 +65,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   stays the fallback, and the CPU/GPU tests keep the two within a level.
 
 ### Changed
+- Parallelized the full-frame visualizer passes and reused the blur scratch. `PixelBuffer.Blur` no
+  longer allocates a copy per pass, and the blur, decay, gamma, centre darkening, video echo, and
+  composite passes now split into row ranges through `ParallelRows.For`, gated by
+  `PresetRenderer.ParallelismEnabled` like the warp; `ParallelWarpTests` proves both paths render
+  identical frames. The built-in presets fell from 39 ms per frame to 12 ms at 480 x 270 and from
+  70 ms to 21 ms at 640 x 360, so the visualizer now defaults to 640 x 360 at 60 frames per second
+  instead of 480 x 270 at 30.
 - Made the compiled SkSL shader passes the visualizer's default. `VisualizerWindow` now creates its
   `PresetRenderer` with `UseSkiaPasses` enabled, so a comp shader and a warp shader run as Skia
   runtime effects; the interpreter stays the fallback for anything the Skia path cannot handle. The

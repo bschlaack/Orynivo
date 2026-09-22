@@ -784,7 +784,7 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
         void WarpRows(int worker, int from, int to)
         {
             // The span is taken inside the body, because a local function cannot capture one.
-            var target = _warped.Pixels;
+            var target = _warped.RawPixels;
             // A parallel worker gets its own slots and its own sample scratch, because the shared
             // ones would let two pixels race on the value a per-pixel program just wrote.
             var slots = worker < 0 ? _slots : _workerSlots[worker];
@@ -996,7 +996,7 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
         // Bilinear on purpose: this grid is the base picture, so a nearest-neighbour scale would
         // show its blocks directly. The comp pass below can afford nearest because it is a soft
         // post-process result.
-        var target = _warped.Pixels;
+        var target = _warped.RawPixels;
         Span<float> sample = stackalloc float[4];
         for (var y = 0; y < height; y++)
         {
@@ -1728,21 +1728,24 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
 
         var width = _warped.Width;
         var height = _warped.Height;
-        var pixels = _warped.Pixels;
-        for (var y = 0; y < height; y++)
+        var pixels = _warped.RawPixels;
+        ParallelRows.For(ParallelismEnabled, height, (worker, from, to) =>
         {
-            var normalizedY = height > 1 ? (y / (float)(height - 1) * 2f) - 1f : 0f;
-            for (var x = 0; x < width; x++)
+            for (var y = from; y < to; y++)
             {
-                var normalizedX = width > 1 ? (x / (float)(width - 1) * 2f) - 1f : 0f;
-                var distance = MathF.Sqrt((normalizedX * normalizedX) + (normalizedY * normalizedY));
-                var factor = 1f - (amount * Math.Clamp(1f - distance, 0f, 1f));
-                var offset = (((y * width) + x) * 4);
-                pixels[offset] *= factor;
-                pixels[offset + 1] *= factor;
-                pixels[offset + 2] *= factor;
+                var normalizedY = height > 1 ? (y / (float)(height - 1) * 2f) - 1f : 0f;
+                for (var x = 0; x < width; x++)
+                {
+                    var normalizedX = width > 1 ? (x / (float)(width - 1) * 2f) - 1f : 0f;
+                    var distance = MathF.Sqrt((normalizedX * normalizedX) + (normalizedY * normalizedY));
+                    var factor = 1f - (amount * Math.Clamp(1f - distance, 0f, 1f));
+                    var offset = (((y * width) + x) * 4);
+                    pixels[offset] *= factor;
+                    pixels[offset + 1] *= factor;
+                    pixels[offset + 2] *= factor;
+                }
             }
-        }
+        });
     }
 
     /// <summary>Applies the preset's gamma adjustment to the warped frame.</summary>
@@ -1753,13 +1756,18 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
             return;
 
         gamma = Math.Clamp(gamma, 0.1f, 10f);
-        var pixels = _warped.Pixels;
-        for (var index = 0; index < pixels.Length; index += 4)
+        var pixels = _warped.RawPixels;
+        var stride = _warped.Width * 4;
+        ParallelRows.For(ParallelismEnabled, _warped.Height, (worker, from, to) =>
         {
-            pixels[index] = MathF.Pow(Math.Clamp(pixels[index], 0f, 1f), gamma);
-            pixels[index + 1] = MathF.Pow(Math.Clamp(pixels[index + 1], 0f, 1f), gamma);
-            pixels[index + 2] = MathF.Pow(Math.Clamp(pixels[index + 2], 0f, 1f), gamma);
-        }
+            var end = to * stride;
+            for (var index = from * stride; index < end; index += 4)
+            {
+                pixels[index] = MathF.Pow(Math.Clamp(pixels[index], 0f, 1f), gamma);
+                pixels[index + 1] = MathF.Pow(Math.Clamp(pixels[index + 1], 0f, 1f), gamma);
+                pixels[index + 2] = MathF.Pow(Math.Clamp(pixels[index + 2], 0f, 1f), gamma);
+            }
+        });
     }
 
     /// <summary>Draws the waveform, the spectrum bars, and the custom shapes into the fresh buffer.</summary>
@@ -2068,31 +2076,35 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
         var width = _warped.Width;
         var height = _warped.Height;
         _fresh.CopyFrom(_warped);
-        var source = _fresh.Pixels;
-        var target = _warped.Pixels;
-        for (var y = 0; y < height; y++)
+        var target = _warped.RawPixels;
+        ParallelRows.For(ParallelismEnabled, height, (worker, from, to) =>
         {
-            var v = (y + 0.5f) / height;
-            for (var x = 0; x < width; x++)
+            // Each worker samples into its own scratch, so two pixels never race on one buffer.
+            var sample = _workerSample[worker];
+            for (var y = from; y < to; y++)
             {
-                var u = (x + 0.5f) / width;
-                var sampleU = ((u - 0.5f) / zoom) + 0.5f;
-                var sampleV = ((v - 0.5f) / zoom) + 0.5f;
-                if (orientation is 1 or 3)
-                    sampleU = 1f - sampleU;
-                if (orientation is 2 or 3)
-                    sampleV = 1f - sampleV;
+                var v = (y + 0.5f) / height;
+                for (var x = 0; x < width; x++)
+                {
+                    var u = (x + 0.5f) / width;
+                    var sampleU = ((u - 0.5f) / zoom) + 0.5f;
+                    var sampleV = ((v - 0.5f) / zoom) + 0.5f;
+                    if (orientation is 1 or 3)
+                        sampleU = 1f - sampleU;
+                    if (orientation is 2 or 3)
+                        sampleV = 1f - sampleV;
 
-                if (sampleU < 0f || sampleU > 1f || sampleV < 0f || sampleV > 1f)
-                    continue;
+                    if (sampleU < 0f || sampleU > 1f || sampleV < 0f || sampleV > 1f)
+                        continue;
 
-                _fresh.SampleBilinear(sampleU, sampleV, _sample);
-                var offset = (((y * width) + x) * 4);
-                target[offset] = Math.Clamp((target[offset] * (1f - alpha)) + (_sample[0] * alpha), 0f, 1f);
-                target[offset + 1] = Math.Clamp((target[offset + 1] * (1f - alpha)) + (_sample[1] * alpha), 0f, 1f);
-                target[offset + 2] = Math.Clamp((target[offset + 2] * (1f - alpha)) + (_sample[2] * alpha), 0f, 1f);
+                    _fresh.SampleBilinear(sampleU, sampleV, sample);
+                    var offset = (((y * width) + x) * 4);
+                    target[offset] = Math.Clamp((target[offset] * (1f - alpha)) + (sample[0] * alpha), 0f, 1f);
+                    target[offset + 1] = Math.Clamp((target[offset + 1] * (1f - alpha)) + (sample[1] * alpha), 0f, 1f);
+                    target[offset + 2] = Math.Clamp((target[offset + 2] * (1f - alpha)) + (sample[2] * alpha), 0f, 1f);
+                }
             }
-        }
+        });
     }
 
     /// <summary>Draws the spectrum bars.</summary>
@@ -2341,14 +2353,20 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
             }
         }
 
-        var pixels = _fresh.Pixels;
-        for (var index = 0; index < pixels.Length; index += 4)
+        var pixels = _fresh.RawPixels;
+        var warped = _warped.RawPixels;
+        var stride = _fresh.Width * 4;
+        ParallelRows.For(ParallelismEnabled, _fresh.Height, (worker, from, to) =>
         {
-            pixels[index] = Math.Clamp(_warped.Pixels[index] + pixels[index], 0f, 1f);
-            pixels[index + 1] = Math.Clamp(_warped.Pixels[index + 1] + pixels[index + 1], 0f, 1f);
-            pixels[index + 2] = Math.Clamp(_warped.Pixels[index + 2] + pixels[index + 2], 0f, 1f);
-            pixels[index + 3] = 1f;
-        }
+            var end = to * stride;
+            for (var index = from * stride; index < end; index += 4)
+            {
+                pixels[index] = Math.Clamp(warped[index] + pixels[index], 0f, 1f);
+                pixels[index + 1] = Math.Clamp(warped[index + 1] + pixels[index + 1], 0f, 1f);
+                pixels[index + 2] = Math.Clamp(warped[index + 2] + pixels[index + 2], 0f, 1f);
+                pixels[index + 3] = 1f;
+            }
+        });
     }
 
     /// <summary>Reads a variable of the shared slot layout, for diagnostics and tests.</summary>

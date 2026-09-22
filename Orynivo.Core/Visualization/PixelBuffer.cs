@@ -10,6 +10,12 @@ public sealed class PixelBuffer
 {
     private readonly float[] _pixels;
 
+    /// <summary>
+    /// Scratch copy of the previous blur pass, allocated once and reused. A blur needs a snapshot of
+    /// the frame it reads, and allocating that every pass added garbage to every frame.
+    /// </summary>
+    private float[]? _blurScratch;
+
     /// <summary>Creates a buffer of the given size.</summary>
     /// <param name="width">Buffer width in pixels.</param>
     /// <param name="height">Buffer height in pixels.</param>
@@ -52,10 +58,18 @@ public sealed class PixelBuffer
 
     /// <summary>Multiplies every sample by a factor, which fades the feedback image.</summary>
     /// <param name="factor">Factor in the range zero to one.</param>
-    public void Scale(float factor)
+    /// <param name="parallel">Whether the pass may use more than one thread.</param>
+    public void Scale(float factor, bool parallel = true)
     {
-        for (var index = 0; index < _pixels.Length; index++)
-            _pixels[index] *= factor;
+        var pixels = _pixels;
+        var stride = Width * 4;
+        ParallelRows.For(parallel, Height, (worker, from, to) =>
+        {
+            var start = from * stride;
+            var end = to * stride;
+            for (var index = start; index < end; index++)
+                pixels[index] *= factor;
+        });
     }
 
     /// <summary>Reads one channel of one pixel.</summary>
@@ -129,32 +143,42 @@ public sealed class PixelBuffer
     }
 
     /// <summary>Applies one three-by-three box blur pass, softening the feedback image.</summary>
-    public void Blur()
+    /// <param name="parallel">Whether the pass may use more than one thread.</param>
+    public void Blur(bool parallel = true)
     {
-        var copy = new float[_pixels.Length];
+        // The scratch copy is reused across passes; the blur is row-independent, because a pixel
+        // reads the untouched copy and writes only itself.
+        _blurScratch ??= new float[_pixels.Length];
+        var copy = _blurScratch;
         _pixels.CopyTo(copy, 0);
-        for (var y = 0; y < Height; y++)
+        var pixels = _pixels;
+        var width = Width;
+        var height = Height;
+        ParallelRows.For(parallel, height, (worker, from, to) =>
         {
-            for (var x = 0; x < Width; x++)
+            for (var y = from; y < to; y++)
             {
-                var offset = ((y * Width) + x) * 4;
-                for (var channel = 0; channel < 4; channel++)
+                for (var x = 0; x < width; x++)
                 {
-                    var sum = 0f;
-                    for (var dy = -1; dy <= 1; dy++)
+                    var offset = ((y * width) + x) * 4;
+                    for (var channel = 0; channel < 4; channel++)
                     {
-                        var sampleY = Math.Clamp(y + dy, 0, Height - 1);
-                        for (var dx = -1; dx <= 1; dx++)
+                        var sum = 0f;
+                        for (var dy = -1; dy <= 1; dy++)
                         {
-                            var sampleX = Math.Clamp(x + dx, 0, Width - 1);
-                            sum += copy[(((sampleY * Width) + sampleX) * 4) + channel];
+                            var sampleY = Math.Clamp(y + dy, 0, height - 1);
+                            for (var dx = -1; dx <= 1; dx++)
+                            {
+                                var sampleX = Math.Clamp(x + dx, 0, width - 1);
+                                sum += copy[(((sampleY * width) + sampleX) * 4) + channel];
+                            }
                         }
-                    }
 
-                    _pixels[offset + channel] = sum / 9f;
+                        pixels[offset + channel] = sum / 9f;
+                    }
                 }
             }
-        }
+        });
     }
 
     /// <summary>Writes the buffer as BGRA bytes for a presentation bitmap.</summary>

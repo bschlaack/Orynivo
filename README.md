@@ -1686,7 +1686,7 @@ archive in place.
 ## Visualizer
 
 **Visualisierung** in the sidebar opens a fullscreen music visualizer. It renders the playing
-audio through a Milkdrop-style preset engine at 480 x 270 and scales the frame up. Escape
+audio through a Milkdrop-style preset engine at 640 x 360 and scales the frame up. Escape
 closes it, a click or Space switches the preset, the arrow keys step through them, and R
 resets the picture; the **Reduce motion** preference draws a static spectrum instead of
 animating.

@@ -18,6 +18,9 @@ internal static class ParallelRows
     /// </summary>
     public static int WorkerCount { get; } = Math.Clamp(Environment.ProcessorCount, 1, 8);
 
+    /// <summary>The options shared by every parallel split, so a frame does not allocate a new one.</summary>
+    private static readonly ParallelOptions Options = new() { MaxDegreeOfParallelism = WorkerCount };
+
     /// <summary>Runs a row-range body over the rows of a frame.</summary>
     /// <param name="height">Number of rows to cover.</param>
     /// <param name="body">
@@ -42,7 +45,7 @@ internal static class ParallelRows
         Parallel.For(
             0,
             workers,
-            new ParallelOptions { MaxDegreeOfParallelism = workers },
+            Options,
             worker =>
             {
                 // Whole-row ranges, so the split never lands inside a row.
@@ -50,5 +53,17 @@ internal static class ParallelRows
                 var to = (int)(((long)height * (worker + 1)) / workers);
                 body(worker, from, to);
             });
+    }
+
+    /// <summary>Runs a row-range body, either in parallel or on the calling thread.</summary>
+    /// <param name="parallel">Whether the pass may use more than one thread.</param>
+    /// <param name="height">Number of rows to cover.</param>
+    /// <param name="body">Body receiving the worker index, the start row, and the end row.</param>
+    public static void For(bool parallel, int height, Action<int, int, int> body)
+    {
+        if (parallel)
+            For(height, body);
+        else
+            body(0, 0, height);
     }
 }
