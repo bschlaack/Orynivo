@@ -251,7 +251,7 @@ public sealed class VisualizerPreset
             Math.Clamp(ReadFloat(values, "decay", 0.96f), 0f, 1f),
             Math.Max(0.05f, ReadFloat(values, "zoom", 1f)),
             ReadFloat(values, "warp", 1f),
-            (int)Math.Clamp(ReadBlurLevel(values), 0f, 4f),
+            (int)Math.Clamp(ReadFloat(values, "blur_level", 0f), 0f, 4f),
             Math.Clamp(ReadFloat(values, "wave_alpha", 0.8f), 0f, 1f),
             Math.Clamp(ReadFloat(values, "wave_scale", 0.25f), 0f, 1f),
             CompileBlock(values, layout, "per_point", failed),
@@ -840,31 +840,6 @@ public sealed class VisualizerPreset
         float.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out var value)
             ? value
             : fallback;
-
-    /// <summary>
-    /// Reads the blur amount. A preset either carries Orynivo's own <c>blur_level</c> key or the
-    /// Milkdrop blur keys, whose <c>blurN_max</c> is the amount of that level's blur, so the two are
-    /// summed when the explicit key is absent. The edge darkening of the same family is not folded
-    /// in; it is a separate effect.
-    /// </summary>
-    /// <param name="values">Parsed preset values.</param>
-    /// <returns>The number of blur passes, before clamping.</returns>
-    private static float ReadBlurLevel(Dictionary<string, string> values)
-    {
-        if (values.ContainsKey("blur_level"))
-            return ReadFloat(values, "blur_level", 0f);
-
-        return ReadAliasedFloat(values, "blur1_max", "b1x") +
-               ReadAliasedFloat(values, "blur2_max", "b2x") +
-               ReadAliasedFloat(values, "blur3_max", "b3x");
-    }
-
-    /// <summary>Reads a value under its canonical key or its Milkdrop 2 short alias.</summary>
-    /// <param name="values">Parsed preset values.</param>
-    /// <param name="key">Canonical Milkdrop 1 key.</param>
-    /// <param name="shortKey">Milkdrop 2 short key.</param>
-    /// <returns>The value, or zero when neither key is present.</returns>
-    private static float ReadAliasedFloat(Dictionary<string, string> values, string key, string shortKey) =>
-        values.ContainsKey(key) ? ReadFloat(values, key, 0f) : ReadFloat(values, shortKey, 0f);
 }
+
 

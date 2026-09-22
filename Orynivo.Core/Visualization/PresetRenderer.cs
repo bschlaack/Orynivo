@@ -40,7 +40,7 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
     private readonly PixelBuffer _warped;
     private readonly PixelBuffer _fresh;
     private readonly PixelBuffer _frameCopy;
-    private readonly PixelBuffer _blurred;
+    private readonly PixelBuffer[] _blurLevels;
     private readonly Stopwatch _shaderClock = new();
     private readonly Stopwatch _warpShaderClock = new();
     private readonly Stopwatch _warpClock = new();
@@ -60,7 +60,10 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
     private readonly List<CompiledShader> _compiledWarp = [];
     private readonly List<CompiledShader> _compiledComp = [];
     private bool _shaderGridReduced;
-    private int _blurLevel;
+    /// <summary>Whether each blur level's buffer holds this stage's picture.</summary>
+    private readonly bool[] _blurLevelReady = new bool[3];
+    /// <summary>Times one Skia comp pass, so an overrunning one hands the preset to the interpreter.</summary>
+    private readonly System.Diagnostics.Stopwatch _skiaCompClock = new();
     /// <summary>
     /// Upper bound on the pixels a shader pass may cost. Both the warp and the comp shader run on
     /// a grid at or below this size and are scaled back up, because a per-pixel shader on the CPU
@@ -170,7 +173,7 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
         _warped = new PixelBuffer(width, height);
         _fresh = new PixelBuffer(width, height);
         _frameCopy = new PixelBuffer(width, height);
-        _blurred = new PixelBuffer(width, height);
+        _blurLevels = [new PixelBuffer(width, height), new PixelBuffer(width, height), new PixelBuffer(width, height)];
         _slots = new float[preset.Layout.Count];
         _slotX = preset.Layout.IndexOf("x");
         _slotY = preset.Layout.IndexOf("y");
@@ -348,8 +351,15 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
     /// or feeds a warp shader keeps the per-pixel path. The interpolated result equals the
     /// per-pixel result when the program writes a constant, which is what the identical-frame test
     /// asserts.
+    /// <para>
+    /// It is off by default: the mesh is the reference's geometry, but the engine's per-pixel
+    /// <c>x</c>/<c>y</c> are the warped position in minus-one-to-one space rather than Milkdrop's
+    /// aspect-scaled zero-to-one vertex position, so a preset that derives an offset from them
+    /// renders visibly differently once the offset is interpolated. Turn it on to compare a preset
+    /// against the reference (see <c>scripts/projectm-oracle</c>) before changing the default.
+    /// </para>
     /// </summary>
-    public bool MeshPerPixelEnabled { get; set; } = true;
+    public bool MeshPerPixelEnabled { get; set; }
 
     /// <summary>
     /// Gets a value indicating whether this preset's warp stage may run in parallel at all. It is
@@ -434,7 +444,6 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
 
         for (var pass = 0; pass < BlurPasses(); pass++)
             _warped.Blur();
-        DarkenEdges();
         var blur = Mark();
 
         _warped.Scale(decay);
@@ -496,8 +505,8 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
         _warped.Clear();
         _fresh.Clear();
         _frameCopy.Clear();
-        _blurred.Clear();
-        _blurLevel = 0;
+        foreach (var blurLevel in _blurLevels) blurLevel.Clear();
+        Array.Clear(_blurLevelReady);
         _shaderPixelTarget = ShaderPixelBudget;
         _shaderPixelsUsed = 0;
         _shaderGridReduced = false;
@@ -636,7 +645,7 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
     {
         // A warp shader's blur levels are rebuilt for this frame; the cached buffer would otherwise
         // keep the previous frame's picture, because the buffer object is reused.
-        _blurLevel = 0;
+        Array.Clear(_blurLevelReady);
         var zoom = Math.Max(0.01f, Read("zoom", Preset.Zoom));
         var zoomExp = Read("zoomexp", 1f);
         var rotation = Read("rot", 0f);
@@ -1038,8 +1047,10 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
                 // Milkdrop hands the program the vertex position and the aspect-scaled polar pair.
                 var aspectVertexX = normalizedX * aspectX;
                 var aspectVertexY = normalizedY * aspectY;
-                Write(_slots, _slotX, normalizedX);
-                Write(_slots, _slotY, normalizedY);
+                // Milkdrop's per-vertex x/y are the aspect-scaled position in zero-to-one space,
+                // which is the space a preset computes an offset like x - ox in.
+                Write(_slots, _slotX, (normalizedX * 0.5f * aspectX) + 0.5f);
+                Write(_slots, _slotY, (normalizedY * 0.5f * aspectY) + 0.5f);
                 Write(_slots, _slotRad, MathF.Sqrt((aspectVertexX * aspectVertexX) + (aspectVertexY * aspectVertexY)));
                 Write(_slots, _slotAng, -MathF.Atan2(aspectVertexY, aspectVertexX));
                 Preset.PerPixel.Execute(_slots);
@@ -1561,7 +1572,7 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
         _frameCopy.CopyFrom(_fresh);
         _samplerMainIsWarped = true;
         // The comp pass blurs a different source than the warp, so its blur levels are rebuilt.
-        _blurLevel = 0;
+        Array.Clear(_blurLevelReady);
 
         // A comp shader whose per-pixel block is empty is a pure post-process, so it can run as a
         // Skia runtime effect over the frame instead of the interpreter.
@@ -1612,6 +1623,15 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
 
         // Bilinear: for many presets the comp shader is the picture rather than a soft
         // post-process, and a nearest-neighbour scale then shows the grid's blocks directly.
+        ScaleGridIntoFresh(output, width, height);
+    }
+
+    /// <summary>Scales a shader grid back over the frame with bilinear sampling.</summary>
+    /// <param name="grid">Grid the shader wrote.</param>
+    /// <param name="width">Frame width.</param>
+    /// <param name="height">Frame height.</param>
+    private void ScaleGridIntoFresh(PixelBuffer grid, int width, int height)
+    {
         var pixelsOut = _fresh.Pixels;
         Span<float> sample = stackalloc float[4];
         for (var y = 0; y < height; y++)
@@ -1620,7 +1640,7 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
             var targetRow = y * width;
             for (var x = 0; x < width; x++)
             {
-                output.SampleBilinear((x + 0.5f) / width, v, sample);
+                grid.SampleBilinear((x + 0.5f) / width, v, sample);
                 var offset = (targetRow + x) * 4;
                 pixelsOut[offset] = sample[0];
                 pixelsOut[offset + 1] = sample[1];
@@ -1669,15 +1689,42 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
                 ["sampler_pc_main"] = new(_previous.RawPixels, width, height)
             };
 
-            // The blur levels are built on the GPU from sampler_main, so the renderer only has to
-            // supply the frame copies.
-            _skiaComp.Render(_fresh, width, height, sources, BuildSkiaScalars(_skiaComp.PerPixelUniforms), BuildSkiaVectors());
+            // Skia rasterises a runtime effect on the CPU, and a comp shader that samples the blur
+            // levels can cost seconds over a full frame. It therefore runs on the same adaptive grid
+            // as the interpreter and is scaled back up, and a pass that overruns its budget is
+            // abandoned for the interpreter, which owns the grid adaptation.
+            var (shaderWidth, shaderHeight) = ShaderGrid(width, height);
+            var scaled = shaderWidth != width || shaderHeight != height;
+            if (scaled &&
+                (_shaderOutput is null || _shaderOutput.Width != shaderWidth || _shaderOutput.Height != shaderHeight))
+            {
+                _shaderOutput = new PixelBuffer(shaderWidth, shaderHeight);
+            }
+
+            // The blur levels are built from sampler_main, so the renderer only has to supply the
+            // frame copies.
+            var target = scaled ? _shaderOutput! : _fresh;
+            _skiaCompClock.Restart();
+            _skiaComp.Render(target, shaderWidth, shaderHeight, sources, BuildSkiaScalars(_skiaComp.PerPixelUniforms), BuildSkiaVectors());
+            _skiaCompClock.Stop();
+            if (_skiaCompClock.Elapsed.TotalMilliseconds > ShaderPassBudgetMilliseconds)
+            {
+                // The pass finished but is too expensive: hand the preset back to the interpreter,
+                // which shrinks its grid until the frame fits the budget.
+                ShaderError = "comp (skia): over the pass budget";
+                _skiaComp.Dispose();
+                _skiaComp = null;
+                return false;
+            }
+
+            if (scaled)
+                ScaleGridIntoFresh(target, width, height);
             return true;
         }
         catch (Exception exception)
         {
             ShaderError = "comp (skia): " + exception.GetType().Name + ": " + exception.Message;
-            _skiaComp.Dispose();
+            _skiaComp?.Dispose();
             _skiaComp = null;
             return false;
         }
@@ -1897,20 +1944,34 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
     public ShaderValue SampleBlur(int level, float u, float v)
     {
         level = Math.Clamp(level, 1, 3);
-        if (_blurLevel != level)
+        // Every level keeps its own buffer. A shader that reads two levels in one pixel used to
+        // thrash a single cache and rebuild a full-frame blur for every sample, which cost seconds
+        // per frame for a comp shader that reads GetBlur1 and GetBlur3. The levels are built in
+        // order and each continues from the one below it, so asking for level 3 after level 1 costs
+        // one more pass rather than three.
+        var buffer = _blurLevels[level - 1];
+        if (!_blurLevelReady[level - 1])
         {
             // Blur the same picture sampler_main currently refers to: the previous frame during the
             // warp and the composited frame during the comp pass. The GPU warp and comp passes build
             // their blur levels from the same source, so the two execution paths agree. The cache is
             // invalidated once per stage, because the buffer's contents change every frame while the
-            // object stays the same.
-            _blurLevel = level;
-            _blurred.CopyFrom(_samplerMainIsWarped ? _frameCopy : _previous);
-            for (var pass = 0; pass < level; pass++)
-                _blurred.Blur();
+            // object stays the same. A level asked for first builds the ones below it, so level 3 is
+            // three passes whether or not level 1 was read before it.
+            for (var build = 1; build <= level; build++)
+            {
+                if (_blurLevelReady[build - 1])
+                    continue;
+
+                _blurLevels[build - 1].CopyFrom(build == 1
+                    ? (_samplerMainIsWarped ? _frameCopy : _previous)
+                    : _blurLevels[build - 2]);
+                _blurLevels[build - 1].Blur();
+                _blurLevelReady[build - 1] = true;
+            }
         }
 
-        _blurred.SampleBilinear(u, v, _sample);
+        buffer.SampleBilinear(u, v, _sample);
         return ShaderValue.Vector(_sample[0], _sample[1], _sample[2], _sample[3], 4);
     }
 
@@ -1976,44 +2037,6 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
         });
     }
 
-    /// <summary>
-    /// Darkens the border of the frame by the blur chain's edge-darkening amount. Milkdrop's
-    /// <c>blurN_edge_darken</c> hides the smear the blur leaves at the frame edge; the exact falloff
-    /// is not stored in a preset, so this is our documented approximation: the centre is untouched
-    /// and the border is multiplied by <c>1 - amount</c>, ramping with the distance from the centre.
-    /// </summary>
-    private void DarkenEdges()
-    {
-        var amount = Math.Clamp(
-            Math.Max(
-                Read("blur1_edge_darken", 0f),
-                Math.Max(Read("blur2_edge_darken", 0f), Read("blur3_edge_darken", 0f))),
-            0f,
-            1f);
-        if (amount <= 0f)
-            return;
-
-        var width = _warped.Width;
-        var height = _warped.Height;
-        var pixels = _warped.RawPixels;
-        ParallelRows.For(ParallelismEnabled, height, (worker, from, to) =>
-        {
-            for (var y = from; y < to; y++)
-            {
-                var normalizedY = height > 1 ? (y / (float)(height - 1) * 2f) - 1f : 0f;
-                for (var x = 0; x < width; x++)
-                {
-                    var normalizedX = width > 1 ? (x / (float)(width - 1) * 2f) - 1f : 0f;
-                    var distance = MathF.Sqrt((normalizedX * normalizedX) + (normalizedY * normalizedY));
-                    var factor = 1f - (amount * Math.Clamp(distance, 0f, 1f));
-                    var offset = (((y * width) + x) * 4);
-                    pixels[offset] *= factor;
-                    pixels[offset + 1] *= factor;
-                    pixels[offset + 2] *= factor;
-                }
-            }
-        });
-    }
 
     /// <summary>Applies the preset's gamma adjustment to the warped frame.</summary>
     private void ApplyGamma()
@@ -2687,3 +2710,6 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
     /// <returns><see langword="true"/> when the warp stage writes the variable before each pixel.</returns>
     private static bool IsSeededPerPixel(string name) => name is "x" or "y" or "rad" or "ang";
 }
+
+
+

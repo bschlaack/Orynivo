@@ -940,17 +940,21 @@ affordable. This is a project of its own and must keep the CPU path as the fallb
   lose their shaders at run time to an unimplemented built-in (`conway` is the known one) or to the
   interpreter's loop budget, so those blocks are disabled after the first frame. Both are recorded
   as their own work rather than being hidden by the budget.
-  **Remaining.** One thing is still open in this phase. The `conway` built-in is unimplemented, so a
-  preset that calls it loses that block.
-  The per-pixel mesh is done. `PresetRenderer.MeshPerPixelEnabled` (on by default) makes the warp
-  evaluate the per-pixel program once per 64 x 48 mesh vertex — the reference's default grid — and
-  interpolate the motion it produced across the quad, which is what Milkdrop's per-vertex program
-  does; a program that writes `x` or `y`, records motion vectors, or feeds a warp shader keeps the
-  per-pixel path, because an interpolated sample position has no meaning. The interpolation is a
-  lerp, so a constant motion stays byte-identical to the per-pixel path; `PerVertexMeshTests` proves
-  that for zoom, rotation, centre, and stretch, proves that a position-varying motion is
-  interpolated, and proves that a position-writing program ignores the setting. The mesh also makes
-  the stage cheaper: 3,185 program runs instead of one per screen pixel.
+  **Remaining.** Three things are still open in this phase. The per-pixel mesh is implemented and
+  opt-in, but it cannot become the default yet: the engine's per-pixel `x`/`y` are the warped
+  position in minus-one-to-one space rather than Milkdrop's aspect-scaled zero-to-one vertex
+  position, so a preset that derives `dx`/`dy` from `x`/`y` renders visibly differently once that
+  offset is interpolated. Reconciling the two conventions is the step that turns the mesh on. The
+  `conway` built-in is unimplemented, so a preset that calls it loses that block. And the blur
+  chain's blur amount and edge darkening (`blurN_min`/`blurN_max`/`blurN_edge_darken` and their
+  `bNn`/`bNx`/`bNed` aliases) resolve to their variables but are not applied, because the reference's
+  semantics are not stored in a preset and a measured comparison against projectM showed that
+  applying a guess left the picture no closer than leaving it out.
+  The per-pixel mesh itself is done: `PresetRenderer.MeshPerPixelEnabled` makes the warp evaluate the
+  per-pixel program once per 64 x 48 mesh vertex — the reference's default grid — and interpolate the
+  motion across the quad, and `PerVertexMeshTests` proves the constant-motion case is byte-identical
+  to the per-pixel path, that a position-varying motion is interpolated, and that a position-writing
+  program ignores the setting.
   A comparison harness now exists for the fidelity work that remains:
   `scripts/projectm-oracle/` builds projectM as the reference, renders a preset with it and with
   Orynivo, and reports the mean channel difference and the correlation per frame. It is a local

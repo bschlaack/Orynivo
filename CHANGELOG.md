@@ -7,13 +7,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Added
-- Added the per-vertex mesh warp. `PresetRenderer.MeshPerPixelEnabled` (on by default) makes the warp
+- Added the per-vertex mesh warp as an opt-in. `PresetRenderer.MeshPerPixelEnabled` makes the warp
   stage evaluate the preset's per-pixel program once per 64 x 48 mesh vertex and interpolate the
   motion it produced across the quad, which is what Milkdrop's per-vertex program does, instead of
   running it for every screen pixel. The interpolation is a lerp, so a program that writes a constant
   motion is byte-identical to the per-pixel path; a program that writes `x` or `y`, records motion
   vectors, or feeds a warp shader keeps the per-pixel path, because an interpolated sample position
-  has no meaning. The stage also became cheaper: 3,185 program runs instead of one per screen pixel.
+  has no meaning. It is off by default: the engine's per-pixel `x`/`y` are the warped position in
+  minus-one-to-one space rather than Milkdrop's aspect-scaled zero-to-one vertex position, so a preset
+  that derives an offset from them renders visibly differently once that offset is interpolated, and
+  that has to be reconciled before the mesh can become the default.
 - Added `scripts/projectm-oracle/`, a local development harness that renders a preset with the
   reference implementation (projectM) and with Orynivo and reports the per-frame mean channel
   difference and correlation. It links a projectM checkout the developer builds separately; no
@@ -95,13 +98,22 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   default 480 x 270, the shader-pass cutover costs 39 ms per frame on average against 57 ms before.
 
 ### Fixed
+- Fixed a comp shader that reads more than one blur level costing seconds per frame. The blur cache
+  held a single level, so a shader that sampled `GetBlur1` and `GetBlur3` in the same pixel
+  invalidated it on every sample and rebuilt a full-frame blur each time. Each level now keeps its
+  own buffer and the levels build on one another, which took one real preset from about 900 to about
+  45 milliseconds per frame on the interpreter.
+- Fixed the Skia comp pass stalling on a heavy shader. It ran at the full frame with no budget, so a
+  comp shader that samples the blur levels took about 2.1 seconds per frame and never degraded. It
+  now runs on the same adaptive grid as the interpreter, is scaled back up, and hands the preset to
+  the interpreter when the pass exceeds its budget; the same preset now runs at about 50 milliseconds
+  per frame and settles at a reduced grid.
 - Recognized the Milkdrop 2 blur and edge keys. `b1n`/`b1x`/`b1ed` and the `b2`/`b3` family are the
   Milkdrop 1 `blurN_min`, `blurN_max`, and `blurN_edge_darken` parameters under their short names, so
-  they now resolve to those variables instead of being ignored, and a preset that carries only them
-  takes its blur amount from their `blurN_max` sum when Orynivo's own `blur_level` key is absent. The
-  edge-darkening amount is applied after the blur passes: the frame centre is untouched and the border
-  is multiplied down towards `1 - amount`, which is our documented approximation of a falloff whose
-  exact shape is not stored in a preset.
+  they now resolve to those variables instead of being ignored. Their effect is deliberately not
+  applied: the reference's blur amount and edge falloff are not stored in a preset, and a measured
+  comparison against projectM showed that applying them left the picture no closer than leaving them
+  out, so guessing would only cost a blur pass.
 - Parsed a fixed-size shader array such as `const float4 samples[5] = { ... }` into its own node and
   stored it in the interpreter's array storage, so a shader that indexes it renders instead of losing
   its block.

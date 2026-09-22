@@ -200,15 +200,26 @@ This file applies to `Orynivo.Core/` and supplements `../AGENTS.md`.
   warp shader or an active motion grid keeps it sequential for the same reason. Never give two
   workers the same slot array, and never claim a speed-up without the identical-frame test in
   `ParallelWarpTests`.
-  `PresetRenderer.MeshPerPixelEnabled` makes the warp evaluate the per-pixel program once per mesh
-  vertex and interpolate the motion it produced across the quad, which is what Milkdrop's per-vertex
-  program does; `BuildMesh` fills the mesh from the per-frame values first, so a program that exceeds
-  the warp budget leaves a plain warp rather than an unfinished mesh, and it restores the per-frame
-  motion afterwards because a later stage means the frame's values, not the last vertex's. The
-  interpolation is a lerp, not a weighted sum, so a constant motion stays byte-identical to the
-  per-pixel path — `PerVertexMeshTests` asserts exactly that and that a varying motion is
-  interpolated. A program that writes `x` or `y`, records motion vectors, or feeds a warp shader
-  keeps the per-pixel path, because an interpolated sample position has no meaning.
+  `PresetRenderer.MeshPerPixelEnabled` (off by default) makes the warp evaluate the per-pixel
+  program once per mesh vertex and interpolate the motion it produced across the quad, which is what
+  Milkdrop's per-vertex program does; `BuildMesh` fills the mesh from the per-frame values first, so a
+  program that exceeds the warp budget leaves a plain warp rather than an unfinished mesh, and it
+  restores the per-frame motion afterwards because a later stage means the frame's values, not the
+  last vertex's. The interpolation is a lerp, not a weighted sum, so a constant motion stays
+  byte-identical to the per-pixel path — `PerVertexMeshTests` asserts exactly that and that a varying
+  motion is interpolated. A program that writes `x` or `y`, records motion vectors, or feeds a warp
+  shader keeps the per-pixel path, because an interpolated sample position has no meaning. Keep it
+  opt-in until the engine's per-pixel `x`/`y` (the warped position in minus-one-to-one space) is
+  reconciled with Milkdrop's aspect-scaled zero-to-one vertex position: a preset that derives
+  `dx`/`dy` from `x`/`y` renders visibly differently once that offset is interpolated, and
+  `scripts/projectm-oracle` is how that is measured.
+  A shader's blur levels each keep their own buffer (`_blurLevels`) and build on one another, and a
+  level asked for first builds the ones below it. Do not collapse them back into one cached level: a
+  comp shader that samples `GetBlur1` and `GetBlur3` in the same pixel otherwise invalidates the
+  cache on every sample and rebuilds a full-frame blur each time, which cost seconds per frame.
+  The Skia comp pass runs on the same adaptive grid as the interpreter and hands the preset to the
+  interpreter when a pass exceeds `ShaderPassBudgetMilliseconds`, because Skia rasterises a runtime
+  effect on the CPU and a comp shader that samples the blur levels otherwise stalls the frame.
   The preset compiler must accept the Milkdrop function set, because a block it cannot compile is
   dropped and takes that preset's motion with it: `above`, `below`, and `equal` yield one or zero
   (never a boolean), and `sqr`, `sigmoid`, `band`, `bor`, and `bnot` belong to it too. Names are

@@ -85,29 +85,6 @@ public sealed class VisualizerPresetTests
         Assert.Equal(4, preset.BlurLevel);
     }
 
-    /// <summary>
-    /// The Milkdrop 2 blur and edge keys are the Milkdrop 1 parameters under their short names, and
-    /// their blur amount stands in for Orynivo's own key when a preset carries only them.
-    /// </summary>
-    [Fact]
-    public void Parse_ReadsTheMilkdropBlurKeys()
-    {
-        var preset = VisualizerPreset.Parse("b1x=1\nb2x=1\nb3n=0.5\nb1ed=0.25");
-
-        Assert.Equal(2, preset.BlurLevel);
-        Assert.Equal(0.25f, preset.Defaults["blur1_edge_darken"], 5);
-        Assert.Equal(1f, preset.Defaults["blur1_max"], 5);
-        Assert.Equal(0.5f, preset.Defaults["blur3_min"], 5);
-    }
-
-    /// <summary>An explicit blur level wins over the Milkdrop blur keys.</summary>
-    [Fact]
-    public void Parse_PrefersTheExplicitBlurLevel()
-    {
-        var preset = VisualizerPreset.Parse("blur_level=1\nb1x=1\nb2x=1");
-
-        Assert.Equal(1, preset.BlurLevel);
-    }
 
     /// <summary>
     /// An invalid expression block is skipped and recorded instead of rejecting the preset, so one
@@ -146,3 +123,4 @@ public sealed class VisualizerPresetTests
         Assert.True(preset.PerPixel.IsEmpty);
     }
 }
+
