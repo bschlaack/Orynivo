@@ -250,8 +250,11 @@ This file applies to `Orynivo.Core/` and supplements `../AGENTS.md`.
   part after it, and the numbered parts are read up to the shader-line bound, because a real
   per-frame block reaches the hundredth part and a lower bound cut a block off mid-loop.
   `megabuf` and `gmegabuf` are Milkdrop's shared memory buffers and their accesses are serialised,
-  because a preset writes lookup tables that other pixels read. `loop(count, statements)` and
-  `while(condition, statements)` repeat a statement list, their iteration count is clamped, and
+  because a preset writes lookup tables that other pixels read. `loop(count, statements)` repeats a
+  statement list, and `while` accepts both `while(condition, statements)` and the one-argument
+  `while(condition)` a real collection writes, where the condition is re-evaluated until it turns
+  false and the repeated work sits inside it as `exec2(statements, condition)`; their iteration count
+  is clamped, and
   presets nest them inside `if()` and other constructs, so the call parser accepts both wherever a
   primary expression starts; both buffer write spellings presets use (`gmegabuf(i, value)` and
   `gmegabuf(i) = value`) must keep working, because presets build their lookup tables with them.
@@ -518,4 +521,5 @@ in the root `AGENTS.md` before modifying those areas.
   file at a reused path must discard the old initialization marker.
 - Use `GetTrackListPage` when only one ordered page is required; do not load the
   complete track list and page it in managed memory.
+
 

@@ -390,8 +390,8 @@ public static class PresetCompiler
     }
 
     /// <summary>
-    /// Parses Milkdrop's <c>while(condition, statements)</c> construct, which presets use as a
-    /// bounded data-driven loop next to <c>loop(count, statements)</c>.
+    /// Parses Milkdrop's <c>while(condition)</c> and <c>while(condition, statements)</c> constructs,
+    /// which presets use as a bounded data-driven loop next to <c>loop(count, statements)</c>.
     /// </summary>
     /// <param name="lexer">Token source.</param>
     /// <param name="current">Token after the opening parenthesis.</param>
@@ -403,18 +403,24 @@ public static class PresetCompiler
         int position)
     {
         var condition = ParseExpression(lexer, ref current);
-        if (current.Kind != PresetTokenKind.Comma)
-            throw new PresetExpressionException("Expected ',' after the while condition", position);
-
-        current = lexer.Next();
         var body = new List<PresetSyntaxNode>();
-        while (current.Kind != PresetTokenKind.End && current.Kind != PresetTokenKind.CloseParenthesis)
+        if (current.Kind == PresetTokenKind.Comma)
         {
-            while (current.Kind == PresetTokenKind.Semicolon)
-                current = lexer.Next();
-            if (current.Kind == PresetTokenKind.CloseParenthesis)
-                break;
-            body.Add(ParseStatement(lexer, ref current));
+            current = lexer.Next();
+            while (current.Kind != PresetTokenKind.End && current.Kind != PresetTokenKind.CloseParenthesis)
+            {
+                while (current.Kind == PresetTokenKind.Semicolon)
+                    current = lexer.Next();
+                if (current.Kind == PresetTokenKind.CloseParenthesis)
+                    break;
+                body.Add(ParseStatement(lexer, ref current));
+            }
+        }
+        else if (current.Kind != PresetTokenKind.CloseParenthesis)
+        {
+            // A real collection writes the one-argument form, where the condition is re-evaluated
+            // until it turns false and the repeated work sits inside it as `exec2(body, condition)`.
+            throw new PresetExpressionException("Expected ',' or ')' after the while condition", position);
         }
 
         if (current.Kind != PresetTokenKind.CloseParenthesis)

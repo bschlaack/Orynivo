@@ -7,6 +7,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Fixed
+- Fixed presets losing a block to Milkdrop's one-argument `while` form. A real collection writes
+  `while (exec2(statements, condition))`, where the condition is re-evaluated until it turns false
+  and the repeated work sits inside it, but the expression parser required a statement list after the
+  condition and rejected the whole block. Both spellings are now accepted, so
+  `martin - castle in the air`, `martin - castle in the air more mbahlsce`, and
+  `EVET - Scanazoic --- Isosceles edit` compile every block again.
 - Fixed the visualizer's OpenGL presentation showing a picture that jumped forwards a few times and
   then back. The presenter only drew when the render thread had published a new frame, and the GL
   surface is double buffered, so every refresh that drew nothing swapped to the buffer that was two

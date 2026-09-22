@@ -79,10 +79,40 @@ public sealed class PresetLoopTests
         Assert.NotNull(renderer.PresetError);
         Assert.Contains("looped too often", renderer.PresetError);
     }
+    /// <summary>
+    /// The one-argument form re-evaluates its condition until it turns false, which is how a real
+    /// collection writes a loop: the repeated work sits inside the condition as
+    /// <c>exec2(statements, condition)</c>, so a <c>while</c> without a statement list is the
+    /// normal spelling rather than a parse error.
+    /// </summary>
+    [Fact]
+    public void Parse_RunsAOneArgumentWhileConditionRepeatedly()
+    {
+        var preset = VisualizerPreset.Parse(
+            "per_frame_1=i = 0;\nper_frame_2=while (exec2(i = i + 1; i < 6));");
+
+        Assert.Empty(preset.FailedBlocks);
+        Assert.Equal(6f, Run(preset, "i"));
+    }
+
+    /// <summary>The one-argument form is still bounded when its condition never turns false.</summary>
+    [Fact]
+    public void RenderFrame_BoundsAOneArgumentWhileLoop()
+    {
+        var preset = VisualizerPreset.Parse("per_frame_1=while (1);");
+        var renderer = new PresetRenderer(preset, 16, 9);
+
+        renderer.RenderFrame(new Silent(), 1d / 60d);
+
+        Assert.NotNull(renderer.PresetError);
+        Assert.Contains("looped too often", renderer.PresetError);
+    }
+
     /// <summary>Runs a parsed preset and returns one of its variables.</summary>
     /// <param name="preset">Preset to run.</param>
     /// <param name="variable">Variable to read back.</param>
     /// <returns>The resulting value.</returns>
+
     private static float Run(VisualizerPreset preset, string variable)
     {
         var renderer = new PresetRenderer(preset, 16, 9);

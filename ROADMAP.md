@@ -1028,12 +1028,19 @@ affordable. This is a project of its own and must keep the CPU path as the fallb
   lose their shaders at run time to an unimplemented built-in (`conway` is the known one) or to the
   interpreter's loop budget, so those blocks are disabled after the first frame. Both are recorded
   as their own work rather than being hidden by the budget.
+  The `conway` half of that claim is retracted. A scan of the collection found 294 occurrences of the
+  name, all of them shader-local variables (`float1 conway = tex2D(...)`), and **zero** in an
+  expression block; the scan had treated shader-local identifiers as built-ins. The blocks those
+  presets actually lost were the ones described next, and the loop budget is the only remaining cause.
   **Remaining.** Three things are still open in this phase. The per-pixel mesh is implemented and
   opt-in, but it cannot become the default yet: the engine's per-pixel `x`/`y` are the warped
   position in minus-one-to-one space rather than Milkdrop's aspect-scaled zero-to-one vertex
   position, so a preset that derives `dx`/`dy` from `x`/`y` renders visibly differently once that
   offset is interpolated. Reconciling the two conventions is the step that turns the mesh on. The
-  `conway` built-in is unimplemented, so a preset that calls it loses that block. And the blur
+  expression language's `while` used to require a statement list after its condition, which is not
+  what a real collection writes: it writes the one-argument `while (exec2(statements, condition))`,
+  so those blocks were rejected and the preset lost its motion. Both spellings are now accepted and
+  the affected presets compile every block again. And the blur
   chain's blur amount and edge darkening (`blurN_min`/`blurN_max`/`blurN_edge_darken` and their
   `bNn`/`bNx`/`bNed` aliases) resolve to their variables but are not applied, because the reference's
   semantics are not stored in a preset and a measured comparison against projectM showed that
