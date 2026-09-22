@@ -859,22 +859,25 @@ affordable. This is a project of its own and must keep the CPU path as the fallb
   That is step 4, and it is the largest remaining piece: shader presets still run on the CPU even
   when `ORYNIVO_VISUALIZER_OPENGL=1`, because `VisualizerGlPipeline` only owns the frame for a preset
   with no shaders. Measured at 640 x 360 the comp shader is about 58 ms of a 62 ms frame, so the
-  port is what turns a shader preset from roughly 16 fps into a GPU frame. The blocker is that
-  `ShaderTranspiler` is coupled to Skia, not merely a different dialect: the prelude declares
-  `uniform shader sampler_main` and samples through `sampler_main.eval(...)`, the entry point is
-  `half4 main(float2 fragCoord)` over a `sk_FragCoord`-based coordinate, and the generated code uses
-  `half4`. A GLSL port therefore either parameterizes that emitter over a dialect (prelude, sampler
-  type and sampling, entry point, and the `half`/`float` split) or adds a parallel emitter over the
-  same `ShaderNode` tree; the parser is dialect-agnostic and needs no change. The pipeline side then
-  binds the frame textures as `sampler2D`, seeds the uniforms through `GetUniformLocation`/`Uniform*`
-  (`GlInterface` exposes only scalar uniforms, so a vector is set component by component), runs the
-  warp shader inside the mesh fragment shader, and runs the comp shader as a post pass; the per-pixel
-  block composes into the warp entry point exactly as `TranspileWarp` already does. The dialect must
-  be chosen from the negotiated version (ANGLE's GLES on Windows, desktop GL on Linux, CGL on macOS),
-  and the SkSL path stays the fallback, so a shader the GLSL emitter cannot translate keeps rendering
-  through Skia or the interpreter. The SkSL emitter's matrix support has to be mirrored there too:
-  `floatNxN` becomes GLSL `matN`, and a single vector argument is spread into scalars because `matN`
-  has no four-component constructor.
+  port is what turns a shader preset from roughly 16 fps into a GPU frame. The **emitter is done**:
+  `ShaderTranspiler` gained a GLSL dialect next to SkSL (`TranspileGlsl`, `TranspileGlslComp`,
+  `TranspileGlslWarp`), the prelude aliases `float2/3/4` onto `vec2/3/4` so the shared body emission
+  is byte-identical, the samplers become `sampler2D` sampled with `texture()`, and the entry point
+  becomes a `void main()` writing `orynivoColor` with the engine's top-down `fragCoord` built from
+  `gl_FragCoord`. The `gl-harness` compiles the emitted comp and warp GLSL of a real preset in the
+  context (both accepted on an NVIDIA context), so the dialect is verified rather than assumed.
+  **What remains is the pipeline integration**, which is mechanical but broad: the warp pass runs
+  the emitted warp shader instead of the fixed mesh fragment shader, the comp pass runs after the
+  post pass into its own target (the feedback stays the pre-comp frame, matching the display-pass
+  rule above), and the pipeline has to bind `sampler_main`, `sampler_blur1`-`3`, and
+  `sampler_pc_main` and seed every uniform the prelude declares (`texsize`, `time`, `frame`, `fps`,
+  `bass`-`treb_att`, `aspect`, `rand_frame`, `rand_preset`, the `q1`-`q32`/`t1`-`t8` slots, the warp
+  motion uniforms, and the per-pixel block's referenced variables) from the renderer's slots, which
+  `PresetRenderer.ReadVariable` exposes. The dialect is chosen from the negotiated version (ANGLE's
+  GLES on Windows, desktop GL on Linux, CGL on macOS), and the SkSL path stays the fallback, so a
+  shader the GLSL emitter cannot translate keeps rendering through Skia or the interpreter. The
+  SkSL emitter's matrix support is mirrored: `floatNxN` becomes GLSL `matN`, and a single vector
+  argument is spread into scalars because `matN` has no four-component constructor.
   The warp's sampling arithmetic now lives in the tested
 
   `Orynivo.Visualization.WarpSampling`, which the GLSL fragment shader has to translate rather than
