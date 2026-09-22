@@ -37,6 +37,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   as a steady rubber band rather than an occasional hitch.
 
 ### Changed
+- The visualizer's once-per-second diagnostic line now also reports the frame's brightness **per
+  stage** (`stageBrightness=warp:…/blur:…/compShader:…/done:…`), sampled when each stage begins, so
+  it reports what the stage before it produced. The saturated share alone says a frame went white; the
+  per-stage brightness says which stage turned it white, instead of leaving that to be inferred from
+  the finished frame. It is recorded through the existing stage logger, so the renderer gained no new
+  logging surface.
 - The visualizer's once-per-second diagnostic line now also reports the rendered frame's
   **saturated share** and whether the per-pixel program is suspended. A white window is either a
   genuinely saturated frame or a frame that never reaches the screen, and the saturated share tells

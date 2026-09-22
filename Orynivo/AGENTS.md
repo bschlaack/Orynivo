@@ -552,7 +552,8 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
   reveal the overlay. Never replace that with a global pointer hook. The window's once-per-second
   diagnostic line also carries the averaged `RenderTimings` per stage (render, warp, blur, post,
   overlay, composite, comp shader) plus the render size, the frame's mean brightness and its
-  **saturated share**, the shader grid state, whether the per-pixel program is suspended, and any
+  **saturated share**, the frame's brightness **per stage**, the shader grid state, whether the
+  per-pixel program is suspended, and any
   shader, render, preset, or presentation error, so render cost is measured rather than guessed.
   Keep the saturated share: a white window is either a genuinely saturated frame or a frame that never
   reaches the screen, and only that number tells the two apart, because a presentation fault leaves

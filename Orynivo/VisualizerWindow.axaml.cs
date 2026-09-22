@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Globalization;
 using Avalonia;
@@ -344,7 +345,14 @@ public partial class VisualizerWindow : Window
             _renderer = new PresetRenderer(preset, _renderWidth, _renderHeight);
             ConfigureRenderer(_renderer);
             // The first frames are traced stage by stage so a frozen frame names its own stage.
-            _renderer.StageLogger = message => SeekDiagnostics.Log("visualizer", message);
+            // Each stage's begin message is also sampled, which reports the frame the stage before it
+            // produced: that is what tells a white picture apart from a warp, a comp, or an overlay
+            // that went white, instead of only knowing the finished frame is saturated.
+            _renderer.StageLogger = message =>
+            {
+                RecordStageBrightness(message);
+                SeekDiagnostics.Log("visualizer", message);
+            };
             // Parsing and compiling a preset happen here, on the render thread, so a preset that
             // takes seconds to build looks exactly like a frozen window. Log both halves.
             SeekDiagnostics.Log(
@@ -478,6 +486,42 @@ public partial class VisualizerWindow : Window
     }
 
     /// <summary>
+    /// The mean brightness the frame had when each stage last began. It is written by the render
+    /// thread through the stage logger and read by the diagnostics line, so it is concurrent.
+    /// </summary>
+    private readonly ConcurrentDictionary<string, float> _stageBrightness = new(StringComparer.Ordinal);
+
+    /// <summary>
+    /// Samples the frame when a stage begins, which reports what the stage before it produced.
+    /// </summary>
+    /// <param name="message">Stage trace message, formatted as <c>stage=&lt;name&gt; begin …</c>.</param>
+    private void RecordStageBrightness(string message)
+    {
+        const string prefix = "stage=";
+        if (!message.StartsWith(prefix, StringComparison.Ordinal))
+            return;
+
+        var end = message.IndexOf(' ', prefix.Length);
+        if (end < 0)
+            return;
+
+        var renderer = _renderer;
+        if (renderer is null)
+            return;
+
+        var pixels = renderer.Output.Pixels;
+        var total = 0f;
+        var samples = 0;
+        for (var index = 0; index + 2 < pixels.Length; index += 64)
+        {
+            total += pixels[index] + pixels[index + 1] + pixels[index + 2];
+            samples += 3;
+        }
+
+        _stageBrightness[message[prefix.Length..end]] = samples == 0 ? 0f : total / samples;
+    }
+
+    /// <summary>
     /// Builds the once-per-second diagnostic line so an empty window can be told apart from a
     /// picture that never reaches the screen, and so the render cost per stage is measurable
     /// instead of guessed. The timings are averaged over the frames of this second. Only counts,
@@ -524,6 +568,7 @@ public partial class VisualizerWindow : Window
             + $"shaders=warp{_renderer.Preset.WarpShaders.Count}/comp{_renderer.Preset.CompShaders.Count} "
             + $"gridReduced={_renderer.ShaderGridReduced} "
             + $"perPixelSuspended={_renderer.PerPixelSuspended} "
+            + $"stageBrightness={string.Join('/', _stageBrightness.Select(pair => $"{pair.Key}:{pair.Value:F3}"))} "
             + (_renderer.ShaderError is { } shaderError ? $"shaderError=[{shaderError}] " : string.Empty)
             + (_renderError is { } renderError ? $"renderError=[{renderError}] " : string.Empty)
             + (_renderer.PresetError is { } presetError ? $"presetError=[{presetError}] " : string.Empty)
