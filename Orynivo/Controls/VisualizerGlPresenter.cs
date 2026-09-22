@@ -21,6 +21,7 @@ namespace Orynivo.Controls;
 public sealed class VisualizerGlPresenter : OpenGlControlBase
 {
     private const int GlColorBufferBit = 0x4000;
+    private const int GlFramebuffer = 0x8D40;
     private const int GlTexture2D = 0x0DE1;
     private const int GlTexture0 = 0x84C0;
     private const int GlTextureMinFilter = 0x2801;
@@ -82,6 +83,8 @@ public sealed class VisualizerGlPresenter : OpenGlControlBase
     private int _vertexArray;
     private int _vertexBuffer;
     private int _textureUniform = -1;
+    /// <summary>The texture last drawn, re-presented on a refresh that published no frame.</summary>
+    private int _lastPresented;
     private bool _glReady;
 
     /// <summary>Gets the negotiated GL version, once the context is up.</summary>
@@ -252,6 +255,28 @@ public sealed class VisualizerGlPresenter : OpenGlControlBase
             Math.Max(1, (int)Math.Round(Bounds.Height * scaling)));
     }
 
+    /// <summary>Draws one texture over the control's framebuffer.</summary>
+    /// <param name="gl">GL interface.</param>
+    /// <param name="framebuffer">Destination framebuffer, or zero for the window.</param>
+    /// <param name="texture">Texture to draw.</param>
+    private void PresentTexture(GlInterface gl, int framebuffer, int texture)
+    {
+        var viewport = FramebufferSize();
+        gl.BindFramebuffer(GlFramebuffer, framebuffer);
+        gl.Viewport(0, 0, viewport.Width, viewport.Height);
+        gl.ClearColor(0f, 0f, 0f, 1f);
+        gl.Clear(GlColorBufferBit);
+        gl.UseProgram(_program);
+        gl.ActiveTexture(GlTexture0);
+        gl.BindTexture(GlTexture2D, texture);
+        if (_textureUniform >= 0)
+            gl.Uniform1i(_textureUniform, 0);
+        gl.BindVertexArray(_vertexArray);
+        gl.DrawArrays(GlTriangleStrip, 0, 4);
+        gl.BindVertexArray(0);
+        gl.Flush();
+    }
+
     /// <inheritdoc/>
     protected override void OnOpenGlRender(GlInterface gl, int fb)
     {
@@ -266,6 +291,8 @@ public sealed class VisualizerGlPresenter : OpenGlControlBase
             float[]? pipelineMesh = null;
             int pipelineMeshX = 0, pipelineMeshY = 0, pipelineWidth = 0, pipelineHeight = 0;
             VisualizerFrameParameters pipelineParameters = default;
+            byte[]? frame = null;
+            int frameWidth = 0, frameHeight = 0;
             lock (_frameLock)
             {
                 if (_pipelinePending)
@@ -278,6 +305,13 @@ public sealed class VisualizerGlPresenter : OpenGlControlBase
                     pipelineHeight = _pipelineFrameHeight;
                     pipelineParameters = _pipelineParameters;
                     _pipelinePending = false;
+                }
+                else if (_hasFrame)
+                {
+                    frame = _rgba;
+                    frameWidth = _frameWidth;
+                    frameHeight = _frameHeight;
+                    _hasFrame = false;
                 }
             }
 
@@ -298,80 +332,29 @@ public sealed class VisualizerGlPresenter : OpenGlControlBase
                     true,
                     pipelineParameters))
                 {
+                    _lastPresented = _pipeline.OutputTexture;
                     Frames++;
-                    RequestNextFrameRendering();
-                    return;
-                }
-
-                // A failed pipeline is fatal for the GL path: the caller falls back to the CPU frame,
-                // because only the overlay was published for this frame.
-                _pipelineFailed = true;
-                GlError = _pipeline.Error ?? "the GL pipeline failed";
-                RequestNextFrameRendering();
-                return;
-            }
-
-            byte[]? frame = null;
-            int frameWidth, frameHeight;
-            lock (_frameLock)
-            {
-                if (_hasFrame)
-                {
-                    frame = _rgba;
-                    frameWidth = _frameWidth;
-                    frameHeight = _frameHeight;
-                    _hasFrame = false;
                 }
                 else
                 {
-                    frameWidth = 0;
-                    frameHeight = 0;
+                    // A failed pipeline is fatal for the GL path: the caller falls back to the CPU
+                    // frame, because only the overlay was published for this frame.
+                    _pipelineFailed = true;
+                    GlError = _pipeline.Error ?? "the GL pipeline failed";
                 }
             }
-
-            if (frame is not null && frameWidth > 0 && frameHeight > 0)
+            else if (frame is not null && frameWidth > 0 && frameHeight > 0)
             {
-                gl.ActiveTexture(GlTexture0);
-                gl.BindTexture(GlTexture2D, _texture);
-                gl.TexParameteri(GlTexture2D, GlTextureMinFilter, GlLinear);
-                gl.TexParameteri(GlTexture2D, GlTextureMagFilter, GlLinear);
-                gl.TexParameteri(GlTexture2D, GlTextureWrapS, GlClampToEdge);
-                gl.TexParameteri(GlTexture2D, GlTextureWrapT, GlClampToEdge);
-                var handle = GCHandle.Alloc(frame, GCHandleType.Pinned);
-                try
-                {
-                    // GlInterface exposes no TexSubImage2D, so the whole texture is re-specified.
-                    gl.TexImage2D(
-                        GlTexture2D,
-                        0,
-                        GlRgba8,
-                        frameWidth,
-                        frameHeight,
-                        0,
-                        GlRgba,
-                        GlUnsignedByte,
-                        handle.AddrOfPinnedObject());
-                }
-                finally
-                {
-                    handle.Free();
-                }
-
-            gl.BindFramebuffer(0x8D40, fb);
-            var viewport = FramebufferSize();
-            gl.Viewport(0, 0, viewport.Width, viewport.Height);
-
-                gl.ClearColor(0f, 0f, 0f, 1f);
-                gl.Clear(GlColorBufferBit);
-                gl.UseProgram(_program);
-                if (_textureUniform >= 0)
-                    gl.Uniform1i(_textureUniform, 0);
-                gl.BindVertexArray(_vertexArray);
-                gl.DrawArrays(GlTriangleStrip, 0, 4);
-                gl.BindVertexArray(0);
-                gl.Flush();
+                UploadFrame(gl, frame, frameWidth, frameHeight);
+                _lastPresented = _texture;
                 Frames++;
             }
+
+            // A frame is drawn on every refresh, even when nothing new was published. The control's
+            // surface is double buffered, so leaving a refresh undrawn swaps to a buffer that is two
+            // presentations old, which shows as the picture jumping backwards.
+            if (_lastPresented != 0)
+                PresentTexture(gl, fb, _lastPresented);
         }
         catch (Exception exception)
         {
@@ -382,6 +365,39 @@ public sealed class VisualizerGlPresenter : OpenGlControlBase
         RequestNextFrameRendering();
     }
 
+    /// <summary>Uploads a finished frame as the presentation texture.</summary>
+    /// <param name="gl">GL interface.</param>
+    /// <param name="frame">RGBA frame, bottom row first.</param>
+    /// <param name="width">Frame width.</param>
+    /// <param name="height">Frame height.</param>
+    private void UploadFrame(GlInterface gl, byte[] frame, int width, int height)
+    {
+        gl.ActiveTexture(GlTexture0);
+        gl.BindTexture(GlTexture2D, _texture);
+        gl.TexParameteri(GlTexture2D, GlTextureMinFilter, GlLinear);
+        gl.TexParameteri(GlTexture2D, GlTextureMagFilter, GlLinear);
+        gl.TexParameteri(GlTexture2D, GlTextureWrapS, GlClampToEdge);
+        gl.TexParameteri(GlTexture2D, GlTextureWrapT, GlClampToEdge);
+        var handle = GCHandle.Alloc(frame, GCHandleType.Pinned);
+        try
+        {
+            // GlInterface exposes no TexSubImage2D, so the whole texture is re-specified.
+            gl.TexImage2D(
+                GlTexture2D,
+                0,
+                GlRgba8,
+                width,
+                height,
+                0,
+                GlRgba,
+                GlUnsignedByte,
+                handle.AddrOfPinnedObject());
+        }
+        finally
+        {
+            handle.Free();
+        }
+    }
     /// <summary>Compiles and links the presentation shaders.</summary>
     /// <param name="gl">GL interface.</param>
     /// <returns>The linked program.</returns>
@@ -410,6 +426,8 @@ public sealed class VisualizerGlPresenter : OpenGlControlBase
         return program;
     }
 }
+
+
 
 
 
