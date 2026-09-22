@@ -1659,14 +1659,18 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
     /// <inheritdoc/>
     public ShaderValue SamplePixel(int x, int y)
     {
-        var column = Math.Clamp(x, 0, _warped.Width - 1);
-        var row = Math.Clamp(y, 0, _warped.Height - 1);
-        var offset = (((row * _warped.Width) + column) * 4);
+        // GetPixel reads the same frame sampler_main refers to, matching the GPU's translation and
+        // Milkdrop; reading the warped frame here made a comp shader's GetPixel differ from its
+        // tex2D(sampler_main, ...).
+        var source = _samplerMainIsWarped ? _frameCopy : _previous;
+        var column = Math.Clamp(x, 0, source.Width - 1);
+        var row = Math.Clamp(y, 0, source.Height - 1);
+        var offset = (((row * source.Width) + column) * 4);
         return ShaderValue.Vector(
-            _warped.Pixels[offset],
-            _warped.Pixels[offset + 1],
-            _warped.Pixels[offset + 2],
-            _warped.Pixels[offset + 3],
+            source.Pixels[offset],
+            source.Pixels[offset + 1],
+            source.Pixels[offset + 2],
+            source.Pixels[offset + 3],
             4);
     }
 

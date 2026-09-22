@@ -56,6 +56,13 @@ public sealed class ShaderInterpreter
     private readonly IShaderSampler? _sampler;
     private readonly Dictionary<string, ShaderValue> _variables = new(StringComparer.Ordinal);
 
+    /// <summary>
+    /// The component count each variable was declared (or seeded) with. An assignment coerces its
+    /// value to it, matching HLSL and the SkSL emitter; without it a "float z = ...; z = float4(...)"
+    /// kept four components and every later use of z differed from the GPU.
+    /// </summary>
+    private readonly Dictionary<string, int> _declaredCounts = new(StringComparer.Ordinal);
+
     /// <summary>The helper functions the shader defines, by name, ready to be called.</summary>
     private readonly Dictionary<string, ShaderNode> _functions = new(StringComparer.Ordinal);
     private int _iterations;
@@ -75,12 +82,20 @@ public sealed class ShaderInterpreter
     /// <summary>Sets a variable before the shader runs.</summary>
     /// <param name="name">Variable name.</param>
     /// <param name="value">Value to assign.</param>
-    public void SetVariable(string name, ShaderValue value) => _variables[name] = value;
+    public void SetVariable(string name, ShaderValue value)
+    {
+        _variables[name] = value;
+        _declaredCounts[name] = value.Count;
+    }
 
     /// <summary>Sets a scalar variable before the shader runs.</summary>
     /// <param name="name">Variable name.</param>
     /// <param name="value">Scalar value.</param>
-    public void SetVariable(string name, float value) => _variables[name] = ShaderValue.Scalar(value);
+    public void SetVariable(string name, float value)
+    {
+        _variables[name] = ShaderValue.Scalar(value);
+        _declaredCounts[name] = 1;
+    }
 
     /// <summary>Runs the shader.</summary>
     /// <returns>The value the shader returned, or zero when it returned nothing.</returns>
@@ -164,6 +179,7 @@ public sealed class ShaderInterpreter
                             ? Evaluate(statement.Left, depth)
                             : ShaderRuntime.DefaultFor(statement.Text),
                         statement.Text);
+                    _declaredCounts[declared] = ShaderRuntime.CountFor(statement.Text);
                 }
 
                 return null;
@@ -387,6 +403,8 @@ public sealed class ShaderInterpreter
     {
         if (target.Kind == ShaderNodeKind.Identifier)
         {
+            if (_declaredCounts.TryGetValue(target.Text, out var declaredCount))
+                value = ShaderRuntime.Coerce(value, declaredCount);
             _variables[target.Text] = value;
             return;
         }

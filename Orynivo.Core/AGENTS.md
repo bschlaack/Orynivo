@@ -97,10 +97,11 @@ This file applies to `Orynivo.Core/` and supplements `../AGENTS.md`.
   finite on the first frame, because a preset that divides by it otherwise accumulates an infinity
   that then reaches the sampler. `PresetSkiaComparisonDiagnosticTests` is the harness that compares
   both execution paths over a real collection and reports their drift. Keep the interpreter and the
-  emitter agreeing on the shader semantics the harness covers: a declaration coerces its value to the
-  declared type (`ShaderRuntime.Coerce`, which HLSL and the emitter both apply), the shader's `/`
-  treats a zero divisor as zero (`orynivoSafeDiv` on the GPU), and a blur samples the same frame
-  `sampler_main` refers to.
+  emitter agreeing on the shader semantics the harness covers: a declaration and an assignment coerce
+  their value to the declared type (`ShaderRuntime.Coerce`, which HLSL and the emitter both apply),
+  the shader's `/` treats a zero divisor as zero (`orynivoSafeDiv` on the GPU), a blur and `GetPixel`
+  read the same frame `sampler_main` refers to, and the compiler remembers each variable's declared
+  component count so its compiled path matches the interpreter.
   `ShaderTranspiler`
   is the SkSL back end for the GPU path and must stay honest against the same reference: the GPU and
   the interpreter have to agree on one variable universe, so the emitter knows the engine-bound

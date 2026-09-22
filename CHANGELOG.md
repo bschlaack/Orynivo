@@ -72,7 +72,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   object is reused while its contents change every frame.
 - Made the shader interpreter and compiler coerce a declaration's value to its declared type, the way
   HLSL and the SkSL emitter do. A `float z = float4(...)` kept all four components on the CPU but was
-  narrowed to `.x` on the GPU, which changed every later use of `z`.
+  narrowed to `.x` on the GPU, which changed every later use of `z`. An assignment to an
+  already-declared variable is coerced the same way: the interpreter remembers each variable's
+  declared component count and the compiler applies the same conversion.
+- Made `GetPixel` read the same frame `sampler_main` refers to. It read the warped frame, so a comp
+  shader's `GetPixel` and its `tex2D(sampler_main, ...)` saw different pictures on the CPU while the
+  GPU's translation used `sampler_main` for both.
 - Emitted `orynivoSafeDiv` for the shader's `/` and `/=` operators. The CPU treats a zero divisor as
   zero, while SkSL's division produced an infinity that then rendered white.
 - Added the missing Milkdrop shader functions to the CPU interpreter. `ShaderRuntime` now carries

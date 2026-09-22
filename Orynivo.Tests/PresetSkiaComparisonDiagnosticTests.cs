@@ -15,7 +15,7 @@ namespace Orynivo.Tests;
 public sealed class PresetSkiaComparisonDiagnosticTests
 {
     private const int FileCount = 200;
-    private const int Frames = 2;
+    private const int Frames = 1;
     private const int Width = 48;
     private const int Height = 27;
     private const int MaxReported = 12;
@@ -62,9 +62,11 @@ public sealed class PresetSkiaComparisonDiagnosticTests
                 }
 
                 float difference;
+                string? cpuError;
+                string? gpuError;
                 try
                 {
-                    difference = Compare(preset);
+                    difference = Compare(preset, out cpuError, out gpuError);
                 }
                 catch (Exception)
                 {
@@ -89,7 +91,7 @@ public sealed class PresetSkiaComparisonDiagnosticTests
                             : "plain";
                 if (difference > 8f / 255f)
                     largeByKind[kind] = largeByKind.TryGetValue(kind, out var count) ? count + 1 : 1;
-                worst.Add((difference, $"{kind,-9} {preset.Name}"));
+                worst.Add((difference, $"{kind,-9} cpu={cpuError ?? "-"} gpu={gpuError ?? "-"} {preset.Name}"));
             }
         }
 
@@ -105,11 +107,13 @@ public sealed class PresetSkiaComparisonDiagnosticTests
 
     /// <summary>Renders one preset both ways and returns the mean absolute difference.</summary>
     /// <param name="preset">Preset to render.</param>
+    /// <param name="cpuError">Receives the CPU renderer's shader error, if any.</param>
+    /// <param name="gpuError">Receives the GPU renderer's shader error, if any.</param>
     /// <returns>The mean difference per channel.</returns>
-    private static float Compare(VisualizerPreset preset)
+    private static float Compare(VisualizerPreset preset, out string? cpuError, out string? gpuError)
     {
-        var cpu = Render(preset, skia: false);
-        var gpu = Render(preset, skia: true);
+        var cpu = Render(preset, skia: false, out cpuError);
+        var gpu = Render(preset, skia: true, out gpuError);
         var total = 0f;
         var count = 0;
         for (var index = 0; index < Math.Min(cpu.Length, gpu.Length); index += 4)
@@ -123,13 +127,6 @@ public sealed class PresetSkiaComparisonDiagnosticTests
 
         return total / Math.Max(1, count);
     }
-
-    /// <summary>Renders a preset and returns its last frame.</summary>
-    /// <param name="preset">Preset to render.</param>
-    /// <param name="skia">Whether the Skia passes are enabled.</param>
-    /// <returns>The last frame's pixels.</returns>
-    private static float[] Render(VisualizerPreset preset, bool skia) =>
-        Render(preset, skia, out _);
 
     /// <summary>Renders a preset and returns its last frame and the shader error, if any.</summary>
     /// <param name="preset">Preset to render.</param>

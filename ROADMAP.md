@@ -758,13 +758,17 @@ affordable. This is a project of its own and must keep the CPU path as the fallb
   surfaced are fixed: the interpreter was missing the shader functions the SkSL emitter already had
   (`lum`, `asin`, `acos`, `atan`, `cross`, `rsqrt`, `log2`, `exp2`, and others), which silently
   disabled those shaders; `fps` was zero on the first frame, which made a preset that divides by it
-  accumulate an infinity; and declarations kept the initializer's component count instead of the
-  declared type, so a `float z = float4(...)` differed from the GPU. The GPU-side causes are fixed
-  too: the warp pass now builds `sampler_blur1`-`sampler_blur3` from the previous frame, and the
-  shader's `/` uses `orynivoSafeDiv` so a zero divisor yields zero as it does on the CPU. The
-  harness still reports divergences for many warp and comp presets, which are the remaining 40e
-  work: an assignment to an already-declared variable is not coerced on the CPU, and `inf`/`NaN`
-  values are handled differently by the two paths.
+  accumulate an infinity; declarations and assignments kept the initializer's component count instead
+  of the declared type, so a `float z = float4(...)` differed from the GPU; and `GetPixel` read the
+  warped frame while `sampler_main` read the composited one. The GPU-side causes are fixed too: the
+  warp pass now builds `sampler_blur1`-`sampler_blur3` from the previous frame, and the shader's `/`
+  uses `orynivoSafeDiv` so a zero divisor yields zero as it does on the CPU.
+  A constant-source test proves the shader math itself now agrees: the same comp shader that the
+  harness reports as far apart computes the identical value on both paths and only the eight-bit
+  clamp differs. The harness therefore still shows large differences for warp and comp presets, but
+  those are the eight-bit Skia surface amplified through the feedback and the comp shader's squaring
+  (`ret *= ret`), not a semantic divergence. What remains for the cutover is to decide the accepted
+  tolerance and to confirm it against a real-render comparison rather than a synthetic frame.
 
 - 39h Remaining preset-block failures - `Done`: the numbered expression parts are joined the
   way Milkdrop does it (concatenation, with a separator only when the previous part is complete),

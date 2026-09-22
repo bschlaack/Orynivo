@@ -54,6 +54,18 @@ internal static class ShaderCompiler
     private static readonly System.Reflection.MethodInfo CoerceMethod =
         typeof(ShaderRuntime).GetMethod(nameof(ShaderRuntime.Coerce), [typeof(ShaderValue), typeof(string)])!;
 
+    /// <summary>The <see cref="ShaderRuntime.Coerce(ShaderValue, int)"/> overload used for assignments.</summary>
+    private static readonly System.Reflection.MethodInfo CoerceCountMethod =
+        typeof(ShaderRuntime).GetMethod(nameof(ShaderRuntime.Coerce), [typeof(ShaderValue), typeof(int)])!;
+
+    /// <summary>
+    /// The component count each variable was declared with while one shader is compiled, so an
+    /// assignment can coerce its value the way the interpreter does. The state is per thread because
+    /// one compilation runs on one thread.
+    /// </summary>
+    [ThreadStatic]
+    private static Dictionary<string, int>? _counts;
+
     /// <summary>The constructor of <see cref="ShaderValue"/> used to build results inline.</summary>
     private static readonly System.Reflection.ConstructorInfo ShaderValueConstructor =
         typeof(ShaderValue).GetConstructor([typeof(float), typeof(float), typeof(float), typeof(float), typeof(int)])!;
@@ -98,6 +110,7 @@ internal static class ShaderCompiler
             return null;
 
         var slots = new Dictionary<string, int>(StringComparer.Ordinal);
+        _counts = new Dictionary<string, int>(StringComparer.Ordinal);
         var slotsParameter = Expression.Parameter(typeof(ShaderValue[]), "slots");
         var samplerParameter = Expression.Parameter(typeof(IShaderSampler), "sampler");
         var result = Expression.Variable(typeof(ShaderValue), "result");
@@ -135,6 +148,15 @@ internal static class ShaderCompiler
     {
         if (statement.Kind == ShaderNodeKind.ExpressionStatement)
             return BuildExpression(slots, slotsParameter, samplerParameter, statement.Left!);
+
+        if (statement.Kind == ShaderNodeKind.Declaration && _counts is not null)
+        {
+            foreach (var item in statement.Items)
+            {
+                if (item.Text.Length > 0)
+                    _counts[item.Text] = ShaderRuntime.CountFor(statement.Text);
+            }
+        }
 
         var name = statement.Items.Count > 0 ? statement.Items[0].Text : string.Empty;
         var slot = Slot(slots, name);
@@ -304,14 +326,18 @@ internal static class ShaderCompiler
                 return Compare(left, right, 5);
             case "=":
                 // Assigning to a local is common in shader bodies, so it is compiled; assigning to
-                // anything else (a swizzle target) stays on the interpreter.
+                // anything else (a swizzle target) stays on the interpreter. The value is coerced to
+                // the target's declared type, matching the interpreter and HLSL.
                 if (node.Left!.Kind == ShaderNodeKind.Identifier)
                 {
+                    var assigned = _counts is not null && _counts.TryGetValue(node.Left.Text, out var count)
+                        ? Expression.Call(CoerceCountMethod, right, Expression.Constant(count))
+                        : right;
                     return Expression.Assign(
                         Expression.ArrayAccess(
                             slotsParameter,
                             Expression.Constant(Slot(slots, node.Left.Text))),
-                        right);
+                        assigned);
                 }
 
                 throw new PresetExpressionException("Unsupported shader assignment.", node.Position);

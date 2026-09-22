@@ -29,6 +29,19 @@ public sealed class SkiaShaderRunnerTests
         AssertMatchesInterpreter(Source);
     }
 
+    /// <summary>A value assigned to a narrower declared variable is coerced on both paths.</summary>
+    [Fact]
+    public void Render_MatchesTheInterpreterForANarrowingAssignment()
+    {
+        const string Source = """
+            float3 v = float3(0.1, 0.2, 0.3);
+            v = float4(0.5, 0.25, 0.75, 0.1);
+            ret = v;
+            """;
+
+        AssertMatchesInterpreter(Source);
+    }
+
     /// <summary>The GPU and the interpreter agree on the extended Milkdrop vocabulary.</summary>
     [Fact]
     public void Render_MatchesTheInterpreterForTheExtendedVocabulary()
