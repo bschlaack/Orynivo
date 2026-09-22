@@ -65,6 +65,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   stays the fallback, and the CPU/GPU tests keep the two within a level.
 
 ### Fixed
+- Made the SkSL emitter handle a comparison of vectors. SkSL rejects a bool vector as a ternary
+  condition and as a constructor argument, so a value comparison is emitted component-wise with
+  `step`/`sign` and a comparison used as a condition compares the first components, which is what
+  the engine's `ShaderValue.IsTrue` and `ShaderRuntime.Compare` do. The emitter also reports the
+  type a narrowed intrinsic actually returns instead of the widest argument type, which had skipped
+  the conversion a later operation needed (`float3 * float4`). Shader translation rose from 760 to
+  762 of 764.
 - Made the shader `aspect` variable a `float4` whose `zw` are the reciprocals of `xy`, matching
   Milkdrop and projectM (whose first shader constant is `(aspectX, aspectY, 1/aspectX, 1/aspectY)`).
   A preset that read `aspect.zw` failed to translate before, so the share of shaders that translate

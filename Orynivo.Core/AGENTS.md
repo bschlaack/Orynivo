@@ -106,10 +106,15 @@ This file applies to `Orynivo.Core/` and supplements `../AGENTS.md`.
   `ShaderTranspiler`
   is the SkSL back end for the GPU path and must stay honest against the same reference: the GPU and
   the interpreter have to agree on one variable universe, so the emitter knows the engine-bound
-    per-pixel variables (`uv`, `uv_orig`, `rad`, `ang`), infers an intrinsic's return type from its
-  arguments, declares a sampler from the shader's own `tex2D`/`tex3D` call instead of a fixed list,
+        per-pixel variables (`uv`, `uv_orig`, `rad`, `ang`), infers an intrinsic's return type from its
+  arguments (and reports the narrowed component count for the intrinsics whose arguments it narrows,
+  because a later operation otherwise skips a conversion SkSL needs), declares a sampler from the
+  shader's own `tex2D`/`tex3D` call instead of a fixed list,
   reads an undeclared variable as a zero constant the way the interpreter does, gives a written
-  uniform a writable copy in main, and renames a name SkSL reserves. Milkdrop keeps one variable
+  uniform a writable copy in main, and renames a name SkSL reserves. A comparison of vectors is
+  emitted component-wise with `step`/`sign`, because SkSL rejects a bool vector as a condition, and
+  a comparison used as a condition compares the first components to match `ShaderValue.IsTrue`.
+ Milkdrop keeps one variable
   universe for the expression blocks and the shader, so `q1`-`q32` and `t1`-`t8` are seeded from the
   preset slots on both CPU paths (`BindShaderVariables` per pixel and `SeedCompiledShaderFrame` once
   per frame) and on the GPU; keep the two sides seeding the same set, because a shader that reads a

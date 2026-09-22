@@ -707,7 +707,30 @@ public static class ShaderTranspiler
     /// <summary>Emits an expression as a SkSL condition, where a non-zero value is true.</summary>
     /// <param name="expression">Condition node.</param>
     /// <returns>The condition text.</returns>
-    private static string EmitCondition(ShaderNode expression) => EmitExpression(expression) + " != 0.0";
+    private static string EmitCondition(ShaderNode expression)
+    {
+        // A comparison of vectors is component-wise, but the engine's truth test reads the first
+        // component (ShaderValue.IsTrue), and SkSL rejects a bool vector as a condition. The
+        // condition therefore compares the first components.
+        if (expression.Kind == ShaderNodeKind.Binary && IsComparisonOperator(expression.Text))
+        {
+            var left = SkSL.Convert(EmitExpression(expression.Left!), TypeOf(expression.Left!), "float");
+            var right = SkSL.Convert(EmitExpression(expression.Right!), TypeOf(expression.Right!), "float");
+            return $"(({left}) {expression.Text} ({right}))";
+        }
+
+        var text = EmitExpression(expression);
+        var type = TypeOf(expression);
+        return type is not null && SkSL.ComponentCount(type) > 1
+            ? $"(({text}).x != 0.0)"
+            : $"({text} != 0.0)";
+    }
+
+    /// <summary>Reports whether an operator is a comparison.</summary>
+    /// <param name="text">Operator text.</param>
+    /// <returns><see langword="true"/> when the operator compares two values.</returns>
+    private static bool IsComparisonOperator(string text) =>
+        text is "<" or ">" or "<=" or ">=" or "==" or "!=";
 
     /// <summary>
     /// Emits a declaration initializer. SkSL has no implicit scalar-to-vector or float-to-int
@@ -858,6 +881,22 @@ public static class ShaderTranspiler
         if (SkSL.IsVectorConstructor(call.Text))
             return SkSL.MapType(call.Text);
 
+        // An intrinsic that takes matching component counts is emitted with every argument narrowed to
+        // the smallest vector count among them, so the result keeps that count. Reporting the widest
+        // count here instead made a later operation skip the conversion it needed, which SkSL then
+        // rejected as "float3 * float4".
+        if (SkSL.DirectFunctions.Contains(call.Text) || call.Text is "saturate" or "lerp" or "atan2" or "mul")
+        {
+            var smallest = int.MaxValue;
+            foreach (var argument in call.Items)
+            {
+                if (TypeOf(argument) is { } argumentType && SkSL.ComponentCount(argumentType) > 1)
+                    smallest = Math.Min(smallest, SkSL.ComponentCount(argumentType));
+            }
+
+            return smallest == int.MaxValue ? "float" : SkSL.ComponentType(smallest);
+        }
+
         // An intrinsic keeps the widest component count of its arguments, which is how pow(float3, …)
         // and max(float3, …) behave. The accumulator must skip an unknown argument instead of folding
         // it in, because Wider reports nothing when either side is unknown and starting from nothing
@@ -880,9 +919,13 @@ public static class ShaderTranspiler
     private static string? BinaryType(ShaderNode expression) => expression.Text switch
     {
         "=" or "+=" or "-=" or "*=" or "/=" => TypeOf(expression.Left!),
-        "<" or ">" or "<=" or ">=" or "==" or "!=" or "&&" or "||" => "float",
+        // A comparison is component-wise in the engine, so its result keeps the operands' wider type;
+        // the logical operators yield a scalar.
+        "<" or ">" or "<=" or ">=" or "==" or "!=" => SkSL.Wider(TypeOf(expression.Left!), TypeOf(expression.Right!)),
+        "&&" or "||" => "float",
         _ => SkSL.Wider(TypeOf(expression.Left!), TypeOf(expression.Right!))
     };
+
 
     /// <summary>
     /// Records the type of every variable a statement tree declares, so a use that stands before its
@@ -1193,10 +1236,11 @@ public static class ShaderTranspiler
         // what the engine's component-wise arithmetic already does. An assignment is left alone: its
         // target must never be converted, only the value it is given, which EmitAssignment does.
         var isAssignment = expression.Text is "=" or "+=" or "-=" or "*=" or "/=";
+        var common = leftType is not null && rightType is not null ? SkSL.Wider(leftType, rightType) : null;
         if (!isAssignment &&
             leftType is not null && rightType is not null &&
             SkSL.ComponentCount(leftType) != SkSL.ComponentCount(rightType) &&
-            SkSL.Wider(leftType, rightType) is { } common)
+            common is not null)
         {
             left = SkSL.Convert(left, leftType, common);
             right = SkSL.Convert(right, rightType, common);
@@ -1219,18 +1263,45 @@ public static class ShaderTranspiler
             "-=" => $"{left} -= {right}",
             "*=" => $"{left} *= {right}",
             "/=" => $"{left} = orynivoSafeDiv({left}, {right})",
-            "==" => $"(({left} == {right}) ? 1.0 : 0.0)",
-            "!=" => $"(({left} != {right}) ? 1.0 : 0.0)",
-            "<" => $"(({left} < {right}) ? 1.0 : 0.0)",
-            ">" => $"(({left} > {right}) ? 1.0 : 0.0)",
-            "<=" => $"(({left} <= {right}) ? 1.0 : 0.0)",
-            ">=" => $"(({left} >= {right}) ? 1.0 : 0.0)",
+            "==" => ComparisonResult("==", left, right, common),
+            "!=" => ComparisonResult("!=", left, right, common),
+            "<" => ComparisonResult("<", left, right, common),
+            ">" => ComparisonResult(">", left, right, common),
+            "<=" => ComparisonResult("<=", left, right, common),
+            ">=" => ComparisonResult(">=", left, right, common),
             "&&" => $"((({left} != 0.0) && ({right} != 0.0)) ? 1.0 : 0.0)",
             "||" => $"((({left} != 0.0) || ({right} != 0.0)) ? 1.0 : 0.0)",
             "," => $"({left}, {right})",
             _ => throw new PresetExpressionException(
                 $"The binary operator '{expression.Text}' has no SkSL translation.",
                 expression.Position)
+        };
+    }
+
+    /// <summary>
+    /// Emits a comparison that yields one or zero. SkSL rejects a bool vector as a ternary condition
+    /// and as a constructor argument, so a comparison of vectors is emitted component-wise with
+    /// <c>step</c> and <c>sign</c>, which is the zero-or-one vector
+    /// <see cref="ShaderRuntime.Compare"/> produces on the CPU.
+    /// </summary>
+    /// <param name="op">Comparison operator.</param>
+    /// <param name="left">Left operand text.</param>
+    /// <param name="right">Right operand text.</param>
+    /// <param name="common">The operands' widened type, or nothing.</param>
+    /// <returns>The comparison text.</returns>
+    private static string ComparisonResult(string op, string left, string right, string? common)
+    {
+        if (common is null || SkSL.ComponentCount(common) <= 1)
+            return $"(({left} {op} {right}) ? 1.0 : 0.0)";
+
+        return op switch
+        {
+            ">=" => $"step({right}, {left})",
+            "<=" => $"step({left}, {right})",
+            ">" => $"(1.0 - step({left}, {right}))",
+            "<" => $"(1.0 - step({right}, {left}))",
+            "==" => $"(1.0 - abs(sign({left} - {right})))",
+            _ => $"abs(sign({left} - {right}))"
         };
     }
 

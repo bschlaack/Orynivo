@@ -58,6 +58,34 @@ public sealed class SkiaShaderRunnerTests
         AssertMatchesInterpreter(Source);
     }
 
+    /// <summary>A vector comparison used as a value is component-wise on both paths.</summary>
+    [Fact]
+    public void Render_MatchesTheInterpreterForAVectorComparisonValue()
+    {
+        const string Source = """
+            float4 a = float4(0.5, 0.25, 0.75, 0.1);
+            float4 b = float4(0.4, 0.4, 0.4, 0.4);
+            float4 mask = (a >= b);
+            ret = float3(mask.xyz);
+            """;
+
+        AssertMatchesInterpreter(Source);
+    }
+
+    /// <summary>A vector comparison used as a condition reads its first component on both paths.</summary>
+    [Fact]
+    public void Render_MatchesTheInterpreterForAVectorComparisonCondition()
+    {
+        const string Source = """
+            float3 a = float3(0.5, 0.25, 0.75);
+            float3 b = float3(0.4, 0.4, 0.4);
+            float n = (a >= b) ? 1.0 : 0.0;
+            ret = float3(n, 0.0, 0.0);
+            """;
+
+        AssertMatchesInterpreter(Source);
+    }
+
     /// <summary>The GPU and the interpreter agree on a sampled, scaled shader.</summary>
     [Fact]
     public void Render_MatchesTheInterpreterForASampledShader()
