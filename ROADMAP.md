@@ -813,7 +813,12 @@ affordable. This is a project of its own and must keep the CPU path as the fallb
   context. The chosen shape is the whole frame pipeline on the control's thread, the way Avalonia's
   GL controls and the reference implementation both work: the CPU keeps the per-frame block, the
   per-vertex mesh, and the overlay as one texture, and the GPU owns the feedback, the warp mesh, the
-  full-frame passes, and the shaders. The warp's sampling arithmetic now lives in the tested
+  full-frame passes, and the shaders.   The Core surface a GPU pipeline reads is complete: the per-vertex mesh (`MeshRequested`,
+  `TryCopyMeshMotion`), the clamped per-frame pass values (`ReadFrameParameters`), and the
+  overlay-only frame (`RenderOverlayFrame`/`OverlayFrame`), all covered by tests. What is left is the
+  GL pipeline itself in the control, which is app-side only.
+  The warp's sampling arithmetic now lives in the tested
+
   `Orynivo.Visualization.WarpSampling`, which the GLSL fragment shader has to translate rather than
   restate, so the two paths cannot drift apart.
   A GL mesh warp was written and then deliberately not wired in, because a warp alone is the wrong
@@ -1022,3 +1027,4 @@ affordable. This is a project of its own and must keep the CPU path as the fallb
 **Tests**: each phase adds its own; 39a is the prerequisite for claiming any speed-up.
 
 **Commit**: `perf(visualizer): add render measurement` (39a), then one commit per phase
+

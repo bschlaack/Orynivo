@@ -219,7 +219,11 @@ This file applies to `Orynivo.Core/` and supplements `../AGENTS.md`.
   transitional double work a GPU warp needs before it replaces the CPU warp; `TryCopyMeshMotion`
   copies the values and `MeshSource` exposes the frame the mesh samples. Requesting the mesh must
   leave the CPU frame byte-identical, which `PerVertexMeshTests` asserts.
-  `WarpSampling.SamplePosition` is the single definition of the warp's sampling arithmetic: the CPU
+  `ReadFrameParameters` publishes the clamped per-frame pass values and `RenderOverlayFrame` the`n  overlay-only frame, so a GPU pipeline reads them instead of duplicating the key lookups and`n  clamps; `RenderOverlayFrame` seeds the live variables first, because the overlay reads them.`n    `ReadFrameParameters` publishes the clamped per-frame pass values and `RenderOverlayFrame` the
+  overlay-only frame, so a GPU pipeline reads them instead of duplicating the key lookups and clamps;
+  `RenderOverlayFrame` seeds the live variables first, because the overlay reads them.
+  `WarpSampling.SamplePosition` is the single definition
+ of the warp's sampling arithmetic: the CPU
   warp calls it per pixel and a GPU warp's fragment shader must be a translation of it, so never
   duplicate that formula. Its position convention is the engine's minus-one-to-one space, not
   Milkdrop's zero-to-one vertex space. `WarpSamplingTests` is the reference the translation is
@@ -514,3 +518,4 @@ in the root `AGENTS.md` before modifying those areas.
   file at a reused path must discard the old initialization marker.
 - Use `GetTrackListPage` when only one ordered page is required; do not load the
   complete track list and page it in managed memory.
+

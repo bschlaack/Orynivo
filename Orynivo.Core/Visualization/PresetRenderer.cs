@@ -383,6 +383,55 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
     public PixelBuffer MeshSource => _previous;
 
     /// <summary>
+    /// Gets the overlay-only frame the last <see cref="RenderOverlayFrame"/> drew: the waveform,
+    /// spectrum, motion vectors, and shapes without the feedback warp. A GPU pipeline composites it
+    /// over its own warped frame, so the overlay stays the CPU's vector drawing.
+    /// </summary>
+    public PixelBuffer OverlayFrame => _fresh;
+
+    /// <summary>
+    /// Draws only the waveform and spectrum overlay, without touching the feedback buffers, and
+    /// leaves it in <see cref="OverlayFrame"/>. It is the overlay half of the frame for a GPU
+    /// pipeline, which owns the warp and the frame passes itself.
+    /// </summary>
+    /// <param name="audio">Audio values to draw.</param>
+    public void RenderOverlayFrame(IVisualizerAudioSource audio)
+    {
+        ArgumentNullException.ThrowIfNull(audio);
+        _audio = audio;
+        Bass = audio.Bass;
+        Mid = audio.Mid;
+        Treble = audio.Treble;
+        Volume = audio.Volume;
+        // The overlay reads the live wave and shape variables, so they have to be seeded here too;
+        // without it the overlay would draw from a stale slot array.
+        SeedFrameVariables();
+        DrawOverlay();
+    }
+
+    /// <summary>
+    /// Reads the per-frame values the frame passes use. It must be called after the per-frame block
+    /// has run, which is the case once <see cref="RenderFrame"/> has returned.
+    /// </summary>
+    /// <returns>The frame's pass parameters.</returns>
+    public VisualizerFrameParameters ReadFrameParameters() => new(
+        Math.Clamp(Read("decay", Preset.Decay), 0f, 1f),
+        BlurPasses(),
+        Math.Clamp(Read("darken_center", 0f), 0f, 1f),
+        Math.Clamp(Read("fGammaAdj", 1f), 0.1f, 10f),
+        Math.Clamp(Read("echo_zoom", Read("fVideoEchoZoom", 1f)), 0.1f, 4f),
+        Math.Clamp(Read("echo_alpha", Read("fVideoEchoAlpha", 0f)), 0f, 1f),
+        (int)Math.Clamp(Read("echo_orient", Read("nVideoEchoOrientation", 0f)), 0f, 3f),
+        ToPublicBand(ReadBand("ob_", 0f, 0.02f)),
+        ToPublicBand(ReadBand("ib_", 0.06f, 0.02f)));
+
+    /// <summary>Publishes one border band with the public frame-parameter type.</summary>
+    /// <param name="band">Band read from the preset's keys.</param>
+    /// <returns>The same band as a public value.</returns>
+    private static VisualizerBorderBand ToPublicBand(SkiaShaderRunner.BorderBand band) =>
+        new(band.Inset, band.Thickness, band.Red, band.Green, band.Blue, band.Alpha);
+
+    /// <summary>
     /// Copies the per-vertex motion the last rendered frame evaluated, so a GPU warp can upload it as
     /// vertex attributes. The values are ordered as <see cref="MeshValues"/> describes, row by row,
     /// with <see cref="MeshGridX"/> + 1 vertices per row.
