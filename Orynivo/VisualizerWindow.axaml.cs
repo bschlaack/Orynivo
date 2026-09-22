@@ -494,22 +494,36 @@ public partial class VisualizerWindow : Window
         var pixels = _renderer.Output.Pixels;
         var total = 0f;
         var samples = 0;
+        var saturated = 0;
         for (var index = 0; index < pixels.Length; index += 64)
         {
-            total += pixels[index] + pixels[index + 1] + pixels[index + 2];
+            var red = pixels[index];
+            var green = pixels[index + 1];
+            var blue = pixels[index + 2];
+            total += red + green + blue;
             samples += 3;
+            // A frame that renders white is either genuinely saturated or never reaches the screen.
+            // Counting the saturated share tells those two apart, because a presentation fault
+            // leaves the rendered frame's brightness and saturation untouched.
+            if (red >= 0.99f && green >= 0.99f && blue >= 0.99f)
+            {
+                saturated++;
+            }
         }
 
+        var sampledPixels = samples / 3f;
         var timings = _renderer.AverageTimings;
         var message =
             $"frames={_renderer.FrameCount} audioFrames={VisualizerAudioHub.Shared.AnalyzedFrames} "
             + $"reduceMotion={ReduceMotion} brightness={(samples == 0 ? 0f : total / samples):F4} "
+            + $"saturated={(sampledPixels == 0f ? 0f : saturated / sampledPixels):P1} "
             + $"size={_renderWidth}x{_renderHeight} "
             + $"renderMs={timings.Total:F2} warpMs={timings.Warp:F2} blurMs={timings.Blur:F2} "
             + $"postMs={timings.PostProcess:F2} overlayMs={timings.Overlay:F2} "
             + $"compositeMs={timings.Composite:F2} compShaderMs={timings.Shader:F2} "
             + $"shaders=warp{_renderer.Preset.WarpShaders.Count}/comp{_renderer.Preset.CompShaders.Count} "
             + $"gridReduced={_renderer.ShaderGridReduced} "
+            + $"perPixelSuspended={_renderer.PerPixelSuspended} "
             + (_renderer.ShaderError is { } shaderError ? $"shaderError=[{shaderError}] " : string.Empty)
             + (_renderError is { } renderError ? $"renderError=[{renderError}] " : string.Empty)
             + (_renderer.PresetError is { } presetError ? $"presetError=[{presetError}] " : string.Empty)

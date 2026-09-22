@@ -37,6 +37,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   as a steady rubber band rather than an occasional hitch.
 
 ### Changed
+- The visualizer's once-per-second diagnostic line now also reports the rendered frame's
+  **saturated share** and whether the per-pixel program is suspended. A white window is either a
+  genuinely saturated frame or a frame that never reaches the screen, and the saturated share tells
+  those apart because a presentation fault leaves the rendered frame's brightness and saturation
+  untouched. The line already carried the mean brightness, the render size, the shader grid state,
+  the stage timings, and any shader, render, preset, or presentation error.
 - The visualizer's resolution choices now run up to 3840 x 2160 and include 2560 x 1440 and
   1920 x 1080; the window accepts up to 7680 x 4320 instead of 3840 x 2160, so the added choices are
   not silently clamped. A missing selection falls back to 640 x 360 by value instead of by index, so

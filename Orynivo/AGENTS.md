@@ -551,8 +551,12 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
   only fires while the pointer is over it, so a mouse move on another monitor must never
   reveal the overlay. Never replace that with a global pointer hook. The window's once-per-second
   diagnostic line also carries the averaged `RenderTimings` per stage (render, warp, blur, post,
-  overlay, composite, comp shader) plus the render size and whether the shaders are being
-  skipped, so render cost is measured rather than guessed; keep it bounded and free of media
+  overlay, composite, comp shader) plus the render size, the frame's mean brightness and its
+  **saturated share**, the shader grid state, whether the per-pixel program is suspended, and any
+  shader, render, preset, or presentation error, so render cost is measured rather than guessed.
+  Keep the saturated share: a white window is either a genuinely saturated frame or a frame that never
+  reaches the screen, and only that number tells the two apart, because a presentation fault leaves
+  the rendered frame's brightness and saturation untouched. Keep the line bounded and free of media
   names and paths.
   The render loop runs on a background thread (`RenderLoop`, `RenderOneFrame`) because a frame
   can cost tens of milliseconds; never move it back onto the Avalonia dispatcher. The UI thread
