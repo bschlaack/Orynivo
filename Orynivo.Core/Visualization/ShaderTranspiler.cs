@@ -507,6 +507,7 @@ public static class ShaderTranspiler
 
         _mutableUniforms = new HashSet<string>(StringComparer.Ordinal);
         _helperReturns = new Dictionary<string, string>(StringComparer.Ordinal);
+        _helperParameters = new Dictionary<string, List<string>>(StringComparer.Ordinal);
 
         if (program is not null)
         {
@@ -546,6 +547,9 @@ public static class ShaderTranspiler
                 {
                     helpers.Add(statement);
                     _helperReturns[statement.Text] = HelperReturnType(statement);
+                    _helperParameters[statement.Text] =
+                        [.. statement.ParameterList.Select(parameter =>
+                            parameter.Items.Count > 0 ? SkSL.MapType(parameter.Items[0].Text) : "float")];
                 }
             }
 
@@ -1053,6 +1057,9 @@ public static class ShaderTranspiler
     /// <summary>The return type of every helper function of the shader being translated.</summary>
     [ThreadStatic]
     private static Dictionary<string, string>? _helperReturns;
+
+    /// <summary>The declared parameter types of each helper, so a call coerces its arguments like HLSL.</summary>
+    private static Dictionary<string, List<string>>? _helperParameters;
 
     /// <summary>
     /// The file-scope variables of the shader being translated. SkSL runtime effects have no mutable
@@ -1782,6 +1789,14 @@ public static class ShaderTranspiler
         // helper needs are appended, matching the parameters EmitFunction added.
         if (_helperReturns is not null && _helperReturns.ContainsKey(name))
         {
+            // HLSL coerces each argument to the parameter's declared type; SkSL is strict, so a helper
+            // that takes a float must not be handed the float3 a preset passes it.
+            if (_helperParameters is not null && _helperParameters.TryGetValue(name, out var parameterTypes))
+            {
+                for (var index = 0; index < arguments.Count && index < parameterTypes.Count; index++)
+                    arguments[index] = SkSL.Convert(arguments[index], TypeOf(call.Items[index]), parameterTypes[index]);
+            }
+
             if (_helperGlobals is not null && _helperGlobals.TryGetValue(name, out var globals))
                 arguments.AddRange(globals.Select(SkSL.SafeName));
             return $"{name}({string.Join(", ", arguments)})";

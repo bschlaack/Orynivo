@@ -139,6 +139,18 @@ public sealed class ShaderTranspilerTests
         Assert.Contains("noSuchFunction", exception.Message, StringComparison.Ordinal);
     }
 
+    /// <summary>A helper call coerces its argument to the declared parameter type, as HLSL does.</summary>
+    [Fact]
+    public void Transpile_CoercesHelperArgumentsToTheParameterType()
+    {
+        // lavcol takes a float but a real preset hands it a float3; without the truncation SkSL
+        // rejects the call and the whole comp shader falls back.
+        AssertCompiles("""
+            float3 lavcol(float t) { return smoothstep(0, 1, float3(t + 0.1, t * 1.1 - 0.3, t - 0.5)); }
+            ret = lavcol(tex2D(sampler_main, uv).rgb * 2);
+            """);
+    }
+
     /// <summary>A float2x2 matrix becomes a SkSL mat2, and mul becomes a matrix product.</summary>
     [Fact]
     public void Transpile_CompilesAMatrixShader()

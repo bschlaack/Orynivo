@@ -506,11 +506,15 @@ public sealed class ShaderInterpreter
                 : new ShaderValue?[function.ParameterList.Count];
             for (var index = 0; index < function.ParameterList.Count; index++)
             {
-                var parameter = function.ParameterList[index].Text;
-                previous[index] = _variables.TryGetValue(parameter, out var existing) ? existing : null;
-                _variables[parameter] = index < count
-                    ? Evaluate(call.Items[index], depth)
-                    : ShaderValue.Scalar(0f);
+                var parameter = function.ParameterList[index];
+                var parameterName = parameter.Text;
+                previous[index] = _variables.TryGetValue(parameterName, out var existing) ? existing : null;
+                var argument = index < count ? Evaluate(call.Items[index], depth) : ShaderValue.Scalar(0f);
+                // HLSL coerces an argument to the parameter's declared type, so a helper that takes a
+                // float truncates the float3 a preset hands it instead of running on the whole vector.
+                _variables[parameterName] = parameter.Items.Count > 0
+                    ? ShaderRuntime.Coerce(argument, parameter.Items[0].Text)
+                    : argument;
             }
 
             var returned = ExecuteBlock(function.Items, depth + 1);

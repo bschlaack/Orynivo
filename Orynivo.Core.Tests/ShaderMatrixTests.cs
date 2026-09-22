@@ -122,6 +122,23 @@ public sealed class ShaderMatrixTests
         Assert.Equal(4f, result.W, 4);
     }
 
+    /// <summary>A helper argument is coerced to the declared parameter type, as HLSL does.</summary>
+    [Fact]
+    public void HelperArgument_IsCoercedToTheParameterType()
+    {
+        // lavcol takes a float; HLSL truncates the float3 a preset hands it, so t is 1.0 and not the
+        // whole vector. Without the coercion the second component would be 5.0 * 2.
+        var program = ShaderParser.Parse("""
+            float3 lavcol(float t) { return float3(t + 0.1, t * 2.0, 0.0); }
+            float4 main(float2 uv : TEXCOORD0) : COLOR { return float4(lavcol(float3(1, 5, 9)), 1); }
+            """);
+        var interpreter = new ShaderInterpreter(program, null);
+        var result = interpreter.Run();
+
+        Assert.Equal(1.1f, result.X, 4);
+        Assert.Equal(2f, result.Y, 4);
+    }
+
     /// <summary>Runs a comp shader through the interpreter, which is the reference path.</summary>
     /// <param name="body">Shader body.</param>
     /// <param name="seed">Optional variable to seed before the run.</param>

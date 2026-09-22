@@ -7,6 +7,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Fixed
+- Fixed shader helper calls passing the argument unchanged instead of coercing it to the helper's
+  declared parameter type. HLSL truncates a `float3` handed to a `float` parameter, so a real preset's
+  `lavcol(float t)` called as `lavcol(ret * 2)` was handed the whole vector; the SkSL emitter then
+  emitted an invalid call that Skia rejected (`expected 'float', but found 'float3'`), which dropped
+  the whole comp shader to the interpreter. `Jc - Crystal Shards` now reports `shaderError=none` on the
+  Skia path, and both the interpreter and the emitter coerce call arguments, with
+  `Transpile_CoercesHelperArgumentsToTheParameterType` and `HelperArgument_IsCoercedToTheParameterType`
+  as the check.
 - Fixed the visualizer ignoring Milkdrop 2's `f`-prefixed scalar keys, which made every preset that
   carries only that spelling render with the built-in default instead of its own value. `fDecay`,
   `fWaveAlpha`, `fWaveScale`, `fWaveSmoothing`, `fWaveParam`, and the `fWaveR/G/B/X/Y` colours now
