@@ -35,7 +35,7 @@ public sealed class PresetFrameDumpDiagnosticTests
         var height = ReadInt("ORYNIVO_PRESET_DUMP_HEIGHT", 180);
         var frames = ReadInt("ORYNIVO_PRESET_DUMP_FRAMES", 4);
         var fps = ReadInt("ORYNIVO_PRESET_DUMP_FPS", 60);
-        var mesh = ReadInt("ORYNIVO_PRESET_DUMP_MESH", 1) != 0;
+        var mesh = ReadFlag("ORYNIVO_PRESET_DUMP_MESH", true);
         Directory.CreateDirectory(directory);
 
         var preset = VisualizerPreset.Parse(File.ReadAllText(file), Path.GetFileNameWithoutExtension(file));
@@ -66,6 +66,13 @@ public sealed class PresetFrameDumpDiagnosticTests
     /// <returns>The value.</returns>
     private static int ReadInt(string name, int fallback) =>
         int.TryParse(Environment.GetEnvironmentVariable(name), out var value) && value > 0 ? value : fallback;
+
+    /// <summary>Reads a zero-or-one environment variable.</summary>
+    /// <param name="name">Variable name.</param>
+    /// <param name="fallback">Value used when the variable is unset or unusable.</param>
+    /// <returns>The value.</returns>
+    private static bool ReadFlag(string name, bool fallback) =>
+        int.TryParse(Environment.GetEnvironmentVariable(name), out var value) ? value != 0 : fallback;
 
     /// <summary>Writes a 24-bit bottom-up BMP from a float RGBA frame.</summary>
     /// <param name="path">Destination path.</param>
