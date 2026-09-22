@@ -84,6 +84,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   default 480 x 270, the shader-pass cutover costs 39 ms per frame on average against 57 ms before.
 
 ### Fixed
+- Made the preset expression parser accept the constructs a real collection uses beyond the basic
+  statement forms, so fewer expression blocks are dropped. An assignment or a shared-memory-buffer
+  write is now a valid `if(...)` argument (`if(c, x = 1, y = 2)`), a semicolon continues such an
+  argument as a statement sequence (`if(a, x = 1; y = 2, b)`), `loop(...)` and `while(...)` are
+  accepted wherever a primary expression starts, and `exec2`/`exec3`/`exec4` evaluate their
+  arguments and yield the last one. A block's numbered parts are no longer cut off at 64, which
+  dropped the rest of a per-frame block and lost it to a parse error, and a line comment is stripped
+  before the parts are concatenated, because a trailing `// ...` otherwise swallowed every part
+  after it. A part that ends with a function name and is followed by `(` is no longer split with a
+  semicolon, so a call split across parts keeps working. Against the 2000-file diagnostic sample
+  expression-block failures fell from 26 to 4 (two files) while the shader slots stayed complete.
 - Made the shader parser stop after the top-level block that is the shader body. Milkdrop stores a
   footer such as "written by ..." after the body's closing brace, and the parser read it as code, so
   two real presets lost their shader to `Expected ';' but found 'by'`.

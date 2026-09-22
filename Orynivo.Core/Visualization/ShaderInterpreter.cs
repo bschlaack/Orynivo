@@ -63,6 +63,12 @@ public sealed class ShaderInterpreter
     /// </summary>
     private readonly Dictionary<string, int> _declaredCounts = new(StringComparer.Ordinal);
 
+    /// <summary>
+    /// The fixed-size arrays a shader declares, by name. A shader value is a short vector, so an
+    /// array needs its own storage; a declaration initializes it and an element access reads it.
+    /// </summary>
+    private readonly Dictionary<string, ShaderValue[]> _arrays = new(StringComparer.Ordinal);
+
     /// <summary>The helper functions the shader defines, by name, ready to be called.</summary>
     private readonly Dictionary<string, ShaderNode> _functions = new(StringComparer.Ordinal);
     private int _iterations;
@@ -183,6 +189,9 @@ public sealed class ShaderInterpreter
                 }
 
                 return null;
+            case ShaderNodeKind.ArrayDeclaration:
+                DeclareArray(statement, depth);
+                return null;
             case ShaderNodeKind.ExpressionStatement:
                 if (statement.Left is not null)
                     Evaluate(statement.Left, depth);
@@ -292,21 +301,72 @@ public sealed class ShaderInterpreter
     }
 
     /// <summary>
-    /// Evaluates an element access with <c>[...]</c>. Milkdrop presets use it for the components of
-    /// a vector and for the rows of a matrix; only the vector form is modelled, so an out-of-range
-    /// index yields zero instead of failing the shader.
+    /// Evaluates an element access with <c>[...]</c>. An array name selects an element, and a vector
+    /// selects a component; only those forms are modelled, so an out-of-range index yields zero
+    /// instead of failing the shader.
     /// </summary>
     /// <param name="expression">Index node.</param>
     /// <param name="depth">Current call depth.</param>
-    /// <returns>The selected component.</returns>
+    /// <returns>The selected element or component.</returns>
     private ShaderValue EvaluateIndex(ShaderNode expression, int depth)
     {
+        if (expression.Left is { Kind: ShaderNodeKind.Identifier } identifier &&
+            _arrays.TryGetValue(identifier.Text, out var array))
+        {
+            var arrayIndex = (int)Evaluate(expression.Right!, depth).X;
+            return arrayIndex >= 0 && arrayIndex < array.Length ? array[arrayIndex] : ShaderValue.Scalar(0f);
+        }
+
         var target = Evaluate(expression.Left!, depth);
         var index = (int)Evaluate(expression.Right!, depth).X;
         if (index < 0 || index >= target.Count)
             return ShaderValue.Scalar(0f);
 
         return ShaderValue.Scalar(target.Get(index));
+    }
+
+    /// <summary>
+    /// Evaluates an array declaration into element values. The initializer is a flat list of
+    /// components, which is grouped by the element type's component count, so both
+    /// <c>float4 a[2] = { 1,2,3,4, 5,6,7,8 }</c> and <c>float4 a[2] = { float4(...), float4(...) }</c>
+    /// produce the same array.
+    /// </summary>
+    /// <param name="statement">Array declaration node.</param>
+    /// <param name="depth">Current call depth.</param>
+    private void DeclareArray(ShaderNode statement, int depth)
+    {
+        var name = statement.Items.Count > 0 ? statement.Items[0].Text : string.Empty;
+        if (name.Length == 0)
+            return;
+
+        var size = statement.Left is null ? 0 : (int)Evaluate(statement.Left, depth).X;
+        var elementCount = ShaderRuntime.CountFor(statement.Text);
+        var elements = new ShaderValue[Math.Max(0, size)];
+        if (statement.Right is not null)
+        {
+            var flat = new List<float>();
+            foreach (var argument in statement.Right.Items)
+            {
+                var value = Evaluate(argument, depth);
+                for (var component = 0; component < value.Count; component++)
+                    flat.Add(value.Get(component));
+            }
+
+            for (var element = 0; element < elements.Length; element++)
+            {
+                var start = element * elementCount;
+                elements[element] = elementCount == 1
+                    ? ShaderValue.Scalar(start < flat.Count ? flat[start] : 0f)
+                    : ShaderValue.Vector(
+                        start < flat.Count ? flat[start] : 0f,
+                        start + 1 < flat.Count ? flat[start + 1] : 0f,
+                        start + 2 < flat.Count ? flat[start + 2] : 0f,
+                        start + 3 < flat.Count ? flat[start + 3] : 0f,
+                        elementCount);
+            }
+        }
+
+        _arrays[name] = elements;
     }
 
     /// <summary>Evaluates a prefix or postfix unary operator.</summary>

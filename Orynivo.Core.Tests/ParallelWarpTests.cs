@@ -11,7 +11,7 @@ namespace Orynivo.Core.Tests;
 public sealed class ParallelWarpTests
 {
     private const int Width = 200;
-    private const int Height = 120;
+    private const int Height = 256;
 
     /// <summary>A parallel-safe preset renders exactly the same frame on both paths.</summary>
     [Theory]

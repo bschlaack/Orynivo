@@ -251,6 +251,29 @@ public static class ShaderParser
         /// <returns>The declaration node.</returns>
         private ShaderNode ParseDeclaration(ShaderToken type, ShaderToken name)
         {
+            // A fixed-size array, as in "const float4 samples[5] = { ... };". The element type, the
+            // size, and the flattened initializer are kept for the interpreter's array storage.
+            if (Current.Text == "[")
+            {
+                Advance();
+                var size = ParseExpression();
+                Expect("]");
+                ShaderNode? arrayInitializer = null;
+                if (TryConsume("="))
+                    arrayInitializer = ParseInitializer(type);
+                SkipAnnotation();
+                Expect(";");
+                return new ShaderNode(
+                    ShaderNodeKind.ArrayDeclaration,
+                    type.Position,
+                    type.Text,
+                    0f,
+                    size,
+                    arrayInitializer,
+                    null,
+                    [new ShaderNode(ShaderNodeKind.Identifier, name.Position, name.Text)]);
+            }
+
             ShaderNode? initializer = null;
             if (TryConsume("="))
                 initializer = ParseInitializer(type);

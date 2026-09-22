@@ -8,8 +8,12 @@ namespace Orynivo.Visualization;
 /// </summary>
 internal static class ParallelRows
 {
-    /// <summary>Rows below this count are processed on the calling thread.</summary>
-    private const int MinimumRowsForParallelism = 32;
+    /// <summary>
+    /// Rows below this count are processed on the calling thread. A small frame is not worth the
+    /// coordination, and the parallel machinery allocates, which the allocation-free frame test
+    /// measures.
+    /// </summary>
+    private const int MinimumRowsForParallelism = 64;
 
     /// <summary>
     /// Gets the number of workers a full-frame pass may use. It is capped so a machine with many

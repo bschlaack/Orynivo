@@ -98,56 +98,46 @@ public static class PresetCompiler
     /// <returns>The parsed statement node.</returns>
     private static PresetSyntaxNode ParseStatement(PresetLexer lexer, ref PresetToken current)
     {
+        if (current.Kind == PresetTokenKind.Identifier &&
+            (string.Equals(current.Text, "loop", StringComparison.OrdinalIgnoreCase) ||
+             string.Equals(current.Text, "while", StringComparison.OrdinalIgnoreCase)))
+        {
+            var isWhile = string.Equals(current.Text, "while", StringComparison.OrdinalIgnoreCase);
+            var position = current.Position;
+            var next = lexer.Next();
+            if (next.Kind == PresetTokenKind.OpenParenthesis)
+            {
+                // Milkdrop's loop(count, statements) and while(condition, statements) repeat a
+                // statement list. They are statements, not expressions, so they are handled before
+                // the expression parser sees the call.
+                current = lexer.Next();
+                return isWhile
+                    ? ParseWhile(lexer, ref current, position)
+                    : ParseLoop(lexer, ref current, position);
+            }
+
+            current = next;
+            return ParseExpression(lexer, ref current, isWhile ? "while" : "loop", position);
+        }
+
+        return ParseAssignable(lexer, ref current);
+    }
+
+    /// <summary>
+    /// Parses an assignment, a shared-memory-buffer write, or a plain expression. Milkdrop's
+    /// <c>if(condition, then, else)</c> takes assignments as arguments, so the argument parser uses
+    /// this as well; a nested assignment yields the assigned value, like HLSL.
+    /// </summary>
+    /// <param name="lexer">Token source.</param>
+    /// <param name="current">Current token, advanced past the expression.</param>
+    /// <returns>The parsed node.</returns>
+    private static PresetSyntaxNode ParseAssignable(PresetLexer lexer, ref PresetToken current)
+    {
         if (current.Kind == PresetTokenKind.Identifier)
         {
             var name = current.Text;
             var position = current.Position;
             var next = lexer.Next();
-            if (next.Kind == PresetTokenKind.OpenParenthesis &&
-                (string.Equals(name, "megabuf", StringComparison.OrdinalIgnoreCase) ||
-                 string.Equals(name, "gmegabuf", StringComparison.OrdinalIgnoreCase)))
-            {
-                // Presets write a buffer entry by assigning to the call: gmegabuf(i) = value;
-                current = lexer.Next();
-                var index = ParseExpression(lexer, ref current);
-                if (current.Kind == PresetTokenKind.Comma)
-                {
-                    // gmegabuf(index, value) writes the entry directly.
-                    current = lexer.Next();
-                    var written = ParseExpression(lexer, ref current);
-                    if (current.Kind != PresetTokenKind.CloseParenthesis)
-                        throw new PresetExpressionException("Expected ')' after the buffer value", position);
-
-                    current = lexer.Next();
-                    return new PresetMegaBufferNode(index, written, null, position);
-                }
-
-                if (current.Kind != PresetTokenKind.CloseParenthesis)
-                    throw new PresetExpressionException("Expected ')' after the buffer index", position);
-
-                current = lexer.Next();
-                if (current.Kind is not (PresetTokenKind.Assign or PresetTokenKind.AssignCompound))
-                    return new PresetMegaBufferNode(index, null, null, position);
-
-                var compound = current;
-                current = lexer.Next();
-                var stored = ParseExpression(lexer, ref current);
-                return new PresetMegaBufferNode(
-                    index,
-                    stored,
-                    compound.Kind == PresetTokenKind.AssignCompound ? CompoundOperator(compound) : null,
-                    position);
-            }
-
-            if (next.Kind == PresetTokenKind.OpenParenthesis &&
-                string.Equals(name, "loop", StringComparison.OrdinalIgnoreCase))
-            {
-                // Milkdrop's loop(count, statements) repeats a statement list. It is a statement,
-                // not an expression, so it is handled before the expression parser sees the call.
-                current = lexer.Next();
-                return ParseLoop(lexer, ref current, position);
-            }
-
             if (next.Kind is PresetTokenKind.Assign or PresetTokenKind.AssignCompound)
             {
                 var compound = next;
@@ -291,13 +281,49 @@ public static class PresetCompiler
             return new PresetVariableNode(name, position);
         }
 
+        if (string.Equals(name, "loop", StringComparison.OrdinalIgnoreCase))
+        {
+            // loop(count, statements) is a statement, but presets also nest it inside if() and
+            // other constructs, so the call parser accepts it wherever a primary expression starts.
+            current = lexer.Next();
+            return ParseLoop(lexer, ref current, position);
+        }
+
+        if (string.Equals(name, "while", StringComparison.OrdinalIgnoreCase))
+        {
+            current = lexer.Next();
+            return ParseWhile(lexer, ref current, position);
+        }
+
         current = lexer.Next();
         var arguments = new List<PresetSyntaxNode>();
         if (current.Kind != PresetTokenKind.CloseParenthesis)
         {
             while (true)
             {
-                arguments.Add(ParseExpression(lexer, ref current));
+                // An argument may be an assignment, which Milkdrop's if() uses:
+                // if(condition, x = 1, y = 2). The nested assignment yields its value.
+                var argument = ParseAssignable(lexer, ref current);
+                if (current.Kind == PresetTokenKind.Semicolon)
+                {
+                    // A semicolon inside the parentheses continues the argument as a statement
+                    // sequence, as in if(a, x = 1; y = 2, b); the value is the last statement.
+                    var statements = new List<PresetSyntaxNode> { argument };
+                    while (current.Kind == PresetTokenKind.Semicolon)
+                    {
+                        current = lexer.Next();
+                        // Presets repeat the separator, so an empty statement is not an argument.
+                        while (current.Kind == PresetTokenKind.Semicolon)
+                            current = lexer.Next();
+                        if (current.Kind is PresetTokenKind.Comma or PresetTokenKind.CloseParenthesis)
+                            break;
+                        statements.Add(ParseAssignable(lexer, ref current));
+                    }
+
+                    argument = new PresetSequenceNode(statements, position);
+                }
+
+                arguments.Add(argument);
                 if (current.Kind != PresetTokenKind.Comma)
                     break;
                 current = lexer.Next();
@@ -307,6 +333,24 @@ public static class PresetCompiler
         if (current.Kind != PresetTokenKind.CloseParenthesis)
             throw new PresetExpressionException("Expected ')'", current.Position);
         current = lexer.Next();
+
+        // Presets write a buffer entry by assigning to the call: gmegabuf(i) = value;. The
+        // gmegabuf(index, value) form stays a call, which the compiler turns into a write.
+        if (arguments.Count == 1 &&
+            (string.Equals(name, "megabuf", StringComparison.OrdinalIgnoreCase) ||
+             string.Equals(name, "gmegabuf", StringComparison.OrdinalIgnoreCase)) &&
+            current.Kind is PresetTokenKind.Assign or PresetTokenKind.AssignCompound)
+        {
+            var compound = current;
+            current = lexer.Next();
+            var value = ParseExpression(lexer, ref current);
+            return new PresetMegaBufferNode(
+                arguments[0],
+                value,
+                compound.Kind == PresetTokenKind.AssignCompound ? CompoundOperator(compound) : null,
+                position);
+        }
+
         return new PresetCallNode(name, arguments, position);
     }
 
@@ -345,6 +389,41 @@ public static class PresetCompiler
         return new PresetLoopNode(count, body, position);
     }
 
+    /// <summary>
+    /// Parses Milkdrop's <c>while(condition, statements)</c> construct, which presets use as a
+    /// bounded data-driven loop next to <c>loop(count, statements)</c>.
+    /// </summary>
+    /// <param name="lexer">Token source.</param>
+    /// <param name="current">Token after the opening parenthesis.</param>
+    /// <param name="position">Source position of the <c>while</c> name.</param>
+    /// <returns>The parsed while node.</returns>
+    private static PresetSyntaxNode ParseWhile(
+        PresetLexer lexer,
+        ref PresetToken current,
+        int position)
+    {
+        var condition = ParseExpression(lexer, ref current);
+        if (current.Kind != PresetTokenKind.Comma)
+            throw new PresetExpressionException("Expected ',' after the while condition", position);
+
+        current = lexer.Next();
+        var body = new List<PresetSyntaxNode>();
+        while (current.Kind != PresetTokenKind.End && current.Kind != PresetTokenKind.CloseParenthesis)
+        {
+            while (current.Kind == PresetTokenKind.Semicolon)
+                current = lexer.Next();
+            if (current.Kind == PresetTokenKind.CloseParenthesis)
+                break;
+            body.Add(ParseStatement(lexer, ref current));
+        }
+
+        if (current.Kind != PresetTokenKind.CloseParenthesis)
+            throw new PresetExpressionException("Expected ')' to close while(...)", current.Position);
+
+        current = lexer.Next();
+        return new PresetWhileNode(condition, body, position);
+    }
+
     /// <summary>Compiles one parsed statement into the LINQ tree the interpreter runs.</summary>
     /// <param name="state">Compile state.</param>
     /// <param name="statement">Statement node.</param>
@@ -354,6 +433,7 @@ public static class PresetCompiler
         PresetAssignmentNode assignment => CompileAssignment(state, assignment),
         PresetMegaBufferNode buffer => CompileMegaBuffer(state, buffer),
         PresetLoopNode loop => CompileLoop(state, loop),
+        PresetWhileNode whileLoop => CompileWhile(state, whileLoop),
         _ => CompileExpression(state, statement)
     };
 
@@ -438,6 +518,40 @@ public static class PresetCompiler
             Expression.Constant(0f));
     }
 
+    /// <summary>Compiles Milkdrop's bounded <c>while</c> construct.</summary>
+    /// <param name="state">Compile state.</param>
+    /// <param name="loop">While node.</param>
+    /// <returns>The loop expression.</returns>
+    private static Expression CompileWhile(CompileState state, PresetWhileNode loop)
+    {
+        var condition = IsTrue(CompileExpression(state, loop.Condition));
+        var body = new List<Expression>(loop.Body.Count + 1);
+        foreach (var statement in loop.Body)
+            body.Add(CompileStatement(state, statement));
+
+        var done = Expression.Label("whileDone");
+        // The total-iteration guard keeps a preset whose condition never turns false from stalling a
+        // frame; it shares the counter with loop(), so the budget is per frame for both.
+        body.Add(Expression.IfThen(
+            Expression.GreaterThan(
+                Expression.PreIncrementAssign(Expression.Field(null, TotalIterationsField)),
+                Expression.Constant(MaxTotalLoopIterations)),
+            Expression.Throw(
+                Expression.New(
+                    LoopOverflowConstructor,
+                    Expression.Constant("The preset looped too often."),
+                    Expression.Constant(loop.Position)))));
+        return Expression.Block(
+            typeof(float),
+            Expression.Loop(
+                Expression.IfThenElse(
+                    condition,
+                    Expression.Block(body),
+                    Expression.Break(done)),
+                done),
+            Expression.Constant(0f));
+    }
+
     /// <summary>Compiles one parsed expression into the LINQ tree the interpreter runs.</summary>
     /// <param name="state">Compile state.</param>
     /// <param name="node">Expression node.</param>
@@ -456,6 +570,12 @@ public static class PresetCompiler
             CompileExpression(state, conditional.WhenTrue),
             CompileExpression(state, conditional.WhenFalse)),
         PresetCallNode call => CompileCall(state, call),
+        // An assignment or buffer write used as an argument, as in if(condition, x = 1, y = 2).
+        PresetAssignmentNode assignment => CompileAssignment(state, assignment),
+        PresetMegaBufferNode buffer => CompileMegaBuffer(state, buffer),
+        PresetLoopNode loop => CompileLoop(state, loop),
+        PresetWhileNode whileLoop => CompileWhile(state, whileLoop),
+        PresetSequenceNode sequence => CompileSequence(state, sequence),
         _ => throw new PresetExpressionException("The expression has no interpreter translation.", node.Position)
     };
 
@@ -470,6 +590,21 @@ public static class PresetCompiler
         PresetTokenKind.Not => ToNumber(Expression.Equal(CompileExpression(state, unary.Operand), Expression.Constant(0f))),
         _ => throw new PresetExpressionException($"Unsupported unary operator '{unary.Operator}'", unary.Position)
     };
+
+    /// <summary>
+    /// Compiles a semicolon-separated statement sequence used as one expression value. Every
+    /// statement is evaluated in order and the sequence yields the value of the last one.
+    /// </summary>
+    /// <param name="state">Compile state.</param>
+    /// <param name="sequence">Sequence node.</param>
+    /// <returns>The value expression.</returns>
+    private static Expression CompileSequence(CompileState state, PresetSequenceNode sequence)
+    {
+        var items = new List<Expression>(sequence.Statements.Count);
+        foreach (var statement in sequence.Statements)
+            items.Add(CompileExpression(state, statement));
+        return items.Count == 1 ? items[0] : Expression.Block(items);
+    }
 
     /// <summary>Compiles a function call.</summary>
     /// <param name="state">Compile state.</param>
@@ -510,6 +645,15 @@ public static class PresetCompiler
                 Expression.Add(
                     Expression.Constant(1f),
                     MathCall(nameof(MathF.Exp), Expression.Negate(arguments[0]))));
+        }
+
+        // Milkdrop's exec2/exec3/exec4 evaluate their arguments in order and yield the last one,
+        // which is how presets pack several assignments into one expression.
+        if (name is "exec2" or "exec3" or "exec4")
+        {
+            if (arguments.Count == 0)
+                throw new PresetExpressionException($"'{name}' expects arguments", position);
+            return arguments.Count == 1 ? arguments[0] : Expression.Block(arguments);
         }
 
         return name switch

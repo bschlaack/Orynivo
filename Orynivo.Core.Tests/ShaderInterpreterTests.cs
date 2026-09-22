@@ -149,10 +149,25 @@ public sealed class ShaderInterpreterTests
         Assert.Contains("mystery", error.Message, StringComparison.Ordinal);
     }
 
+    /// <summary>A fixed-size array is declared and indexed, including with a loop variable.</summary>
+    [Fact]
+    public void Run_ReadsAndWritesArrays()
+    {
+        var element = Run("const float4 a[2] = { 1, 2, 3, 4, 5, 6, 7, 8 }; return a[1];");
+        Assert.Equal(4, element.Count);
+        Assert.Equal(5f, element.X);
+        Assert.Equal(8f, element.W);
+
+        var sum = Run(
+            "const float4 a[3] = { 1,1,1,1, 2,2,2,2, 3,3,3,3 }; float s = 0; for (i = 0; i < 3; i++) { s += a[i].x; } return s;");
+        Assert.Equal(6f, sum.X);
+    }
+
     /// <summary>A loop without a bound stops at the iteration budget.</summary>
     [Fact]
     public void Run_ReportsRunawayLoops()
     {
+
         var error = Assert.Throws<PresetExpressionException>(
             () => Run("x = 0; for (i = 0; i < 1000000; i++) { x += 1; } return x;"));
 

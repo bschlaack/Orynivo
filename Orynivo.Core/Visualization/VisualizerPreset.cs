@@ -745,7 +745,10 @@ public sealed class VisualizerPreset
     private static string? Join(Dictionary<string, string> values, string prefix)
     {
         var parts = new List<string>();
-        for (var index = 1; index <= 64; index++)
+        // Presets number the parts far beyond a handful: a real per-frame block reaches the
+        // hundredth part, so the bound matches the shader-line bound instead of cutting a block off
+        // in the middle of a nested loop and losing it to a parse error.
+        for (var index = 1; index <= 4096; index++)
         {
             if (values.TryGetValue($"{prefix}_{index}", out var part) && !string.IsNullOrWhiteSpace(part))
                 parts.Add(part);
@@ -765,12 +768,15 @@ public sealed class VisualizerPreset
         var builder = new System.Text.StringBuilder();
         foreach (var part in parts)
         {
-            var text = part.Trim();
+            // A line comment is stripped: the parts are concatenated without a newline, so a
+            // trailing "// ..." would otherwise swallow every part after it, which lost a whole
+            // per-frame block that ends a loop line with a comment.
+            var text = StripExpressionComment(part.Trim());
             if (text.Length == 0)
                 continue;
 
             if (builder.Length > 0 && text[0] != ';' && !StartsWithContinuation(text[0]) &&
-                !EndsWithContinuation(builder[^1]))
+                !EndsWithContinuation(builder[^1]) && !ContinuesCall(text, builder))
             {
                 builder.Append(';');
             }
@@ -779,6 +785,30 @@ public sealed class VisualizerPreset
         }
 
         return builder.Length == 0 ? null : builder.ToString();
+    }
+
+    /// <summary>
+    /// Reports whether a part starting with an opening parenthesis continues a call whose function
+    /// name ended the previous part, as in a split <c>above(x, .95)</c>.
+    /// </summary>
+    /// <param name="text">Current part.</param>
+    /// <param name="builder">Text accumulated so far.</param>
+    /// <returns><see langword="true"/> when the two parts form one call.</returns>
+    private static bool ContinuesCall(string text, System.Text.StringBuilder builder)
+    {
+        if (text[0] != '(')
+            return false;
+        var previous = builder[^1];
+        return char.IsLetterOrDigit(previous) || previous == '_';
+    }
+
+    /// <summary>Removes a trailing line comment from one expression part.</summary>
+    /// <param name="text">Part text.</param>
+    /// <returns>The part without its line comment.</returns>
+    private static string StripExpressionComment(string text)
+    {
+        var index = text.IndexOf("//", StringComparison.Ordinal);
+        return index < 0 ? text : text[..index].TrimEnd();
     }
 
     /// <summary>Reports whether a part starts by continuing the previous expression.</summary>
@@ -800,3 +830,4 @@ public sealed class VisualizerPreset
             ? value
             : fallback;
 }
+

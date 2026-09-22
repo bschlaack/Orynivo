@@ -122,6 +122,7 @@ public static class PresetExpressionTranspiler
             // inside the body is checked against a copy that does carry the body's own assignments.
             StatementsAssignBeforeRead(loop.Body, new HashSet<string>(assigned, StringComparer.Ordinal), written),
         PresetBlockNode block => StatementsAssignBeforeRead(block.Statements, assigned, written),
+        PresetSequenceNode sequence => StatementsAssignBeforeRead(sequence.Statements, assigned, written),
         PresetMegaBufferNode buffer =>
             ExpressionAssignBeforeRead(buffer.Index, assigned, written) &&
             (buffer.Value is null || ExpressionAssignBeforeRead(buffer.Value, assigned, written)),
@@ -169,6 +170,20 @@ public static class PresetExpressionTranspiler
                 }
 
                 return true;
+            case PresetSequenceNode sequence:
+                return StatementsAssignBeforeRead(sequence.Statements, assigned, written);
+            case PresetLoopNode loop:
+                return ExpressionAssignBeforeRead(loop.Count, assigned, written) &&
+                       StatementsAssignBeforeRead(
+                           loop.Body,
+                           new HashSet<string>(assigned, StringComparer.Ordinal),
+                           written);
+            case PresetWhileNode whileLoop:
+                return ExpressionAssignBeforeRead(whileLoop.Condition, assigned, written) &&
+                       StatementsAssignBeforeRead(
+                           whileLoop.Body,
+                           new HashSet<string>(assigned, StringComparer.Ordinal),
+                           written);
             default:
                 return true;
         }

@@ -19,7 +19,15 @@ public enum ShaderNodeKind
     /// <summary>A variable declaration.</summary>
     Declaration,
 
+    /// <summary>
+    /// A fixed-size array declaration such as <c>const float4 samples[5] = { ... };</c>. It is kept
+    /// apart from <see cref="Declaration"/> because the interpreter stores it as an array value
+    /// rather than in the scalar variable dictionary.
+    /// </summary>
+    ArrayDeclaration,
+
     /// <summary>An expression used as a statement.</summary>
+
     ExpressionStatement,
 
     /// <summary>An <c>if</c> with an optional <c>else</c> branch.</summary>

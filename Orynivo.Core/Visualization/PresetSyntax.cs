@@ -90,6 +90,25 @@ internal sealed record PresetLoopNode(
     IReadOnlyList<PresetSyntaxNode> Body,
     int Position) : PresetSyntaxNode(Position);
 
+/// <summary>Milkdrop's <c>while(condition, statements)</c> construct.</summary>
+/// <param name="Condition">Loop condition.</param>
+/// <param name="Body">Statements repeated while the condition holds.</param>
+/// <param name="Position">Source position.</param>
+internal sealed record PresetWhileNode(
+    PresetSyntaxNode Condition,
+    IReadOnlyList<PresetSyntaxNode> Body,
+    int Position) : PresetSyntaxNode(Position);
+
 /// <summary>A sequence of statements, which is the root of one compiled block.</summary>
 /// <param name="Statements">Statements in source order.</param>
 internal sealed record PresetBlockNode(IReadOnlyList<PresetSyntaxNode> Statements) : PresetSyntaxNode(0);
+
+/// <summary>
+/// A semicolon-separated sequence of statements used where one expression value is
+/// expected, as in <c>if(a, x = 1; y = 2, b)</c>. The value is the last statement.
+/// </summary>
+/// <param name="Statements">Statements in source order.</param>
+/// <param name="Position">Source position.</param>
+internal sealed record PresetSequenceNode(
+    IReadOnlyList<PresetSyntaxNode> Statements,
+    int Position) : PresetSyntaxNode(Position);

@@ -201,11 +201,19 @@ This file applies to `Orynivo.Core/` and supplements `../AGENTS.md`.
   against a real collection; run it after touching the compiler. The numbered parts of an
   expression block are joined by concatenation, because presets split one expression across parts
   and a part may end with an operator; a semicolon is inserted only when the previous part is
-  complete and the next does not bring its own. `megabuf` and `gmegabuf` are Milkdrop's shared
-  memory buffers and their accesses are serialised, because a preset writes lookup tables that
-  other pixels read. `loop(count, statements)` is a statement, not an expression, and its
-  iteration count is clamped; both buffer write spellings presets use (`gmegabuf(i, value)` and
-  `gmegabuf(i) = value`) must keep working, because presets build their lookup tables with them. Keep the
+  complete, the next does not bring its own, and the next does not continue a call whose function
+  name ended the previous part. A part's line comment is stripped before the join, because the
+  parts are concatenated without a newline and a trailing `// ...` would otherwise swallow every
+  part after it, and the numbered parts are read up to the shader-line bound, because a real
+  per-frame block reaches the hundredth part and a lower bound cut a block off mid-loop.
+  `megabuf` and `gmegabuf` are Milkdrop's shared memory buffers and their accesses are serialised,
+  because a preset writes lookup tables that other pixels read. `loop(count, statements)` and
+  `while(condition, statements)` repeat a statement list, their iteration count is clamped, and
+  presets nest them inside `if()` and other constructs, so the call parser accepts both wherever a
+  primary expression starts; both buffer write spellings presets use (`gmegabuf(i, value)` and
+  `gmegabuf(i) = value`) must keep working, because presets build their lookup tables with them.
+  `exec2`/`exec3`/`exec4` evaluate their arguments and yield the last one, an assignment is a valid
+  `if(...)` argument, and a semicolon continues that argument as a statement sequence. Keep the
   interpreter off the audio thread and bound its per-frame cost so a heavy shader degrades the
   render resolution instead of stalling playback.
   The expression language also has compound assignments: `PresetLexer` must emit `+=`, `-=`, `*=`,
@@ -216,9 +224,10 @@ This file applies to `Orynivo.Core/` and supplements `../AGENTS.md`.
   commas separate arguments), a declaration initialized with a braced list or a `sampler_state`
   block, element access on a vector, and the integer and double vector types. A macro definition
   ends at its line comment, so `#define a b //comment` must not expand the comment into the middle
-  of a call. Array declarations such as `const float4 samples[5] = { ... }` stay a deliberate hard
-  failure rather than an ignored declaration: an unknown array name would render a wrong picture,
-  and modelling arrays needs its own value kind in the interpreter.
+  of a call. A fixed-size array declaration such as `const float4 samples[5] = { ... }` is parsed
+  into its own node and stored in the interpreter's array storage, because indexing an unknown
+  array name would render a wrong picture; keep the element type, the size, and the flattened
+  initializer together.
 - Keep the project cross-platform `net10.0`; do not introduce Avalonia, Windows,
   DPAPI, WASAPI, ASIO, or other platform-specific dependencies.
 - Put shared library scanning, SQLite persistence, search, streaming models and
