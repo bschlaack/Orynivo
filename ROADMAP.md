@@ -759,8 +759,15 @@ affordable. This is a project of its own and must keep the CPU path as the fallb
   constant `(aspectX, aspectY, 1/aspectX, 1/aspectY)`. That lifted the share to 760 of 764, and the
   vector-comparison, narrowed-intrinsic, and helper-global fixes took it to 764 of 764: every shader
   in the sample now translates and is accepted by Skia.
-- 40d Platform, packaging, and CI - `Pending`: native dependencies for Windows, Linux, and macOS,
-  packaging, the signed release manifest, and the CI build matrix.
+- 40d Platform, packaging, and CI - `Done`: the GPU path adds no native dependency. It runs on
+  SkiaSharp, which `Orynivo.Core` already referenced, and the desktop already depends on Avalonia's
+  Skia renderer, so the native library is part of the existing dependency graph rather than a new
+  one. Verified by publishing the desktop self-contained for `linux-x64` and `osx-arm64` and
+  confirming `libSkiaSharp.so` and `libSkiaSharp.dylib` land next to the managed assembly; the
+  Windows build ships `libSkiaSharp.dll` the same way. Nothing in the visualizer reaches outside the
+  managed SkiaSharp surface, so the existing CI matrix (Windows Debug/Release, the `linux-x64`
+  artifact, and the macOS `Orynivo.app` bundles), the packaging scripts, and the signed release
+  manifest already cover it and needed no change.
 - 40e Cutover and validation - `Done`: the GPU path is the visualizer's default where it is
   available and the CPU path stays the fallback, and a comparison harness validates both against the
   same reference frames. `PresetSkiaComparisonDiagnosticTests` is that harness. The CPU-side causes
@@ -796,6 +803,16 @@ affordable. This is a project of its own and must keep the CPU path as the fallb
   the skipped expression blocks fell from 1267 to 19 against the same collection. The remainder is
   16 `Unexpected '='` and 2 `Unexpected '*'` cases plus one `Expected ')'`; each needs its parts
   read one by one, and they are no longer a class of failure that affects whole preset families.
+  Reading those parts closed the rest of the class. An assignment or a buffer write is a valid
+  `if(...)` argument and a semicolon continues such an argument as a statement sequence,
+  `loop(...)`/`while(...)` are accepted wherever a primary expression starts, and
+  `exec2`/`exec3`/`exec4` yield their last argument. The join no longer cuts a block off at 64
+  parts, strips a part's line comment before concatenating, and does not insert a separator before
+  a `(` that continues a call. Against the 2,000-file sample the failed expression blocks fell from
+  19 to 4, and those four are two files that use a `while` spelling with a single argument; the
+  shader slots stay complete at zero failures. A block that still fails is skipped and recorded on
+  `VisualizerPreset.FailedBlocks`, which is the documented design, so a remaining case costs one
+  block rather than a preset.
 
 - 39i Milkdrop 2 shader dialect and blur/edge keys - `Pending`: measured against a real
   2000-file collection, 1706 presets (85 percent) declare their `warp_N`/`comp_N` values as
@@ -821,10 +838,15 @@ affordable. This is a project of its own and must keep the CPU path as the fallb
   The storage format is decoded now: Milkdrop 2 writes a shader one source line per numbered key,
   each line carrying a backtick marker, and `` `shader_body `` only says where the body starts.
   `VisualizerPreset` detects that form and joins the lines, so a real collection went from 50,707
-  skipped shader slots to 1,020 against the same 2,000 files. What remains is the HLSL preprocessor
-  (`#if` and friends) and the macro constants such as `M_INV_PI_2`, which account for the rest, plus
-  the blur and edge parameter keys (`b1n`, `b1x`, `b1ed`, and the `b2`/`b3` family) that need our own
-  documented approximation because their semantics are not in the presets.
+  skipped shader slots to 1,020 against the same 2,000 files. The HLSL preprocessor (`#define`,
+  `#if`, `#ifdef`, `#ifndef`, `#else`, `#endif`) and the built-in math constants (`M_PI`, `M_PI_2`,
+  `M_2PI`, `M_INV_PI`, `M_INV_PI_2`, `M_E`) are translated before parsing, so what remains there is
+  the per-frame random translation and rotation vectors. The blur and edge parameter keys are
+  recognised: `b1n`/`b1x`/`b1ed` and the `b2`/`b3` family are the Milkdrop 1 `blurN_min`,
+  `blurN_max`, and `blurN_edge_darken` parameters under their short names, so they resolve to those
+  variables, and a preset that carries only them takes its blur amount from their `blurN_max` sum
+  instead of Orynivo's own `blur_level` key. Their edge-darkening semantics are still not
+  implemented, so that part of the chain stays a documented approximation.
   Comparing the variable sets against the reference implementation closed three more gaps and
   exposed one semantic difference. Added: the eight `t1`-`t8` variables, plus `progress`, `meshx`,
   and `meshy`. The difference is bigger than a missing name: in Milkdrop the motion variables
@@ -877,11 +899,12 @@ affordable. This is a project of its own and must keep the CPU path as the fallb
   which is most of them — failed as `Unexpected '='`. The lexer now emits one compound-assignment
   token and the compiler applies it, including for the `gmegabuf(i) += x` buffer form.
   Against the same 2,000 files this took the skipped shader slots from 326 to 10 and the failed
-  expression blocks from 345 to 13. What is left is array declarations such as
-  `const float4 samples[5] = { ... }` indexed as `samples[i]` (8), a `loop(...)` that does not close
-  (2), and four single cases. Arrays stay a hard failure rather than a declaration that is ignored,
-  because an unknown array name would render a wrong picture instead of dropping the block; modelling
-  them needs its own value kind in the interpreter.
+  expression blocks from 345 to 13. What was left was array declarations such as
+  `const float4 samples[5] = { ... }` indexed as `samples[i]`, a `loop(...)` that does not close,
+  and four single cases. Arrays are modelled now: the parser keeps the element type, the size, and
+  the flattened initializer on their own node, and `ShaderInterpreter` stores the elements in array
+  storage that an element access reads, so a shader that indexes an array renders what the preset
+  asked for instead of dropping its block.
   The parser also stops after the top-level block that is the shader body, because Milkdrop stores a
   footer such as "written by ..." after its closing brace; two presets failed to parse on that text
   before.
@@ -915,6 +938,13 @@ affordable. This is a project of its own and must keep the CPU path as the fallb
   lose their shaders at run time to an unimplemented built-in (`conway` is the known one) or to the
   interpreter's loop budget, so those blocks are disabled after the first frame. Both are recorded
   as their own work rather than being hidden by the budget.
+  **Remaining.** Three things are still open in this phase. The blur chain's edge darkening
+  (`blurN_edge_darken`, and its Milkdrop 2 `bNed` alias) is parsed and seeded but not applied, so a
+  preset that relies on it looks slightly different; it needs a documented approximation of the
+  border falloff and a picture comparison. The per-pixel expression program still runs per screen
+  pixel instead of on Milkdrop's roughly 32 x 24 mesh, which is the largest remaining fidelity gap
+  and a behaviour change to the warp that needs identical-frame verification. And the `conway`
+  built-in is unimplemented, so a preset that calls it loses that block.
 **Tests**: each phase adds its own; 39a is the prerequisite for claiming any speed-up.
 
 **Commit**: `perf(visualizer): add render measurement` (39a), then one commit per phase

@@ -35,8 +35,12 @@ This file applies to `Orynivo.Core/` and supplements `../AGENTS.md`.
   preset keys are parsed into `VisualizerPreset.Defaults` and applied as the per-frame
   starting values after the computed seeds, which is how Milkdrop presets carry most of their
   settings; never drop that step or key-only presets lose their wave, border, and echo
-  parameters. The default wave mode is the single line (3), not the circular mode (0), because
-  every built-in preset and the legacy `per_point` contract assume a line.
+  parameters. `VisualizerPreset.KeyAliases` maps the Milkdrop 2 short keys onto the Milkdrop 1 names
+  the variables use, so the `b1n`/`b1x`/`b1ed` and `b2`/`b3` blur and edge keys resolve to
+  `blurN_min`/`blurN_max`/`blurN_edge_darken` instead of being dropped, and a preset that carries
+  only them takes its blur amount from their `blurN_max` sum when Orynivo's own `blur_level` key is
+  absent. Keep new aliases in that one table. The default wave mode is the single line (3), not the
+  circular mode (0), because every built-in preset and the legacy `per_point` contract assume a line.
   `VisualizerTextureBank` generates the Milkdrop noise and random textures from fixed seeds
   instead of bundling third party images: keep generation deterministic and lazy, and keep the
   sizes (32, 256, 512) so shader sampling stays comparable. It also generates the two 32³ volume
@@ -224,7 +228,11 @@ This file applies to `Orynivo.Core/` and supplements `../AGENTS.md`.
   commas separate arguments), a declaration initialized with a braced list or a `sampler_state`
   block, element access on a vector, and the integer and double vector types. A macro definition
   ends at its line comment, so `#define a b //comment` must not expand the comment into the middle
-  of a call. A fixed-size array declaration such as `const float4 samples[5] = { ... }` is parsed
+  of a call. `VisualizerPreset.TranslateShaderDialect` resolves Milkdrop's preprocessor conditionals
+  (`#define`, `#if`, `#ifdef`, `#ifndef`, `#else`, `#endif`) and its built-in math constants
+  (`M_PI`, `M_PI_2`, `M_2PI`, `M_INV_PI`, `M_INV_PI_2`, `M_E`) before `ShaderParser` sees the
+  source, so the parser stays plain HLSL; keep the constants in that one table. A fixed-size array
+  declaration such as `const float4 samples[5] = { ... }` is parsed
   into its own node and stored in the interpreter's array storage, because indexing an unknown
   array name would render a wrong picture; keep the element type, the size, and the flattened
   initializer together.

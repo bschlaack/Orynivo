@@ -84,6 +84,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   default 480 x 270, the shader-pass cutover costs 39 ms per frame on average against 57 ms before.
 
 ### Fixed
+- Recognized the Milkdrop 2 blur and edge keys. `b1n`/`b1x`/`b1ed` and the `b2`/`b3` family are the
+  Milkdrop 1 `blurN_min`, `blurN_max`, and `blurN_edge_darken` parameters under their short names, so
+  they now resolve to those variables instead of being ignored, and a preset that carries only them
+  takes its blur amount from their `blurN_max` sum when Orynivo's own `blur_level` key is absent. A
+  fixed-size shader array (`const float4 samples[5] = { ... }`) is parsed into its own node and stored
+  in the interpreter's array storage, so a shader that indexes it renders instead of losing its block.
 - Made the preset expression parser accept the constructs a real collection uses beyond the basic
   statement forms, so fewer expression blocks are dropped. An assignment or a shared-memory-buffer
   write is now a valid `if(...)` argument (`if(c, x = 1, y = 2)`), a semicolon continues such an
