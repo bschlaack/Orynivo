@@ -99,14 +99,16 @@ This file applies to `Orynivo.Core/` and supplements `../AGENTS.md`.
   same values; `ShaderCompilerTests` asserts exactly that and must keep passing. Keep its function
   set aligned with `ShaderTranspiler`'s vocabulary: a function the emitter can translate but the
   runtime does not know makes the CPU silently disable a shader the GPU renders, and `lum` alone
-  appears in a third of a real collection. A two-by-two matrix is part of that set now: `float2x2`
-  was unknown and disabled 729 presets' shaders. `ShaderValue` stores it row-major in its four
-  components (`ShaderValue.Matrix2x2`, `IsMatrix`) so the per-pixel value does not grow,
-  `ShaderRuntime.ConstructMatrix2` builds it from four scalars or one vector, `HlslMultiply` handles
-  matrix-by-vector, vector-by-matrix, and matrix-by-matrix, and `ShaderTranspiler` maps `float2x2`
-  onto SkSL's `mat2` (spreading a vector argument into four scalars, because `mat2` has no
-  four-component constructor) and must not narrow a matrix argument. `float3x3`/`float4x4` remain
-  out of scope because nine and sixteen components do not fit the four the hot path copies.
+  appears in a third of a real collection. The matrix types are part of that set now: `float2x2`,
+  `float3x3`, and `float4x4` were unknown and disabled 788 presets' shaders. A matrix lives in a
+  per-pixel pool in `ShaderRuntime` (`StoreMatrix`/`ResetMatrixPool`), and `ShaderValue` carries only
+  its index and dimension; do not move the nine or sixteen components into the value, because an
+  inline matrix made the measured 640 x 360 comp-shader frame go from 26 ms to 47 ms. `ConstructMatrix`
+  builds any of the three dimensions from scalars or a vector, `HlslMultiply` handles
+  matrix-by-vector, vector-by-matrix, and matrix-by-matrix, and `ShaderTranspiler` maps `floatNxN`
+  onto SkSL's `matN` (spreading a vector argument into scalars, because `matN` has no four-component
+  constructor) and must not narrow a matrix argument. The shader entry points must clear the pool
+  before evaluating a pixel, so a handle can never point at a matrix another pixel built.
   `PresetRenderer.SeedFrameVariables` must keep `fps`
   finite on the first frame, because a preset that divides by it otherwise accumulates an infinity
   that then reaches the sampler. `PresetSkiaComparisonDiagnosticTests` is the harness that compares

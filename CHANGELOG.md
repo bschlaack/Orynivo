@@ -22,17 +22,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   now probes the buffer each stage reads on every frame (`StageBrightnessLogger`), so the log shows
   where the brightness jumps. The same investigation found that `PresetRenderer.Output` had to
   become the post-comp frame; the presenter was previously showing the feedback buffer.
-- Fixed the shader runtime rejecting `float2x2`. `Unknown shader function 'float2x2'` disabled a
-  shader outright, and a scan of the preset collection found 729 files that build a `float2x2` and
-  consume it with `mul`; a real preset such as `martin - neon space ps2 (ati fix)` now renders with
-  `shaderError=none` instead of losing its shader. The runtime gained a two-by-two matrix value
-  (stored row-major in the existing four components, so the per-pixel value stays the same size),
-  the `float2x2(...)` constructor from four scalars or one vector, and HLSL's `mul` for
-  matrix-by-vector, vector-by-matrix, and matrix-by-matrix. The SkSL emitter maps `float2x2` onto
-  `mat2`, spreads a vector argument into four scalars because SkSL's `mat2` has no four-component
-  constructor, and leaves a matrix argument alone instead of narrowing it. `ShaderMatrixTests` and
-  `ShaderCompilerTests` cover the values and the interpreter/compiled-path agreement, and
-  `ShaderTranspilerTests` proves Skia accepts the emitted SkSL.
+- Fixed the shader runtime rejecting the matrix types. `Unknown shader function 'float2x2'` disabled a
+  shader outright, and a scan of the preset collection found 729 files that build a `float2x2` and 59
+  that build a `float3x3`; a real preset such as `martin - neon space ps2 (ati fix)` now renders with
+  `shaderError=none` instead of losing its shader. The runtime gained `float2x2`, `float3x3`, and
+  `float4x4` construction from scalars or vectors, and HLSL's `mul` for matrix-by-vector,
+  vector-by-matrix, and matrix-by-matrix. A matrix is stored row-major in a per-pixel pool the value
+  only refers to, because a nine- or sixteen-component value would make every shader value four times
+  larger and slow the per-pixel path for the presets that never build one; measured on the comp-shader
+  cost harness the pool leaves the 640 x 360 frame within noise of its previous 26 ms, where an inline
+  matrix value took it to 47 ms. The SkSL emitter maps `floatNxN` onto SkSL's `matN`, spreads a vector
+  argument into scalars because `matN` has no four-component constructor, and leaves a matrix argument
+  alone instead of narrowing it. `ShaderMatrixTests` and `ShaderCompilerTests` cover the values and the
+  interpreter/compiled-path agreement, `ShaderTranspilerTests` proves Skia accepts the emitted SkSL,
+  and the collection-wide translation harness reports every sampled shader accepted.
 - Fixed the **Visualisierung** entry in Settings having no icon. `IconVisualizer` is a stroke-only
 
   geometry (rising spectrum bars over a baseline), while the Settings navigation style sets `Fill`, so

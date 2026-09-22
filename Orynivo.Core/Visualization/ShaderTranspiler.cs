@@ -1550,7 +1550,15 @@ public static class ShaderTranspiler
             case "float2x2":
             case "half2x2":
             case "double2x2":
-                return EmitMatrix2(call, arguments);
+                return EmitMatrix(call, arguments, 2);
+            case "float3x3":
+            case "half3x3":
+            case "double3x3":
+                return EmitMatrix(call, arguments, 3);
+            case "float4x4":
+            case "half4x4":
+            case "double4x4":
+                return EmitMatrix(call, arguments, 4);
             case "mul":
                 return arguments.Count >= 2 ? $"({arguments[0]} * {arguments[1]})" : arguments[0];
             case "lum":
@@ -1587,30 +1595,30 @@ public static class ShaderTranspiler
     }
 
     /// <summary>
-    /// Emits a <c>float2x2</c> constructor as a SkSL <c>mat2</c>. HLSL fills a matrix row-major from a
-    /// single vector, while SkSL's <c>mat2</c> has no four-component constructor, so the components of
-    /// a vector argument are spread explicitly.
+    /// Emits a <c>floatNxN</c> constructor as a SkSL matrix. HLSL fills a matrix row-major from a
+    /// single vector, while SkSL's matrix constructors have no four-component form, so the components
+    /// of a vector argument are spread explicitly.
     /// </summary>
     /// <param name="call">Constructor call node.</param>
     /// <param name="arguments">Already emitted arguments.</param>
+    /// <param name="dimension">Matrix dimension.</param>
     /// <returns>The constructor text.</returns>
-    private static string EmitMatrix2(ShaderNode call, List<string> arguments)
+    private static string EmitMatrix(ShaderNode call, List<string> arguments, int dimension)
     {
+        var size = dimension * dimension;
         if (arguments.Count == 1)
         {
             var type = call.Items.Count > 0 ? TypeOf(call.Items[0]) : null;
             var count = type is null ? 1 : SkSL.ComponentCount(type);
             if (count is >= 2 and <= 4)
             {
-                var components = new List<string>(4);
-                for (var index = 0; index < count; index++)
-                    components.Add($"{arguments[0]}.{"xyzw"[index]}");
-                while (components.Count < 4)
-                    components.Add("0.0");
-                return $"mat2({string.Join(", ", components)})";
+                var components = new List<string>(size);
+                for (var index = 0; index < size; index++)
+                    components.Add(index < count ? $"{arguments[0]}.{"xyzw"[index]}" : "0.0");
+                return $"mat{dimension}({string.Join(", ", components)})";
             }
         }
 
-        return $"mat2({string.Join(", ", arguments)})";
+        return $"mat{dimension}({string.Join(", ", arguments)})";
     }
 }

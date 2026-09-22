@@ -45,6 +45,9 @@ public sealed class ShaderCompilerTests
     [InlineData("float2x2 m = float2x2(1, 0, 0, 1); return float4(mul(m, uv), 0, 1);")]
     [InlineData("return float4(mul(float2x2(q1, 2, 3, 4), float2(bass, mid)), 0, 1);")]
     [InlineData("return float4(mul(mul(float2x2(1, 2, 3, 4), float2x2(bass, mid, treb, vol)), uv), 0, 1);")]
+    [InlineData("return float4(mul(float3x3(1, 2, 3, 4, 5, 6, 7, 8, 9), float3(bass, mid, treb)), 1);")]
+    [InlineData("static const float3x3 m = float3x3(1, 0, 0, 0, 1, 0, 0, 0, 1); return float4(mul(float3(uv, 0.5), m), 1);")]
+    [InlineData("return mul(float4x4(1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1), float4(bass, mid, treb, vol));")]
     public void Compile_MatchesTheInterpreter(string body)
     {
         Compare("comp_1=float4 main(float2 uv : TEXCOORD0) : COLOR\n{\n" + body + "\n}");

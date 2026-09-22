@@ -25,9 +25,6 @@ internal static class ShaderRuntime
         Construct3,
         Construct4,
 
-        /// <summary>A two-by-two matrix constructor.</summary>
-        ConstructMatrix2,
-
         /// <summary>Component-wise intrinsics.</summary>
         Abs,
         Ceil,
@@ -96,8 +93,6 @@ internal static class ShaderRuntime
         ["half3"] = Opcode.Construct3,
         ["float4"] = Opcode.Construct4,
         ["half4"] = Opcode.Construct4,
-        ["float2x2"] = Opcode.ConstructMatrix2,
-        ["half2x2"] = Opcode.ConstructMatrix2,
         ["abs"] = Opcode.Abs,
         ["ceil"] = Opcode.Ceil,
         ["cos"] = Opcode.Cos,
@@ -212,8 +207,6 @@ internal static class ShaderRuntime
                 return Construct(3, a, b, c, d, count);
             case Opcode.Construct4:
                 return Construct(4, a, b, c, d, count);
-            case Opcode.ConstructMatrix2:
-                return ConstructMatrix2(a, b, c, d, count);
             case Opcode.Abs:
                 return Unary(count, a, MathF.Abs);
             case Opcode.Ceil:
@@ -458,46 +451,126 @@ internal static class ShaderRuntime
     /// <summary>Returns the default value of a declared type.</summary>
     /// <param name="type">Type name.</param>
     /// <returns>The default value.</returns>
-    public static ShaderValue DefaultFor(string type) => type switch
+    public static ShaderValue DefaultFor(string type)
     {
-        "float2" or "half2" => ShaderValue.Vector(0f, 0f, 0f, 0f, 2),
-        "float3" or "half3" => ShaderValue.Vector(0f, 0f, 0f, 0f, 3),
-        "float4" or "half4" => ShaderValue.Vector(0f, 0f, 0f, 0f, 4),
-        "float2x2" or "half2x2" => ShaderValue.Matrix2x2(0f, 0f, 0f, 0f),
-        _ => ShaderValue.Scalar(0f)
-    };
+        var dimension = MatrixDimensionFor(type);
+        if (dimension > 0)
+            return StoreMatrix(dimension, default);
+
+        return type switch
+        {
+            "float2" or "half2" => ShaderValue.Vector(0f, 0f, 0f, 0f, 2),
+            "float3" or "half3" => ShaderValue.Vector(0f, 0f, 0f, 0f, 3),
+            "float4" or "half4" => ShaderValue.Vector(0f, 0f, 0f, 0f, 4),
+            _ => ShaderValue.Scalar(0f)
+        };
+    }
+
+    /// <summary>The number of matrices one pixel may build before the pool reuses the last slot.</summary>
+    private const int MatrixPoolCapacity = 256;
+
+    /// <summary>Row-major matrix storage for the current pixel, one sixteen-float block per matrix.</summary>
+    [ThreadStatic]
+    private static float[]? _matrixPool;
+
+    /// <summary>Dimension of each pooled matrix, or zero when the slot is unused.</summary>
+    [ThreadStatic]
+    private static int[]? _matrixDimensions;
+
+    /// <summary>How many pool slots the current pixel has used.</summary>
+    [ThreadStatic]
+    private static int _matrixCount;
+
+    /// <summary>
+    /// Clears the per-pixel matrix pool. The shader entry points call it before evaluating a pixel, so
+    /// a matrix built by one pixel cannot be mistaken for one the next pixel never built.
+    /// </summary>
+    public static void ResetMatrixPool() => _matrixCount = 0;
+
+    /// <summary>
+    /// Stores a row-major matrix and returns the value that refers to it. A matrix needs nine or
+    /// sixteen components, so it lives in the pool instead of inside <see cref="ShaderValue"/>, which
+    /// keeps every value small enough for the per-pixel shader path to stay fast.
+    /// </summary>
+    /// <param name="dimension">Matrix dimension, two to four.</param>
+    /// <param name="values">Row-major components, padded with zeros when short.</param>
+    /// <returns>The matrix handle.</returns>
+    public static ShaderValue StoreMatrix(int dimension, ReadOnlySpan<float> values)
+    {
+        _matrixPool ??= new float[MatrixPoolCapacity * 16];
+        _matrixDimensions ??= new int[MatrixPoolCapacity];
+        var index = _matrixCount < MatrixPoolCapacity ? _matrixCount++ : MatrixPoolCapacity - 1;
+        _matrixDimensions[index] = dimension;
+        var offset = index * 16;
+        var limit = Math.Min(dimension * dimension, 16);
+        for (var component = 0; component < limit; component++)
+            _matrixPool[offset + component] = component < values.Length ? values[component] : 0f;
+        return ShaderValue.MatrixHandle(index, dimension);
+    }
+
+    /// <summary>Reads one component of a matrix value, row-major.</summary>
+    /// <param name="matrix">Matrix handle.</param>
+    /// <param name="row">Row index.</param>
+    /// <param name="column">Column index.</param>
+    /// <returns>The component value.</returns>
+    private static float MatrixComponent(ShaderValue matrix, int row, int column)
+    {
+        var dimension = matrix.MatrixDimension;
+        var offset = (matrix.MatrixIndex * 16) + (row * dimension) + column;
+        return _matrixPool is not null && offset >= 0 && offset < _matrixPool.Length ? _matrixPool[offset] : 0f;
+    }
 
     /// <summary>Reports whether a declared type name is a matrix.</summary>
     /// <param name="type">Type name.</param>
     /// <returns><see langword="true"/> when the type is a matrix.</returns>
-    public static bool IsMatrixType(string type) =>
-        type is "float2x2" or "half2x2" or "double2x2" or
-            "float3x3" or "half3x3" or "double3x3" or
-            "float4x4" or "half4x4" or "double4x4";
+    public static bool IsMatrixType(string type) => MatrixDimensionFor(type) > 0;
+
+    /// <summary>
+    /// Gets the dimension of a matrix type name, or zero when the name is not a square matrix.
+    /// </summary>
+    /// <param name="type">Type name.</param>
+    /// <returns>The dimension, or zero.</returns>
+    public static int MatrixDimensionFor(string type) => type switch
+    {
+        "float2x2" or "half2x2" or "double2x2" => 2,
+        "float3x3" or "half3x3" or "double3x3" => 3,
+        "float4x4" or "half4x4" or "double4x4" => 4,
+        _ => 0
+    };
 
     /// <summary>Returns the component count a declared type has.</summary>
     /// <param name="type">Type name.</param>
     /// <returns>The component count.</returns>
-    public static int CountFor(string type) => type switch
+    public static int CountFor(string type)
     {
-        "float2" or "half2" or "int2" or "uint2" or "bool2" => 2,
-        "float3" or "half3" or "int3" or "uint3" or "bool3" => 3,
-        "float4" or "half4" or "int4" or "uint4" or "bool4" => 4,
-        "float2x2" or "half2x2" or "double2x2" => 4,
-        _ => 1
-    };
+        // A matrix is stored row-major but described by its dimension, not by a component count, so
+        // the coercion below leaves it alone whatever number is reported here.
+        if (MatrixDimensionFor(type) > 0)
+            return 4;
+
+        return type switch
+        {
+            "float2" or "half2" or "int2" or "uint2" or "bool2" => 2,
+            "float3" or "half3" or "int3" or "uint3" or "bool3" => 3,
+            "float4" or "half4" or "int4" or "uint4" or "bool4" => 4,
+            _ => 1
+        };
+    }
 
     /// <summary>
     /// Coerces a value to a declared type the way HLSL does: a scalar broadcasts, a shorter vector
     /// pads with zeros, and a narrower type takes the leading components. The SkSL emitter performs
     /// the same conversion, so the interpreter and the GPU produce the same value. A matrix keeps its
-    /// four row-major components instead of being collapsed to a vector.
+    /// row-major components instead of being collapsed to a vector.
     /// </summary>
     /// <param name="value">Value to coerce.</param>
     /// <param name="type">Declared type name.</param>
     /// <returns>The coerced value.</returns>
-    public static ShaderValue Coerce(ShaderValue value, string type) =>
-        IsMatrixType(type) ? ToMatrix2(value) : Coerce(value, CountFor(type));
+    public static ShaderValue Coerce(ShaderValue value, string type)
+    {
+        var dimension = MatrixDimensionFor(type);
+        return dimension > 0 ? ToMatrix(value, dimension) : Coerce(value, CountFor(type));
+    }
 
     /// <summary>Coerces a value to a component count.</summary>
     /// <param name="value">Value to coerce.</param>
@@ -753,84 +826,158 @@ internal static class ShaderRuntime
         return ComponentWise(left, right, (a, b) => a * b);
     }
 
-    /// <summary>Multiplies a two-by-two matrix by a vector.</summary>
+    /// <summary>Multiplies a matrix by a vector.</summary>
     /// <param name="matrix">Left matrix.</param>
     /// <param name="vector">Right vector.</param>
     /// <returns>The resulting vector.</returns>
     private static ShaderValue MultiplyMatrixVector(ShaderValue matrix, ShaderValue vector)
     {
-        var x = (matrix.X * vector.Get(0)) + (matrix.Y * vector.Get(1));
-        var y = (matrix.Z * vector.Get(0)) + (matrix.W * vector.Get(1));
-        return ShaderValue.Vector(x, y, 0f, 0f, 2);
+        var dimension = matrix.MatrixDimension;
+        Span<float> result = stackalloc float[4];
+        for (var row = 0; row < dimension; row++)
+        {
+            var sum = 0f;
+            for (var column = 0; column < dimension; column++)
+                sum += MatrixComponent(matrix, row, column) * vector.Get(column);
+            result[row] = sum;
+        }
+
+        return new ShaderValue(result[0], result[1], result[2], result[3], dimension);
     }
 
-    /// <summary>Multiplies a vector by a two-by-two matrix.</summary>
+    /// <summary>Multiplies a vector by a matrix.</summary>
     /// <param name="vector">Left vector.</param>
     /// <param name="matrix">Right matrix.</param>
     /// <returns>The resulting vector.</returns>
     private static ShaderValue MultiplyVectorMatrix(ShaderValue vector, ShaderValue matrix)
     {
-        var x = (vector.Get(0) * matrix.X) + (vector.Get(1) * matrix.Z);
-        var y = (vector.Get(0) * matrix.Y) + (vector.Get(1) * matrix.W);
-        return ShaderValue.Vector(x, y, 0f, 0f, 2);
+        var dimension = matrix.MatrixDimension;
+        Span<float> result = stackalloc float[4];
+        for (var column = 0; column < dimension; column++)
+        {
+            var sum = 0f;
+            for (var row = 0; row < dimension; row++)
+                sum += vector.Get(row) * MatrixComponent(matrix, row, column);
+            result[column] = sum;
+        }
+
+        return new ShaderValue(result[0], result[1], result[2], result[3], dimension);
     }
 
-    /// <summary>Multiplies two two-by-two matrices.</summary>
+    /// <summary>Multiplies two matrices of the same dimension.</summary>
     /// <param name="left">Left matrix.</param>
     /// <param name="right">Right matrix.</param>
     /// <returns>The resulting matrix.</returns>
     private static ShaderValue MultiplyMatrices(ShaderValue left, ShaderValue right)
     {
-        var m00 = (left.X * right.X) + (left.Y * right.Z);
-        var m01 = (left.X * right.Y) + (left.Y * right.W);
-        var m10 = (left.Z * right.X) + (left.W * right.Z);
-        var m11 = (left.Z * right.Y) + (left.W * right.W);
-        return ShaderValue.Matrix2x2(m00, m01, m10, m11);
+        var dimension = left.MatrixDimension;
+        Span<float> result = stackalloc float[16];
+        for (var row = 0; row < dimension; row++)
+        {
+            for (var column = 0; column < dimension; column++)
+            {
+                var sum = 0f;
+                for (var index = 0; index < dimension; index++)
+                    sum += MatrixComponent(left, row, index) * MatrixComponent(right, index, column);
+                result[(row * dimension) + column] = sum;
+            }
+        }
+
+        return StoreMatrix(dimension, result);
     }
 
     /// <summary>
-    /// Builds a two-by-two matrix from a constructor call. Four scalars or one vector fill it
-    /// row-major, matching the <c>float2x2(...)</c> spelling Milkdrop shaders use; a single scalar
-    /// fills the diagonal.
+    /// Builds a square matrix from a constructor call. The arguments fill it row-major, matching the
+    /// <c>floatNxN(...)</c> spelling Milkdrop shaders use; a single scalar fills the diagonal. The
+    /// sixteen values are passed individually so the compiled path can call it without an array.
     /// </summary>
+    /// <param name="dimension">Matrix dimension, two to four.</param>
+    /// <param name="count">Number of evaluated arguments.</param>
     /// <param name="a">First argument.</param>
     /// <param name="b">Second argument.</param>
     /// <param name="c">Third argument.</param>
     /// <param name="d">Fourth argument.</param>
-    /// <param name="count">Number of evaluated arguments.</param>
+    /// <param name="e">Fifth argument.</param>
+    /// <param name="f">Sixth argument.</param>
+    /// <param name="g">Seventh argument.</param>
+    /// <param name="h">Eighth argument.</param>
+    /// <param name="i">Ninth argument.</param>
+    /// <param name="j">Tenth argument.</param>
+    /// <param name="k">Eleventh argument.</param>
+    /// <param name="l">Twelfth argument.</param>
+    /// <param name="m">Thirteenth argument.</param>
+    /// <param name="n">Fourteenth argument.</param>
+    /// <param name="o">Fifteenth argument.</param>
+    /// <param name="p">Sixteenth argument.</param>
     /// <returns>The matrix value.</returns>
-    private static ShaderValue ConstructMatrix2(
+    public static ShaderValue ConstructMatrix(
+        int dimension,
+        int count,
         ShaderValue a,
         ShaderValue b,
         ShaderValue c,
         ShaderValue d,
-        int count)
+        ShaderValue e,
+        ShaderValue f,
+        ShaderValue g,
+        ShaderValue h,
+        ShaderValue i,
+        ShaderValue j,
+        ShaderValue k,
+        ShaderValue l,
+        ShaderValue m,
+        ShaderValue n,
+        ShaderValue o,
+        ShaderValue p)
     {
+        var limit = dimension * dimension;
         if (count == 1 && a.Count == 1)
-            return ShaderValue.Matrix2x2(a.X, 0f, 0f, a.X);
+        {
+            // floatNxN(s) fills the diagonal, matching HLSL.
+            Span<float> diagonal = stackalloc float[16];
+            for (var index = 0; index < dimension; index++)
+                diagonal[(index * dimension) + index] = a.X;
+            return StoreMatrix(dimension, diagonal);
+        }
 
-        Span<float> flat = stackalloc float[4];
+        Span<ShaderValue> arguments = stackalloc ShaderValue[16];
+        arguments[0] = a;
+        arguments[1] = b;
+        arguments[2] = c;
+        arguments[3] = d;
+        arguments[4] = e;
+        arguments[5] = f;
+        arguments[6] = g;
+        arguments[7] = h;
+        arguments[8] = i;
+        arguments[9] = j;
+        arguments[10] = k;
+        arguments[11] = l;
+        arguments[12] = m;
+        arguments[13] = n;
+        arguments[14] = o;
+        arguments[15] = p;
+        Span<float> flat = stackalloc float[16];
         var filled = 0;
-        if (count > 0)
-            Append(flat, ref filled, 4, a);
-        if (count > 1)
-            Append(flat, ref filled, 4, b);
-        if (count > 2)
-            Append(flat, ref filled, 4, c);
-        if (count > 3)
-            Append(flat, ref filled, 4, d);
+        for (var index = 0; index < count && index < 16; index++)
+            Append(flat, ref filled, limit, arguments[index]);
 
-        return ShaderValue.Matrix2x2(flat[0], flat[1], flat[2], flat[3]);
+        return StoreMatrix(dimension, flat);
     }
 
-    /// <summary>Reads a value as a two-by-two matrix, keeping an existing matrix unchanged.</summary>
+    /// <summary>Reads a value as a square matrix, keeping an existing matrix of the same dimension.</summary>
     /// <param name="value">Value to read.</param>
+    /// <param name="dimension">Target dimension.</param>
     /// <returns>The matrix value.</returns>
-    private static ShaderValue ToMatrix2(ShaderValue value)
+    private static ShaderValue ToMatrix(ShaderValue value, int dimension)
     {
-        if (value.IsMatrix)
+        if (value.IsMatrix && value.MatrixDimension == dimension)
             return value;
 
-        return ShaderValue.Matrix2x2(value.Get(0), value.Get(1), value.Get(2), value.Get(3));
+        Span<float> flat = stackalloc float[16];
+        var limit = dimension * dimension;
+        for (var index = 0; index < limit; index++)
+            flat[index] = index < value.Count ? value.Get(index) : 0f;
+        return StoreMatrix(dimension, flat);
     }
 }

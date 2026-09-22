@@ -1,25 +1,27 @@
 namespace Orynivo.Visualization;
 
 /// <summary>
-/// A value flowing through a shader: a scalar or a vector of up to four components. HLSL shaders
-/// work on <c>float</c>, <c>float2</c>, <c>float3</c>, and <c>float4</c>, so one type carries all
-/// of them together with the component count; reading a component outside the count yields zero,
-/// which is what the arithmetic relies on.
+/// A value flowing through a shader: a scalar, a vector of up to four components, or a handle to a
+/// square matrix up to four by four. HLSL shaders work on <c>float</c>, <c>float2</c>, <c>float3</c>,
+/// <c>float4</c>, and the <c>floatNxN</c> matrices, so one type carries all of them together with the
+/// component count; reading a component outside the count yields zero, which is what the arithmetic
+/// relies on.
+/// <para>
+/// A matrix needs nine or sixteen components, which would make every value four times larger and
+/// slow the per-pixel shader path for the 99 percent of presets that never build one. It is therefore
+/// kept in the runtime's per-pixel pool and the value carries only its index and dimension; see
+/// <see cref="ShaderRuntime.StoreMatrix"/>.
+/// </para>
 /// </summary>
-public readonly record struct ShaderValue
+public readonly struct ShaderValue
 {
-    /// <summary>Creates a value.</summary>
+    /// <summary>Creates a scalar or vector value.</summary>
     /// <param name="x">First component.</param>
     /// <param name="y">Second component.</param>
     /// <param name="z">Third component.</param>
     /// <param name="w">Fourth component.</param>
     /// <param name="count">Number of meaningful components, one to four.</param>
-    /// <param name="isMatrix">
-    /// Whether the value is a two-by-two matrix stored row-major in the four components instead of a
-    /// vector. Milkdrop shaders construct a matrix with <c>float2x2(...)</c> and consume it with
-    /// <c>mul</c>; keeping it in the same four floats avoids growing the value the per-pixel shader
-    /// path copies around.
-    /// </param>
+    /// <param name="isMatrix">Whether the value is a matrix handle instead of a vector.</param>
     public ShaderValue(float x, float y, float z, float w, int count, bool isMatrix = false)
     {
         X = x;
@@ -30,10 +32,10 @@ public readonly record struct ShaderValue
         IsMatrix = isMatrix;
     }
 
-    /// <summary>Gets the first component.</summary>
+    /// <summary>Gets the first component, or a matrix handle's pool index.</summary>
     public float X { get; }
 
-    /// <summary>Gets the second component.</summary>
+    /// <summary>Gets the second component, or a matrix handle's dimension.</summary>
     public float Y { get; }
 
     /// <summary>Gets the third component.</summary>
@@ -45,11 +47,17 @@ public readonly record struct ShaderValue
     /// <summary>Gets how many components are meaningful.</summary>
     public int Count { get; }
 
-    /// <summary>Gets a value indicating whether the value is a two-by-two matrix, not a vector.</summary>
+    /// <summary>Gets a value indicating whether the value is a matrix handle, not a vector.</summary>
     public bool IsMatrix { get; }
 
     /// <summary>Gets the value as a truth value, using the first component.</summary>
     public bool IsTrue => X != 0f;
+
+    /// <summary>Gets the matrix pool index, or zero when the value is not a matrix.</summary>
+    internal int MatrixIndex => IsMatrix ? (int)X : 0;
+
+    /// <summary>Gets the matrix dimension, or zero when the value is not a matrix.</summary>
+    internal int MatrixDimension => IsMatrix ? (int)Y : 0;
 
     /// <summary>Creates a scalar value.</summary>
     /// <param name="value">Scalar value.</param>
@@ -65,14 +73,12 @@ public readonly record struct ShaderValue
     /// <returns>The vector.</returns>
     public static ShaderValue Vector(float x, float y, float z, float w, int count) => new(x, y, z, w, count);
 
-    /// <summary>Creates a two-by-two matrix stored row-major.</summary>
-    /// <param name="m00">Row 0, column 0.</param>
-    /// <param name="m01">Row 0, column 1.</param>
-    /// <param name="m10">Row 1, column 0.</param>
-    /// <param name="m11">Row 1, column 1.</param>
+    /// <summary>Creates a matrix handle from its pool index and dimension.</summary>
+    /// <param name="index">Pool index.</param>
+    /// <param name="dimension">Matrix dimension.</param>
     /// <returns>The matrix value.</returns>
-    public static ShaderValue Matrix2x2(float m00, float m01, float m10, float m11) =>
-        new(m00, m01, m10, m11, 4, true);
+    internal static ShaderValue MatrixHandle(int index, int dimension) =>
+        new(index, dimension, 0f, 0f, 4, true);
 
     /// <summary>Reads one component, or zero when the value is shorter.</summary>
     /// <param name="index">Component index from zero to three.</param>

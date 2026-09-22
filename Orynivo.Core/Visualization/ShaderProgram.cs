@@ -37,7 +37,13 @@ public sealed class ShaderProgram
     /// <param name="slots">Slot storage of at least <see cref="SlotCount"/> entries.</param>
     /// <param name="sampler">Bound sampler, or <see langword="null"/>.</param>
     /// <returns>The value the shader returned.</returns>
-    public ShaderValue Execute(ShaderValue[] slots, IShaderSampler? sampler) => _execute(slots, sampler);
+    public ShaderValue Execute(ShaderValue[] slots, IShaderSampler? sampler)
+    {
+        // A matrix is stored in the runtime's per-pixel pool, so the pool is cleared here, before the
+        // pixel is evaluated, and a handle can never point at a matrix another pixel built.
+        ShaderRuntime.ResetMatrixPool();
+        return _execute(slots, sampler);
+    }
 }
 
 /// <summary>
@@ -224,6 +230,32 @@ internal static class ShaderCompiler
         ShaderNode node)
     {
         var count = node.Items.Count;
+
+        // A matrix constructor takes up to sixteen components, so it bypasses the four-argument call
+        // path and is compiled to the sixteen-value runtime helper.
+        var matrixDimension = ShaderRuntime.MatrixDimensionFor(node.Text);
+        if (matrixDimension > 0)
+        {
+            var matrixArguments = new Expression[16];
+            for (var index = 0; index < 16; index++)
+            {
+                matrixArguments[index] = index < count
+                    ? BuildExpression(slots, slotsParameter, samplerParameter, node.Items[index])
+                    : Expression.Constant(default(ShaderValue));
+            }
+
+            var matrixCall = new Expression[18];
+            matrixCall[0] = Expression.Constant(matrixDimension);
+            matrixCall[1] = Expression.Constant(count);
+            for (var index = 0; index < 16; index++)
+                matrixCall[index + 2] = matrixArguments[index];
+            return Expression.Call(
+                typeof(ShaderRuntime),
+                nameof(ShaderRuntime.ConstructMatrix),
+                null,
+                matrixCall);
+        }
+
         if (count > 4)
             throw new PresetExpressionException("Unsupported shader call.", node.Position);
 

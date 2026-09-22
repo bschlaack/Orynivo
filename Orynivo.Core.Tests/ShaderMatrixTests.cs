@@ -71,6 +71,57 @@ public sealed class ShaderMatrixTests
         Assert.Equal(0f, result.Y, 4);
     }
 
+    /// <summary>A three-by-three matrix times a column vector uses the row-major layout.</summary>
+    [Fact]
+    public void Mul_ThreeByThreeMatrixTimesVector()
+    {
+        // [[1,2,3],[4,5,6],[7,8,9]] * (1,0,0) = (1,4,7)
+        var result = Run("return float4(mul(float3x3(1, 2, 3, 4, 5, 6, 7, 8, 9), float3(1, 0, 0)), 1);");
+
+        Assert.Equal(1f, result.X, 4);
+        Assert.Equal(4f, result.Y, 4);
+        Assert.Equal(7f, result.Z, 4);
+    }
+
+    /// <summary>A row vector times a three-by-three matrix is the other argument order.</summary>
+    [Fact]
+    public void Mul_VectorTimesThreeByThreeMatrix()
+    {
+        // (1,0,0) * [[1,2,3],[4,5,6],[7,8,9]] = (1,2,3)
+        var result = Run("return float4(mul(float3(1, 0, 0), float3x3(1, 2, 3, 4, 5, 6, 7, 8, 9)), 1);");
+
+        Assert.Equal(1f, result.X, 4);
+        Assert.Equal(2f, result.Y, 4);
+        Assert.Equal(3f, result.Z, 4);
+    }
+
+    /// <summary>A static const three-by-three matrix, the shape the collection uses, works.</summary>
+    [Fact]
+    public void Mul_StaticConstThreeByThreeMatrix()
+    {
+        var result = Run("""
+            static const float3x3 RotMat = float3x3(1, 0, 0, 0, 1, 0, 0, 0, 1);
+            return float4(mul(float3(1, 2, 3), RotMat), 1);
+            """);
+
+        Assert.Equal(1f, result.X, 4);
+        Assert.Equal(2f, result.Y, 4);
+        Assert.Equal(3f, result.Z, 4);
+    }
+
+    /// <summary>A four-by-four matrix works with a four-component vector.</summary>
+    [Fact]
+    public void Mul_FourByFourMatrixTimesVector()
+    {
+        var result = Run(
+            "return mul(float4x4(1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1), float4(1, 2, 3, 4));");
+
+        Assert.Equal(1f, result.X, 4);
+        Assert.Equal(2f, result.Y, 4);
+        Assert.Equal(3f, result.Z, 4);
+        Assert.Equal(4f, result.W, 4);
+    }
+
     /// <summary>Runs a comp shader through the interpreter, which is the reference path.</summary>
     /// <param name="body">Shader body.</param>
     /// <param name="seed">Optional variable to seed before the run.</param>

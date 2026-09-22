@@ -862,9 +862,9 @@ affordable. This is a project of its own and must keep the CPU path as the fallb
   port is what turns a shader preset from roughly 16 fps into a GPU frame. The work is to retarget
   `ShaderTranspiler` from SkSL to GLSL (the dialect differs per platform: ANGLE's GLES on Windows,
   desktop GL on Linux, CGL on macOS, so the preamble is chosen from the negotiated version) and to
-  compile and bind it in `VisualizerGlPipeline`'s context. The SkSL emitter's recent matrix support
-  has to be mirrored there too: `float2x2` becomes GLSL `mat2`, and a single vector argument is
-  spread into four scalars because `mat2` has no four-component constructor. The SkSL path stays the
+  compile and bind it in `VisualizerGlPipeline`'s context. The SkSL emitter's matrix support
+  has to be mirrored there too: `floatNxN` becomes GLSL `matN`, and a single vector argument is
+  spread into scalars because `matN` has no four-component constructor. The SkSL path stays the
   fallback, so a shader the GLSL emitter cannot translate keeps rendering through Skia or the
   interpreter.
   The warp's sampling arithmetic now lives in the tested
@@ -1060,22 +1060,27 @@ affordable. This is a project of its own and must keep the CPU path as the fallb
   loop-budget errors**. The claim had counted a *parse* failure as a run-time loss. So nothing in the
   collection loses a block or a frame at run time today; the only open fidelity work is the per-pixel
   mesh convention below and the GLSL shader port in 40f.
-  **Remaining.** Three things are still open in this phase. The **two-by-two matrix type is done**:
-  `float2x2` was unknown to the shader runtime, so `Unknown shader function 'float2x2'` disabled a
-  shader outright. A scan of the 9795-file collection found 729 files that build a `float2x2` and
-  consume it with `mul`, plus 59 that build a `float3x3` and none that build a `float4x4`. The
-  usage is construction plus `mul` — `mul(uv1, float2x2(ang2.y,-ang2.x,ang2.x,ang2.y))` with four
-  scalars and `mul(16*uv1, float2x2(_qb))` with one vector — so the implemented scope is a
-  two-by-two matrix value, the `float2x2(...)` constructor from four scalars or one vector, and
-  HLSL's `mul` for matrix-by-vector, vector-by-matrix, and matrix-by-matrix. The matrix is stored
-  row-major in the four components the value already has, so the per-pixel value the shader paths
-  copy around does not grow; `ShaderRuntime` is the single dispatch point both execution paths call,
-  the compiled path in `ShaderProgram` and the SkSL emitter agree with it (`float2x2` becomes a SkSL
-  `mat2`, a vector argument is spread into four scalars because `mat2` has no four-component
-  constructor, and a matrix argument is not narrowed), and `ShaderMatrixTests`, `ShaderCompilerTests`,
-  and `ShaderTranspilerTests` are the check. `float3x3` (59 files) and `float4x4` (0 files) remain:
-  nine and sixteen components do not fit the four the hot path copies, so they need the value
-  representation to grow or a side channel, and they are left scoped rather than guessed at.
+  **Remaining.** Two things are still open in this phase. The **matrix types are done**:
+  `float2x2`, `float3x3`, and `float4x4` were unknown to the shader runtime, so
+  `Unknown shader function 'float2x2'` disabled a shader outright. A scan of the 9795-file collection
+  found 729 files that build a `float2x2`, 59 that build a `float3x3`, and none that build a
+  `float4x4`. The usage is construction plus `mul` —
+  `mul(uv1, float2x2(ang2.y,-ang2.x,ang2.x,ang2.y))` with four scalars,
+  `mul(16*uv1, float2x2(_qb))` with one vector, and
+  `mul(float3(...), RotMat)` for the static-const three-by-three — so the implemented scope is a
+  matrix value of any of the three dimensions, the `floatNxN(...)` constructor from scalars or a
+  vector, and HLSL's `mul` for matrix-by-vector, vector-by-matrix, and matrix-by-matrix.
+  The representation is the decision that mattered: a matrix needs nine or sixteen components, and
+  putting them inside `ShaderValue` would make every shader value four times larger and slow the
+  per-pixel path for the 99 percent of presets that never build one. Measured on the comp-shader cost
+  harness, an inline matrix value took the 640 x 360 frame from 26 ms to 47 ms. The matrix therefore
+  lives in a per-pixel pool in `ShaderRuntime` (`StoreMatrix`/`ResetMatrixPool`) and the value carries
+  only its index and dimension, which left the measured cost within noise of 26 ms. `ShaderRuntime`
+  is the single dispatch point both execution paths call, the compiled path in `ShaderProgram` and the
+  SkSL emitter agree with it (`floatNxN` becomes a SkSL `matN`, a vector argument is spread into
+  scalars because `matN` has no four-component constructor, and a matrix argument is not narrowed),
+  and `ShaderMatrixTests`, `ShaderCompilerTests`, and `ShaderTranspilerTests` are the check. The
+  collection-wide translation harness reports every sampled shader accepted by Skia.
   The per-pixel mesh is implemented and
   opt-in, but it cannot become the default yet: the engine's per-pixel `x`/`y` are the warped
   position in minus-one-to-one space rather than Milkdrop's aspect-scaled zero-to-one vertex

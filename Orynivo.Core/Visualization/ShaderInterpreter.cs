@@ -109,6 +109,9 @@ public sealed class ShaderInterpreter
     public ShaderValue Run()
     {
         _iterations = 0;
+        // A matrix is stored in the runtime's per-pixel pool, so the pool is cleared here, before the
+        // pixel is evaluated, and a handle can never point at a matrix another pixel built.
+        ShaderRuntime.ResetMatrixPool();
         ShaderValue? result = null;
         foreach (var statement in _program.Items)
         {
@@ -526,6 +529,35 @@ public sealed class ShaderInterpreter
         Span<ShaderValue> arguments = stackalloc ShaderValue[4];
         for (var index = 0; index < count && index < 4; index++)
             arguments[index] = Evaluate(call.Items[index], depth);
+
+        // A matrix constructor takes up to sixteen components, which is more than the generic call
+        // carries, so it is evaluated in full here.
+        var matrixDimension = ShaderRuntime.MatrixDimensionFor(name);
+        if (matrixDimension > 0)
+        {
+            Span<ShaderValue> matrixArguments = stackalloc ShaderValue[16];
+            for (var index = 0; index < count && index < 16; index++)
+                matrixArguments[index] = Evaluate(call.Items[index], depth);
+            return ShaderRuntime.ConstructMatrix(
+                matrixDimension,
+                count,
+                matrixArguments[0],
+                matrixArguments[1],
+                matrixArguments[2],
+                matrixArguments[3],
+                matrixArguments[4],
+                matrixArguments[5],
+                matrixArguments[6],
+                matrixArguments[7],
+                matrixArguments[8],
+                matrixArguments[9],
+                matrixArguments[10],
+                matrixArguments[11],
+                matrixArguments[12],
+                matrixArguments[13],
+                matrixArguments[14],
+                matrixArguments[15]);
+        }
 
         var samplerName = call.Items.Count > 0 && call.Items[0].Kind == ShaderNodeKind.Identifier
             ? call.Items[0].Text

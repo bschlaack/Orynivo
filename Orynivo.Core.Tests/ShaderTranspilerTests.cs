@@ -155,6 +155,22 @@ public sealed class ShaderTranspilerTests
         Assert.True(effect is not null, $"SkSL was rejected: {errors}\n{sksl}");
     }
 
+    /// <summary>A float3x3 matrix becomes a SkSL mat3 and compiles.</summary>
+    [Fact]
+    public void Transpile_CompilesAThreeByThreeMatrix()
+    {
+        var node = ShaderParser.Parse("""
+            static const float3x3 rot = float3x3(q20, q21, q22, q23, q24, q25, q26, q27, q28);
+            ret = mul(float3(uv, 0.5), rot);
+            """);
+
+        var sksl = ShaderTranspiler.Transpile(node, out _);
+        Assert.Contains("mat3(", sksl, StringComparison.Ordinal);
+
+        using var effect = SKRuntimeEffect.CreateShader(sksl, out var errors);
+        Assert.True(effect is not null, $"SkSL was rejected: {errors}\n{sksl}");
+    }
+
     /// <summary>A float2x2 built from a float4 uniform spreads its components for SkSL's mat2.</summary>
     [Fact]
     public void Transpile_CompilesAMatrixFromAVector()
