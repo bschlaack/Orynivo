@@ -811,6 +811,14 @@ affordable. This is a project of its own and must keep the CPU path as the fallb
   Note that the GL context belongs to the control and therefore to the UI thread, so the GL frame
   work has to run inside `OnOpenGlRender`; the render thread cannot drive it without a second shared
   context, which is the decision the next step has to make.
+  A GL mesh warp was written and then deliberately not wired in, because a warp alone is the wrong
+  picture: this engine applies the blur, decay, video echo, borders, gamma, and the overlay *after*
+  the warp, so presenting only the warped feedback would drop every one of them and the window would
+  look visibly worse. The warp therefore cannot be added on its own; the step has to move the whole
+  frame pipeline onto the control's thread, with the CPU providing the per-frame block, the
+  per-vertex mesh, and the overlay texture, and the GPU owning the feedback, the passes, and the
+  shaders. That is the shape the remaining work has, and it is why the cutover is one step rather
+  than four: `PresetRenderer`'s CPU frame path and the GL path cannot share a frame.
 
 - 40e Cutover and validation - `Done`: the GPU path is the visualizer's default where it is
   available and the CPU path stays the fallback, and a comparison harness validates both against the
