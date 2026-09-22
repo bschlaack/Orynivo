@@ -113,7 +113,10 @@ This file applies to `Orynivo.Core/` and supplements `../AGENTS.md`.
   reads an undeclared variable as a zero constant the way the interpreter does, gives a written
   uniform a writable copy in main, and renames a name SkSL reserves. A comparison of vectors is
   emitted component-wise with `step`/`sign`, because SkSL rejects a bool vector as a condition, and
-  a comparison used as a condition compares the first components to match `ShaderValue.IsTrue`.
+  a comparison used as a condition compares the first components to match `ShaderValue.IsTrue`. A
+  file-scope variable a helper reads is passed into the helper as a parameter, transitively through
+  the helpers it calls, because SkSL runtime effects have no mutable globals and the helper is
+  emitted before `main` declares it.
  Milkdrop keeps one variable
   universe for the expression blocks and the shader, so `q1`-`q32` and `t1`-`t8` are seeded from the
   preset slots on both CPU paths (`BindShaderVariables` per pixel and `SeedCompiledShaderFrame` once

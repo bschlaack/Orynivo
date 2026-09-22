@@ -752,9 +752,8 @@ affordable. This is a project of its own and must keep the CPU path as the fallb
   variable, and a couple of vector comparisons. The `aspect.zw` group is fixed: Milkdrop's `aspect`
   is a `float4` whose `zw` are the reciprocals of `xy`, which projectM binds as its first shader
   constant `(aspectX, aspectY, 1/aspectX, 1/aspectY)`. That lifted the share to 760 of 764, and the
-  vector-comparison and narrowed-intrinsic typing fixes took it to 762. What remains are two shaders
-  whose helper reads a file-scope global variable, which would need the emitter to pass the global to
-  the helper (SkSL runtime effects have no mutable globals).
+  vector-comparison, narrowed-intrinsic, and helper-global fixes took it to 764 of 764: every shader
+  in the sample now translates and is accepted by Skia.
 - 40d Platform, packaging, and CI - `Pending`: native dependencies for Windows, Linux, and macOS,
   packaging, the signed release manifest, and the CI build matrix.
 - 40e Cutover and validation - `In progress`: the GPU path becomes the default where it is available,

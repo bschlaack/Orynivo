@@ -86,6 +86,26 @@ public sealed class SkiaShaderRunnerTests
         AssertMatchesInterpreter(Source);
     }
 
+    /// <summary>A helper that reads a file-scope variable matches the interpreter.</summary>
+    [Fact]
+    public void Render_MatchesTheInterpreterForAHelperReadingAGlobal()
+    {
+        const string Source = """
+            static float offset = 0.05;
+            float3 addOffset(float3 c)
+            {
+                return c + offset;
+            }
+
+            float4 main(float2 uv : TEXCOORD0) : COLOR
+            {
+                ret = addOffset(tex2D(sampler_main, uv).rgb);
+            }
+            """;
+
+        AssertMatchesInterpreter(Source);
+    }
+
     /// <summary>The GPU and the interpreter agree on a sampled, scaled shader.</summary>
     [Fact]
     public void Render_MatchesTheInterpreterForASampledShader()

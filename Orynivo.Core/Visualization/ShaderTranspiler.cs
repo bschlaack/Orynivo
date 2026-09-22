@@ -391,6 +391,43 @@ public static class ShaderTranspiler
                 }
             }
 
+            // A file-scope variable is a local of main, which a helper emitted before main cannot see.
+            // SkSL runtime effects have no mutable globals, so each helper that reads one takes it as a
+            // parameter; the set is closed transitively over the helpers it calls.
+            _globals = new HashSet<string>(StringComparer.Ordinal);
+            foreach (var statement in program.Items)
+            {
+                if (statement.Kind != ShaderNodeKind.Declaration)
+                    continue;
+
+                foreach (var item in statement.Items)
+                {
+                    if (item.Text.Length > 0)
+                        _globals.Add(item.Text);
+                }
+            }
+
+            _helperGlobals = new Dictionary<string, List<string>>(StringComparer.Ordinal);
+            foreach (var helper in helpers)
+                _helperGlobals[helper.Text] = [];
+
+            var changed = true;
+            while (changed)
+            {
+                changed = false;
+                foreach (var helper in helpers)
+                {
+                    var needed = new SortedSet<string>(_helperGlobals[helper.Text], StringComparer.Ordinal);
+                    foreach (var statement in helper.Items)
+                        CollectHelperGlobals(statement, needed);
+                    if (needed.Count != _helperGlobals[helper.Text].Count)
+                    {
+                        _helperGlobals[helper.Text] = [.. needed];
+                        changed = true;
+                    }
+                }
+            }
+
             foreach (var helper in helpers)
                 EmitFunction(builder, helper);
         }
@@ -823,6 +860,17 @@ public static class ShaderTranspiler
     private static Dictionary<string, string>? _helperReturns;
 
     /// <summary>
+    /// The file-scope variables of the shader being translated. SkSL runtime effects have no mutable
+    /// globals, so a helper that reads one takes it as a parameter instead.
+    /// </summary>
+    [ThreadStatic]
+    private static HashSet<string>? _globals;
+
+    /// <summary>The file-scope variables each helper reads, transitively through the helpers it calls.</summary>
+    [ThreadStatic]
+    private static Dictionary<string, List<string>>? _helperGlobals;
+
+    /// <summary>
     /// The uniforms the shader assigns to. SkSL uniforms are immutable, so main keeps a writable copy
     /// of each and the body writes that instead, which is the per-pixel behaviour the interpreter has.
     /// </summary>
@@ -1112,6 +1160,36 @@ public static class ShaderTranspiler
     }
 
     /// <summary>
+    /// Adds the file-scope variables a helper reads, and the ones its callees read, so the helper can
+    /// take them as parameters.
+    /// </summary>
+    /// <param name="node">Node to walk.</param>
+    /// <param name="needed">Set to fill.</param>
+    private static void CollectHelperGlobals(ShaderNode node, SortedSet<string> needed)
+    {
+        if (node.Kind == ShaderNodeKind.Identifier && _globals is not null && _globals.Contains(node.Text))
+            needed.Add(node.Text);
+        if (node.Kind == ShaderNodeKind.Call &&
+            _helperGlobals is not null &&
+            _helperGlobals.TryGetValue(node.Text, out var callee))
+        {
+            needed.UnionWith(callee);
+        }
+
+        foreach (var child in node.Items)
+            CollectHelperGlobals(child, needed);
+        foreach (var parameter in node.ParameterList)
+            CollectHelperGlobals(parameter, needed);
+
+        if (node.Kind != ShaderNodeKind.Call && node.Left is not null)
+            CollectHelperGlobals(node.Left, needed);
+        if (node.Right is not null)
+            CollectHelperGlobals(node.Right, needed);
+        if (node.Third is not null)
+            CollectHelperGlobals(node.Third, needed);
+    }
+
+    /// <summary>
     /// Emits a helper function as SkSL, with the parameter types the parser kept. Its return type is
     /// read from its own return statement, because the engine does not track declared return types.
     /// </summary>
@@ -1126,6 +1204,17 @@ public static class ShaderTranspiler
             if (_types is not null)
                 _types[parameter.Text] = type;
             parameters.Add($"{type} {SkSL.SafeName(parameter.Text)}");
+        }
+
+        // A file-scope variable the helper reads is passed in, because SkSL runtime effects have no
+        // mutable globals and the helper is emitted before main declares them.
+        if (_helperGlobals is not null && _helperGlobals.TryGetValue(function.Text, out var globals))
+        {
+            foreach (var name in globals)
+            {
+                var type = _types is not null && _types.TryGetValue(name, out var globalType) ? globalType : "float";
+                parameters.Add($"{type} {SkSL.SafeName(name)}");
+            }
         }
 
         _inHelper = true;
@@ -1439,9 +1528,14 @@ public static class ShaderTranspiler
                 return $"dot({SkSL.Convert(arguments[0], call.Items.Count > 0 ? TypeOf(call.Items[0]) : null, "float3")}, float3(0.299, 0.587, 0.114))";
         }
 
-        // A call to a function the shader defines itself keeps its name.
+        // A call to a function the shader defines itself keeps its name. The file-scope variables the
+        // helper needs are appended, matching the parameters EmitFunction added.
         if (_helperReturns is not null && _helperReturns.ContainsKey(name))
+        {
+            if (_helperGlobals is not null && _helperGlobals.TryGetValue(name, out var globals))
+                arguments.AddRange(globals.Select(SkSL.SafeName));
             return $"{name}({string.Join(", ", arguments)})";
+        }
 
         if (SkSL.RenamedFunctions.TryGetValue(name, out var renamed))
             return $"{renamed}({string.Join(", ", arguments)})";

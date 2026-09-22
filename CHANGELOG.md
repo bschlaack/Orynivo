@@ -65,6 +65,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   stays the fallback, and the CPU/GPU tests keep the two within a level.
 
 ### Fixed
+- Made the SkSL emitter pass a file-scope variable into a helper that reads it. SkSL runtime effects
+  have no mutable globals and the helper is emitted before `main` declares them, so each helper now
+  takes the globals it reads, transitively through the helpers it calls, as parameters. Shader
+  translation reached 764 of 764 in the 500-file sample, that is every shader.
 - Made the SkSL emitter handle a comparison of vectors. SkSL rejects a bool vector as a ternary
   condition and as a constructor argument, so a value comparison is emitted component-wise with
   `step`/`sign` and a comparison used as a condition compares the first components, which is what
