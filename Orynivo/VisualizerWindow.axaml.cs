@@ -407,7 +407,10 @@ public partial class VisualizerWindow : Window
             if (_renderer.ExpressionsOnly)
             {
                 // The GPU pipeline owns the frame: the CPU hands over the overlay, the mesh, and the
-                // per-frame pass values.
+                // per-frame pass values. The overlay buffer is the render size, like the frame copy.
+                var overlaySize = _renderWidth * _renderHeight * 4;
+                if (_glOverlayBytes.Length != overlaySize)
+                    _glOverlayBytes = new byte[overlaySize];
                 _renderer.OverlayFrame.WriteBgra(_glOverlayBytes);
                 _glMeshValid = _renderer.TryCopyMeshMotion(_glMeshSnapshot, out var meshX, out var meshY);
                 _glMeshX = meshX;

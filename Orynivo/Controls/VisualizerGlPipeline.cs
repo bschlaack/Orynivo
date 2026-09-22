@@ -246,6 +246,7 @@ internal sealed class VisualizerGlPipeline
 
     private readonly float[] _vertices = new float[(PresetRenderer.MeshGridX + 1) * (PresetRenderer.MeshGridY + 1) * FloatsPerVertex];
     private readonly ushort[] _indices = BuildIndices();
+    private byte[] _overlayRgba = [];
 
     /// <summary>The full-screen quad, as a triangle strip.</summary>
     private static readonly float[] QuadVertices = [-1f, -1f, 1f, -1f, -1f, 1f, 1f, 1f];
@@ -578,6 +579,14 @@ internal sealed class VisualizerGlPipeline
         Allocate(gl, _feedbackTexture, _feedbackFramebuffer, width, height);
         Allocate(gl, _pingTexture[0], _pingFramebuffer[0], width, height);
         Allocate(gl, _pingTexture[1], _pingFramebuffer[1], width, height);
+
+        // A freshly specified texture holds undefined content, so the feedback starts black.
+        gl.BindFramebuffer(GlFramebuffer, _feedbackFramebuffer);
+        gl.Viewport(0, 0, width, height);
+        gl.ClearColor(0f, 0f, 0f, 1f);
+        gl.Clear(GlColorBufferBit);
+        gl.BindFramebuffer(GlFramebuffer, 0);
+        _overlayRgba = new byte[width * height * 4];
     }
 
     /// <summary>Allocates one texture and binds it to one framebuffer.</summary>
@@ -609,10 +618,11 @@ internal sealed class VisualizerGlPipeline
     private void UploadOverlay(GlInterface gl, byte[] bgra, int width, int height)
     {
         var required = width * height * 4;
-        if (bgra.Length < required)
+        if (bgra.Length < required || _overlayRgba.Length < required)
             return;
 
-        var rgba = new byte[required];
+        var rgba = _overlayRgba;
+
         var stride = width * 4;
         for (var y = 0; y < height; y++)
         {
@@ -742,3 +752,4 @@ internal sealed class VisualizerGlPipeline
         return program;
     }
 }
+
