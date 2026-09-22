@@ -160,11 +160,9 @@ public static class ShaderTranspiler
         string y,
         string z)
     {
-        builder.Append("    float4 ").Append(variable).Append(" = ").Append(sampler)
-            .Append(".eval(float2((mod(").Append(z).Append(", ").Append(columns).Append(".0) * ")
-            .Append(size).Append(".0) + ").Append(x).Append(" + 0.5, (floor(").Append(z)
-            .Append(" / ").Append(columns).Append(".0) * ").Append(size).Append(".0) + ").Append(y)
-            .Append(" + 0.5));\n");
+        var coordinate = "float2((mod(" + z + ", " + columns + ".0) * " + size + ".0) + " + x
+            + " + 0.5, (floor(" + z + " / " + columns + ".0) * " + size + ".0) + " + y + " + 0.5)";
+        builder.Append("    float4 ").Append(variable).Append(" = ").Append(SampleExpr(sampler, coordinate)).Append(";\n");
     }
 
     /// <summary>The sampler a shader reads when it does not name one.</summary>
@@ -225,6 +223,73 @@ public static class ShaderTranspiler
         """;
 
     /// <summary>
+    /// Whether the emitter is producing GLSL instead of SkSL. It is set for the duration of one
+    /// translation, which is single-threaded, and it only changes the prelude, the sampler access, and
+    /// the entry point: the body emission is shared so the two dialects cannot drift apart.
+    /// </summary>
+    private static bool _glsl;
+
+    /// <summary>
+    /// The GLSL prelude. It is the SkSL prelude with GLSL ES 3.0 spelling: the samplers are
+    /// <c>sampler2D</c> sampled with <c>texture()</c>, and the vector types are aliased so the shared
+    /// body emission can keep writing <c>float2</c>/<c>float3</c>/<c>float4</c>.
+    /// </summary>
+    private const string GlslPrelude = """
+        #version 300 es
+        #define float2 vec2
+        #define float3 vec3
+        #define float4 vec4
+        #define half2 vec2
+        #define half3 vec3
+        #define half4 vec4
+        #define half float
+        precision highp float;
+        precision highp sampler2D;
+        uniform float4 texsize;
+        uniform float time;
+        uniform float frame;
+        uniform float fps;
+        uniform float bass;
+        uniform float mid;
+        uniform float treb;
+        uniform float vol;
+        uniform float bass_att;
+        uniform float mid_att;
+        uniform float treb_att;
+        uniform float4 aspect;
+        uniform float4 rand_frame;
+        uniform float4 rand_preset;
+        uniform sampler2D sampler_main;
+        uniform sampler2D sampler_blur1;
+        uniform sampler2D sampler_blur2;
+        uniform sampler2D sampler_blur3;
+        uniform sampler2D sampler_noise_lq;
+        uniform sampler2D sampler_noise_mq;
+        uniform sampler2D sampler_noise_hq;
+        uniform sampler2D sampler_fc_main;
+        uniform sampler2D sampler_pc_main;
+        uniform sampler2D sampler_noisevol_lq;
+        uniform sampler2D sampler_noisevol_hq;
+        uniform sampler2D sampler_pw_main;
+        uniform sampler2D sampler_pw_noise_lq;
+        uniform sampler2D sampler_worms;
+        float4 toColour(float3 c) { return float4(c, 1.0); }
+        float4 toColour(float4 c) { return c; }
+        float4 toColour(float c) { return float4(c, c, c, 1.0); }
+        float orynivoSafeDiv(float a, float b) { return b == 0.0 ? 0.0 : a / b; }
+        float2 orynivoSafeDiv(float2 a, float2 b) { return float2(b.x == 0.0 ? 0.0 : a.x / b.x, b.y == 0.0 ? 0.0 : a.y / b.y); }
+        float3 orynivoSafeDiv(float3 a, float3 b) { return float3(b.x == 0.0 ? 0.0 : a.x / b.x, b.y == 0.0 ? 0.0 : a.y / b.y, b.z == 0.0 ? 0.0 : a.z / b.z); }
+        float4 orynivoSafeDiv(float4 a, float4 b) { return float4(b.x == 0.0 ? 0.0 : a.x / b.x, b.y == 0.0 ? 0.0 : a.y / b.y, b.z == 0.0 ? 0.0 : a.z / b.z, b.w == 0.0 ? 0.0 : a.w / b.w); }
+        """;
+
+    /// <summary>Reads a sampler, spelled for the active dialect.</summary>
+    /// <param name="sampler">Sampler expression.</param>
+    /// <param name="coordinate">Normalised or texel coordinate expression.</param>
+    /// <returns>The sampling expression.</returns>
+    private static string SampleExpr(string sampler, string coordinate) =>
+        _glsl ? $"texture({sampler}, {coordinate})" : $"{sampler}.eval({coordinate})";
+
+    /// <summary>
     /// The motion uniforms of a warp translation. They are prefixed so a shader that declares a
     /// local named <c>zoom</c> or <c>centre</c> cannot collide with them.
     /// </summary>
@@ -260,7 +325,7 @@ public static class ShaderTranspiler
     public static string Transpile(ShaderNode program, out IReadOnlyList<string> samplers)
     {
         ArgumentNullException.ThrowIfNull(program);
-        return TranspileCore(program, null, warpedUv: false, out samplers, out _);
+        return TranspileCore(program, null, warpedUv: false, glsl: false, out samplers, out _);
     }
 
     /// <summary>
@@ -279,7 +344,7 @@ public static class ShaderTranspiler
         PresetProgram? perPixel,
         out IReadOnlyList<string> samplers,
         out IReadOnlyList<string> perPixelUniforms) =>
-        TranspileCore(program, perPixel, warpedUv: false, out samplers, out perPixelUniforms);
+        TranspileCore(program, perPixel, warpedUv: false, glsl: false, out samplers, out perPixelUniforms);
 
     /// <summary>
     /// Translates a warp shader together with the preset's per-pixel expression block into SkSL. The
@@ -300,7 +365,56 @@ public static class ShaderTranspiler
         PresetProgram? perPixel,
         out IReadOnlyList<string> samplers,
         out IReadOnlyList<string> perPixelUniforms) =>
-        TranspileCore(program, perPixel, warpedUv: true, out samplers, out perPixelUniforms);
+        TranspileCore(program, perPixel, warpedUv: true, glsl: false, out samplers, out perPixelUniforms);
+
+    /// <summary>
+    /// Translates a parsed shader body into GLSL ES 3.0 for the OpenGL pipeline, which is the same
+    /// translation as <see cref="Transpile"/> with a different prelude, sampler access, and entry
+    /// point. A shader the GLSL dialect cannot express throws, so the caller keeps it on the SkSL or
+    /// interpreter path.
+    /// </summary>
+    /// <param name="program">Root node returned by <see cref="ShaderParser.Parse"/>.</param>
+    /// <param name="samplers">The samplers the generated GLSL declares.</param>
+    /// <returns>GLSL source for a <c>void main()</c> fragment shader writing <c>orynivoColor</c>.</returns>
+    /// <exception cref="PresetExpressionException">The body uses something GLSL cannot express here.</exception>
+    public static string TranspileGlsl(ShaderNode program, out IReadOnlyList<string> samplers)
+    {
+        ArgumentNullException.ThrowIfNull(program);
+        return TranspileCore(program, null, warpedUv: false, glsl: true, out samplers, out _);
+    }
+
+    /// <summary>
+    /// Translates a comp shader and its per-pixel block into GLSL ES 3.0 for the OpenGL pipeline.
+    /// </summary>
+    /// <param name="program">Parsed comp shader body.</param>
+    /// <param name="perPixel">Per-pixel expression block that runs alongside the shader, or <see langword="null"/>.</param>
+    /// <param name="samplers">The samplers the generated GLSL declares.</param>
+    /// <param name="perPixelUniforms">Preset variables the per-pixel block reads.</param>
+    /// <returns>GLSL source for a <c>void main()</c> fragment shader writing <c>orynivoColor</c>.</returns>
+    /// <exception cref="PresetExpressionException">The body or block uses something GLSL cannot express here.</exception>
+    public static string TranspileGlslComp(
+        ShaderNode program,
+        PresetProgram? perPixel,
+        out IReadOnlyList<string> samplers,
+        out IReadOnlyList<string> perPixelUniforms) =>
+        TranspileCore(program, perPixel, warpedUv: false, glsl: true, out samplers, out perPixelUniforms);
+
+    /// <summary>
+    /// Translates a warp shader and the preset's per-pixel block into GLSL ES 3.0 for the OpenGL
+    /// pipeline.
+    /// </summary>
+    /// <param name="program">Parsed warp shader body, or <see langword="null"/> for a warp without a shader.</param>
+    /// <param name="perPixel">Per-pixel expression block that chooses the sampling position, or <see langword="null"/>.</param>
+    /// <param name="samplers">The samplers the generated GLSL declares.</param>
+    /// <param name="perPixelUniforms">Preset variables the per-pixel block reads.</param>
+    /// <returns>GLSL source for a <c>void main()</c> fragment shader writing <c>orynivoColor</c>.</returns>
+    /// <exception cref="PresetExpressionException">The body or block uses something GLSL cannot express here.</exception>
+    public static string TranspileGlslWarp(
+        ShaderNode? program,
+        PresetProgram? perPixel,
+        out IReadOnlyList<string> samplers,
+        out IReadOnlyList<string> perPixelUniforms) =>
+        TranspileCore(program, perPixel, warpedUv: true, glsl: true, out samplers, out perPixelUniforms);
 
     /// <summary>The shared core of both translations.</summary>
     /// <param name="program">Parsed shader body, or <see langword="null"/> for a warp without a shader.</param>
@@ -313,9 +427,11 @@ public static class ShaderTranspiler
         ShaderNode? program,
         PresetProgram? perPixel,
         bool warpedUv,
+        bool glsl,
         out IReadOnlyList<string> samplers,
         out IReadOnlyList<string> perPixelUniforms)
     {
+        _glsl = glsl;
         var builder = new StringBuilder();
 
         // Every sampler the shader names is declared, so an unknown sampler does not become a zero
@@ -325,7 +441,7 @@ public static class ShaderTranspiler
             CollectSamplers(program, samplerNames);
         samplers = [.. samplerNames];
 
-        builder.Append(Prelude).Append(GeneratedUniforms()).Append(GeneratedVolumeHelpers());
+        builder.Append(glsl ? GlslPrelude : Prelude).Append(GeneratedUniforms()).Append(GeneratedVolumeHelpers());
         if (warpedUv)
             builder.Append(WarpUniforms);
         var extras = samplerNames.Where(name => !SamplerSet.Contains(name)).ToList();
@@ -468,7 +584,7 @@ public static class ShaderTranspiler
     /// <param name="perPixelBody">Emitted per-pixel statements.</param>
     private static void EmitCompMain(StringBuilder builder, ShaderNode? program, string perPixelBody)
     {
-        builder.Append("half4 main(float2 fragCoord) {\n");
+        EmitEntryHeader(builder);
         builder.Append("    float2 uv_orig = fragCoord / texsize.xy;\n");
         builder.Append("    float2 uv = uv_orig;\n");
         builder.Append("    float2 centred = (uv * 2.0) - 1.0;\n");
@@ -488,8 +604,38 @@ public static class ShaderTranspiler
 
         EmitMutableUniforms(builder);
         EmitEntryStatements(builder, program);
-        builder.Append("    return half4(toColour(ret));\n");
+        EmitEntryReturn(builder, "ret");
         builder.Append("}\n");
+    }
+
+    /// <summary>
+    /// Emits the entry point header. SkSL takes the fragment coordinate as a parameter and returns the
+    /// colour; GLSL has one <c>void main()</c> that writes an output variable and reads
+    /// <c>gl_FragCoord</c>, whose origin is bottom-left, so the row is flipped to the engine's top-down
+    /// convention.
+    /// </summary>
+    /// <param name="builder">Output.</param>
+    private static void EmitEntryHeader(StringBuilder builder)
+    {
+        if (_glsl)
+        {
+            builder.Append("out vec4 orynivoColor;\n");
+            builder.Append("void main() {\n");
+            builder.Append("    vec2 fragCoord = vec2(gl_FragCoord.x, texsize.y - gl_FragCoord.y);\n");
+            return;
+        }
+
+        builder.Append("half4 main(float2 fragCoord) {\n");
+    }
+
+    /// <summary>Emits the entry point's final return of the shader colour.</summary>
+    /// <param name="builder">Output.</param>
+    /// <param name="expression">Colour expression.</param>
+    private static void EmitEntryReturn(StringBuilder builder, string expression)
+    {
+        builder.Append("    ")
+            .Append(_glsl ? "orynivoColor = " : "return ")
+            .Append("half4(toColour(").Append(expression).Append("));\n");
     }
 
     /// <summary>
@@ -502,7 +648,7 @@ public static class ShaderTranspiler
     /// <param name="perPixelBody">Emitted per-pixel statements.</param>
     private static void EmitWarpMain(StringBuilder builder, ShaderNode? program, string perPixelBody)
     {
-        builder.Append("half4 main(float2 fragCoord) {\n");
+        EmitEntryHeader(builder);
         builder.Append("    float2 _orynivo_uv_orig = (fragCoord - 0.5) / (_orynivo_size - 1.0);\n");
         builder.Append("    float2 _orynivo_normalized = (_orynivo_uv_orig * 2.0) - 1.0;\n");
         builder.Append("    float2 _orynivo_warped = (_orynivo_normalized - _orynivo_centre) * _orynivo_stretch;\n");
@@ -522,8 +668,13 @@ public static class ShaderTranspiler
         {
             // A warp without a shader is the geometric warp: sample the previous frame, black outside.
             builder.Append("    float2 uv = (float2(_orynivo_x, _orynivo_y) * 0.5) + 0.5;\n");
-            builder.Append("    if (uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0) { return half4(0.0); }\n");
-            builder.Append("    return half4(sampler_main.eval((uv * (_orynivo_size - 1.0)) + 0.5));\n");
+            builder.Append("    if (uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0) { ")
+                .Append(_glsl ? "orynivoColor = half4(0.0); return; " : "return half4(0.0); ")
+                .Append("}\n");
+            var sample = $"half4({SampleExpr("sampler_main", "(uv * (_orynivo_size - 1.0)) + 0.5")})";
+            builder.Append("    ")
+                .Append(_glsl ? $"orynivoColor = {sample}; return;" : $"return {sample};")
+                .Append("\n");
             builder.Append("}\n");
             return;
         }
@@ -538,7 +689,7 @@ public static class ShaderTranspiler
         builder.Append("    float3 ret = float3(0.0);\n");
         EmitMutableUniforms(builder);
         EmitEntryStatements(builder, program);
-        builder.Append("    return half4(toColour(ret));\n");
+        EmitEntryReturn(builder, "ret");
         builder.Append("}\n");
     }
 
@@ -669,9 +820,11 @@ public static class ShaderTranspiler
                     return;
                 }
 
-                builder.Append(indent).Append("return half4(toColour(")
+                builder.Append(indent)
+                    .Append(_glsl ? "orynivoColor = " : "return ")
+                    .Append("half4(toColour(")
                     .Append(statement.Left is null ? "ret" : EmitExpression(statement.Left))
-                    .Append("));\n");
+                    .Append(_glsl ? ")); return;\n" : "));\n");
                 return;
             default:
                 throw new PresetExpressionException(
@@ -1515,7 +1668,7 @@ public static class ShaderTranspiler
                 // frame size for them would sample the wrong texels. The frame textures use
                 // PixelBuffer.SampleBilinear's convention, which maps a normalised coordinate to
                 // zero..size-1, so their scale is one less and their texel centres shift by half.
-                return $"float4({arguments[0]}.eval({SamplerCoordinate(arguments[0], Coordinate(call, arguments[1], 1))}))";
+                return $"float4({SampleExpr(arguments[0], SamplerCoordinate(arguments[0], Coordinate(call, arguments[1], 1)))})";
             case "tex3d":
                 // Milkdrop samples a 3D noise volume. Skia's runtime effects only sample 2D
                 // shaders, so the volume travels as a slice atlas and the generated helper does the
@@ -1533,14 +1686,14 @@ public static class ShaderTranspiler
                 // The interpreter reads the texel at the truncated integer coordinate, so the pixel
                 // centre is the coordinate plus half.
                 return arguments.Count >= 2
-                    ? $"float4({MainSampler}.eval(float2(float(int({arguments[0]})), float(int({arguments[1]}))) + 0.5)).rgb"
-                    : $"float4({MainSampler}.eval(float2(float(int({arguments[0]}.x)), float(int({arguments[0]}.y))) + 0.5)).rgb";
+                    ? $"float4({SampleExpr(MainSampler, $"float2(float(int({arguments[0]})), float(int({arguments[1]}))) + 0.5")}).rgb"
+                    : $"float4({SampleExpr(MainSampler, $"float2(float(int({arguments[0]}.x)), float(int({arguments[0]}.y))) + 0.5")}).rgb";
             case "getblur1":
-                return $"float4(sampler_blur1.eval({Coordinate(call, arguments[0], 0)} * (texsize.xy - 1.0) + 0.5)).rgb";
+                return $"float4({SampleExpr("sampler_blur1", $"{Coordinate(call, arguments[0], 0)} * (texsize.xy - 1.0) + 0.5")}).rgb";
             case "getblur2":
-                return $"float4(sampler_blur2.eval({Coordinate(call, arguments[0], 0)} * (texsize.xy - 1.0) + 0.5)).rgb";
+                return $"float4({SampleExpr("sampler_blur2", $"{Coordinate(call, arguments[0], 0)} * (texsize.xy - 1.0) + 0.5")}).rgb";
             case "getblur3":
-                return $"float4(sampler_blur3.eval({Coordinate(call, arguments[0], 0)} * (texsize.xy - 1.0) + 0.5)).rgb";
+                return $"float4({SampleExpr("sampler_blur3", $"{Coordinate(call, arguments[0], 0)} * (texsize.xy - 1.0) + 0.5")}).rgb";
             case "saturate":
                 return $"clamp({arguments[0]}, 0.0, 1.0)";
             case "atan2":

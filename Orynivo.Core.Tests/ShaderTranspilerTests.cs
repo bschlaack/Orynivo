@@ -187,6 +187,40 @@ public sealed class ShaderTranspilerTests
         Assert.True(effect is not null, $"SkSL was rejected: {errors}\n{sksl}");
     }
 
+    /// <summary>The GLSL dialect emits a versioned fragment shader with sampler2D textures.</summary>
+    [Fact]
+    public void TranspileGlsl_EmitsAGlslFragmentShader()
+    {
+        var node = ShaderParser.Parse("""
+            float2 shifted = uv * 2.0;
+            ret = tex2D(sampler_main, shifted).rgb + float3(bass, mid, treb);
+            """);
+
+        var glsl = ShaderTranspiler.TranspileGlsl(node, out _);
+        Assert.StartsWith("#version 300 es", glsl, StringComparison.Ordinal);
+        Assert.Contains("uniform sampler2D sampler_main;", glsl, StringComparison.Ordinal);
+        Assert.Contains("void main()", glsl, StringComparison.Ordinal);
+        Assert.Contains("out vec4 orynivoColor;", glsl, StringComparison.Ordinal);
+        Assert.Contains("texture(sampler_main", glsl, StringComparison.Ordinal);
+        Assert.Contains("gl_FragCoord", glsl, StringComparison.Ordinal);
+        Assert.DoesNotContain(".eval(", glsl, StringComparison.Ordinal);
+    }
+
+    /// <summary>The GLSL dialect emits a matrix constructor as matN and a warp entry point.</summary>
+    [Fact]
+    public void TranspileGlslWarp_EmitsAMatrixWarp()
+    {
+        var node = ShaderParser.Parse("""
+            static const float3x3 rot = float3x3(1, 0, 0, 0, 1, 0, 0, 0, 1);
+            ret = mul(float3(uv, 0.5), rot);
+            """);
+
+        var glsl = ShaderTranspiler.TranspileGlslWarp(node, null, out _, out _);
+        Assert.Contains("mat3(", glsl, StringComparison.Ordinal);
+        Assert.Contains("_orynivo_warped", glsl, StringComparison.Ordinal);
+        Assert.DoesNotContain(".eval(", glsl, StringComparison.Ordinal);
+    }
+
     /// <summary>Transpiles a shader and asserts that Skia accepts the result.</summary>
     /// <param name="source">HLSL source.</param>
     private static void AssertCompiles(string source)
