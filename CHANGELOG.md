@@ -84,6 +84,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   default 480 x 270, the shader-pass cutover costs 39 ms per frame on average against 57 ms before.
 
 ### Fixed
+- Made the shader parser stop after the top-level block that is the shader body. Milkdrop stores a
+  footer such as "written by ..." after the body's closing brace, and the parser read it as code, so
+  two real presets lost their shader to `Expected ';' but found 'by'`.
 - Made the SkSL emitter pass a file-scope variable into a helper that reads it. SkSL runtime effects
   have no mutable globals and the helper is emitted before `main` declares them, so each helper now
   takes the globals it reads, transitively through the helpers it calls, as parameters. Shader

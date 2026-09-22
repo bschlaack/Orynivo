@@ -39,6 +39,12 @@ public static class ShaderParser
             var statement = parser.ParseStatement();
             if (statement is not null)
                 statements.Add(statement);
+
+            // A bare block at the top level is the shader body (Milkdrop's shader_body). Milkdrop
+            // stores a footer such as "written by ..." after its closing brace, which is not part of
+            // the shader, so parsing stops there.
+            if (statement is { Kind: ShaderNodeKind.Block })
+                break;
         }
 
         return new ShaderNode(ShaderNodeKind.Program, 0, Children: statements);

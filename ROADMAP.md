@@ -882,6 +882,9 @@ affordable. This is a project of its own and must keep the CPU path as the fallb
   (2), and four single cases. Arrays stay a hard failure rather than a declaration that is ignored,
   because an unknown array name would render a wrong picture instead of dropping the block; modelling
   them needs its own value kind in the interpreter.
+  The parser also stops after the top-level block that is the shader body, because Milkdrop stores a
+  footer such as "written by ..." after its closing brace; two presets failed to parse on that text
+  before.
   A measurement of real presets at the shipped 480 x 270 render size found the reason the
   collection looks empty rather than merely imprecise. The warp stage costs 83 to 218 ms per frame
   and the comp shader up to 87 ms, while `ShaderTimeBudgetMilliseconds` is 30 ms and the target
