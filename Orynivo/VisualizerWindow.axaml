@@ -47,8 +47,8 @@
                Stretch="Fill"
                RenderOptions.BitmapInterpolationMode="HighQuality"/>
 
-        <controls:VisualizerGlProbe x:Name="GlProbe"
-                                    IsVisible="False"/>
+        <controls:VisualizerGlPresenter x:Name="GlPresenter"
+                                        IsVisible="False"/>
 
         <Grid x:Name="OverlayRoot">
             <Border HorizontalAlignment="Left"

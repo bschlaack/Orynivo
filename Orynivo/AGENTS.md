@@ -494,9 +494,14 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
   A comp shader that samples more than one blur level therefore costs tens to hundreds of
   milliseconds and needs the budget adaptation described below; do not describe the Skia passes as
   a GPU path, and do not remove the interpreter fallback on the assumption that Skia is
-  hardware-accelerated. `Orynivo.Controls.VisualizerGlProbe` (shown with
-  `ORYNIVO_VISUALIZER_OPENGL_PROBE=1`) is the capability probe for the real GPU pipeline recorded as
-  roadmap 40f; keep it free of renderer state so it stays a pure context check.
+  hardware-accelerated. Roadmap 40f moves the pipeline onto OpenGL: `Avalonia` 12 already ships
+  `Avalonia.OpenGL` with `OpenGlControlBase`, and the context is confirmed as OpenGL ES 3.0 through
+  ANGLE on Windows. `Orynivo.Controls.VisualizerGlPresenter`, shown with
+  `ORYNIVO_VISUALIZER_OPENGL=1`, is step 1: it uploads the finished frame as an RGBA8 texture and
+  draws it with a `#version 300 es` program over a quad in a vertex buffer. Keep it opt-in with the
+  bitmap path as the fallback, keep a shader or context failure logged rather than fatal, and note
+  that `GlInterface` exposes no `TexSubImage2D`, so a texture update re-specifies it through
+  `TexImage2D` or goes through `GetProcAddress`.
   `VisualizerWindow`
   owns `VisualizerAudioHub.IsActive`: while it is false the players skip the tap entirely, so
   a closed visualizer costs nothing. Never render, analyse, or evaluate preset expressions on

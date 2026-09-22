@@ -7,11 +7,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Added
-- Added an OpenGL capability probe to the visualizer. With `ORYNIVO_VISUALIZER_OPENGL_PROBE=1` the
-  visualizer shows `Orynivo.Controls.VisualizerGlProbe` instead of its bitmap, draws a frame ramp, and
-  logs the negotiated GL version and frame count, so it can be confirmed whether the platform hands
-  out a GL context before the preset pipeline is moved onto it. It changes nothing unless that
-  variable is set.
+- Added an OpenGL presentation path to the visualizer, off by default. With
+  `ORYNIVO_VISUALIZER_OPENGL=1` the visualizer shows `Orynivo.Controls.VisualizerGlPresenter`, which
+  uploads the finished frame as a texture and draws it with a shader instead of writing a
+  `WriteableBitmap`, and logs the negotiated GL version once through the diagnostics log. The preset
+  pipeline still renders on the CPU; this is the first step of roadmap 40f and proves the context, the
+  shader compilation, the vertex buffer, and the texture upload. Avalonia 12 negotiates OpenGL ES 3.0
+  through ANGLE on Windows. Nothing changes unless the variable is set, and the bitmap presentation
+  stays the fallback.
 - Added the per-vertex mesh warp as an opt-in. `PresetRenderer.MeshPerPixelEnabled` makes the warp
   stage evaluate the preset's per-pixel program once per 64 x 48 mesh vertex and interpolate the
   motion it produced across the quad, which is what Milkdrop's per-vertex program does, instead of

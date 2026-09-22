@@ -37,6 +37,10 @@ public partial class VisualizerWindow : Window
     private readonly WriteableBitmap _bitmap;
     private readonly PixelBuffer _presentBuffer;
     private readonly object _presentLock = new();
+    private bool _useGlPresenter;
+    private byte[] _glBytes = [];
+    private bool _glErrorLogged;
+    private bool _glInfoLogged;
     private readonly VisualizerPresetLibrary _library = new();
     private readonly SilentAudioSource _silent = new();
     private readonly Stopwatch _renderClock = new();
@@ -106,19 +110,13 @@ public partial class VisualizerWindow : Window
         HintTextBlock.Text = LocalizationManager.Current.VisualizerHint;
         UpdatePresetLabel();
 
-        // Capability probe: whether Avalonia hands out an OpenGL context decides whether the preset
-        // pipeline can move off the CPU at all, so it can be checked without changing the renderer.
-        if (Environment.GetEnvironmentVariable("ORYNIVO_VISUALIZER_OPENGL_PROBE") == "1")
+        // Roadmap 40f: presenting through OpenGL instead of the WriteableBitmap. It is opt-in while
+        // the GL path is proven per platform, and the bitmap presentation stays the fallback.
+        _useGlPresenter = Environment.GetEnvironmentVariable("ORYNIVO_VISUALIZER_OPENGL") == "1";
+        if (_useGlPresenter)
         {
             VisualizerImage.IsVisible = false;
-            GlProbe.IsVisible = true;
-            GlProbe.FrameRendered += () =>
-            {
-                var info = GlProbe.GlError is { Length: > 0 } error
-                    ? $"OpenGL probe failed: {error}"
-                    : $"OpenGL probe: {GlProbe.GlInfo} frames={GlProbe.Frames}";
-                SeekDiagnostics.Log("visualizer", info);
-            };
+            GlPresenter.IsVisible = true;
         }
 
         Opened += (_, _) =>
@@ -496,6 +494,37 @@ public partial class VisualizerWindow : Window
 
     private void PresentCore()
     {
+        if (_useGlPresenter)
+        {
+            // The GL path reads the same finished presentation copy, so the lock and the copy stay
+            // exactly as they are for the bitmap path.
+            var size = _renderWidth * _renderHeight * 4;
+            if (_glBytes.Length != size)
+                _glBytes = new byte[size];
+            lock (_presentLock)
+            {
+                _presentBuffer.WriteBgra(_glBytes);
+            }
+
+            GlPresenter.SetFrame(_glBytes, _renderWidth, _renderHeight);
+            GlPresenter.RequestNextFrameRendering();
+            if (!_glInfoLogged && GlPresenter.Frames > 0)
+            {
+                _glInfoLogged = true;
+                SeekDiagnostics.Log(
+                    "visualizer",
+                    $"OpenGL presenter active: {GlPresenter.GlInfo} (bitmap presentation disabled)");
+            }
+
+            if (GlPresenter.GlError is { Length: > 0 } glError && !_glErrorLogged)
+            {
+                _glErrorLogged = true;
+                SeekDiagnostics.Log("visualizer", $"OpenGL presenter failed: {glError}");
+            }
+
+            return;
+        }
+
         using var buffer = _bitmap.Lock();
         var stride = _renderWidth * 4;
         // The render thread keeps working on its own buffers, so this thread reads the finished
