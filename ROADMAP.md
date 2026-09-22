@@ -828,6 +828,19 @@ affordable. This is a project of its own and must keep the CPU path as the fallb
   uniforms, so vector uniforms are set component by component, and it exposes no `TexSubImage2D`, so
   the overlay texture is re-specified through `TexImage2D`. A preset with shaders keeps the CPU frame
   path, and a pipeline failure is logged once and hands the frame back to the CPU.
+  Step 3's float16 feedback is done: the frame textures are `RGBA16F` when the context exposes
+  `GL_EXT_color_buffer_float` or `GL_EXT_color_buffer_half_float`, and eight-bit colour otherwise; an
+  incomplete framebuffer falls back to eight-bit colour instead of losing the pipeline. The headless
+  harness runs a desktop context, which advertises neither extension, so it exercises the eight-bit
+  path and `VisualizerGlPipeline.ForceHalfFloat` lets it force the float path for comparison. Measured
+  on a blur-heavy synthetic preset (five blur passes, 40 frames) the mean channel difference from the
+  CPU reference falls from 9.74 to 9.59 of 255, so the eight-bit rounding was a small part of the
+  remaining difference; the rest is structural.
+  The presenter draws on **every** refresh, re-presenting the texture it drew last when the render
+  thread published nothing new. Avalonia's GL surface is double buffered, so an undrawn refresh swaps
+  to the buffer two presentations old; because the render loop publishes at the configured frame rate
+  while the control refreshes at the display rate, an undrawn refresh is the normal case and the
+  artefact was a steady rubber band.
   What remains: the comp and warp shaders as GLSL, which is what makes the many shader presets
   eligible, and then deleting the CPU frame path for the GL mode.
   The warp's sampling arithmetic now lives in the tested

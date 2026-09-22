@@ -39,6 +39,7 @@ internal sealed class VisualizerGlPipeline
     private const int GlClampToEdge = 0x812F;
     private const int GlRgba = 0x1908;
     private const int GlRgba8 = 0x8058;
+    private const int GlRgba16f = 0x881A;
     private const int GlVertexShader = 0x8B31;
     private const int GlFragmentShader = 0x8B30;
     private const int GlFramebuffer = 0x8D40;
@@ -270,6 +271,15 @@ internal sealed class VisualizerGlPipeline
     private int _height;
     private bool _ready;
     private int _frame;
+    /// <summary>
+    /// Forces the sixteen-bit frame format even when the context does not advertise it. The headless
+    /// harness sets this so the float path can be exercised on a desktop context; the player never does.
+    /// </summary>
+    internal static bool ForceHalfFloat { get; set; }
+
+    /// <summary>Whether the frame textures carry sixteen-bit floats instead of eight-bit colour.</summary>
+    private bool _halfFloat;
+
 
     private Dictionary<string, int> _warpUniforms = new(StringComparer.Ordinal);
     private Dictionary<string, int> _blurUniforms = new(StringComparer.Ordinal);
@@ -367,8 +377,15 @@ internal sealed class VisualizerGlPipeline
             _pingFramebuffer[1] = gl.GenFramebuffer();
             _overlayTexture = gl.GenTexture();
             gl.BindVertexArray(0);
+            // A sixteen-bit feedback keeps the frame from being rounded to eight bits on every pass,
+            // which is what drifts the GPU picture away from the CPU's float buffers.
+            var extensions = gl.GetExtensions() ?? [];
+            _halfFloat = ForceHalfFloat ||
+                         extensions.Contains("GL_EXT_color_buffer_float") ||
+                         extensions.Contains("GL_EXT_color_buffer_half_float");
             _ready = true;
             return true;
+
         }
         catch (Exception exception)
         {
@@ -542,6 +559,7 @@ internal sealed class VisualizerGlPipeline
                 Diagnostics =
                     $"GL pipeline first frame: size={frameWidth}x{frameHeight} mesh={meshX}x{meshY} " +
                     $"blur={parameters.BlurPasses} zoom={_vertices[2]:F3} overlayLit={nonZero} " +
+                    $"float16={_halfFloat} " +
                     $"glError=0x{gl.GetError():X}";
             }
 
@@ -609,9 +627,14 @@ internal sealed class VisualizerGlPipeline
 
         _width = width;
         _height = height;
-        Allocate(gl, _feedbackTexture, _feedbackFramebuffer, width, height);
-        Allocate(gl, _pingTexture[0], _pingFramebuffer[0], width, height);
-        Allocate(gl, _pingTexture[1], _pingFramebuffer[1], width, height);
+        if (!TryAllocate(gl, width, height) && _halfFloat)
+        {
+            // The context advertised a renderable float format but refused it, so the frame falls
+            // back to eight-bit colour instead of losing the whole pipeline.
+            _halfFloat = false;
+            TryAllocate(gl, width, height);
+        }
+
 
         // A freshly specified texture holds undefined content, so the feedback starts black.
         gl.BindFramebuffer(GlFramebuffer, _feedbackFramebuffer);
@@ -622,20 +645,43 @@ internal sealed class VisualizerGlPipeline
         _overlayRgba = new byte[width * height * 4];
     }
 
+    /// <summary>Allocates the frame-sized textures and reports whether the context accepted them.</summary>
+    /// <param name="gl">GL interface.</param>
+    /// <param name="width">Frame width.</param>
+    /// <param name="height">Frame height.</param>
+    /// <returns><see langword="true"/> when every framebuffer is complete.</returns>
+    private bool TryAllocate(GlInterface gl, int width, int height)
+    {
+        try
+        {
+            Allocate(gl, _feedbackTexture, _feedbackFramebuffer, width, height);
+            Allocate(gl, _pingTexture[0], _pingFramebuffer[0], width, height);
+            Allocate(gl, _pingTexture[1], _pingFramebuffer[1], width, height);
+            return true;
+        }
+        catch (InvalidOperationException)
+        {
+            return false;
+        }
+    }
+
     /// <summary>Allocates one texture and binds it to one framebuffer.</summary>
     /// <param name="gl">GL interface.</param>
+
     /// <param name="texture">Texture.</param>
     /// <param name="framebuffer">Framebuffer.</param>
     /// <param name="width">Width.</param>
     /// <param name="height">Height.</param>
-    private static void Allocate(GlInterface gl, int texture, int framebuffer, int width, int height)
+    private void Allocate(GlInterface gl, int texture, int framebuffer, int width, int height)
+
     {
         gl.BindTexture(GlTexture2D, texture);
         gl.TexParameteri(GlTexture2D, GlTextureMinFilter, GlLinear);
         gl.TexParameteri(GlTexture2D, GlTextureMagFilter, GlLinear);
         gl.TexParameteri(GlTexture2D, GlTextureWrapS, GlClampToEdge);
         gl.TexParameteri(GlTexture2D, GlTextureWrapT, GlClampToEdge);
-        gl.TexImage2D(GlTexture2D, 0, GlRgba8, width, height, 0, GlRgba, GlUnsignedByte, IntPtr.Zero);
+        gl.TexImage2D(GlTexture2D, 0, _halfFloat ? GlRgba16f : GlRgba8, width, height, 0, GlRgba, GlUnsignedByte, IntPtr.Zero);
+
         gl.BindFramebuffer(GlFramebuffer, framebuffer);
         gl.FramebufferTexture2D(GlFramebuffer, GlColorAttachment0, GlTexture2D, texture, 0);
         if (gl.CheckFramebufferStatus(GlFramebuffer) != GlFramebufferComplete)
@@ -785,5 +831,6 @@ internal sealed class VisualizerGlPipeline
         return program;
     }
 }
+
 
 

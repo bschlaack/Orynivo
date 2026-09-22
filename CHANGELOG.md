@@ -6,13 +6,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Fixed
+- Fixed the visualizer's OpenGL presentation showing a picture that jumped forwards a few times and
+  then back. The presenter only drew when the render thread had published a new frame, and the GL
+  surface is double buffered, so every refresh that drew nothing swapped to the buffer that was two
+  presentations old. It now re-presents the texture it drew last on every refresh, which keeps the
+  newest picture on screen. The render loop publishes at the configured frame rate while the control
+  refreshes at the display rate, so an undrawn refresh is the normal case and the artefact appeared
+  as a steady rubber band rather than an occasional hitch.
+
 ### Added
 - Added `scripts/gl-harness/`, a local development harness that renders the visualizer's GPU pipeline
   without Avalonia. It compiles `Orynivo/Controls/VisualizerGlPipeline.cs` unchanged and supplies its
   own `Avalonia.OpenGL.GlInterface` over a hidden WGL context, so the real shaders and pass order are
   verified headlessly and a change to the pipeline's GL calls breaks that build instead of drifting.
   It writes the GPU and CPU frames side by side and prints the pipeline's one-shot diagnostics.
-- Added the GPU frame pipeline for the visualizer, off by default. With `ORYNIVO_VISUALIZER_OPENGL=1`
 - Added the GPU frame pipeline for the visualizer, off by default. With `ORYNIVO_VISUALIZER_OPENGL=1`
   a preset **without** shaders renders entirely through `Orynivo.Controls.VisualizerGlPipeline`: the
   warp is a mesh draw whose fragment shader is a translation of `WarpSampling.SamplePosition`, the
@@ -23,6 +31,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   mesh, and draws the overlay without any pixel pass. A preset with shaders keeps the CPU frame path,
   because the GL shader dialect is a separate step, and the bitmap presentation stays the fallback.
   A pipeline failure is logged once and hands the frame back to the CPU.
+- The GPU pipeline's frame textures are sixteen-bit floats when the context exposes
+  `GL_EXT_color_buffer_float` or `GL_EXT_color_buffer_half_float`, and eight-bit colour otherwise.
+  An incomplete framebuffer falls back to eight-bit colour rather than losing the pipeline. Repeated
+  blur and feedback otherwise rounds the frame to eight bits on every pass. On a blur-heavy synthetic
+  preset (five blur passes, 40 frames) the mean channel difference from the CPU reference falls from
+  9.74 to 9.59 of 255; the remaining difference is structural, not precision.
 - Completed the Core surface a GPU pipeline reads: `PresetRenderer.ReadFrameParameters` publishes the
   clamped per-frame pass values (decay, blur passes, centre darkening, gamma, video echo, and both
   border bands) as `VisualizerFrameParameters`, and `RenderOverlayFrame` draws the waveform,

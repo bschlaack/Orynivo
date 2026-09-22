@@ -509,8 +509,12 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
   exposes no `TexSubImage2D`, so a texture update re-specifies it through `TexImage2D` or goes through
   `GetProcAddress`. Every GL texture holds the frame bottom-up, which is OpenGL's natural orientation,
   so the overlay upload and the warp shader convert between that and the engine's top-down
-  coordinates; do not mix the two. A preset with shaders keeps the CPU frame path until the comp and
-  warp shaders are ported to GLSL.
+  coordinates; do not mix the two. The presenter must draw on **every** refresh and re-present the
+  texture it drew last when the render thread published nothing new: Avalonia's GL surface is double
+  buffered, so a refresh that draws nothing swaps to the buffer two presentations old and the picture
+  appears to jump backwards. The render loop publishes at the configured frame rate while the control
+  refreshes at the display rate, so an undrawn refresh is the normal case. A preset with shaders keeps
+  the CPU frame path until the comp and warp shaders are ported to GLSL.
   `VisualizerWindow`
   owns `VisualizerAudioHub.IsActive`: while it is false the players skip the tap entirely, so
   a closed visualizer costs nothing. Never render, analyse, or evaluate preset expressions on
