@@ -152,6 +152,23 @@ public sealed class MilkdropCompatibilityTests
         Assert.True(middle < corner);
     }
 
+    /// <summary>The blur chain's edge darkening pulls the frame down without touching its middle.</summary>
+    [Fact]
+    public void RenderFrame_DarkenEdgesTargetsTheBorder()
+    {
+        var plain = RenderFeedback(string.Empty);
+        var darkened = RenderFeedback("blur1_edge_darken = 1;");
+
+        Assert.True(Mean(darkened) < Mean(plain), $"mean {Mean(plain)} -> {Mean(darkened)}");
+
+        // The falloff is zero in the middle, so the middle keeps its brightness while the border,
+        // which is what the pass targets, is what the lower mean comes from.
+        var middle = ((20 * 40) + 20) * 4;
+        Assert.True(
+            Math.Abs(Luminance(darkened, middle) - Luminance(plain, middle)) < 0.001f,
+            $"middle changed from {Luminance(plain, middle)} to {Luminance(darkened, middle)}");
+    }
+
     /// <summary>The waveform honours the first waveform's per-point program.</summary>
     [Fact]
     public void RenderFrame_UsesTheWavePrograms()

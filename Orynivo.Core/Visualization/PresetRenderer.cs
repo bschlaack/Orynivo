@@ -407,6 +407,7 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
 
         for (var pass = 0; pass < BlurPasses(); pass++)
             _warped.Blur();
+        DarkenEdges();
         var blur = Mark();
 
         _warped.Scale(decay);
@@ -1739,6 +1740,45 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
                     var normalizedX = width > 1 ? (x / (float)(width - 1) * 2f) - 1f : 0f;
                     var distance = MathF.Sqrt((normalizedX * normalizedX) + (normalizedY * normalizedY));
                     var factor = 1f - (amount * Math.Clamp(1f - distance, 0f, 1f));
+                    var offset = (((y * width) + x) * 4);
+                    pixels[offset] *= factor;
+                    pixels[offset + 1] *= factor;
+                    pixels[offset + 2] *= factor;
+                }
+            }
+        });
+    }
+
+    /// <summary>
+    /// Darkens the border of the frame by the blur chain's edge-darkening amount. Milkdrop's
+    /// <c>blurN_edge_darken</c> hides the smear the blur leaves at the frame edge; the exact falloff
+    /// is not stored in a preset, so this is our documented approximation: the centre is untouched
+    /// and the border is multiplied by <c>1 - amount</c>, ramping with the distance from the centre.
+    /// </summary>
+    private void DarkenEdges()
+    {
+        var amount = Math.Clamp(
+            Math.Max(
+                Read("blur1_edge_darken", 0f),
+                Math.Max(Read("blur2_edge_darken", 0f), Read("blur3_edge_darken", 0f))),
+            0f,
+            1f);
+        if (amount <= 0f)
+            return;
+
+        var width = _warped.Width;
+        var height = _warped.Height;
+        var pixels = _warped.RawPixels;
+        ParallelRows.For(ParallelismEnabled, height, (worker, from, to) =>
+        {
+            for (var y = from; y < to; y++)
+            {
+                var normalizedY = height > 1 ? (y / (float)(height - 1) * 2f) - 1f : 0f;
+                for (var x = 0; x < width; x++)
+                {
+                    var normalizedX = width > 1 ? (x / (float)(width - 1) * 2f) - 1f : 0f;
+                    var distance = MathF.Sqrt((normalizedX * normalizedX) + (normalizedY * normalizedY));
+                    var factor = 1f - (amount * Math.Clamp(distance, 0f, 1f));
                     var offset = (((y * width) + x) * 4);
                     pixels[offset] *= factor;
                     pixels[offset + 1] *= factor;

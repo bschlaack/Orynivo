@@ -28,7 +28,8 @@ This file applies to `Orynivo.Core/` and supplements `../AGENTS.md`.
   slot layout and `q1`-`q32` keep their value between the per-frame and per-pixel stages. The
   renderer runs the stages in Milkdrop order: the init blocks once, the per-frame block and
   the four waveform per-frame blocks, the motion warp (`zoom`, `zoomexp`, `rot`, `cx`/`cy`,
-  `dx`/`dy`, `sx`/`sy`) with the per-pixel block on top, the blur passes, the decay fade, the
+  `dx`/`dy`, `sx`/`sy`) with the per-pixel block on top, the blur passes and the blur chain's edge
+  darkening, the decay fade, the
   centre darkening, the gamma adjustment, and the overlay. The per-pixel block sees the warped
   position in `x`/`y`, which is a deliberate deviation from Milkdrop offset semantics so the
   built-in presets keep working; revisit it with the shader runtime in phase 38d. Numeric
@@ -186,10 +187,13 @@ This file applies to `Orynivo.Core/` and supplements `../AGENTS.md`.
   rendered frame allocation-free, which `RenderTimingTests` asserts.
   Full-frame passes may run in parallel only when they are row-independent: a pixel reads the
   source buffer and writes its own pixel, nothing else. `ParallelRows.For` owns the split and
-  keeps small frames on the calling thread. The blur, decay, gamma, centre darkening, video echo,
-  and composite passes are row-independent and split the same way, gated by
+  keeps small frames on the calling thread. The blur, decay, gamma, centre darkening, edge
+  darkening, video echo, and composite passes are row-independent and split the same way, gated by
   `PresetRenderer.ParallelismEnabled`; `PixelBuffer.Blur` reuses one scratch array instead of
-  allocating a copy per pass, and `PresetRenderer` gives each worker its own sample scratch. The warp
+  allocating a copy per pass, and `PresetRenderer` gives each worker its own sample scratch.
+  `PresetRenderer.DarkenEdges` applies the blur chain's `blurN_edge_darken` after the blur passes; its
+  falloff is our own documented approximation, because a preset does not store the shape, so the
+  centre stays untouched and the border is multiplied towards `1 - amount`. The warp
   is parallel only when the per-pixel program
   writes nothing but the values the engine re-seeds per pixel (`x`, `y`, `rad`, `ang`), because a
   value written by one pixel and read by another would make the picture depend on the split; a

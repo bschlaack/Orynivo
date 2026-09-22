@@ -845,8 +845,10 @@ affordable. This is a project of its own and must keep the CPU path as the fallb
   recognised: `b1n`/`b1x`/`b1ed` and the `b2`/`b3` family are the Milkdrop 1 `blurN_min`,
   `blurN_max`, and `blurN_edge_darken` parameters under their short names, so they resolve to those
   variables, and a preset that carries only them takes its blur amount from their `blurN_max` sum
-  instead of Orynivo's own `blur_level` key. Their edge-darkening semantics are still not
-  implemented, so that part of the chain stays a documented approximation.
+  instead of Orynivo's own `blur_level` key. Their edge-darkening amount is applied after the blur
+  passes with our own documented falloff: the frame centre is untouched and the border is multiplied
+  down towards `1 - amount`, which is the approximation the phase called for because the exact shape
+  is not stored in a preset.
   Comparing the variable sets against the reference implementation closed three more gaps and
   exposed one semantic difference. Added: the eight `t1`-`t8` variables, plus `progress`, `meshx`,
   and `meshy`. The difference is bigger than a missing name: in Milkdrop the motion variables
@@ -938,13 +940,10 @@ affordable. This is a project of its own and must keep the CPU path as the fallb
   lose their shaders at run time to an unimplemented built-in (`conway` is the known one) or to the
   interpreter's loop budget, so those blocks are disabled after the first frame. Both are recorded
   as their own work rather than being hidden by the budget.
-  **Remaining.** Three things are still open in this phase. The blur chain's edge darkening
-  (`blurN_edge_darken`, and its Milkdrop 2 `bNed` alias) is parsed and seeded but not applied, so a
-  preset that relies on it looks slightly different; it needs a documented approximation of the
-  border falloff and a picture comparison. The per-pixel expression program still runs per screen
-  pixel instead of on Milkdrop's roughly 32 x 24 mesh, which is the largest remaining fidelity gap
-  and a behaviour change to the warp that needs identical-frame verification. And the `conway`
-  built-in is unimplemented, so a preset that calls it loses that block.
+  **Remaining.** Two things are still open in this phase. The per-pixel expression program still runs
+  per screen pixel instead of on Milkdrop's roughly 32 x 24 mesh, which is the largest remaining
+  fidelity gap and a behaviour change to the warp that needs identical-frame verification. And the
+  `conway` built-in is unimplemented, so a preset that calls it loses that block.
 **Tests**: each phase adds its own; 39a is the prerequisite for claiming any speed-up.
 
 **Commit**: `perf(visualizer): add render measurement` (39a), then one commit per phase

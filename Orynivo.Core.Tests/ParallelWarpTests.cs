@@ -22,6 +22,7 @@ public sealed class ParallelWarpTests
     // The full-frame passes (blur, decay, echo, darken, gamma, borders, composite) are row-independent.
     [InlineData("fDecay=0.9\nblur2=3")]
     [InlineData("fDecay=0.9\necho_alpha=0.5\necho_zoom=1.2\nob_a=0.5\nib_a=0.5\ndarken_center=0.3\nfGammaAdj=1.2")]
+    [InlineData("fDecay=0.9\nblur1_edge_darken=0.4")]
     public void RenderFrame_ParallelAndSequentialProduceIdenticalFrames(string presetText)
     {
         var parallel = Render(presetText, parallelism: true);
