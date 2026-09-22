@@ -1120,6 +1120,20 @@ affordable. This is a project of its own and must keep the CPU path as the fallb
   test run, or release artifact. Against a few presets the correlation is weak but positive where
   the two renderers draw a similar structure, which is the signal the remaining shader and audio
   work has to move.
+  The oracle drove the first two fidelity fixes. **Milkdrop 2's `f`-prefixed scalar keys were not
+  aliased**, so `fDecay`, `fWaveAlpha`, `fWaveScale`, `fWaveSmoothing`, `fWaveParam`, and the
+  `fWaveR/G/B/X/Y` colours fell back to the built-in default: `LuxXx - BadBallz Beta` asked for
+  `fWaveAlpha=0.001` and got a full overlay, and its `fDecay=0.925` fed back at 0.96. With the
+  aliases in place that preset went from a mean channel difference of 0.5 and a correlation of 0.03
+  to 0.07-0.14 and 0.36-0.41. **A shader helper call did not coerce its argument to the declared
+  parameter type**, so `lavcol(float t)` called as `lavcol(ret * 2)` ran on the whole vector and the
+  SkSL emitter produced a call Skia rejected; both paths now coerce. What remains, in the order the
+  oracle ranks them: projectM tints the comp output through `ApplyHueShaderColors` and Orynivo has no
+  hue step, the blur chain uses projectM's `blurMin`/`blurMax` scale and bias rather than a plain box
+  blur, the comp shader's `sampler_main` is the warped frame in projectM and the composited frame
+  here, and the video echo and overlay modulation still differ. The oracle's audio input is not
+  equivalent to projectM's own analysis, so a comparison must disable the overlay (for example with
+  `wave_a=0`) before the numbers mean anything.
 **Tests**: each phase adds its own; 39a is the prerequisite for claiming any speed-up.
 
 **Commit**: `perf(visualizer): add render measurement` (39a), then one commit per phase
