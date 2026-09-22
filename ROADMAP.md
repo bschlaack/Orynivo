@@ -854,30 +854,31 @@ affordable. This is a project of its own and must keep the CPU path as the fallb
   to the buffer two presentations old; because the render loop publishes at the configured frame rate
   while the control refreshes at the display rate, an undrawn refresh is the normal case and the
   artefact was a steady rubber band.
-  What remains: the comp and warp shaders as GLSL, which is what makes the many shader presets
-  eligible, and then deleting the CPU frame path for the GL mode.
-  That is step 4, and it is the largest remaining piece: shader presets still run on the CPU even
-  when `ORYNIVO_VISUALIZER_OPENGL=1`, because `VisualizerGlPipeline` only owns the frame for a preset
-  with no shaders. Measured at 640 x 360 the comp shader is about 58 ms of a 62 ms frame, so the
-  port is what turns a shader preset from roughly 16 fps into a GPU frame. The **emitter is done**:
-  `ShaderTranspiler` gained a GLSL dialect next to SkSL (`TranspileGlsl`, `TranspileGlslComp`,
-  `TranspileGlslWarp`), the prelude aliases `float2/3/4` onto `vec2/3/4` so the shared body emission
-  is byte-identical, the samplers become `sampler2D` sampled with `texture()`, and the entry point
-  becomes a `void main()` writing `orynivoColor` with the engine's top-down `fragCoord` built from
-  `gl_FragCoord`. The `gl-harness` compiles the emitted comp and warp GLSL of a real preset in the
-  context (both accepted on an NVIDIA context), so the dialect is verified rather than assumed.
-  **What remains is the pipeline integration**, which is mechanical but broad: the warp pass runs
-  the emitted warp shader instead of the fixed mesh fragment shader, the comp pass runs after the
-  post pass into its own target (the feedback stays the pre-comp frame, matching the display-pass
-  rule above), and the pipeline has to bind `sampler_main`, `sampler_blur1`-`3`, and
-  `sampler_pc_main` and seed every uniform the prelude declares (`texsize`, `time`, `frame`, `fps`,
-  `bass`-`treb_att`, `aspect`, `rand_frame`, `rand_preset`, the `q1`-`q32`/`t1`-`t8` slots, the warp
-  motion uniforms, and the per-pixel block's referenced variables) from the renderer's slots, which
-  `PresetRenderer.ReadVariable` exposes. The dialect is chosen from the negotiated version (ANGLE's
-  GLES on Windows, desktop GL on Linux, CGL on macOS), and the SkSL path stays the fallback, so a
-  shader the GLSL emitter cannot translate keeps rendering through Skia or the interpreter. The
-  SkSL emitter's matrix support is mirrored: `floatNxN` becomes GLSL `matN`, and a single vector
-  argument is spread into scalars because `matN` has no four-component constructor.
+  What remains: deleting the CPU frame path for the GL mode.
+  **Step 4 is done.** The GLSL emitter is `ShaderTranspiler`'s GLSL dialect next to SkSL
+  (`TranspileGlsl`, `TranspileGlslComp`, `TranspileGlslWarp`): the prelude aliases `float2/3/4` onto
+  `vec2/3/4` so the shared body emission is byte-identical, the samplers become `sampler2D` sampled
+  with `texture()`, and the entry point becomes a `void main()` writing `orynivoColor` with the
+  engine's top-down `fragCoord` built from `gl_FragCoord`. The pipeline integration runs it:
+  `VisualizerGlPipeline.SetShaders` compiles the emitted GLSL in the control's context, the warp pass
+  uses the warp shader in place of the fixed mesh fragment shader, the blur chain is built into the
+  textures the shader's `GetBlur1`-`GetBlur3` read (for the warp from the feedback, for the comp from
+  the composited frame), and the comp pass runs after the post pass into its own display target so
+  the feedback stays the pre-comp frame. The GLSL samples with normalised coordinates while Skia's
+  `eval` takes pixels, so `SamplerCoordinate` and `PixelCoordinate` branch on the dialect; the vector
+  uniforms are declared as scalars with a reconstructing macro because `GlInterface` only exposes
+  scalar uniform setters; and the uniforms come from `PresetRenderer.WriteShaderUniforms`, which
+  seeds the same values the interpreter binds. A shader the dialect cannot express leaves that stage
+  on the fixed pipeline, and a preset whose shaders do not emit keeps the CPU frame path.
+  The `gl-harness` emits a real preset's shaders, compiles them in the context, and compares the GPU
+  frame against the CPU reference: `LuxXx - BadBallz Beta` now renders 0.49 against the CPU's 0.53
+  instead of a saturated white frame, a shader-free preset matches to 0.0002, and three further
+  shader presets run with `glError=0x0`. The residual difference is the GL frame-pass approximation,
+  not the shaders: the fixed-warp pre-comp frame differs from the CPU by the same ratio. The dialect
+  is chosen from the negotiated version (ANGLE's GLES on Windows, desktop GL on Linux, CGL on macOS),
+  and the SkSL path stays the fallback. The SkSL emitter's matrix support is mirrored: `floatNxN`
+  becomes GLSL `matN`, and a single vector argument is spread into scalars because `matN` has no
+  four-component constructor.
   The warp's sampling arithmetic now lives in the tested
 
   `Orynivo.Visualization.WarpSampling`, which the GLSL fragment shader has to translate rather than

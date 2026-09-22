@@ -31,6 +31,9 @@ internal sealed class VisualizerGlPipeline
     private const int GlTexture2D = 0x0DE1;
     private const int GlTexture0 = 0x84C0;
     private const int GlTexture1 = 0x84C1;
+    private const int GlTexture2 = 0x84C2;
+    private const int GlTexture3 = 0x84C3;
+    private const int GlTexture4 = 0x84C4;
     private const int GlTextureMinFilter = 0x2801;
     private const int GlTextureMagFilter = 0x2800;
     private const int GlTextureWrapS = 0x2802;
@@ -290,6 +293,55 @@ internal sealed class VisualizerGlPipeline
     private Dictionary<string, int> _postUniforms = new(StringComparer.Ordinal);
     private int _quadTextureUniform = -1;
 
+    /// <summary>The emitted warp shader program, or zero when the preset has none or it failed.</summary>
+    private int _warpShaderProgram;
+
+    /// <summary>The emitted comp shader program, or zero when the preset has none or it failed.</summary>
+    private int _compShaderProgram;
+
+    /// <summary>The GLSL source each shader program was built from, so a preset switch recompiles.</summary>
+    private string? _warpShaderSource;
+    private string? _compShaderSource;
+
+    /// <summary>The uniform locations of the emitted shader programs.</summary>
+    private Dictionary<string, int> _warpShaderUniforms = new(StringComparer.Ordinal);
+    private Dictionary<string, int> _compShaderUniforms = new(StringComparer.Ordinal);
+
+    /// <summary>The comp pass output, which is presented while the feedback stays the pre-comp frame.</summary>
+    private int _compTexture;
+    private int _compFramebuffer;
+
+    /// <summary>The previous frame's pre-comp composite, for the comp shader's <c>sampler_pc_main</c>.</summary>
+    private int _previousTexture;
+    private int _previousFramebuffer;
+
+    /// <summary>Blurred copies of the comp input, for the comp shader's <c>sampler_blur1</c>-<c>3</c>.</summary>
+    private readonly int[] _shaderBlurTexture = new int[3];
+    private readonly int[] _shaderBlurFramebuffer = new int[3];
+
+    /// <summary>Gets why the last emitted shader failed to build, or <see langword="null"/>.</summary>
+    public string? ShaderError { get; private set; }
+
+    /// <summary>
+    /// Publishes the emitted GLSL for the current preset. The sources are compiled on the next frame,
+    /// because the GL context is only current inside the render callback. A source that fails to build
+    /// leaves that stage on the fixed pipeline instead of losing the frame.
+    /// </summary>
+    /// <param name="warpSource">GLSL for the warp shader, or <see langword="null"/>.</param>
+    /// <param name="compSource">GLSL for the comp shader, or <see langword="null"/>.</param>
+    public void SetShaders(string? warpSource, string? compSource)
+    {
+        if (!string.Equals(_warpShaderSource, warpSource, StringComparison.Ordinal) ||
+            !string.Equals(_compShaderSource, compSource, StringComparison.Ordinal))
+        {
+            _warpShaderSource = warpSource;
+            _compShaderSource = compSource;
+            _shadersDirty = true;
+        }
+    }
+
+    private bool _shadersDirty;
+
     /// <summary>Gets why the pipeline could not be built or last failed, or <see langword="null"/>.</summary>
     public string? Error { get; private set; }
 
@@ -303,7 +355,10 @@ internal sealed class VisualizerGlPipeline
     public string? Diagnostics { get; private set; }
 
     /// <summary>Gets the texture holding the last finished frame, for presentation.</summary>
-    public int OutputTexture => _feedbackTexture;
+    public int OutputTexture => _outputTexture != 0 ? _outputTexture : _feedbackTexture;
+
+    /// <summary>The texture last presented: the comp output when a comp shader ran, else the feedback.</summary>
+    private int _outputTexture;
 
     /// <summary>Creates the GL objects.</summary>
     /// <param name="gl">GL interface.</param>
@@ -380,6 +435,16 @@ internal sealed class VisualizerGlPipeline
             _pingFramebuffer[0] = gl.GenFramebuffer();
             _pingFramebuffer[1] = gl.GenFramebuffer();
             _overlayTexture = gl.GenTexture();
+            _compTexture = gl.GenTexture();
+            _compFramebuffer = gl.GenFramebuffer();
+            _previousTexture = gl.GenTexture();
+            _previousFramebuffer = gl.GenFramebuffer();
+            for (var index = 0; index < 3; index++)
+            {
+                _shaderBlurTexture[index] = gl.GenTexture();
+                _shaderBlurFramebuffer[index] = gl.GenFramebuffer();
+            }
+
             gl.BindVertexArray(0);
             // A sixteen-bit feedback keeps the frame from being rounded to eight bits on every pass,
             // which is what drifts the GPU picture away from the CPU's float buffers.
@@ -420,6 +485,20 @@ internal sealed class VisualizerGlPipeline
         gl.DeleteFramebuffer(_pingFramebuffer[0]);
         gl.DeleteFramebuffer(_pingFramebuffer[1]);
         gl.DeleteTexture(_overlayTexture);
+        gl.DeleteTexture(_compTexture);
+        gl.DeleteFramebuffer(_compFramebuffer);
+        gl.DeleteTexture(_previousTexture);
+        gl.DeleteFramebuffer(_previousFramebuffer);
+        for (var index = 0; index < 3; index++)
+        {
+            gl.DeleteTexture(_shaderBlurTexture[index]);
+            gl.DeleteFramebuffer(_shaderBlurFramebuffer[index]);
+        }
+
+        if (_warpShaderProgram != 0)
+            gl.DeleteProgram(_warpShaderProgram);
+        if (_compShaderProgram != 0)
+            gl.DeleteProgram(_compShaderProgram);
         _ready = false;
     }
 
@@ -436,6 +515,7 @@ internal sealed class VisualizerGlPipeline
     /// <param name="meshY">Mesh grid rows.</param>
     /// <param name="needsRadius">Whether the warp needs the polar radius.</param>
     /// <param name="parameters">The frame's pass values.</param>
+    /// <param name="uniforms">The shader uniforms to seed, or <see langword="null"/> for none.</param>
     /// <returns><see langword="true"/> when the frame was drawn.</returns>
     public bool Render(
         GlInterface gl,
@@ -449,7 +529,8 @@ internal sealed class VisualizerGlPipeline
         int meshX,
         int meshY,
         bool needsRadius,
-        VisualizerFrameParameters parameters)
+        VisualizerFrameParameters parameters,
+        IReadOnlyDictionary<string, ShaderValue>? uniforms = null)
     {
         if (!_ready || frameWidth <= 0 || frameHeight <= 0)
             return false;
@@ -457,34 +538,52 @@ internal sealed class VisualizerGlPipeline
         try
         {
             EnsureSize(gl, frameWidth, frameHeight);
+            EnsureShaderPrograms(gl);
             UploadOverlay(gl, overlayBgra, frameWidth, frameHeight);
             PackVertices(mesh, meshX, meshY);
 
-            // Warp the feedback into ping zero.
+            // Warp the feedback into ping zero, with the emitted warp shader when the preset has one.
             gl.BindFramebuffer(GlFramebuffer, _pingFramebuffer[0]);
             gl.Viewport(0, 0, frameWidth, frameHeight);
             gl.ClearColor(0f, 0f, 0f, 1f);
             gl.Clear(GlColorBufferBit);
-            gl.UseProgram(_warpProgram);
-            gl.ActiveTexture(GlTexture0);
-            gl.BindTexture(GlTexture2D, _feedbackTexture);
-            SetSampler(gl, _warpUniforms, "uSource", 0);
-            Set(gl, _warpUniforms, "uFrameWidth", frameWidth);
-            Set(gl, _warpUniforms, "uFrameHeight", frameHeight);
-            Set(gl, _warpUniforms, "uNeedsRadius", needsRadius ? 1f : 0f);
-            gl.BindVertexArray(_meshVertexArray);
-            gl.BindBuffer(GlArrayBuffer, _meshVertexBuffer);
-            var vertices = GCHandle.Alloc(_vertices, GCHandleType.Pinned);
-            try
+            if (_warpShaderProgram != 0)
             {
-                gl.BufferData(GlArrayBuffer, (IntPtr)(_vertices.Length * sizeof(float)), vertices.AddrOfPinnedObject(), GlDynamicDraw);
+                // The warp shader's GetBlur1-GetBlur3 read the blur chain of the feedback, exactly as
+                // the CPU warp stage builds it from the previous frame.
+                BuildShaderBlurLevels(gl, _feedbackTexture, frameWidth, frameHeight);
+                gl.UseProgram(_warpShaderProgram);
+                BindShaderSamplers(gl, _warpShaderProgram, _warpShaderUniforms, _feedbackTexture, _previousTexture);
+                SetShaderUniforms(gl, _warpShaderProgram, _warpShaderUniforms, uniforms);
+                DrawQuad(gl);
             }
-            finally
+            else
             {
-                vertices.Free();
+                gl.UseProgram(_warpProgram);
+                gl.ActiveTexture(GlTexture0);
+                gl.BindTexture(GlTexture2D, _feedbackTexture);
+                SetSampler(gl, _warpUniforms, "uSource", 0);
+                Set(gl, _warpUniforms, "uFrameWidth", frameWidth);
+                Set(gl, _warpUniforms, "uFrameHeight", frameHeight);
+                Set(gl, _warpUniforms, "uNeedsRadius", needsRadius ? 1f : 0f);
+                gl.BindVertexArray(_meshVertexArray);
+                gl.BindBuffer(GlArrayBuffer, _meshVertexBuffer);
+                var vertices = GCHandle.Alloc(_vertices, GCHandleType.Pinned);
+                try
+                {
+                    gl.BufferData(GlArrayBuffer, (IntPtr)(_vertices.Length * sizeof(float)), vertices.AddrOfPinnedObject(), GlDynamicDraw);
+                }
+                finally
+                {
+                    vertices.Free();
+                }
+
+                gl.DrawElements(GlTriangles, _meshIndexCount, GlUnsignedShort, IntPtr.Zero);
             }
 
-            gl.DrawElements(GlTriangles, _meshIndexCount, GlUnsignedShort, IntPtr.Zero);
+            // Remember the previous pre-comp frame for the comp shader before the post pass overwrites it.
+            if (_compShaderProgram != 0)
+                Blit(gl, _feedbackTexture, _previousFramebuffer, frameWidth, frameHeight);
 
             // Blur, ping-ponging between the two work textures.
             var current = 0;
@@ -536,18 +635,25 @@ internal sealed class VisualizerGlPipeline
             Set(gl, _postUniforms, "uSmaller", Math.Min(frameWidth, frameHeight));
             DrawQuad(gl);
 
-            // Present the finished frame, which is also the next frame's feedback.
+            // The comp shader is a display pass: it reads the composited frame and writes the display,
+            // while the feedback stays the pre-comp frame the next warp samples.
+            var output = _feedbackTexture;
+            if (_compShaderProgram != 0 && RunCompShader(gl, frameWidth, frameHeight, uniforms))
+                output = _compTexture;
+
+            // Present the finished frame.
             gl.BindFramebuffer(GlFramebuffer, framebuffer);
             gl.Viewport(0, 0, Math.Max(1, viewportWidth), Math.Max(1, viewportHeight));
             gl.ClearColor(0f, 0f, 0f, 1f);
             gl.Clear(GlColorBufferBit);
             gl.UseProgram(_quadProgram);
             gl.ActiveTexture(GlTexture0);
-            gl.BindTexture(GlTexture2D, _feedbackTexture);
+            gl.BindTexture(GlTexture2D, output);
             if (_quadTextureUniform >= 0)
                 gl.Uniform1i(_quadTextureUniform, 0);
             DrawQuad(gl);
 
+            _outputTexture = output;
             gl.Flush();
             Frames++;
             _frame++;
@@ -620,6 +726,239 @@ internal sealed class VisualizerGlPipeline
         return uniforms;
     }
 
+    /// <summary>The vertex shader the emitted fragment shaders are paired with: a plain full-screen quad.</summary>
+    private const string ShaderVertexSource = """
+        #version 300 es
+        precision highp float;
+        layout(location = 0) in vec2 aPosition;
+        void main()
+        {
+            gl_Position = vec4(aPosition, 0.0, 1.0);
+        }
+        """;
+
+    /// <summary>Builds the emitted shader programs when the preset published new sources.</summary>
+    /// <param name="gl">GL interface.</param>
+    private void EnsureShaderPrograms(GlInterface gl)
+    {
+        if (!_shadersDirty)
+            return;
+
+        _shadersDirty = false;
+        if (_warpShaderProgram != 0)
+        {
+            gl.DeleteProgram(_warpShaderProgram);
+            _warpShaderProgram = 0;
+        }
+
+        if (_compShaderProgram != 0)
+        {
+            gl.DeleteProgram(_compShaderProgram);
+            _compShaderProgram = 0;
+        }
+
+        _warpShaderUniforms.Clear();
+        _compShaderUniforms.Clear();
+        ShaderError = null;
+
+        if (_warpShaderSource is { Length: > 0 })
+        {
+            if (TryBuildShaderProgram(gl, _warpShaderSource, out var program, out var error))
+                _warpShaderProgram = program;
+            else
+                ShaderError = "warp: " + error;
+        }
+
+        if (_compShaderSource is { Length: > 0 })
+        {
+            if (TryBuildShaderProgram(gl, _compShaderSource, out var program, out var error))
+                _compShaderProgram = program;
+            else
+                ShaderError = (ShaderError is null ? string.Empty : ShaderError + " ") + "comp: " + error;
+        }
+    }
+
+    /// <summary>Compiles and links one emitted fragment shader with the quad vertex shader.</summary>
+    /// <param name="gl">GL interface.</param>
+    /// <param name="fragmentSource">Emitted GLSL fragment shader.</param>
+    /// <param name="program">Receives the linked program.</param>
+    /// <param name="error">Receives the compile or link log.</param>
+    /// <returns><see langword="true"/> when the program linked.</returns>
+    private static bool TryBuildShaderProgram(GlInterface gl, string fragmentSource, out int program, out string? error)
+    {
+        program = 0;
+        error = null;
+        try
+        {
+            program = BuildProgram(gl, ShaderVertexSource, fragmentSource, out error);
+            return true;
+        }
+        catch (InvalidOperationException)
+        {
+            program = 0;
+            return false;
+        }
+    }
+
+    /// <summary>Runs the comp shader over the composited frame into its own display target.</summary>
+    /// <param name="gl">GL interface.</param>
+    /// <param name="width">Frame width.</param>
+    /// <param name="height">Frame height.</param>
+    /// <param name="uniforms">Shader uniforms to seed.</param>
+    /// <returns><see langword="true"/> when the pass was drawn.</returns>
+    private bool RunCompShader(GlInterface gl, int width, int height, IReadOnlyDictionary<string, ShaderValue>? uniforms)
+    {
+        // The comp shader reads the blur levels of its input, so they are built here from the
+        // composited frame, each level continuing from the one below it.
+        BuildShaderBlurLevels(gl, _feedbackTexture, width, height);
+
+        gl.BindFramebuffer(GlFramebuffer, _compFramebuffer);
+        gl.Viewport(0, 0, width, height);
+        gl.ClearColor(0f, 0f, 0f, 1f);
+        gl.Clear(GlColorBufferBit);
+        gl.UseProgram(_compShaderProgram);
+        BindShaderSamplers(gl, _compShaderProgram, _compShaderUniforms, _feedbackTexture, _previousTexture);
+        SetShaderUniforms(gl, _compShaderProgram, _compShaderUniforms, uniforms);
+        DrawQuad(gl);
+        return true;
+    }
+
+    /// <summary>
+    /// Builds the three blur levels of a frame into the shader blur textures, each level continuing
+    /// from the one below it, so a shader's <c>GetBlur1</c>-<c>GetBlur3</c> read the same chain the CPU
+    /// builds.
+    /// </summary>
+    /// <param name="gl">GL interface.</param>
+    /// <param name="source">Frame to blur.</param>
+    /// <param name="width">Frame width.</param>
+    /// <param name="height">Frame height.</param>
+    private void BuildShaderBlurLevels(GlInterface gl, int source, int width, int height)
+    {
+        var current = source;
+        gl.UseProgram(_blurProgram);
+        for (var level = 0; level < 3; level++)
+        {
+            gl.BindFramebuffer(GlFramebuffer, _shaderBlurFramebuffer[level]);
+            gl.Viewport(0, 0, width, height);
+            gl.ActiveTexture(GlTexture0);
+            gl.BindTexture(GlTexture2D, current);
+            SetSampler(gl, _blurUniforms, "uSource", 0);
+            Set(gl, _blurUniforms, "uTexelX", 1f / width);
+            Set(gl, _blurUniforms, "uTexelY", 1f / height);
+            DrawQuad(gl);
+            current = _shaderBlurTexture[level];
+        }
+    }
+
+    /// <summary>Copies one texture into a framebuffer.</summary>
+    /// <param name="gl">GL interface.</param>
+    /// <param name="texture">Source texture.</param>
+    /// <param name="framebuffer">Destination framebuffer.</param>
+    /// <param name="width">Frame width.</param>
+    /// <param name="height">Frame height.</param>
+    private void Blit(GlInterface gl, int texture, int framebuffer, int width, int height)
+    {
+        gl.BindFramebuffer(GlFramebuffer, framebuffer);
+        gl.Viewport(0, 0, width, height);
+        gl.UseProgram(_quadProgram);
+        gl.ActiveTexture(GlTexture0);
+        gl.BindTexture(GlTexture2D, texture);
+        if (_quadTextureUniform >= 0)
+            gl.Uniform1i(_quadTextureUniform, 0);
+        DrawQuad(gl);
+    }
+
+    /// <summary>
+    /// Binds the frame textures to the emitted shader's samplers. The main and filtered samplers read
+    /// the composited frame, the previous-composite sampler reads the stored previous frame, the blur
+    /// levels read their own textures, and every other sampler falls back to the main frame so it is
+    /// never left unbound.
+    /// </summary>
+    /// <param name="gl">GL interface.</param>
+    /// <param name="locations">Uniform locations of the program.</param>
+    /// <param name="main">The composited frame.</param>
+    /// <param name="previous">The previous pre-comp frame.</param>
+    /// <param name="comp">Whether this is the comp pass, which has real blur levels.</param>
+    private void BindShaderSamplers(
+        GlInterface gl,
+        int program,
+        Dictionary<string, int> locations,
+        int main,
+        int previous)
+    {
+        gl.ActiveTexture(GlTexture0);
+        gl.BindTexture(GlTexture2D, main);
+        gl.ActiveTexture(GlTexture1);
+        gl.BindTexture(GlTexture2D, previous);
+        for (var level = 0; level < 3; level++)
+        {
+            gl.ActiveTexture(GlTexture2 + level);
+            gl.BindTexture(GlTexture2D, _shaderBlurTexture[level]);
+        }
+
+        foreach (var name in ShaderTranspiler.Samplers)
+        {
+            if (!locations.TryGetValue(name, out var location))
+            {
+                location = gl.GetUniformLocationString(program, name);
+                locations[name] = location;
+            }
+
+            if (location < 0)
+                continue;
+
+            var unit = name switch
+            {
+                "sampler_pc_main" => 1,
+                "sampler_blur1" => 2,
+                "sampler_blur2" => 3,
+                "sampler_blur3" => 4,
+                _ => 0
+            };
+            gl.Uniform1i(location, unit);
+        }
+    }
+
+    /// <summary>Sets the scalar and vector uniforms an emitted shader declares.</summary>
+    /// <param name="gl">GL interface.</param>
+    /// <param name="program">Program the locations belong to.</param>
+    /// <param name="locations">Resolved locations, extended lazily.</param>
+    /// <param name="uniforms">Values to set, or <see langword="null"/>.</param>
+    private static void SetShaderUniforms(
+        GlInterface gl,
+        int program,
+        Dictionary<string, int> locations,
+        IReadOnlyDictionary<string, ShaderValue>? uniforms)
+    {
+        if (uniforms is null)
+            return;
+
+        foreach (var (name, value) in uniforms)
+        {
+            if (name.StartsWith("sampler_", StringComparison.Ordinal))
+                continue;
+
+            // GL exposes only scalar uniform setters, so a vector uniform is declared as its
+            // components in the emitted GLSL and set one scalar at a time.
+            var count = Math.Clamp(value.Count, 1, 4);
+            for (var component = 0; component < count; component++)
+            {
+                var componentName = count == 1 ? name : name + ComponentSuffix[component];
+                if (!locations.TryGetValue(componentName, out var location))
+                {
+                    location = gl.GetUniformLocationString(program, componentName);
+                    locations[componentName] = location;
+                }
+
+                if (location >= 0)
+                    gl.Uniform1f(location, value.Get(component));
+            }
+        }
+    }
+
+    /// <summary>The component suffixes the emitted GLSL appends to a vector uniform.</summary>
+    private static readonly string[] ComponentSuffix = ["_x", "_y", "_z", "_w"];
+
     /// <summary>Creates or resizes the frame-sized textures.</summary>
     /// <param name="gl">GL interface.</param>
     /// <param name="width">Frame width.</param>
@@ -661,6 +1000,10 @@ internal sealed class VisualizerGlPipeline
             Allocate(gl, _feedbackTexture, _feedbackFramebuffer, width, height);
             Allocate(gl, _pingTexture[0], _pingFramebuffer[0], width, height);
             Allocate(gl, _pingTexture[1], _pingFramebuffer[1], width, height);
+            Allocate(gl, _compTexture, _compFramebuffer, width, height);
+            Allocate(gl, _previousTexture, _previousFramebuffer, width, height);
+            for (var index = 0; index < 3; index++)
+                Allocate(gl, _shaderBlurTexture[index], _shaderBlurFramebuffer[index], width, height);
             return true;
         }
         catch (InvalidOperationException)

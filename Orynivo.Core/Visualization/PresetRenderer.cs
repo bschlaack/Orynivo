@@ -1981,6 +1981,73 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
         };
     }
 
+    /// <summary>
+    /// Fills every uniform a translated shader prelude declares from the current frame, so the OpenGL
+    /// pipeline seeds the same values the interpreter binds. The caller owns the dictionary, because a
+    /// frame must not allocate one.
+    /// </summary>
+    /// <param name="destination">Dictionary to fill; existing entries are overwritten.</param>
+    /// <param name="perPixelVariables">
+    /// Preset variables the shader's per-pixel block reads, as reported by the emitter, or
+    /// <see langword="null"/> when the block reads none.
+    /// </param>
+    public void WriteShaderUniforms(
+        IDictionary<string, ShaderValue> destination,
+        IReadOnlyList<string>? perPixelVariables = null)
+    {
+        ArgumentNullException.ThrowIfNull(destination);
+        var width = _previous.Width;
+        var height = _previous.Height;
+        destination["texsize"] = ShaderValue.Vector(width, height, 1f / Math.Max(1, width), 1f / Math.Max(1, height), 4);
+        destination["time"] = ShaderValue.Scalar(Read("time", 0f));
+        destination["frame"] = ShaderValue.Scalar(Read("frame", 0f));
+        destination["fps"] = ShaderValue.Scalar(Read("fps", 0f));
+        destination["bass"] = ShaderValue.Scalar(Bass);
+        destination["mid"] = ShaderValue.Scalar(Mid);
+        destination["treb"] = ShaderValue.Scalar(Treble);
+        destination["vol"] = ShaderValue.Scalar(Volume);
+        destination["bass_att"] = ShaderValue.Scalar(Read("bass_att", 0f));
+        destination["mid_att"] = ShaderValue.Scalar(Read("mid_att", 0f));
+        destination["treb_att"] = ShaderValue.Scalar(Read("treb_att", 0f));
+        for (var index = 1; index <= 32; index++)
+            destination["q" + index] = ShaderValue.Scalar(Read("q" + index, 0f));
+        for (var index = 1; index <= 8; index++)
+            destination["t" + index] = ShaderValue.Scalar(Read("t" + index, 0f));
+
+        var aspectX = Read("aspectx", 1f);
+        var aspectY = Read("aspecty", 1f);
+        destination["aspectx"] = ShaderValue.Scalar(aspectX);
+        destination["aspecty"] = ShaderValue.Scalar(aspectY);
+        destination["aspect"] = ShaderValue.Vector(
+            aspectX,
+            aspectY,
+            1f / Math.Max(0.0001f, aspectX),
+            1f / Math.Max(0.0001f, aspectY),
+            4);
+        destination["rand_frame"] = ShaderValue.Vector(_randFrame[0], _randFrame[1], _randFrame[2], _randFrame[3], 4);
+
+        // The motion uniforms of the warp entry point. They are the per-frame values the CPU warp
+        // reads, so the GPU warp reproduces the same sampling position.
+        destination["_orynivo_size"] = ShaderValue.Vector(width, height, 0f, 0f, 2);
+        destination["_orynivo_zoom"] = ShaderValue.Scalar(Math.Max(0.01f, Read("zoom", Preset.Zoom)));
+        destination["_orynivo_zoomExp"] = ShaderValue.Scalar(Read("zoomexp", 1f));
+        destination["_orynivo_rotation"] = ShaderValue.Scalar(Read("rot", 0f));
+        destination["_orynivo_centre"] = ShaderValue.Vector(Read("cx", 0f), Read("cy", 0f), 0f, 0f, 2);
+        destination["_orynivo_offset"] = ShaderValue.Vector(Read("dx", 0f), Read("dy", 0f), 0f, 0f, 2);
+        destination["_orynivo_stretch"] = ShaderValue.Vector(Read("sx", 1f), Read("sy", 1f), 0f, 0f, 2);
+
+        if (perPixelVariables is null)
+            return;
+
+        var layout = Preset.Layout;
+        foreach (var name in perPixelVariables)
+        {
+            var slot = layout.IndexOf(name);
+            destination[PresetExpressionTranspiler.UniformName(name)] =
+                ShaderValue.Scalar(slot >= 0 && slot < _slots.Length ? _slots[slot] : 0f);
+        }
+    }
+
     /// <summary>Writes the variables every shader can read for this pixel.</summary>
     /// <param name="interpreter">Shader about to run.</param>
     /// <param name="u">Sampling coordinate in the range zero to one.</param>

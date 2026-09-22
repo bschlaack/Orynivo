@@ -143,6 +143,9 @@ public sealed class VisualizerGlPresenter : OpenGlControlBase
     private VisualizerFrameParameters _pipelineParameters;
     private int _pipelineFrameWidth;
     private int _pipelineFrameHeight;
+    private string? _pipelineWarpShader;
+    private string? _pipelineCompShader;
+    private IReadOnlyDictionary<string, ShaderValue>? _pipelineUniforms;
     private bool _pipelinePending;
     private bool _pipelineFailed;
     private readonly VisualizerGlPipeline _pipeline = new();
@@ -156,9 +159,13 @@ public sealed class VisualizerGlPresenter : OpenGlControlBase
     /// <summary>Gets the pipeline's one-shot first-frame description, or <see langword="null"/>.</summary>
     public string? PipelineDiagnostics => _pipeline.Diagnostics;
 
+    /// <summary>Gets why an emitted shader failed to build, or <see langword="null"/>.</summary>
+    public string? ShaderError => _pipeline.ShaderError;
+
     /// <summary>
-    /// Publishes the CPU half of a GPU frame: the overlay, the per-vertex mesh, and the frame's pass
-    /// values. The GPU then owns the warp, the passes, and the composite.
+    /// Publishes the CPU half of a GPU frame: the overlay, the per-vertex mesh, the frame's pass
+    /// values, and, when the preset has shaders, the emitted GLSL and the uniforms it reads. The GPU
+    /// then owns the warp, the passes, and the composite.
     /// </summary>
     /// <param name="overlayBgra">Overlay frame, tightly packed BGRA.</param>
     /// <param name="frameWidth">Render width.</param>
@@ -167,6 +174,9 @@ public sealed class VisualizerGlPresenter : OpenGlControlBase
     /// <param name="meshX">Mesh grid columns.</param>
     /// <param name="meshY">Mesh grid rows.</param>
     /// <param name="parameters">The frame's pass values.</param>
+    /// <param name="warpShader">Emitted GLSL for the warp shader, or <see langword="null"/>.</param>
+    /// <param name="compShader">Emitted GLSL for the comp shader, or <see langword="null"/>.</param>
+    /// <param name="uniforms">Shader uniforms to seed, or <see langword="null"/>.</param>
     public void SetPipeline(
         byte[] overlayBgra,
         int frameWidth,
@@ -174,7 +184,10 @@ public sealed class VisualizerGlPresenter : OpenGlControlBase
         float[] mesh,
         int meshX,
         int meshY,
-        VisualizerFrameParameters parameters)
+        VisualizerFrameParameters parameters,
+        string? warpShader = null,
+        string? compShader = null,
+        IReadOnlyDictionary<string, ShaderValue>? uniforms = null)
     {
         lock (_frameLock)
         {
@@ -185,6 +198,9 @@ public sealed class VisualizerGlPresenter : OpenGlControlBase
             _pipelineMeshX = meshX;
             _pipelineMeshY = meshY;
             _pipelineParameters = parameters;
+            _pipelineWarpShader = warpShader;
+            _pipelineCompShader = compShader;
+            _pipelineUniforms = uniforms;
             _pipelinePending = true;
         }
     }
@@ -291,6 +307,8 @@ public sealed class VisualizerGlPresenter : OpenGlControlBase
             float[]? pipelineMesh = null;
             int pipelineMeshX = 0, pipelineMeshY = 0, pipelineWidth = 0, pipelineHeight = 0;
             VisualizerFrameParameters pipelineParameters = default;
+            string? pipelineWarpShader = null, pipelineCompShader = null;
+            IReadOnlyDictionary<string, ShaderValue>? pipelineUniforms = null;
             byte[]? frame = null;
             int frameWidth = 0, frameHeight = 0;
             lock (_frameLock)
@@ -304,6 +322,9 @@ public sealed class VisualizerGlPresenter : OpenGlControlBase
                     pipelineWidth = _pipelineFrameWidth;
                     pipelineHeight = _pipelineFrameHeight;
                     pipelineParameters = _pipelineParameters;
+                    pipelineWarpShader = _pipelineWarpShader;
+                    pipelineCompShader = _pipelineCompShader;
+                    pipelineUniforms = _pipelineUniforms;
                     _pipelinePending = false;
                 }
                 else if (_hasFrame)
@@ -318,6 +339,7 @@ public sealed class VisualizerGlPresenter : OpenGlControlBase
             if (pipelineOverlay is not null && pipelineMesh is not null && pipelineWidth > 0 && pipelineHeight > 0)
             {
                 var pipelineViewport = FramebufferSize();
+                _pipeline.SetShaders(pipelineWarpShader, pipelineCompShader);
                 if (_pipeline.Render(
                     gl,
                     fb,
@@ -330,7 +352,8 @@ public sealed class VisualizerGlPresenter : OpenGlControlBase
                     pipelineMeshX,
                     pipelineMeshY,
                     true,
-                    pipelineParameters))
+                    pipelineParameters,
+                    pipelineUniforms))
                 {
                     _lastPresented = _pipeline.OutputTexture;
                     Frames++;

@@ -92,6 +92,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   adding a choice cannot move the default.
 
 ### Added
+- Added the GPU comp and warp shader pipeline for the visualizer (opt-in with
+  `ORYNIVO_VISUALIZER_OPENGL=1`). Shader presets now run their comp and warp shaders as GLSL on the
+  GPU at the full render resolution, instead of through the CPU interpreter on a grid capped at
+  10,000 pixels and shrunk toward 1,024 when it overruns the 30 ms budget — which is why the Milk
+  presets looked like roughly 50-pixel pictures. `ShaderTranspiler` gained a GLSL dialect
+  (`TranspileGlsl`, `TranspileGlslComp`, `TranspileGlslWarp`); `VisualizerGlPipeline` compiles it,
+  runs the warp shader in place of the fixed mesh warp, builds the three blur levels the shader's
+  `GetBlur1`-`GetBlur3` read, and runs the comp shader after the post pass into its own display
+  target so the feedback stays the pre-comp frame. The GLSL samples are normalised (Skia's `eval`
+  takes pixels), the vector uniforms are declared as scalars because `GlInterface` only exposes
+  scalar uniform setters, and a shader the dialect cannot express falls back to the CPU path.
+  Verified headlessly with `scripts/gl-harness`, which emits a real preset's shaders, compiles them
+  in the context, and compares the GPU frame against the CPU reference: `LuxXx - BadBallz Beta` now
+  renders 0.49 against the CPU's 0.53 instead of a saturated white frame, and `martin - neon space
+  ps2`, `martin - lock and release`, and `Jc - Crystal Shards` all run with `glError=0x0`.
 - Added `PresetBrightnessDiagnosticTests`, which renders one configured preset file for a few frames
   and reports each frame's mean brightness and saturated share, so a preset that turns white can be
   located to the frame it happens on. Point `ORYNIVO_PRESET_BRIGHTNESS_FILE` at a preset to run it.

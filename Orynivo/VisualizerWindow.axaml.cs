@@ -41,6 +41,10 @@ public partial class VisualizerWindow : Window
     private bool _useGlPresenter;
     private byte[] _glBytes = [];
     private byte[] _glOverlayBytes = [];
+    private string? _glWarpShader;
+    private string? _glCompShader;
+    private IReadOnlyList<string>? _glPerPixelUniforms;
+    private readonly Dictionary<string, ShaderValue> _glUniforms = new(StringComparer.Ordinal);
     private bool _glErrorLogged;
     private bool _glInfoLogged;
     private bool _glPipelineActive;
@@ -52,8 +56,8 @@ public partial class VisualizerWindow : Window
 
     /// <summary>
     /// Applies the GL mode's renderer settings. The GPU pipeline owns the frame when the preset has no
-    /// shaders, because the GL shader dialect is a separate step; a preset with shaders keeps the CPU
-    /// frame path and only the presentation is GL.
+    /// shaders, and also when its shaders emit GLSL, because the pipeline can then run them; a preset
+    /// whose shaders the GLSL dialect cannot express keeps the CPU frame path.
     /// </summary>
     /// <param name="renderer">Renderer to configure.</param>
     private void ConfigureRenderer(PresetRenderer renderer)
@@ -62,7 +66,74 @@ public partial class VisualizerWindow : Window
             return;
 
         renderer.MeshRequested = true;
-        renderer.ExpressionsOnly = !renderer.HasShaders;
+        _glWarpShader = null;
+        _glCompShader = null;
+        _glPerPixelUniforms = null;
+        if (!renderer.HasShaders)
+        {
+            renderer.ExpressionsOnly = true;
+            return;
+        }
+
+        if (TryEmitGlsl(renderer, out var warp, out var comp, out var uniforms))
+        {
+            renderer.ExpressionsOnly = true;
+            _glWarpShader = warp;
+            _glCompShader = comp;
+            _glPerPixelUniforms = uniforms;
+        }
+        else
+        {
+            renderer.ExpressionsOnly = false;
+        }
+    }
+
+    /// <summary>
+    /// Emits the preset's shaders as GLSL for the OpenGL pipeline. The warp shader composes the
+    /// preset's per-pixel block and the comp shader its own, exactly like the Skia path, so the two
+    /// produce the same picture. A shader the dialect cannot express reports failure so the caller
+    /// keeps the CPU path.
+    /// </summary>
+    /// <param name="renderer">Renderer whose preset to translate.</param>
+    /// <param name="warp">Receives the warp GLSL, or <see langword="null"/>.</param>
+    /// <param name="comp">Receives the comp GLSL, or <see langword="null"/>.</param>
+    /// <param name="uniforms">Receives the per-pixel variables both shaders read.</param>
+    /// <returns><see langword="true"/> when every shader translated.</returns>
+    private static bool TryEmitGlsl(
+        PresetRenderer renderer,
+        out string? warp,
+        out string? comp,
+        out IReadOnlyList<string>? uniforms)
+    {
+        warp = null;
+        comp = null;
+        uniforms = null;
+        var preset = renderer.Preset;
+        var names = new SortedSet<string>(StringComparer.Ordinal);
+        try
+        {
+            if (preset.WarpShaders.Count > 0)
+            {
+                var perPixel = preset.PerPixel.IsEmpty ? null : preset.PerPixel;
+                warp = ShaderTranspiler.TranspileGlslWarp(preset.WarpShaders[0].Program, perPixel, out _, out var warpUniforms);
+                names.UnionWith(warpUniforms);
+            }
+
+            if (preset.CompShaders.Count > 0)
+            {
+                var shader = preset.CompShaders[0];
+                var perPixel = shader.PerPixel.IsEmpty ? null : shader.PerPixel;
+                comp = ShaderTranspiler.TranspileGlslComp(shader.Program, perPixel, out _, out var compUniforms);
+                names.UnionWith(compUniforms);
+            }
+        }
+        catch (PresetExpressionException)
+        {
+            return false;
+        }
+
+        uniforms = [.. names];
+        return true;
     }
     private readonly VisualizerPresetLibrary _library = new();
     private readonly SilentAudioSource _silent = new();
@@ -422,6 +493,9 @@ public partial class VisualizerWindow : Window
                 _glMeshX = meshX;
                 _glMeshY = meshY;
                 _glParameters = _renderer.ReadFrameParameters();
+                // The uniforms are filled under the same lock the presenter reads them under, so the
+                // GPU pipeline seeds the frame the CPU just computed.
+                _renderer.WriteShaderUniforms(_glUniforms, _glPerPixelUniforms);
                 _glPipelineActive = true;
             }
             else
@@ -594,19 +668,23 @@ public partial class VisualizerWindow : Window
                 {
                     _presentSourceBrightness = MeanBrightnessBgra(_glOverlayBytes);
                     _presentDestinationBrightness = _presentSourceBrightness;
+                    // Published under the lock so the presenter's copy of the uniform dictionary
+                    // cannot race the render thread that fills it.
+                    GlPresenter.SetPipeline(
+                        _glOverlayBytes,
+                        _renderWidth,
+                        _renderHeight,
+                        _glMeshSnapshot,
+                        _glMeshX,
+                        _glMeshY,
+                        _glParameters,
+                        _glWarpShader,
+                        _glCompShader,
+                        _glUniforms);
                 }
             }
 
-            if (pipeline)
-                GlPresenter.SetPipeline(
-                    _glOverlayBytes,
-                    _renderWidth,
-                    _renderHeight,
-                    _glMeshSnapshot,
-                    _glMeshX,
-                    _glMeshY,
-                    _glParameters);
-            else
+            if (!pipeline)
                 GlPresenter.SetFrame(_glBytes, _renderWidth, _renderHeight);
 
             GlPresenter.RequestNextFrameRendering();

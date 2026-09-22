@@ -517,8 +517,16 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
   output to zero-to-one, exactly like the eight-bit texture it replaces: the clamp is what gives a
   preset that amplifies its own feedback a stable fixed point, so a float format without it diverges
   exponentially, becomes an infinity and then a NaN, and paints the frame white. The float format
-  buys precision, not range. A preset with shaders keeps
-  the CPU frame path until the comp and warp shaders are ported to GLSL.
+  buys precision, not range. A preset with shaders now uses the GL pipeline too when its comp and
+  warp shaders emit GLSL: `ShaderTranspiler`'s GLSL dialect (`TranspileGlsl`, `TranspileGlslComp`,
+  `TranspileGlslWarp`) produces a `void main()` writing `orynivoColor`, `VisualizerGlPipeline` runs
+  the warp shader in place of the fixed mesh warp and the comp shader after the post pass into its
+  own display target, and the feedback stays the pre-comp frame. The GLSL samples with normalised
+  coordinates while Skia's `eval` takes pixels, so the emitter branches on the dialect; the vector
+  uniforms are declared as scalars with a reconstructing macro because `GlInterface` only exposes
+  scalar uniform setters; and `PresetRenderer.WriteShaderUniforms` seeds the same values the
+  interpreter binds. A shader the dialect cannot express leaves that stage on the fixed pipeline, and
+  a preset whose shaders do not emit keeps the CPU frame path.
   `VisualizerWindow`
   owns `VisualizerAudioHub.IsActive`: while it is false the players skip the tap entirely, so
   a closed visualizer costs nothing. Never render, analyse, or evaluate preset expressions on

@@ -160,8 +160,12 @@ public static class ShaderTranspiler
         string y,
         string z)
     {
-        var coordinate = "float2((mod(" + z + ", " + columns + ".0) * " + size + ".0) + " + x
+        var pixel = "float2((mod(" + z + ", " + columns + ".0) * " + size + ".0) + " + x
             + " + 0.5, (floor(" + z + " / " + columns + ".0) * " + size + ".0) + " + y + " + 0.5)";
+        // Skia samples the atlas in pixels; GLSL samples it normalised.
+        var coordinate = _glsl
+            ? $"({pixel} / float2({VisualizerTextureBank.VolumeAtlasWidth}.0, {VisualizerTextureBank.VolumeAtlasHeight}.0))"
+            : pixel;
         builder.Append("    float4 ").Append(variable).Append(" = ").Append(SampleExpr(sampler, coordinate)).Append(";\n");
     }
 
@@ -245,7 +249,11 @@ public static class ShaderTranspiler
         #define half float
         precision highp float;
         precision highp sampler2D;
-        uniform float4 texsize;
+        uniform float texsize_x;
+        uniform float texsize_y;
+        uniform float texsize_z;
+        uniform float texsize_w;
+        #define texsize float4(texsize_x, texsize_y, texsize_z, texsize_w)
         uniform float time;
         uniform float frame;
         uniform float fps;
@@ -256,9 +264,21 @@ public static class ShaderTranspiler
         uniform float bass_att;
         uniform float mid_att;
         uniform float treb_att;
-        uniform float4 aspect;
-        uniform float4 rand_frame;
-        uniform float4 rand_preset;
+        uniform float aspect_x;
+        uniform float aspect_y;
+        uniform float aspect_z;
+        uniform float aspect_w;
+        #define aspect float4(aspect_x, aspect_y, aspect_z, aspect_w)
+        uniform float rand_frame_x;
+        uniform float rand_frame_y;
+        uniform float rand_frame_z;
+        uniform float rand_frame_w;
+        #define rand_frame float4(rand_frame_x, rand_frame_y, rand_frame_z, rand_frame_w)
+        uniform float rand_preset_x;
+        uniform float rand_preset_y;
+        uniform float rand_preset_z;
+        uniform float rand_preset_w;
+        #define rand_preset float4(rand_preset_x, rand_preset_y, rand_preset_z, rand_preset_w)
         uniform sampler2D sampler_main;
         uniform sampler2D sampler_blur1;
         uniform sampler2D sampler_blur2;
@@ -301,6 +321,28 @@ public static class ShaderTranspiler
         uniform float2 _orynivo_centre;
         uniform float2 _orynivo_offset;
         uniform float2 _orynivo_stretch;
+        """;
+
+    /// <summary>
+    /// The GLSL spelling of the warp uniforms. GL exposes only scalar uniform setters, so a vector is
+    /// declared as its components and rebuilt with a macro.
+    /// </summary>
+    private const string GlslWarpUniforms = """
+        uniform float _orynivo_size_x;
+        uniform float _orynivo_size_y;
+        #define _orynivo_size float2(_orynivo_size_x, _orynivo_size_y)
+        uniform float _orynivo_zoom;
+        uniform float _orynivo_zoomExp;
+        uniform float _orynivo_rotation;
+        uniform float _orynivo_centre_x;
+        uniform float _orynivo_centre_y;
+        #define _orynivo_centre float2(_orynivo_centre_x, _orynivo_centre_y)
+        uniform float _orynivo_offset_x;
+        uniform float _orynivo_offset_y;
+        #define _orynivo_offset float2(_orynivo_offset_x, _orynivo_offset_y)
+        uniform float _orynivo_stretch_x;
+        uniform float _orynivo_stretch_y;
+        #define _orynivo_stretch float2(_orynivo_stretch_x, _orynivo_stretch_y)
         """;
 
     /// <summary>
@@ -443,7 +485,7 @@ public static class ShaderTranspiler
 
         builder.Append(glsl ? GlslPrelude : Prelude).Append(GeneratedUniforms()).Append(GeneratedVolumeHelpers());
         if (warpedUv)
-            builder.Append(WarpUniforms);
+            builder.Append(glsl ? GlslWarpUniforms : WarpUniforms);
         var extras = samplerNames.Where(name => !SamplerSet.Contains(name)).ToList();
         foreach (var name in extras)
             builder.Append("uniform shader ").Append(name).Append(";\n");
@@ -1601,14 +1643,26 @@ public static class ShaderTranspiler
     /// <param name="coordinate">Emitted normalised coordinate.</param>
     /// <returns>The pixel coordinate text.</returns>
     private static string SamplerCoordinate(string sampler, string coordinate) =>
-        IsFrameSampler(sampler)
-            ? $"({coordinate} * ({TexSizeUniform(sampler)}.xy - 1.0) + 0.5)"
-            : $"({coordinate} * {TexSizeUniform(sampler)}.xy)";
+        _glsl
+            // GLSL samples with normalised coordinates, so the shader's own coordinate is used as is.
+            ? coordinate
+            : IsFrameSampler(sampler)
+                ? $"({coordinate} * ({TexSizeUniform(sampler)}.xy - 1.0) + 0.5)"
+                : $"({coordinate} * {TexSizeUniform(sampler)}.xy)";
 
     /// <summary>Reports whether a sampler reads a frame rather than a generated texture.</summary>
     /// <param name="sampler">Emitted sampler name.</param>
     /// <returns><see langword="true"/> when the sampler is not one of the generated textures.</returns>
     private static bool IsFrameSampler(string sampler) => !VisualizerTextureBank.TryResolve(sampler, out _);
+
+    /// <summary>
+    /// Converts a pixel-centre coordinate into the form the active dialect samples with: Skia's
+    /// <c>eval</c> takes pixel coordinates, GLSL's <c>texture</c> takes normalised ones.
+    /// </summary>
+    /// <param name="pixel">Pixel-centre coordinate.</param>
+    /// <returns>The coordinate text.</returns>
+    private static string PixelCoordinate(string pixel) =>
+        _glsl ? $"(({pixel} + 0.5) / texsize.xy)" : $"({pixel} + 0.5)";
 
     /// <summary>Emits a call, translating the sampler accessors and the renamed intrinsics.</summary>
     /// <param name="call">Call node.</param>
@@ -1683,17 +1737,20 @@ public static class ShaderTranspiler
                     : "orynivoTex3DLq";
                 return $"{volumeHelper}({arguments[1]})";
             case "getpixel":
-                // The interpreter reads the texel at the truncated integer coordinate, so the pixel
-                // centre is the coordinate plus half.
-                return arguments.Count >= 2
-                    ? $"float4({SampleExpr(MainSampler, $"float2(float(int({arguments[0]})), float(int({arguments[1]}))) + 0.5")}).rgb"
-                    : $"float4({SampleExpr(MainSampler, $"float2(float(int({arguments[0]}.x)), float(int({arguments[0]}.y))) + 0.5")}).rgb";
+                {
+                    // The interpreter reads the texel at the truncated integer coordinate, so the pixel
+                    // centre is the coordinate plus half; GLSL samples that pixel centre normalised.
+                    var pixel = arguments.Count >= 2
+                        ? $"float2(float(int({arguments[0]})), float(int({arguments[1]})))"
+                        : $"float2(float(int({arguments[0]}.x)), float(int({arguments[0]}.y)))";
+                    return $"float4({SampleExpr(MainSampler, PixelCoordinate(pixel))}).rgb";
+                }
             case "getblur1":
-                return $"float4({SampleExpr("sampler_blur1", $"{Coordinate(call, arguments[0], 0)} * (texsize.xy - 1.0) + 0.5")}).rgb";
+                return $"float4({SampleExpr("sampler_blur1", SamplerCoordinate("sampler_blur1", Coordinate(call, arguments[0], 0)))}).rgb";
             case "getblur2":
-                return $"float4({SampleExpr("sampler_blur2", $"{Coordinate(call, arguments[0], 0)} * (texsize.xy - 1.0) + 0.5")}).rgb";
+                return $"float4({SampleExpr("sampler_blur2", SamplerCoordinate("sampler_blur2", Coordinate(call, arguments[0], 0)))}).rgb";
             case "getblur3":
-                return $"float4({SampleExpr("sampler_blur3", $"{Coordinate(call, arguments[0], 0)} * (texsize.xy - 1.0) + 0.5")}).rgb";
+                return $"float4({SampleExpr("sampler_blur3", SamplerCoordinate("sampler_blur3", Coordinate(call, arguments[0], 0)))}).rgb";
             case "saturate":
                 return $"clamp({arguments[0]}, 0.0, 1.0)";
             case "atan2":
