@@ -253,8 +253,14 @@
                          FontSize="{DynamicResource FontSizeBody}"
                          Theme="{StaticResource SettingsNavItemTheme}">
                 <StackPanel Orientation="Horizontal" Spacing="10">
-                    <Path Width="16" Height="16" Stretch="Uniform" VerticalAlignment="Center"
-                          Data="{StaticResource IconVisualizer}"/>
+                            <Path Width="16" Height="16" Stretch="Uniform" VerticalAlignment="Center"
+                                  Data="{StaticResource IconVisualizer}"
+                                  Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ListBoxItem}}"
+                                  StrokeThickness="1.6"
+                                  StrokeLineCap="Round"
+                                  StrokeJoin="Round"
+                                  Fill="Transparent"/>
+
                     <TextBlock Text="{DynamicResource L_Visualizer}" VerticalAlignment="Center"/>
                 </StackPanel>
             </ListBoxItem>

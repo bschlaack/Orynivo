@@ -104,8 +104,9 @@ public partial class VisualizerWindow : Window
     {
         _transport = transport;
         _presetIndex = presetIndex;
-        _renderWidth = Math.Clamp(options.Width, 160, 3840);
-        _renderHeight = Math.Clamp(options.Height, 90, 2160);
+            _renderWidth = Math.Clamp(options.Width, 160, 7680);
+            _renderHeight = Math.Clamp(options.Height, 90, 4320);
+
         _frameInterval = TimeSpan.FromMilliseconds(1000.0 / Math.Clamp(options.FrameRate, 5, 240));
         // Only the built-ins are available here. Enumerating a real preset collection is a disk
         // walk over thousands of files and must never run while the window is being constructed,

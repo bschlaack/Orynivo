@@ -215,6 +215,9 @@ internal partial class SettingsView : UserControl
         VisualizerAlwaysShowOverlayCheckBox.IsChecked = settings.VisualizerAlwaysShowOverlay;
         var visualizerResolutionChoices = new[]
         {
+            new SettingChoice<VisualizerResolution>(new VisualizerResolution(3840, 2160), "3840 × 2160"),
+            new SettingChoice<VisualizerResolution>(new VisualizerResolution(2560, 1440), "2560 × 1440"),
+            new SettingChoice<VisualizerResolution>(new VisualizerResolution(1920, 1080), "1920 × 1080"),
             new SettingChoice<VisualizerResolution>(new VisualizerResolution(1280, 720), "1280 × 720"),
             new SettingChoice<VisualizerResolution>(new VisualizerResolution(960, 540), "960 × 540"),
             new SettingChoice<VisualizerResolution>(new VisualizerResolution(640, 360), "640 × 360"),
@@ -225,7 +228,9 @@ internal partial class SettingsView : UserControl
         VisualizerResolutionComboBox.SelectedItem = visualizerResolutionChoices
             .FirstOrDefault(choice => choice.Value.Width == settings.VisualizerRenderWidth &&
                                       choice.Value.Height == settings.VisualizerRenderHeight)
-            ?? visualizerResolutionChoices[2];
+            ?? visualizerResolutionChoices
+                .FirstOrDefault(choice => choice.Value.Width == 640 && choice.Value.Height == 360)
+            ?? visualizerResolutionChoices[0];
         var visualizerFrameRateChoices = new[]
         {
             new SettingChoice<int>(120, "120"),

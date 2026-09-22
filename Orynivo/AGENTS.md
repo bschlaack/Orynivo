@@ -540,7 +540,10 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
   focusable button would keep a focus ring after the key press. `AppSettings` stores the
   render size (`VisualizerRenderWidth`/`VisualizerRenderHeight`), the target
   `VisualizerFrameRate`, and the user preset folder; the **Visualisierung** settings section
-  edits all three, and the window clamps them to a sane range (160-3840 wide, 5-240 fps). The
+  edits all three, and the window clamps them to a sane range (160-7680 wide, 5-240 fps). The
+  resolution choices run from 320 x 180 up to 3840 x 2160; keep the list ordered from the largest
+  down, and resolve a missing selection through a named default rather than an index, because an
+  index silently changes meaning when an entry is added. The
   defaults are 640 x 360 at 60 frames per second, which the parallel frame passes made affordable
   (the built-in presets cost 21 ms per frame on average there against 39 ms at 480 x 270 before).
   `VisualizerAlwaysShowOverlay` decides whether the overlay is permanent or appears on pointer

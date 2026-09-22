@@ -7,6 +7,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Fixed
+- Fixed the **Visualisierung** entry in Settings having no icon. `IconVisualizer` is a stroke-only
+  geometry (rising spectrum bars over a baseline), while the Settings navigation style sets `Fill`, so
+  the icon drew nothing. It now strokes with the navigation item's foreground, exactly like the
+  transport button that already used the same geometry.
 - Fixed presets turning into a solid white screen a few seconds after the sixteen-bit feedback
   landed. Eight-bit textures clamp every write to the colour range, so a preset that amplifies its
   own feedback (`fGammaAdj` below one against a decay near one) settled on a stable fixed point; a
@@ -31,6 +35,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   newest picture on screen. The render loop publishes at the configured frame rate while the control
   refreshes at the display rate, so an undrawn refresh is the normal case and the artefact appeared
   as a steady rubber band rather than an occasional hitch.
+
+### Changed
+- The visualizer's resolution choices now run up to 3840 x 2160 and include 2560 x 1440 and
+  1920 x 1080; the window accepts up to 7680 x 4320 instead of 3840 x 2160, so the added choices are
+  not silently clamped. A missing selection falls back to 640 x 360 by value instead of by index, so
+  adding a choice cannot move the default.
 
 ### Added
 - Added `PresetRuntimeDiagnosticTests`, which renders every preset of the configured folder for a few
