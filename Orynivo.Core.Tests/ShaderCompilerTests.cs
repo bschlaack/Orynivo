@@ -40,6 +40,11 @@ public sealed class ShaderCompilerTests
     [InlineData("return float4(dot(float3(1, 2, 3), float3(4, 5, 6)), length(float2(3, 4)), 0, 0);")]
     [InlineData("return float4(uv.xyxy.rgb, 1);")]
     [InlineData("return float4(normalize(float2(1, 2)), smoothstep(0, 1, bass), clamp(bass, 0, 1));")]
+    [InlineData("return float4(mul(float2x2(1, 2, 3, 4), uv), 0, 1);")]
+    [InlineData("return float4(mul(uv, float2x2(1, 2, 3, 4)), 0, 1);")]
+    [InlineData("float2x2 m = float2x2(1, 0, 0, 1); return float4(mul(m, uv), 0, 1);")]
+    [InlineData("return float4(mul(float2x2(q1, 2, 3, 4), float2(bass, mid)), 0, 1);")]
+    [InlineData("return float4(mul(mul(float2x2(1, 2, 3, 4), float2x2(bass, mid, treb, vol)), uv), 0, 1);")]
     public void Compile_MatchesTheInterpreter(string body)
     {
         Compare("comp_1=float4 main(float2 uv : TEXCOORD0) : COLOR\n{\n" + body + "\n}");

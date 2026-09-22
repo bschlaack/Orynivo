@@ -117,9 +117,9 @@ internal static class SkSL
     public static string MapType(string type)
     {
         if (type.StartsWith("half", StringComparison.Ordinal))
-            return "float" + type[4..];
+            return MapType("float" + type[4..]);
         if (type.StartsWith("double", StringComparison.Ordinal))
-            return "float" + type[6..];
+            return MapType("float" + type[6..]);
 
         // The engine stores every value as a float, so integer and boolean variables become floats.
         // SkSL is strictly typed, and "n < 4" with an int and a float is a compile error.
@@ -128,6 +128,10 @@ internal static class SkSL
             if (type.StartsWith(prefix, StringComparison.Ordinal))
                 return "float" + type[prefix.Length..];
         }
+
+        // A Milkdrop matrix is a SkSL matrix. SkSL spells a two-by-two matrix mat2, not float2x2.
+        if (IsMatrixType(type))
+            return "mat" + MatrixDimension(type);
 
         return type switch
         {
@@ -138,6 +142,42 @@ internal static class SkSL
             "sampler" or "sampler2D" or "sampler3D" or "texture" => "shader",
             _ => type
         };
+    }
+
+    /// <summary>Reports whether a declared type name is a matrix.</summary>
+    /// <param name="type">Type name.</param>
+    /// <returns><see langword="true"/> when the type is a matrix.</returns>
+    public static bool IsMatrixType(string type)
+    {
+        // The SkSL spelling, which the emitter infers for a matrix constructor.
+        if (type is "mat2" or "mat3" or "mat4")
+            return true;
+
+        foreach (var prefix in new[] { "float", "half", "double" })
+        {
+            if (!type.StartsWith(prefix, StringComparison.Ordinal))
+                continue;
+
+            var suffix = type[prefix.Length..];
+            return suffix.Length == 3 && suffix[1] == 'x' &&
+                   suffix[0] is '2' or '3' or '4' && suffix[2] == suffix[0];
+        }
+
+        return false;
+    }
+
+    /// <summary>Gets the dimension of a matrix type name.</summary>
+    /// <param name="type">Matrix type name.</param>
+    /// <returns>The dimension, or two when the name is not a square matrix.</returns>
+    public static int MatrixDimension(string type)
+    {
+        foreach (var character in type)
+        {
+            if (character is '2' or '3' or '4')
+                return character - '0';
+        }
+
+        return 2;
     }
 
     /// <summary>Reports whether a name is a vector or matrix constructor.</summary>

@@ -344,15 +344,13 @@ public partial class VisualizerWindow : Window
             _renderer.Dispose();
             _renderer = new PresetRenderer(preset, _renderWidth, _renderHeight);
             ConfigureRenderer(_renderer);
-            // The first frames are traced stage by stage so a frozen frame names its own stage.
-            // Each stage's begin message is also sampled, which reports the frame the stage before it
-            // produced: that is what tells a white picture apart from a warp, a comp, or an overlay
-            // that went white, instead of only knowing the finished frame is saturated.
-            _renderer.StageLogger = message =>
-            {
-                RecordStageBrightness(message);
-                SeekDiagnostics.Log("visualizer", message);
-            };
+            // The first frames are traced stage by stage so a frozen frame names its own stage, and
+            // every frame reports the brightness as it enters each stage. The renderer probes the
+            // buffer the stage reads, so the values follow the current frame instead of only the
+            // first frame the trace happens to cover; that is what tells a white picture apart from
+            // a warp, a comp, or an overlay that went white.
+            _renderer.StageLogger = message => SeekDiagnostics.Log("visualizer", message);
+            _renderer.StageBrightnessLogger = (stage, value) => _stageBrightness[stage] = value;
             // Parsing and compiling a preset happen here, on the render thread, so a preset that
             // takes seconds to build looks exactly like a frozen window. Log both halves.
             SeekDiagnostics.Log(
@@ -486,40 +484,23 @@ public partial class VisualizerWindow : Window
     }
 
     /// <summary>
-    /// The mean brightness the frame had when each stage last began. It is written by the render
-    /// thread through the stage logger and read by the diagnostics line, so it is concurrent.
+    /// The mean brightness the frame had as it entered each stage. It is written by the render thread
+    /// through the renderer's stage probe and read by the diagnostics line, so it is concurrent.
     /// </summary>
     private readonly ConcurrentDictionary<string, float> _stageBrightness = new(StringComparer.Ordinal);
 
     /// <summary>
-    /// Samples the frame when a stage begins, which reports what the stage before it produced.
+    /// The mean brightness of the frame the presenter last copied, sampled from the render thread's
+    /// presentation buffer before the copy. It is written by the UI thread under
+    /// <see cref="_presentLock"/> and read by the diagnostics line.
     /// </summary>
-    /// <param name="message">Stage trace message, formatted as <c>stage=&lt;name&gt; begin …</c>.</param>
-    private void RecordStageBrightness(string message)
-    {
-        const string prefix = "stage=";
-        if (!message.StartsWith(prefix, StringComparison.Ordinal))
-            return;
+    private float _presentSourceBrightness = -1f;
 
-        var end = message.IndexOf(' ', prefix.Length);
-        if (end < 0)
-            return;
-
-        var renderer = _renderer;
-        if (renderer is null)
-            return;
-
-        var pixels = renderer.Output.Pixels;
-        var total = 0f;
-        var samples = 0;
-        for (var index = 0; index + 2 < pixels.Length; index += 64)
-        {
-            total += pixels[index] + pixels[index + 1] + pixels[index + 2];
-            samples += 3;
-        }
-
-        _stageBrightness[message[prefix.Length..end]] = samples == 0 ? 0f : total / samples;
-    }
+    /// <summary>
+    /// The mean brightness of the bytes the presenter last copied into, sampled after the copy. A
+    /// presentation fault shows up as this value differing from <see cref="_presentSourceBrightness"/>.
+    /// </summary>
+    private float _presentDestinationBrightness = -1f;
 
     /// <summary>
     /// Builds the once-per-second diagnostic line so an empty window can be told apart from a
@@ -535,32 +516,19 @@ public partial class VisualizerWindow : Window
             return null;
 
         _lastDiagnostics = now;
-        var pixels = _renderer.Output.Pixels;
-        var total = 0f;
-        var samples = 0;
-        var saturated = 0;
-        for (var index = 0; index < pixels.Length; index += 64)
-        {
-            var red = pixels[index];
-            var green = pixels[index + 1];
-            var blue = pixels[index + 2];
-            total += red + green + blue;
-            samples += 3;
-            // A frame that renders white is either genuinely saturated or never reaches the screen.
-            // Counting the saturated share tells those two apart, because a presentation fault
-            // leaves the rendered frame's brightness and saturation untouched.
-            if (red >= 0.99f && green >= 0.99f && blue >= 0.99f)
-            {
-                saturated++;
-            }
-        }
+        // The rendered frame is the post-comp frame the presenter copies. Its brightness and
+        // saturated share are the two numbers that tell a genuinely white picture apart from one
+        // that never reaches the screen, because a presentation fault leaves them untouched.
+        var output = _renderer.Output;
+        var brightness = output.MeanBrightness();
+        var saturated = output.SaturatedShare();
 
-        var sampledPixels = samples / 3f;
         var timings = _renderer.AverageTimings;
         var message =
             $"frames={_renderer.FrameCount} audioFrames={VisualizerAudioHub.Shared.AnalyzedFrames} "
-            + $"reduceMotion={ReduceMotion} brightness={(samples == 0 ? 0f : total / samples):F4} "
-            + $"saturated={(sampledPixels == 0f ? 0f : saturated / sampledPixels):P1} "
+            + $"reduceMotion={ReduceMotion} brightness={brightness:F4} "
+            + $"saturated={saturated:P1} "
+            + $"presentBrightness=source:{_presentSourceBrightness:F4}/destination:{_presentDestinationBrightness:F4} "
             + $"size={_renderWidth}x{_renderHeight} "
             + $"renderMs={timings.Total:F2} warpMs={timings.Warp:F2} blurMs={timings.Blur:F2} "
             + $"postMs={timings.PostProcess:F2} overlayMs={timings.Overlay:F2} "
@@ -615,7 +583,17 @@ public partial class VisualizerWindow : Window
                     var size = _renderWidth * _renderHeight * 4;
                     if (_glBytes.Length != size)
                         _glBytes = new byte[size];
+                    // The brightness before and after the copy tells a white GL upload from a white
+                    // source frame. The pipeline path has no full-frame CPU buffer, so the CPU half
+                    // (the overlay) is what it reports.
+                    _presentSourceBrightness = _presentBuffer.MeanBrightness();
                     _presentBuffer.WriteBgra(_glBytes);
+                    _presentDestinationBrightness = MeanBrightnessBgra(_glBytes);
+                }
+                else
+                {
+                    _presentSourceBrightness = MeanBrightnessBgra(_glOverlayBytes);
+                    _presentDestinationBrightness = _presentSourceBrightness;
                 }
             }
 
@@ -658,6 +636,9 @@ public partial class VisualizerWindow : Window
         // presentation copy. The lock is held for the copy only, never for a whole frame.
         lock (_presentLock)
         {
+            // Sample the render thread's finished frame before the copy and the destination bytes
+            // after it, so a copy or bitmap fault shows up as the two numbers disagreeing.
+            _presentSourceBrightness = _presentBuffer.MeanBrightness();
             if (buffer.RowBytes == stride)
             {
                 unsafe
@@ -679,6 +660,8 @@ public partial class VisualizerWindow : Window
                         stride);
                 }
             }
+
+            _presentDestinationBrightness = MeanBrightnessBgra(buffer.Address, buffer.RowBytes, _renderWidth, _renderHeight);
         }
 
         // Writing the bitmap is not enough on its own: the image has to be invalidated so
@@ -723,6 +706,54 @@ public partial class VisualizerWindow : Window
 
         PlayPauseIconPath.Data = (Avalonia.Media.Geometry?)this.FindResource(
             _isPlaying ? "IconPauseGlyph" : "IconPlayGlyph");
+    }
+
+    /// <summary>
+    /// Measures the mean RGB brightness of a BGRA byte buffer over a fixed strided sample, so the
+    /// presenter can report what it copied without walking every byte of a full-resolution frame.
+    /// </summary>
+    /// <param name="bytes">BGRA bytes.</param>
+    /// <returns>The mean channel value in the range zero to one.</returns>
+    private static float MeanBrightnessBgra(ReadOnlySpan<byte> bytes)
+    {
+        var total = 0L;
+        var samples = 0;
+        for (var index = 0; index + 2 < bytes.Length; index += 64)
+        {
+            total += bytes[index] + bytes[index + 1] + bytes[index + 2];
+            samples += 3;
+        }
+
+        return samples == 0 ? 0f : total / (samples * 255f);
+    }
+
+    /// <summary>
+    /// Measures the mean RGB brightness of a locked bitmap, respecting a padded row stride so the
+    /// padding is not counted.
+    /// </summary>
+    /// <param name="address">Start of the first row.</param>
+    /// <param name="rowBytes">Bytes per row, including padding.</param>
+    /// <param name="width">Frame width in pixels.</param>
+    /// <param name="height">Frame height in pixels.</param>
+    /// <returns>The mean channel value in the range zero to one.</returns>
+    private static float MeanBrightnessBgra(IntPtr address, int rowBytes, int width, int height)
+    {
+        var total = 0L;
+        var samples = 0;
+        unsafe
+        {
+            for (var y = 0; y < height; y++)
+            {
+                var row = new ReadOnlySpan<byte>((void*)(address + (y * rowBytes)), width * 4);
+                for (var index = 0; index + 2 < row.Length; index += 64)
+                {
+                    total += row[index] + row[index + 1] + row[index + 2];
+                    samples += 3;
+                }
+            }
+        }
+
+        return samples == 0 ? 0f : total / (samples * 255f);
     }
 
     /// <summary>Silent fallback so a preset renders before playback starts or while paused.</summary>

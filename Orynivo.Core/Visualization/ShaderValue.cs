@@ -14,13 +14,20 @@ public readonly record struct ShaderValue
     /// <param name="z">Third component.</param>
     /// <param name="w">Fourth component.</param>
     /// <param name="count">Number of meaningful components, one to four.</param>
-    public ShaderValue(float x, float y, float z, float w, int count)
+    /// <param name="isMatrix">
+    /// Whether the value is a two-by-two matrix stored row-major in the four components instead of a
+    /// vector. Milkdrop shaders construct a matrix with <c>float2x2(...)</c> and consume it with
+    /// <c>mul</c>; keeping it in the same four floats avoids growing the value the per-pixel shader
+    /// path copies around.
+    /// </param>
+    public ShaderValue(float x, float y, float z, float w, int count, bool isMatrix = false)
     {
         X = x;
         Y = y;
         Z = z;
         W = w;
         Count = Math.Clamp(count, 1, 4);
+        IsMatrix = isMatrix;
     }
 
     /// <summary>Gets the first component.</summary>
@@ -38,6 +45,9 @@ public readonly record struct ShaderValue
     /// <summary>Gets how many components are meaningful.</summary>
     public int Count { get; }
 
+    /// <summary>Gets a value indicating whether the value is a two-by-two matrix, not a vector.</summary>
+    public bool IsMatrix { get; }
+
     /// <summary>Gets the value as a truth value, using the first component.</summary>
     public bool IsTrue => X != 0f;
 
@@ -54,6 +64,15 @@ public readonly record struct ShaderValue
     /// <param name="count">Number of components.</param>
     /// <returns>The vector.</returns>
     public static ShaderValue Vector(float x, float y, float z, float w, int count) => new(x, y, z, w, count);
+
+    /// <summary>Creates a two-by-two matrix stored row-major.</summary>
+    /// <param name="m00">Row 0, column 0.</param>
+    /// <param name="m01">Row 0, column 1.</param>
+    /// <param name="m10">Row 1, column 0.</param>
+    /// <param name="m11">Row 1, column 1.</param>
+    /// <returns>The matrix value.</returns>
+    public static ShaderValue Matrix2x2(float m00, float m01, float m10, float m11) =>
+        new(m00, m01, m10, m11, 4, true);
 
     /// <summary>Reads one component, or zero when the value is shorter.</summary>
     /// <param name="index">Component index from zero to three.</param>

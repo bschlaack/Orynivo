@@ -841,6 +841,14 @@ affordable. This is a project of its own and must keep the CPU path as the fallb
   fixed point, so without it a preset with `fGammaAdj` below one against a decay near one diverges
   exponentially past the sixteen-bit range, turns into an infinity and then a NaN, and paints the
   whole frame white after a few seconds. The sixteen-bit format buys precision, not range.
+  The clamp alone was not enough, because the **comp shader is a display pass, not a feedback
+  stage**: the reference draws it into the previous-frame buffer while the next frame's `mainTexture`
+  is the pre-comp composite, so a comp shader that amplifies its input (the common `ret *= 10`
+  gamma idiom) never compounds. The CPU renderer fed the comp output back instead, so
+  `LuxXx - BadBallz Beta` saturated to a white frame by frame 6; the feedback is now the pre-comp
+  composite and only the display is the post-comp frame. Measured at 640 x 360 the frame settles
+  around 0.85 mean brightness instead of 1.0. `PresetRenderer.Output` is the post-comp display frame
+  and `MeshSource` is the pre-comp feedback, and `CompFeedbackTests` pins both down.
   The presenter draws on **every** refresh, re-presenting the texture it drew last when the render
   thread published nothing new. Avalonia's GL surface is double buffered, so an undrawn refresh swaps
   to the buffer two presentations old; because the render loop publishes at the configured frame rate
@@ -848,6 +856,17 @@ affordable. This is a project of its own and must keep the CPU path as the fallb
   artefact was a steady rubber band.
   What remains: the comp and warp shaders as GLSL, which is what makes the many shader presets
   eligible, and then deleting the CPU frame path for the GL mode.
+  That is step 4, and it is the largest remaining piece: shader presets still run on the CPU even
+  when `ORYNIVO_VISUALIZER_OPENGL=1`, because `VisualizerGlPipeline` only owns the frame for a preset
+  with no shaders. Measured at 640 x 360 the comp shader is about 58 ms of a 62 ms frame, so the
+  port is what turns a shader preset from roughly 16 fps into a GPU frame. The work is to retarget
+  `ShaderTranspiler` from SkSL to GLSL (the dialect differs per platform: ANGLE's GLES on Windows,
+  desktop GL on Linux, CGL on macOS, so the preamble is chosen from the negotiated version) and to
+  compile and bind it in `VisualizerGlPipeline`'s context. The SkSL emitter's recent matrix support
+  has to be mirrored there too: `float2x2` becomes GLSL `mat2`, and a single vector argument is
+  spread into four scalars because `mat2` has no four-component constructor. The SkSL path stays the
+  fallback, so a shader the GLSL emitter cannot translate keeps rendering through Skia or the
+  interpreter.
   The warp's sampling arithmetic now lives in the tested
 
   `Orynivo.Visualization.WarpSampling`, which the GLSL fragment shader has to translate rather than
@@ -1041,17 +1060,23 @@ affordable. This is a project of its own and must keep the CPU path as the fallb
   loop-budget errors**. The claim had counted a *parse* failure as a run-time loss. So nothing in the
   collection loses a block or a frame at run time today; the only open fidelity work is the per-pixel
   mesh convention below and the GLSL shader port in 40f.
-  **Remaining.** Four things are still open in this phase. The **matrix types are the biggest one**:
-  `float2x2`, `float3x3`, and `float4x4` are unknown to the shader runtime, so
-  `Unknown shader function 'float2x2'` disables a shader outright. A scan of the sample collection
-  found **913 files** that use a matrix type, so this is a fidelity gap and not an edge case. The
-  usage is consistently construction plus `mul` — `mul(uv1, float2x2(ang2.y,-ang2.x,ang2.x,ang2.y))`
-  with four scalars and `mul(16*uv1, float2x2(_qb))` with one vector — so the required scope is a
-  matrix value, the `floatNxN` constructors from scalars and vectors, and `mul` in both argument
-  orders. `ShaderRuntime` is the single dispatch point both execution paths call, so the work belongs
-  there; the compiled path in `ShaderProgram` and the SkSL emitter have to agree with it, and
-  `ShaderCompilerTests` is the check. A guessed implementation would be worse than the current skip,
-  which is why it is scoped here rather than patched. The per-pixel mesh is implemented and
+  **Remaining.** Three things are still open in this phase. The **two-by-two matrix type is done**:
+  `float2x2` was unknown to the shader runtime, so `Unknown shader function 'float2x2'` disabled a
+  shader outright. A scan of the 9795-file collection found 729 files that build a `float2x2` and
+  consume it with `mul`, plus 59 that build a `float3x3` and none that build a `float4x4`. The
+  usage is construction plus `mul` — `mul(uv1, float2x2(ang2.y,-ang2.x,ang2.x,ang2.y))` with four
+  scalars and `mul(16*uv1, float2x2(_qb))` with one vector — so the implemented scope is a
+  two-by-two matrix value, the `float2x2(...)` constructor from four scalars or one vector, and
+  HLSL's `mul` for matrix-by-vector, vector-by-matrix, and matrix-by-matrix. The matrix is stored
+  row-major in the four components the value already has, so the per-pixel value the shader paths
+  copy around does not grow; `ShaderRuntime` is the single dispatch point both execution paths call,
+  the compiled path in `ShaderProgram` and the SkSL emitter agree with it (`float2x2` becomes a SkSL
+  `mat2`, a vector argument is spread into four scalars because `mat2` has no four-component
+  constructor, and a matrix argument is not narrowed), and `ShaderMatrixTests`, `ShaderCompilerTests`,
+  and `ShaderTranspilerTests` are the check. `float3x3` (59 files) and `float4x4` (0 files) remain:
+  nine and sixteen components do not fit the four the hot path copies, so they need the value
+  representation to grow or a side channel, and they are left scoped rather than guessed at.
+  The per-pixel mesh is implemented and
   opt-in, but it cannot become the default yet: the engine's per-pixel `x`/`y` are the warped
   position in minus-one-to-one space rather than Milkdrop's aspect-scaled zero-to-one vertex
   position, so a preset that derives `dx`/`dy` from `x`/`y` renders visibly differently once that

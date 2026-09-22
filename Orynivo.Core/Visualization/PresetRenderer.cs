@@ -98,6 +98,14 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
     private bool _skiaWarpTried;
     private bool _warpShadersFailed;
     private bool _compShadersFailed;
+
+    /// <summary>
+    /// Whether the comp stage ran on the last frame, so its input is the pre-comp composite. The
+    /// feedback has to be that pre-comp frame, not the comp output: the comp shader is a display
+    /// pass in the reference implementation, and feeding its output back lets a preset that
+    /// amplifies inside the comp shader diverge to white.
+    /// </summary>
+    private bool _compStageRan;
     private readonly float[] _slots;
     // Resolved once so the per-pixel loop never looks a name up in the layout again.
     private readonly int _slotX;
@@ -231,8 +239,13 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
     /// <summary>Gets the preset being rendered.</summary>
     public VisualizerPreset Preset { get; }
 
-    /// <summary>Gets the frame the presenter should show.</summary>
-    public PixelBuffer Output => _previous;
+    /// <summary>
+    /// Gets the frame the presenter should show. It is the post-comp frame, because the comp shader
+    /// is the display pass; the feedback the next frame warps from is the separate pre-comp frame
+    /// <see cref="MeshSource"/> exposes. Presenting <see cref="MeshSource"/> instead would drop the
+    /// comp shader's picture.
+    /// </summary>
+    public PixelBuffer Output => _fresh;
 
     /// <summary>Gets the number of rendered frames.</summary>
     public long FrameCount => _frame;
@@ -318,6 +331,15 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
     /// returns leaves its own line as the last one, which is how a frozen frame is located.
     /// </summary>
     public Action<string>? StageLogger { get; set; }
+
+    /// <summary>
+    /// Gets or sets the sink for the frame's brightness as it enters each stage, which is what lets a
+    /// diagnostic attribute a white frame to the stage that turned it white. It is invoked once per
+    /// stage on every frame while it is set, so the values track the current frame instead of the
+    /// first frame the stage trace happens to cover. Leave it <see langword="null"/> to skip the
+    /// probes.
+    /// </summary>
+    public Action<string, float>? StageBrightnessLogger { get; set; }
 
     /// <summary>The motion variables a per-pixel program may change for the following pixel.</summary>
     private static readonly string[] MotionVariables =
@@ -410,8 +432,9 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
     }
 
     /// <summary>
-    /// Gets the frame the mesh warp samples: the feedback the CPU warp would read. A GPU warp binds
-    /// it as its source texture, so it must stay valid until the next frame is rendered.
+    /// Gets the frame the mesh warp samples: the feedback the CPU warp reads, which is the previous
+    /// frame's pre-comp composite. A GPU warp binds it as its source texture, so it must stay valid
+    /// until the next frame is rendered.
     /// </summary>
     public PixelBuffer MeshSource => _previous;
 
@@ -551,6 +574,7 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
         // visualizer would fill the log.
         var trace = _frame < 2 ? StageLogger : null;
         trace?.Invoke($"stage=perFrame begin frame={_frame} preset={Preset.Name}");
+        ProbeStage("perFrame", _previous);
         try
         {
             Preset.PerFrame.Execute(_slots);
@@ -587,9 +611,11 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
         if (useShaders)
             SeedCompiledShaderFrame();
         trace?.Invoke($"stage=warp begin frame={_frame}");
+        ProbeStage("warp", _previous);
         Warp(useShaders);
         var warp = Mark();
         trace?.Invoke($"stage=blur begin frame={_frame}");
+        ProbeStage("blur", _warped);
 
         for (var pass = 0; pass < BlurPasses(); pass++)
             _warped.Blur();
@@ -603,15 +629,18 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
         var postProcess = Mark();
 
         trace?.Invoke($"stage=overlay begin frame={_frame}");
+        ProbeStage("overlay", _warped);
         DrawOverlay();
         var overlay = Mark();
         Composite();
         var composite = Mark();
 
         var shader = 0d;
+        _compStageRan = false;
         if (useShaders)
         {
             trace?.Invoke($"stage=compShader begin frame={_frame}");
+            ProbeStage("compShader", _fresh);
             _shaderClock.Restart();
             ApplyCompShaders();
             _shaderClock.Stop();
@@ -620,10 +649,24 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
 
         LastShaderMilliseconds = shader + _warpShaderMilliseconds;
         trace?.Invoke($"stage=done frame={_frame}");
-        _previous.CopyFrom(_fresh);
+        ProbeStage("done", _fresh);
+        // The feedback is the pre-comp composite, exactly like the reference: the comp shader is a
+        // display pass and must not feed its own output back. Without a comp stage the composite is
+        // already the pre-comp frame, so it is the feedback too.
+        _previous.CopyFrom(_compStageRan ? _frameCopy : _fresh);
         _frame++;
         RecordTimings(warp, blur, postProcess, overlay, composite, LastShaderMilliseconds);
     }
+
+    /// <summary>
+    /// Reports the frame's mean brightness as it enters a named stage by sampling the buffer that
+    /// stage reads. The value is what the previous stage produced, which is what lets a diagnostic
+    /// attribute a white frame to the stage that turned it white.
+    /// </summary>
+    /// <param name="stage">Stage name, matching the stage trace.</param>
+    /// <param name="buffer">Buffer the stage reads.</param>
+    private void ProbeStage(string stage, PixelBuffer buffer) =>
+        StageBrightnessLogger?.Invoke(stage, buffer.MeanBrightness());
 
     /// <summary>
     /// Draws only the waveform and spectrum overlay, without the feedback warp. This is the
@@ -1727,6 +1770,7 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
         var width = _fresh.Width;
         var height = _fresh.Height;
         _frameCopy.CopyFrom(_fresh);
+        _compStageRan = true;
         _samplerMainIsWarped = true;
         // The comp pass blurs a different source than the warp, so its blur levels are rebuilt.
         Array.Clear(_blurLevelReady);

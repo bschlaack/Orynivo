@@ -7,7 +7,34 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Fixed
+- Fixed the visualizer turning into a solid white screen on comp-shader presets such as
+  `LuxXx - BadBallz Beta`. The renderer fed the comp shader's output back as the next frame's
+  feedback, so a comp shader that amplifies its input (the common `ret *= 10` gamma idiom)
+  compounded every frame until the whole frame saturated. The feedback is now the **pre-comp**
+  composite and only the display is the post-comp frame, matching the reference implementation
+  (`FinalComposite` writes the display into the previous frame buffer while the next frame's
+  `mainTexture` is the pre-comp frame). Measured on `LuxXx - BadBallz Beta` at 640 x 360, the
+  frame now settles around 0.85 mean brightness instead of reaching 1.0 and 100 percent saturated
+  by frame 6. `CompFeedbackTests` pins the rule down.
+- Fixed the visualizer's `stageBrightness` diagnostic reporting the wrong frame. It sampled
+  `renderer.Output`, which was the previous frame until the end-of-frame copy, so every stage
+  reported the same stale value and a white frame could not be attributed to a stage. The renderer
+  now probes the buffer each stage reads on every frame (`StageBrightnessLogger`), so the log shows
+  where the brightness jumps. The same investigation found that `PresetRenderer.Output` had to
+  become the post-comp frame; the presenter was previously showing the feedback buffer.
+- Fixed the shader runtime rejecting `float2x2`. `Unknown shader function 'float2x2'` disabled a
+  shader outright, and a scan of the preset collection found 729 files that build a `float2x2` and
+  consume it with `mul`; a real preset such as `martin - neon space ps2 (ati fix)` now renders with
+  `shaderError=none` instead of losing its shader. The runtime gained a two-by-two matrix value
+  (stored row-major in the existing four components, so the per-pixel value stays the same size),
+  the `float2x2(...)` constructor from four scalars or one vector, and HLSL's `mul` for
+  matrix-by-vector, vector-by-matrix, and matrix-by-matrix. The SkSL emitter maps `float2x2` onto
+  `mat2`, spreads a vector argument into four scalars because SkSL's `mat2` has no four-component
+  constructor, and leaves a matrix argument alone instead of narrowing it. `ShaderMatrixTests` and
+  `ShaderCompilerTests` cover the values and the interpreter/compiled-path agreement, and
+  `ShaderTranspilerTests` proves Skia accepts the emitted SkSL.
 - Fixed the **Visualisierung** entry in Settings having no icon. `IconVisualizer` is a stroke-only
+
   geometry (rising spectrum bars over a baseline), while the Settings navigation style sets `Fill`, so
   the icon drew nothing. It now strokes with the navigation item's foreground, exactly like the
   transport button that already used the same geometry.
@@ -37,12 +64,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   as a steady rubber band rather than an occasional hitch.
 
 ### Changed
-- The visualizer's once-per-second diagnostic line now also reports the frame's brightness **per
-  stage** (`stageBrightness=warp:…/blur:…/compShader:…/done:…`), sampled when each stage begins, so
-  it reports what the stage before it produced. The saturated share alone says a frame went white; the
-  per-stage brightness says which stage turned it white, instead of leaving that to be inferred from
-  the finished frame. It is recorded through the existing stage logger, so the renderer gained no new
-  logging surface.
+- The visualizer's once-per-second diagnostic line now also reports the brightness of the frame the
+  presenter copied, sampled **before and after** the copy under the presentation lock
+  (`presentBrightness=source:…/destination:…`), so a copy or bitmap fault is told apart from a
+  genuinely white source frame without another round trip. The line is bounded and carries no media
+  names or paths.
+- The visualizer's once-per-second diagnostic line now reports the frame's brightness **per stage**
+  (`stageBrightness=warp:…/blur:…/compShader:…/done:…`) on **every** frame, each value sampled from
+  the buffer that stage reads, so the numbers follow the current frame instead of the first frame the
+  stage trace happens to cover. The saturated share alone says a frame went white; the per-stage
+  brightness says which stage turned it white, and a stale per-stage value is worse than none because
+  it looks authoritative while pointing at the wrong stage. The renderer gained one small
+  `StageBrightnessLogger` hook, and `PixelBuffer.MeanBrightness`/`SaturatedShare` are the shared
+  probes.
 - The visualizer's once-per-second diagnostic line now also reports the rendered frame's
   **saturated share** and whether the per-pixel program is suspended. A white window is either a
   genuinely saturated frame or a frame that never reaches the screen, and the saturated share tells
@@ -55,6 +89,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   adding a choice cannot move the default.
 
 ### Added
+- Added `PresetBrightnessDiagnosticTests`, which renders one configured preset file for a few frames
+  and reports each frame's mean brightness and saturated share, so a preset that turns white can be
+  located to the frame it happens on. Point `ORYNIVO_PRESET_BRIGHTNESS_FILE` at a preset to run it.
+- Added `CompFeedbackTests`, which pins down the comp stage's feedback rule: a comp shader that
+  writes white must paint the display white without whitening the feedback, and an amplifying comp
+  shader must settle instead of diverging.
+- Added `ShaderMatrixTests`, which verifies the two-by-two matrix constructor and `mul` in both
+  argument orders and for two matrices against hand-computed values.
+- Added `PixelBuffer.MeanBrightness` and `PixelBuffer.SaturatedShare`, the strided probes the
+  visualizer diagnostics share.
 - Added `PresetRuntimeDiagnosticTests`, which renders every preset of the configured folder for a few
   frames and reports the ones whose frame failed at run time, separately counting the interpreter's
   loop budget. It is the harness that decides whether a preset really loses its picture at run time,

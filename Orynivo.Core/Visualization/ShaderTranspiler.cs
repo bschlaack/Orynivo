@@ -929,6 +929,22 @@ public static class ShaderTranspiler
         if (SkSL.IsVectorConstructor(call.Text))
             return SkSL.MapType(call.Text);
 
+        // mul with a matrix yields a matrix for matrix-by-matrix and the vector type otherwise, so
+        // the assignment coercion below does not collapse a matrix result to a float2.
+        if (call.Text.Equals("mul", StringComparison.OrdinalIgnoreCase))
+        {
+            var left = call.Items.Count > 0 ? TypeOf(call.Items[0]) : null;
+            var right = call.Items.Count > 1 ? TypeOf(call.Items[1]) : null;
+            var leftMatrix = left is not null && SkSL.IsMatrixType(left);
+            var rightMatrix = right is not null && SkSL.IsMatrixType(right);
+            if (leftMatrix && rightMatrix)
+                return left;
+            if (leftMatrix)
+                return right ?? "float2";
+            if (rightMatrix)
+                return left ?? "float2";
+        }
+
         // An intrinsic that takes matching component counts is emitted with every argument narrowed to
         // the smallest vector count among them, so the result keeps that count. Reporting the widest
         // count here instead made a later operation skip the conversion it needed, which SkSL then
@@ -1453,8 +1469,20 @@ public static class ShaderTranspiler
 
         // An intrinsic takes matching component counts, while a preset may hand it a float4 where a
         // float3 is meant, as in "max(ret, tex2D(...) * 0.97)". Every argument is brought to the
-        // smallest vector count among them; widening a scalar is harmless because it is uniform.
-        if (SkSL.DirectFunctions.Contains(name) || name is "saturate" or "lerp" or "atan2" or "mul" or "lum")
+        // smallest vector count among them; widening a scalar is harmless because it is uniform. A
+        // matrix argument is left alone: SkSL spells it mat2 and a component count cannot describe it.
+        var hasMatrix = false;
+        foreach (var argument in call.Items)
+        {
+            if (TypeOf(argument) is { } matrixType && SkSL.IsMatrixType(matrixType))
+            {
+                hasMatrix = true;
+                break;
+            }
+        }
+
+        if (!hasMatrix &&
+            (SkSL.DirectFunctions.Contains(name) || name is "saturate" or "lerp" or "atan2" or "mul" or "lum"))
         {
             var smallest = int.MaxValue;
             foreach (var argument in call.Items)
@@ -1519,6 +1547,10 @@ public static class ShaderTranspiler
                 return $"atan({arguments[0]}, {arguments[1]})";
             case "lerp":
                 return $"mix({arguments[0]}, {arguments[1]}, {arguments[2]})";
+            case "float2x2":
+            case "half2x2":
+            case "double2x2":
+                return EmitMatrix2(call, arguments);
             case "mul":
                 return arguments.Count >= 2 ? $"({arguments[0]} * {arguments[1]})" : arguments[0];
             case "lum":
@@ -1552,5 +1584,33 @@ public static class ShaderTranspiler
         throw new PresetExpressionException(
             $"The shader function '{name}' has no SkSL translation.",
             call.Position);
+    }
+
+    /// <summary>
+    /// Emits a <c>float2x2</c> constructor as a SkSL <c>mat2</c>. HLSL fills a matrix row-major from a
+    /// single vector, while SkSL's <c>mat2</c> has no four-component constructor, so the components of
+    /// a vector argument are spread explicitly.
+    /// </summary>
+    /// <param name="call">Constructor call node.</param>
+    /// <param name="arguments">Already emitted arguments.</param>
+    /// <returns>The constructor text.</returns>
+    private static string EmitMatrix2(ShaderNode call, List<string> arguments)
+    {
+        if (arguments.Count == 1)
+        {
+            var type = call.Items.Count > 0 ? TypeOf(call.Items[0]) : null;
+            var count = type is null ? 1 : SkSL.ComponentCount(type);
+            if (count is >= 2 and <= 4)
+            {
+                var components = new List<string>(4);
+                for (var index = 0; index < count; index++)
+                    components.Add($"{arguments[0]}.{"xyzw"[index]}");
+                while (components.Count < 4)
+                    components.Add("0.0");
+                return $"mat2({string.Join(", ", components)})";
+            }
+        }
+
+        return $"mat2({string.Join(", ", arguments)})";
     }
 }

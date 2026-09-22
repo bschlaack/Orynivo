@@ -68,7 +68,7 @@ internal static class ShaderCompiler
 
     /// <summary>The constructor of <see cref="ShaderValue"/> used to build results inline.</summary>
     private static readonly System.Reflection.ConstructorInfo ShaderValueConstructor =
-        typeof(ShaderValue).GetConstructor([typeof(float), typeof(float), typeof(float), typeof(float), typeof(int)])!;
+        typeof(ShaderValue).GetConstructor([typeof(float), typeof(float), typeof(float), typeof(float), typeof(int), typeof(bool)])!;
 
     /// <summary>Compiles a shader body, or reports that it is not supported.</summary>
     /// <param name="program">Parsed shader body.</param>
@@ -410,7 +410,8 @@ internal static class ShaderCompiler
                 components[1],
                 components[2],
                 components[3],
-                Expression.Constant(count)));
+                Expression.Constant(count),
+                Expression.Constant(false)));
     }
 
     /// <summary>Builds a component-wise comparison.</summary>

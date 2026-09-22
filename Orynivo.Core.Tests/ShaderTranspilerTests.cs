@@ -139,6 +139,38 @@ public sealed class ShaderTranspilerTests
         Assert.Contains("noSuchFunction", exception.Message, StringComparison.Ordinal);
     }
 
+    /// <summary>A float2x2 matrix becomes a SkSL mat2, and mul becomes a matrix product.</summary>
+    [Fact]
+    public void Transpile_CompilesAMatrixShader()
+    {
+        var node = ShaderParser.Parse("""
+            float2x2 rot = float2x2(bass, mid, -mid, bass);
+            ret = float3(mul(rot, uv - 0.5) + 0.5, 1);
+            """);
+
+        var sksl = ShaderTranspiler.Transpile(node, out _);
+        Assert.Contains("mat2", sksl, StringComparison.Ordinal);
+
+        using var effect = SKRuntimeEffect.CreateShader(sksl, out var errors);
+        Assert.True(effect is not null, $"SkSL was rejected: {errors}\n{sksl}");
+    }
+
+    /// <summary>A float2x2 built from a float4 uniform spreads its components for SkSL's mat2.</summary>
+    [Fact]
+    public void Transpile_CompilesAMatrixFromAVector()
+    {
+        var node = ShaderParser.Parse("""
+            float2x2 rot = float2x2(_qb);
+            ret = float3(mul(uv, rot) + 0.5, 1);
+            """);
+
+        var sksl = ShaderTranspiler.Transpile(node, out _);
+        Assert.Contains("mat2(", sksl, StringComparison.Ordinal);
+
+        using var effect = SKRuntimeEffect.CreateShader(sksl, out var errors);
+        Assert.True(effect is not null, $"SkSL was rejected: {errors}\n{sksl}");
+    }
+
     /// <summary>Transpiles a shader and asserts that Skia accepts the result.</summary>
     /// <param name="source">HLSL source.</param>
     private static void AssertCompiles(string source)

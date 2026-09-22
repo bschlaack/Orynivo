@@ -99,7 +99,15 @@ This file applies to `Orynivo.Core/` and supplements `../AGENTS.md`.
   same values; `ShaderCompilerTests` asserts exactly that and must keep passing. Keep its function
   set aligned with `ShaderTranspiler`'s vocabulary: a function the emitter can translate but the
   runtime does not know makes the CPU silently disable a shader the GPU renders, and `lum` alone
-  appears in a third of a real collection. `PresetRenderer.SeedFrameVariables` must keep `fps`
+  appears in a third of a real collection. A two-by-two matrix is part of that set now: `float2x2`
+  was unknown and disabled 729 presets' shaders. `ShaderValue` stores it row-major in its four
+  components (`ShaderValue.Matrix2x2`, `IsMatrix`) so the per-pixel value does not grow,
+  `ShaderRuntime.ConstructMatrix2` builds it from four scalars or one vector, `HlslMultiply` handles
+  matrix-by-vector, vector-by-matrix, and matrix-by-matrix, and `ShaderTranspiler` maps `float2x2`
+  onto SkSL's `mat2` (spreading a vector argument into four scalars, because `mat2` has no
+  four-component constructor) and must not narrow a matrix argument. `float3x3`/`float4x4` remain
+  out of scope because nine and sixteen components do not fit the four the hot path copies.
+  `PresetRenderer.SeedFrameVariables` must keep `fps`
   finite on the first frame, because a preset that divides by it otherwise accumulates an infinity
   that then reaches the sampler. `PresetSkiaComparisonDiagnosticTests` is the harness that compares
   both execution paths over a real collection and reports their drift. Keep the interpreter and the
@@ -108,6 +116,11 @@ This file applies to `Orynivo.Core/` and supplements `../AGENTS.md`.
   the shader's `/` treats a zero divisor as zero (`orynivoSafeDiv` on the GPU), a blur and `GetPixel`
   read the same frame `sampler_main` refers to, and the compiler remembers each variable's declared
   component count so its compiled path matches the interpreter.
+  The comp shader is a **display** pass, not a feedback stage: `PresetRenderer.Output` is the
+  post-comp frame the presenter shows, while the next frame warps from the pre-comp composite
+  (`MeshSource`, and the frame-end copy of `_frameCopy`). Feeding the comp output back lets a
+  `ret *= 10` comp shader compound every frame until the whole frame is white, which is what
+  `LuxXx - BadBallz Beta` did; `CompFeedbackTests` is the check.
   `ShaderTranspiler`
   is the SkSL back end for the GPU path and must stay honest against the same reference: the GPU and
   the interpreter have to agree on one variable universe, so the emitter knows the engine-bound

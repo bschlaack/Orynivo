@@ -552,13 +552,21 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
   reveal the overlay. Never replace that with a global pointer hook. The window's once-per-second
   diagnostic line also carries the averaged `RenderTimings` per stage (render, warp, blur, post,
   overlay, composite, comp shader) plus the render size, the frame's mean brightness and its
-  **saturated share**, the frame's brightness **per stage**, the shader grid state, whether the
+  **saturated share**, the frame's brightness **per stage**, the presenter's source and destination
+  brightness (`presentBrightness`), the shader grid state, whether the
   per-pixel program is suspended, and any
   shader, render, preset, or presentation error, so render cost is measured rather than guessed.
   Keep the saturated share: a white window is either a genuinely saturated frame or a frame that never
   reaches the screen, and only that number tells the two apart, because a presentation fault leaves
   the rendered frame's brightness and saturation untouched. Keep the line bounded and free of media
-  names and paths.
+  names and paths. The per-stage brightness must stay truthful: `PresetRenderer` invokes its
+  `StageBrightnessLogger` once per stage on **every** frame with the mean brightness of the buffer
+  that stage reads, and `PresetRenderer.Output` is the post-comp display frame while `MeshSource` is
+  the pre-comp feedback. Sampling `Output` at a stage boundary instead reported the previous frame,
+  which made every stage look identical and pointed a white frame at the wrong stage; a stale
+  diagnostic is worse than none. The `presentBrightness` pair samples the presentation buffer under
+  `_presentLock` before and after the copy plus the destination bytes, so a copy or bitmap fault is
+  told apart from a genuinely white source frame in one run.
   The render loop runs on a background thread (`RenderLoop`, `RenderOneFrame`) because a frame
   can cost tens of milliseconds; never move it back onto the Avalonia dispatcher. The UI thread
   only ever reads the presentation buffer, never the renderer's live buffers, and the short copy

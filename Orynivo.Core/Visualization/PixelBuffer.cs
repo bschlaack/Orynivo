@@ -41,6 +41,45 @@ public sealed class PixelBuffer
     /// <summary>Gets the backing array, for a caller that needs a stable reference to it.</summary>
     internal float[] RawPixels => _pixels;
 
+    /// <summary>
+    /// Measures the mean RGB brightness of the buffer over a fixed strided sample. It is the cheap
+    /// probe the diagnostics use to tell a black frame from a white one, so it never walks every
+    /// pixel of a full-resolution frame.
+    /// </summary>
+    /// <returns>The mean channel value, or zero for an empty buffer.</returns>
+    public float MeanBrightness()
+    {
+        var total = 0f;
+        var samples = 0;
+        for (var index = 0; index + 2 < _pixels.Length; index += 64)
+        {
+            total += _pixels[index] + _pixels[index + 1] + _pixels[index + 2];
+            samples += 3;
+        }
+
+        return samples == 0 ? 0f : total / samples;
+    }
+
+    /// <summary>
+    /// Measures the share of sampled pixels whose red, green, and blue channels are all saturated.
+    /// A frame that renders white is either genuinely saturated or never reaches the screen, and
+    /// this share tells those apart because a presentation fault leaves it untouched.
+    /// </summary>
+    /// <returns>The saturated share in the range zero to one.</returns>
+    public float SaturatedShare()
+    {
+        var saturated = 0;
+        var sampled = 0;
+        for (var index = 0; index + 2 < _pixels.Length; index += 64)
+        {
+            sampled++;
+            if (_pixels[index] >= 0.99f && _pixels[index + 1] >= 0.99f && _pixels[index + 2] >= 0.99f)
+                saturated++;
+        }
+
+        return sampled == 0 ? 0f : saturated / (float)sampled;
+    }
+
     /// <summary>Sets every sample to zero.</summary>
     public void Clear() => Array.Clear(_pixels);
 

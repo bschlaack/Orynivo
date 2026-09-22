@@ -25,6 +25,9 @@ internal static class ShaderRuntime
         Construct3,
         Construct4,
 
+        /// <summary>A two-by-two matrix constructor.</summary>
+        ConstructMatrix2,
+
         /// <summary>Component-wise intrinsics.</summary>
         Abs,
         Ceil,
@@ -93,6 +96,8 @@ internal static class ShaderRuntime
         ["half3"] = Opcode.Construct3,
         ["float4"] = Opcode.Construct4,
         ["half4"] = Opcode.Construct4,
+        ["float2x2"] = Opcode.ConstructMatrix2,
+        ["half2x2"] = Opcode.ConstructMatrix2,
         ["abs"] = Opcode.Abs,
         ["ceil"] = Opcode.Ceil,
         ["cos"] = Opcode.Cos,
@@ -207,6 +212,8 @@ internal static class ShaderRuntime
                 return Construct(3, a, b, c, d, count);
             case Opcode.Construct4:
                 return Construct(4, a, b, c, d, count);
+            case Opcode.ConstructMatrix2:
+                return ConstructMatrix2(a, b, c, d, count);
             case Opcode.Abs:
                 return Unary(count, a, MathF.Abs);
             case Opcode.Ceil:
@@ -243,7 +250,7 @@ internal static class ShaderRuntime
             case Opcode.Step:
                 return ComponentWise(b, a, (edge, value) => value >= edge ? 1f : 0f);
             case Opcode.Mul:
-                return ComponentWise(a, b, (left, right) => left * right);
+                return HlslMultiply(a, b, count);
             case Opcode.Length:
                 return ShaderValue.Scalar(Length(count > 0 ? a : ShaderValue.Scalar(0f)));
             case Opcode.Normalize:
@@ -456,8 +463,17 @@ internal static class ShaderRuntime
         "float2" or "half2" => ShaderValue.Vector(0f, 0f, 0f, 0f, 2),
         "float3" or "half3" => ShaderValue.Vector(0f, 0f, 0f, 0f, 3),
         "float4" or "half4" => ShaderValue.Vector(0f, 0f, 0f, 0f, 4),
+        "float2x2" or "half2x2" => ShaderValue.Matrix2x2(0f, 0f, 0f, 0f),
         _ => ShaderValue.Scalar(0f)
     };
+
+    /// <summary>Reports whether a declared type name is a matrix.</summary>
+    /// <param name="type">Type name.</param>
+    /// <returns><see langword="true"/> when the type is a matrix.</returns>
+    public static bool IsMatrixType(string type) =>
+        type is "float2x2" or "half2x2" or "double2x2" or
+            "float3x3" or "half3x3" or "double3x3" or
+            "float4x4" or "half4x4" or "double4x4";
 
     /// <summary>Returns the component count a declared type has.</summary>
     /// <param name="type">Type name.</param>
@@ -467,18 +483,21 @@ internal static class ShaderRuntime
         "float2" or "half2" or "int2" or "uint2" or "bool2" => 2,
         "float3" or "half3" or "int3" or "uint3" or "bool3" => 3,
         "float4" or "half4" or "int4" or "uint4" or "bool4" => 4,
+        "float2x2" or "half2x2" or "double2x2" => 4,
         _ => 1
     };
 
     /// <summary>
     /// Coerces a value to a declared type the way HLSL does: a scalar broadcasts, a shorter vector
     /// pads with zeros, and a narrower type takes the leading components. The SkSL emitter performs
-    /// the same conversion, so the interpreter and the GPU produce the same value.
+    /// the same conversion, so the interpreter and the GPU produce the same value. A matrix keeps its
+    /// four row-major components instead of being collapsed to a vector.
     /// </summary>
     /// <param name="value">Value to coerce.</param>
     /// <param name="type">Declared type name.</param>
     /// <returns>The coerced value.</returns>
-    public static ShaderValue Coerce(ShaderValue value, string type) => Coerce(value, CountFor(type));
+    public static ShaderValue Coerce(ShaderValue value, string type) =>
+        IsMatrixType(type) ? ToMatrix2(value) : Coerce(value, CountFor(type));
 
     /// <summary>Coerces a value to a component count.</summary>
     /// <param name="value">Value to coerce.</param>
@@ -486,6 +505,11 @@ internal static class ShaderRuntime
     /// <returns>The coerced value.</returns>
     public static ShaderValue Coerce(ShaderValue value, int count)
     {
+        // A matrix is not a vector: collapsing it to the declared component count would drop the
+        // row-major flag and turn every later mul into a component-wise product.
+        if (value.IsMatrix)
+            return value;
+
         if (count <= 0 || count == value.Count)
             return value;
 
@@ -702,5 +726,111 @@ internal static class ShaderRuntime
     {
         for (var index = 0; index < value.Count && filled < limit; index++)
             target[filled++] = value.Get(index);
+    }
+
+    /// <summary>
+    /// Applies HLSL's <c>mul</c> for the shapes Milkdrop presets use: a matrix operand multiplies,
+    /// and everything else keeps the component-wise product the runtime used before. The matrix forms
+    /// are what <c>float2x2</c> constructors feed, and they are the only ones the SkSL emitter's
+    /// <c>a * b</c> does not already match.
+    /// </summary>
+    /// <param name="left">Left operand.</param>
+    /// <param name="right">Right operand.</param>
+    /// <param name="count">Number of evaluated arguments.</param>
+    /// <returns>The product.</returns>
+    private static ShaderValue HlslMultiply(ShaderValue left, ShaderValue right, int count)
+    {
+        if (count < 2)
+            return left;
+
+        if (left.IsMatrix && right.IsMatrix)
+            return MultiplyMatrices(left, right);
+        if (left.IsMatrix)
+            return MultiplyMatrixVector(left, right);
+        if (right.IsMatrix)
+            return MultiplyVectorMatrix(left, right);
+
+        return ComponentWise(left, right, (a, b) => a * b);
+    }
+
+    /// <summary>Multiplies a two-by-two matrix by a vector.</summary>
+    /// <param name="matrix">Left matrix.</param>
+    /// <param name="vector">Right vector.</param>
+    /// <returns>The resulting vector.</returns>
+    private static ShaderValue MultiplyMatrixVector(ShaderValue matrix, ShaderValue vector)
+    {
+        var x = (matrix.X * vector.Get(0)) + (matrix.Y * vector.Get(1));
+        var y = (matrix.Z * vector.Get(0)) + (matrix.W * vector.Get(1));
+        return ShaderValue.Vector(x, y, 0f, 0f, 2);
+    }
+
+    /// <summary>Multiplies a vector by a two-by-two matrix.</summary>
+    /// <param name="vector">Left vector.</param>
+    /// <param name="matrix">Right matrix.</param>
+    /// <returns>The resulting vector.</returns>
+    private static ShaderValue MultiplyVectorMatrix(ShaderValue vector, ShaderValue matrix)
+    {
+        var x = (vector.Get(0) * matrix.X) + (vector.Get(1) * matrix.Z);
+        var y = (vector.Get(0) * matrix.Y) + (vector.Get(1) * matrix.W);
+        return ShaderValue.Vector(x, y, 0f, 0f, 2);
+    }
+
+    /// <summary>Multiplies two two-by-two matrices.</summary>
+    /// <param name="left">Left matrix.</param>
+    /// <param name="right">Right matrix.</param>
+    /// <returns>The resulting matrix.</returns>
+    private static ShaderValue MultiplyMatrices(ShaderValue left, ShaderValue right)
+    {
+        var m00 = (left.X * right.X) + (left.Y * right.Z);
+        var m01 = (left.X * right.Y) + (left.Y * right.W);
+        var m10 = (left.Z * right.X) + (left.W * right.Z);
+        var m11 = (left.Z * right.Y) + (left.W * right.W);
+        return ShaderValue.Matrix2x2(m00, m01, m10, m11);
+    }
+
+    /// <summary>
+    /// Builds a two-by-two matrix from a constructor call. Four scalars or one vector fill it
+    /// row-major, matching the <c>float2x2(...)</c> spelling Milkdrop shaders use; a single scalar
+    /// fills the diagonal.
+    /// </summary>
+    /// <param name="a">First argument.</param>
+    /// <param name="b">Second argument.</param>
+    /// <param name="c">Third argument.</param>
+    /// <param name="d">Fourth argument.</param>
+    /// <param name="count">Number of evaluated arguments.</param>
+    /// <returns>The matrix value.</returns>
+    private static ShaderValue ConstructMatrix2(
+        ShaderValue a,
+        ShaderValue b,
+        ShaderValue c,
+        ShaderValue d,
+        int count)
+    {
+        if (count == 1 && a.Count == 1)
+            return ShaderValue.Matrix2x2(a.X, 0f, 0f, a.X);
+
+        Span<float> flat = stackalloc float[4];
+        var filled = 0;
+        if (count > 0)
+            Append(flat, ref filled, 4, a);
+        if (count > 1)
+            Append(flat, ref filled, 4, b);
+        if (count > 2)
+            Append(flat, ref filled, 4, c);
+        if (count > 3)
+            Append(flat, ref filled, 4, d);
+
+        return ShaderValue.Matrix2x2(flat[0], flat[1], flat[2], flat[3]);
+    }
+
+    /// <summary>Reads a value as a two-by-two matrix, keeping an existing matrix unchanged.</summary>
+    /// <param name="value">Value to read.</param>
+    /// <returns>The matrix value.</returns>
+    private static ShaderValue ToMatrix2(ShaderValue value)
+    {
+        if (value.IsMatrix)
+            return value;
+
+        return ShaderValue.Matrix2x2(value.Get(0), value.Get(1), value.Get(2), value.Get(3));
     }
 }
