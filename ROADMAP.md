@@ -802,6 +802,15 @@ affordable. This is a project of its own and must keep the CPU path as the fallb
   and is uploaded as one texture per frame, because it is a vector drawing and cheap. The GLSL
   preamble must be chosen from the negotiated version rather than hard-coded, because the dialect
   differs per platform (ANGLE's GLES on Windows, desktop GL on Linux, CGL on macOS).
+  Step 2's Core side is done: `PresetRenderer.MeshGridX`/`MeshGridY`/`MeshValues` are public,
+  `MeshRequested` builds the per-vertex mesh without switching the CPU picture over (the transitional
+  double work), and `TryCopyMeshMotion` copies the values while `MeshSource` exposes the frame the
+  mesh samples, so the GL warp can upload the mesh as vertex attributes and bind the feedback as its
+  source texture. `PerVertexMeshTests` proves the mesh is exposed, that the aspect-scaled zero-to-one
+  vertex convention holds, and that requesting the mesh leaves the CPU frame byte-identical.
+  Note that the GL context belongs to the control and therefore to the UI thread, so the GL frame
+  work has to run inside `OnOpenGlRender`; the render thread cannot drive it without a second shared
+  context, which is the decision the next step has to make.
 
 - 40e Cutover and validation - `Done`: the GPU path is the visualizer's default where it is
   available and the CPU path stays the fallback, and a comparison harness validates both against the

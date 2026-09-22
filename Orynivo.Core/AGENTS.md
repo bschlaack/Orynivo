@@ -213,6 +213,12 @@ This file applies to `Orynivo.Core/` and supplements `../AGENTS.md`.
   reconciled with Milkdrop's aspect-scaled zero-to-one vertex position: a preset that derives
   `dx`/`dy` from `x`/`y` renders visibly differently once that offset is interpolated, and
   `scripts/projectm-oracle` is how that is measured.
+  `MeshGridX`, `MeshGridY`, and `MeshValues` are public because a GPU warp reads the mesh as vertex
+  attributes, and the value order is part of that contract: zoom, zoomexp, rot, cx, cy, dx, dy, sx,
+  sy. `MeshRequested` builds the mesh while the CPU keeps evaluating per pixel, which is the
+  transitional double work a GPU warp needs before it replaces the CPU warp; `TryCopyMeshMotion`
+  copies the values and `MeshSource` exposes the frame the mesh samples. Requesting the mesh must
+  leave the CPU frame byte-identical, which `PerVertexMeshTests` asserts.
   A shader's blur levels each keep their own buffer (`_blurLevels`) and build on one another, and a
   level asked for first builds the ones below it. Do not collapse them back into one cached level: a
   comp shader that samples `GetBlur1` and `GetBlur3` in the same pixel otherwise invalidates the

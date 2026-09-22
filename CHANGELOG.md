@@ -7,6 +7,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Added
+- Added the Core-side interface a GPU warp needs. `PresetRenderer.MeshGridX`, `MeshGridY`, and
+  `MeshValues` are public, `MeshRequested` evaluates the per-vertex mesh without switching the CPU
+  picture over, and `TryCopyMeshMotion` copies the per-vertex motion while `MeshSource` exposes the
+  frame the mesh samples. A GPU warp uploads the values as vertex attributes; the CPU keeps
+  evaluating the per-pixel program until the GPU warp replaces it.
 - Added an OpenGL presentation path to the visualizer, off by default. With
   `ORYNIVO_VISUALIZER_OPENGL=1` the visualizer shows `Orynivo.Controls.VisualizerGlPresenter`, which
   uploads the finished frame as a texture and draws it with a shader instead of writing a

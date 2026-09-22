@@ -150,16 +150,22 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
     private const int MotionRows = 6;
 
     /// <summary>Mesh grid columns, matching the reference implementation's default.</summary>
-    private const int MeshGridX = 64;
+    public const int MeshGridX = 64;
 
     /// <summary>Mesh grid rows, matching the reference implementation's default.</summary>
-    private const int MeshGridY = 48;
+    public const int MeshGridY = 48;
 
-    /// <summary>Motion values the mesh carries per vertex: zoom, zoomexp, rot, cx, cy, dx, dy, sx, sy.</summary>
-    private const int MeshValues = 9;
+    /// <summary>
+    /// Motion values the mesh carries per vertex, in this order: zoom, zoomexp, rot, cx, cy, dx, dy,
+    /// sx, sy. A GPU warp reads them as vertex attributes, so the order is part of the contract.
+    /// </summary>
+    public const int MeshValues = 9;
 
     /// <summary>The interpolated motion the per-pixel program produced per mesh vertex.</summary>
     private readonly float[] _meshMotion = new float[(MeshGridX + 1) * (MeshGridY + 1) * MeshValues];
+
+    /// <summary>Whether <see cref="_meshMotion"/> holds the current frame's mesh.</summary>
+    private bool _meshBuiltThisFrame;
 
     /// <summary>Creates a renderer for one preset.</summary>
     
@@ -360,6 +366,49 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
     /// </para>
     /// </summary>
     public bool MeshPerPixelEnabled { get; set; }
+
+    /// <summary>
+    /// Gets or sets a value indicating whether the per-vertex mesh is evaluated even when the CPU
+    /// warp does not interpolate it. A GPU warp needs the mesh values as vertex attributes, so it
+    /// sets this while the CPU path keeps evaluating the per-pixel program; the two together are the
+    /// transitional state, and a GPU warp that replaces the CPU warp clears it again. It has no
+    /// effect when the per-pixel program writes no motion.
+    /// </summary>
+    public bool MeshRequested { get; set; }
+
+    /// <summary>
+    /// Gets the frame the mesh warp samples: the feedback the CPU warp would read. A GPU warp binds
+    /// it as its source texture, so it must stay valid until the next frame is rendered.
+    /// </summary>
+    public PixelBuffer MeshSource => _previous;
+
+    /// <summary>
+    /// Copies the per-vertex motion the last rendered frame evaluated, so a GPU warp can upload it as
+    /// vertex attributes. The values are ordered as <see cref="MeshValues"/> describes, row by row,
+    /// with <see cref="MeshGridX"/> + 1 vertices per row.
+    /// </summary>
+    /// <param name="destination">Destination for the values.</param>
+    /// <param name="meshX">Receives the mesh grid's column count.</param>
+    /// <param name="meshY">Receives the mesh grid's row count.</param>
+    /// <returns>
+    /// <see langword="true"/> when the last frame built a mesh; <see langword="false"/> when the
+    /// preset writes no per-pixel motion or the mesh was not requested, in which case the CPU warp is
+    /// the only picture.
+    /// </returns>
+    /// <exception cref="ArgumentException">The destination is too small.</exception>
+    public bool TryCopyMeshMotion(Span<float> destination, out int meshX, out int meshY)
+    {
+        meshX = MeshGridX;
+        meshY = MeshGridY;
+        if (!_meshBuiltThisFrame)
+            return false;
+
+        if (destination.Length < _meshMotion.Length)
+            throw new ArgumentException("The destination is smaller than the mesh.", nameof(destination));
+
+        _meshMotion.AsSpan().CopyTo(destination);
+        return true;
+    }
 
     /// <summary>
     /// Gets a value indicating whether this preset's warp stage may run in parallel at all. It is
@@ -865,20 +914,29 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
         }
 
         _warpShaderMilliseconds = 0d;
+        _meshBuiltThisFrame = false;
 
         // Milkdrop runs the per-pixel program once per mesh vertex and interpolates the motion it
         // produced across the quad. Our per-pixel path runs it for every pixel, which is finer than
         // the reference and costs more; the mesh is the faithful one. A program that writes the
         // sample position has no interpolated meaning, and one that records motion vectors keeps
-        // the per-pixel path.
-        if (MeshPerPixelEnabled && _perPixelWritesMotion && !_perPixelWritesPosition && !recordMotion)
+        // the per-pixel path. A GPU warp needs the mesh values even while the CPU keeps evaluating
+        // per pixel, so MeshRequested builds the mesh without switching the CPU picture over.
+        if ((MeshPerPixelEnabled || MeshRequested) &&
+            _perPixelWritesMotion &&
+            !_perPixelWritesPosition &&
+            !recordMotion)
         {
             BuildMesh(zoom, zoomExp, rotation, centreX, centreY, offsetX, offsetY, stretchX, stretchY);
-            if (ParallelismEnabled)
-                ParallelRows.For(height, MeshRows);
-            else
-                MeshRows(-1, 0, height);
-            return;
+            _meshBuiltThisFrame = true;
+            if (MeshPerPixelEnabled)
+            {
+                if (ParallelismEnabled)
+                    ParallelRows.For(height, MeshRows);
+                else
+                    MeshRows(-1, 0, height);
+                return;
+            }
         }
 
         if (ParallelismEnabled && _canParallelizeWarp && !recordMotion)

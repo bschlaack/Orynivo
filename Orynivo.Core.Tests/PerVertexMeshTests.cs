@@ -52,7 +52,61 @@ public sealed class PerVertexMeshTests
         Assert.Equal(perPixelPath, mesh);
     }
 
+    /// <summary>
+    /// A GPU warp needs the mesh values while the CPU keeps evaluating per pixel, so
+    /// <c>MeshRequested</c> builds the mesh and exposes it without changing the CPU picture.
+    /// </summary>
+    [Fact]
+    public void RenderFrame_MeshRequestedExposesTheMeshWithoutChangingThePicture()
+    {
+        const string perPixel = "zoom = 1.02 + 0.04 * x;";
+        var text = "decay = 1;\nper_frame_1=wave_a = 1;\nper_pixel_1=" + perPixel;
+
+        var without = new PresetRenderer(VisualizerPreset.Parse(text), 200, 150) { ParallelismEnabled = false };
+        var with = new PresetRenderer(VisualizerPreset.Parse(text), 200, 150)
+        {
+            ParallelismEnabled = false,
+            MeshRequested = true,
+        };
+        var audio = new FakeAudio();
+        for (var frame = 0; frame < 3; frame++)
+        {
+            without.RenderFrame(audio, 1d / 60d);
+            with.RenderFrame(audio, 1d / 60d);
+        }
+
+        // The CPU picture is the per-pixel one in both cases, so the mesh build must not change it.
+        Assert.Equal(without.Output.Pixels.ToArray(), with.Output.Pixels.ToArray());
+
+        var mesh = new float[(PresetRenderer.MeshGridX + 1) * (PresetRenderer.MeshGridY + 1) * PresetRenderer.MeshValues];
+        Assert.True(with.TryCopyMeshMotion(mesh, out var meshX, out var meshY));
+        Assert.Equal(PresetRenderer.MeshGridX, meshX);
+        Assert.Equal(PresetRenderer.MeshGridY, meshY);
+        // Milkdrop hands the program the aspect-scaled vertex position in zero-to-one space, so the
+        // first vertex sits left of zero and the last one right of one; a zoom that grows with x is
+        // therefore below the constant term at the first vertex and above it at the last.
+        Assert.True(mesh[0] < 1.02f, $"zoom at the first vertex was {mesh[0]}");
+        var last = mesh.Length - PresetRenderer.MeshValues;
+        Assert.True(mesh[last] > 1.02f, $"zoom at the last vertex was {mesh[last]}");
+    }
+
+    /// <summary>A preset with no per-pixel motion exposes no mesh.</summary>
+    [Fact]
+    public void RenderFrame_ExposesNoMeshWithoutPerPixelMotion()
+    {
+        var renderer = new PresetRenderer(VisualizerPreset.Parse("decay = 1;"), 40, 40)
+        {
+            MeshRequested = true,
+        };
+        renderer.RenderFrame(new FakeAudio(), 1d / 60d);
+
+        var mesh = new float[(PresetRenderer.MeshGridX + 1) * (PresetRenderer.MeshGridY + 1) * PresetRenderer.MeshValues];
+        Assert.False(renderer.TryCopyMeshMotion(mesh, out _, out _));
+        Assert.NotNull(renderer.MeshSource);
+    }
+
     /// <summary>Renders a preset with a visible overlay so the feedback carries a picture.</summary>
+
     /// <param name="perPixel">Per-pixel program text.</param>
     /// <param name="mesh">Whether the mesh path is enabled.</param>
     /// <returns>The rendered pixels of the last frame.</returns>
