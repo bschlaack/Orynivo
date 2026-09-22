@@ -1041,7 +1041,17 @@ affordable. This is a project of its own and must keep the CPU path as the fallb
   loop-budget errors**. The claim had counted a *parse* failure as a run-time loss. So nothing in the
   collection loses a block or a frame at run time today; the only open fidelity work is the per-pixel
   mesh convention below and the GLSL shader port in 40f.
-  **Remaining.** Three things are still open in this phase. The per-pixel mesh is implemented and
+  **Remaining.** Four things are still open in this phase. The **matrix types are the biggest one**:
+  `float2x2`, `float3x3`, and `float4x4` are unknown to the shader runtime, so
+  `Unknown shader function 'float2x2'` disables a shader outright. A scan of the sample collection
+  found **913 files** that use a matrix type, so this is a fidelity gap and not an edge case. The
+  usage is consistently construction plus `mul` — `mul(uv1, float2x2(ang2.y,-ang2.x,ang2.x,ang2.y))`
+  with four scalars and `mul(16*uv1, float2x2(_qb))` with one vector — so the required scope is a
+  matrix value, the `floatNxN` constructors from scalars and vectors, and `mul` in both argument
+  orders. `ShaderRuntime` is the single dispatch point both execution paths call, so the work belongs
+  there; the compiled path in `ShaderProgram` and the SkSL emitter have to agree with it, and
+  `ShaderCompilerTests` is the check. A guessed implementation would be worse than the current skip,
+  which is why it is scoped here rather than patched. The per-pixel mesh is implemented and
   opt-in, but it cannot become the default yet: the engine's per-pixel `x`/`y` are the warped
   position in minus-one-to-one space rather than Milkdrop's aspect-scaled zero-to-one vertex
   position, so a preset that derives `dx`/`dy` from `x`/`y` renders visibly differently once that

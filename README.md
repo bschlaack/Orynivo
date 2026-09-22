@@ -1742,6 +1742,11 @@ for each held-back line are recorded in
 
 ## Current Limitations
 
+- The visualizer's Milkdrop shader runtime does not implement the matrix types
+  `float2x2`, `float3x3`, and `float4x4`. A shader that uses one is disabled
+  rather than rendered incorrectly, and 913 files of a sample collection use a
+  matrix type, so those presets lose that shader's effect. The compiled shader
+  path is unaffected because it only compiles straight-line bodies.
 - Linux output profiles include direct ALSA `hw:` endpoints and endpoints
   exposed by OpenAL. A direct ALSA profile opens the DAC at the track's PCM
   sample rate with ALSA software resampling disabled; it fails explicitly when
