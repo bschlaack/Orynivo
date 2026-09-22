@@ -1035,8 +1035,12 @@ affordable. This is a project of its own and must keep the CPU path as the fallb
   as their own work rather than being hidden by the budget.
   The `conway` half of that claim is retracted. A scan of the collection found 294 occurrences of the
   name, all of them shader-local variables (`float1 conway = tex2D(...)`), and **zero** in an
-  expression block; the scan had treated shader-local identifiers as built-ins. The blocks those
-  presets actually lost were the ones described next, and the loop budget is the only remaining cause.
+  expression block; the scan had treated shader-local identifiers as built-ins.
+  The loop-budget half is retracted as well, and by measurement rather than inspection: rendering all
+  2000 sampled presets for three frames at 64 x 36 reports **0 presets with a runtime error and 0
+  loop-budget errors**. The claim had counted a *parse* failure as a run-time loss. So nothing in the
+  collection loses a block or a frame at run time today; the only open fidelity work is the per-pixel
+  mesh convention below and the GLSL shader port in 40f.
   **Remaining.** Three things are still open in this phase. The per-pixel mesh is implemented and
   opt-in, but it cannot become the default yet: the engine's per-pixel `x`/`y` are the warped
   position in minus-one-to-one space rather than Milkdrop's aspect-scaled zero-to-one vertex

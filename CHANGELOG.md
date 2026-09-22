@@ -33,6 +33,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   as a steady rubber band rather than an occasional hitch.
 
 ### Added
+- Added `PresetRuntimeDiagnosticTests`, which renders every preset of the configured folder for a few
+  frames and reports the ones whose frame failed at run time, separately counting the interpreter's
+  loop budget. It is the harness that decides whether a preset really loses its picture at run time,
+  because a block that fails to parse costs a preset its motion while a frame that throws costs it the
+  whole picture. Against the 2000-file sample collection it reports 0 runtime errors and 0 loop-budget
+  errors, which retracts the roadmap's claim that several presets lose their shaders to the loop
+  budget: that claim had counted a parse failure as a run-time loss.
 - Added `scripts/gl-harness/`, a local development harness that renders the visualizer's GPU pipeline
   without Avalonia. It compiles `Orynivo/Controls/VisualizerGlPipeline.cs` unchanged and supplies its
   own `Avalonia.OpenGL.GlInterface` over a hidden WGL context, so the real shaders and pass order are
