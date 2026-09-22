@@ -7,6 +7,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Added
+- Extracted the warp's sampling arithmetic into `Orynivo.Visualization.WarpSampling`, which is now
+  the single definition of it: the CPU warp calls it per pixel and the GPU warp's fragment shader is
+  its translation, so a GPU warp cannot silently disagree with the reference. `WarpSamplingTests`
+  covers the identity, zoom, offset, rotation, stretch, and radial-exponent cases. The extraction is
+  behaviour-preserving; the mesh and parallel tests still render byte-identical frames.
 - Added the Core-side interface a GPU warp needs. `PresetRenderer.MeshGridX`, `MeshGridY`, and
   `MeshValues` are public, `MeshRequested` evaluates the per-vertex mesh without switching the CPU
   picture over, and `TryCopyMeshMotion` copies the per-vertex motion while `MeshSource` exposes the

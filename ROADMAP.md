@@ -810,7 +810,12 @@ affordable. This is a project of its own and must keep the CPU path as the fallb
   vertex convention holds, and that requesting the mesh leaves the CPU frame byte-identical.
   Note that the GL context belongs to the control and therefore to the UI thread, so the GL frame
   work has to run inside `OnOpenGlRender`; the render thread cannot drive it without a second shared
-  context, which is the decision the next step has to make.
+  context. The chosen shape is the whole frame pipeline on the control's thread, the way Avalonia's
+  GL controls and the reference implementation both work: the CPU keeps the per-frame block, the
+  per-vertex mesh, and the overlay as one texture, and the GPU owns the feedback, the warp mesh, the
+  full-frame passes, and the shaders. The warp's sampling arithmetic now lives in the tested
+  `Orynivo.Visualization.WarpSampling`, which the GLSL fragment shader has to translate rather than
+  restate, so the two paths cannot drift apart.
   A GL mesh warp was written and then deliberately not wired in, because a warp alone is the wrong
   picture: this engine applies the blur, decay, video echo, borders, gamma, and the overlay *after*
   the warp, so presenting only the warped feedback would drop every one of them and the window would

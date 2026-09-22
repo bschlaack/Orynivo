@@ -219,6 +219,11 @@ This file applies to `Orynivo.Core/` and supplements `../AGENTS.md`.
   transitional double work a GPU warp needs before it replaces the CPU warp; `TryCopyMeshMotion`
   copies the values and `MeshSource` exposes the frame the mesh samples. Requesting the mesh must
   leave the CPU frame byte-identical, which `PerVertexMeshTests` asserts.
+  `WarpSampling.SamplePosition` is the single definition of the warp's sampling arithmetic: the CPU
+  warp calls it per pixel and a GPU warp's fragment shader must be a translation of it, so never
+  duplicate that formula. Its position convention is the engine's minus-one-to-one space, not
+  Milkdrop's zero-to-one vertex space. `WarpSamplingTests` is the reference the translation is
+  checked against.
   A shader's blur levels each keep their own buffer (`_blurLevels`) and build on one another, and a
   level asked for first builds the ones below it. Do not collapse them back into one cached level: a
   comp shader that samples `GetBlur1` and `GetBlur3` in the same pixel otherwise invalidates the

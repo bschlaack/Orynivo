@@ -999,21 +999,21 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
                     var stretchXNow = InterpolateMesh(meshX, meshY, 7);
                     var stretchYNow = InterpolateMesh(meshX, meshY, 8);
 
-                    var warpedX = (normalizedX - centreXNow) * stretchXNow;
-                    var warpedY = (normalizedY - centreYNow) * stretchYNow;
-                    var cosNow = MathF.Cos(rotationNow);
-                    var sinNow = MathF.Sin(rotationNow);
-                    var rotatedX = (warpedX * cosNow) - (warpedY * sinNow);
-                    var rotatedY = (warpedX * sinNow) + (warpedY * cosNow);
-                    var pixelZoom = zoomNow;
-                    if (needsRadius && zoomExpNow != 1f)
-                    {
-                        var radius = MathF.Sqrt((rotatedX * rotatedX) + (rotatedY * rotatedY));
-                        pixelZoom = MathF.Pow(zoomNow, 1f + (zoomExpNow * radius * 2f));
-                    }
-
-                    var sampleX = (rotatedX * pixelZoom) + centreXNow + offsetXNow;
-                    var sampleY = (rotatedY * pixelZoom) + centreYNow + offsetYNow;
+                    WarpSampling.SamplePosition(
+                        normalizedX,
+                        normalizedY,
+                        zoomNow,
+                        zoomExpNow,
+                        rotationNow,
+                        centreXNow,
+                        centreYNow,
+                        offsetXNow,
+                        offsetYNow,
+                        stretchXNow,
+                        stretchYNow,
+                        needsRadius,
+                        out var sampleX,
+                        out var sampleY);
                     _previous.SampleBilinear((sampleX * 0.5f) + 0.5f, (sampleY * 0.5f) + 0.5f, sample);
 
                     var offset = (((y * width) + x) * 4);
@@ -2768,6 +2768,7 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
     /// <returns><see langword="true"/> when the warp stage writes the variable before each pixel.</returns>
     private static bool IsSeededPerPixel(string name) => name is "x" or "y" or "rad" or "ang";
 }
+
 
 
 
