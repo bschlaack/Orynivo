@@ -7,6 +7,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Fixed
+- Fixed presets turning into a solid white screen a few seconds after the sixteen-bit feedback
+  landed. Eight-bit textures clamp every write to the colour range, so a preset that amplifies its
+  own feedback (`fGammaAdj` below one against a decay near one) settled on a stable fixed point; a
+  float texture does not clamp, so the same frame diverged exponentially until it exceeded the
+  sixteen-bit range, became an infinity, and then a NaN that spread across the frame. Every pass of
+  the GPU pipeline now clamps its output to zero-to-one exactly like the eight-bit texture it
+  replaces, which restores the fixed point and keeps the precision the float format was added for.
+  Measured on a blur-heavy synthetic preset: the sixteen-bit and eight-bit paths now agree to 0.01
+  percent in how much of the frame is saturated.
 - Fixed presets losing a block to Milkdrop's one-argument `while` form. A real collection writes
   `while (exec2(statements, condition))`, where the condition is re-evaluated until it turns false
   and the repeated work sits inside it, but the expression parser required a statement list after the

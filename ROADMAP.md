@@ -836,6 +836,11 @@ affordable. This is a project of its own and must keep the CPU path as the fallb
   on a blur-heavy synthetic preset (five blur passes, 40 frames) the mean channel difference from the
   CPU reference falls from 9.74 to 9.59 of 255, so the eight-bit rounding was a small part of the
   remaining difference; the rest is structural.
+  **Every pass clamps its output to zero-to-one**, exactly like the eight-bit texture it replaces.
+  That is not cosmetic: the clamp is what gives a preset that amplifies its own feedback a stable
+  fixed point, so without it a preset with `fGammaAdj` below one against a decay near one diverges
+  exponentially past the sixteen-bit range, turns into an infinity and then a NaN, and paints the
+  whole frame white after a few seconds. The sixteen-bit format buys precision, not range.
   The presenter draws on **every** refresh, re-presenting the texture it drew last when the render
   thread published nothing new. Avalonia's GL surface is double buffered, so an undrawn refresh swaps
   to the buffer two presentations old; because the render loop publishes at the configured frame rate

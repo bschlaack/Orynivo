@@ -513,7 +513,11 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
   texture it drew last when the render thread published nothing new: Avalonia's GL surface is double
   buffered, so a refresh that draws nothing swaps to the buffer two presentations old and the picture
   appears to jump backwards. The render loop publishes at the configured frame rate while the control
-  refreshes at the display rate, so an undrawn refresh is the normal case. A preset with shaders keeps
+  refreshes at the display rate, so an undrawn refresh is the normal case. **Every** pass clamps its
+  output to zero-to-one, exactly like the eight-bit texture it replaces: the clamp is what gives a
+  preset that amplifies its own feedback a stable fixed point, so a float format without it diverges
+  exponentially, becomes an infinity and then a NaN, and paints the frame white. The float format
+  buys precision, not range. A preset with shaders keeps
   the CPU frame path until the comp and warp shaders are ported to GLSL.
   `VisualizerWindow`
   owns `VisualizerAudioHub.IsActive`: while it is false the players skip the tap entirely, so

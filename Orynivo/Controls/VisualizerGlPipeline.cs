@@ -132,10 +132,13 @@ internal sealed class VisualizerGlPipeline
             vec2 samplePosition = (rotated * pixelZoom) + vec2(cx, cy) + vec2(dx, dy);
             vec2 uv = (samplePosition * 0.5) + 0.5;
 
-            // Outside the frame the warp is transparent black, like the CPU sampler.
+            // Outside the frame the warp is transparent black, like the CPU sampler. The clamp keeps
+            // every pass bounded exactly like the eight-bit texture it replaces, so a preset that
+            // accumulates cannot leave the range the CPU reference and Milkdrop's textures stay in.
             vec4 colour = texture(uSource, vec2(uv.x, 1.0 - uv.y));
             float inside = step(0.0, uv.x) * step(uv.x, 1.0) * step(0.0, uv.y) * step(uv.y, 1.0);
-            fragColor = colour * inside;
+            fragColor = clamp(colour * inside, 0.0, 1.0);
+
         }
         """;
 
@@ -160,7 +163,8 @@ internal sealed class VisualizerGlPipeline
                 }
             }
 
-            fragColor = sum / 9.0;
+            fragColor = clamp(sum / 9.0, 0.0, 1.0);
+
         }
         """;
 
