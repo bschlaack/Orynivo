@@ -1040,7 +1040,9 @@ affordable. This is a project of its own and must keep the CPU path as the fallb
   expression language's `while` used to require a statement list after its condition, which is not
   what a real collection writes: it writes the one-argument `while (exec2(statements, condition))`,
   so those blocks were rejected and the preset lost its motion. Both spellings are now accepted and
-  the affected presets compile every block again. And the blur
+  the affected presets compile every block again; parsing the 2000-file sample collection reports 0
+  whole-file, 0 expression-block, and 0 shader-slot failures, against 4 expression-block failures in
+  2 files before. And the blur
   chain's blur amount and edge darkening (`blurN_min`/`blurN_max`/`blurN_edge_darken` and their
   `bNn`/`bNx`/`bNed` aliases) resolve to their variables but are not applied, because the reference's
   semantics are not stored in a preset and a measured comparison against projectM showed that

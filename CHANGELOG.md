@@ -12,7 +12,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   and the repeated work sits inside it, but the expression parser required a statement list after the
   condition and rejected the whole block. Both spellings are now accepted, so
   `martin - castle in the air`, `martin - castle in the air more mbahlsce`, and
-  `EVET - Scanazoic --- Isosceles edit` compile every block again.
+  `EVET - Scanazoic --- Isosceles edit` compile every block again. Parsing the 2000-file sample
+  collection now reports 0 whole-file, 0 expression-block, and 0 shader-slot failures, where it
+  previously reported 4 expression-block failures in 2 files.
 - Fixed the visualizer's OpenGL presentation showing a picture that jumped forwards a few times and
   then back. The presenter only drew when the render thread had published a new frame, and the GL
   surface is double buffered, so every refresh that drew nothing swapped to the buffer that was two
