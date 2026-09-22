@@ -7,6 +7,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Added
+- Added `scripts/gl-harness/`, a local development harness that renders the visualizer's GPU pipeline
+  without Avalonia. It compiles `Orynivo/Controls/VisualizerGlPipeline.cs` unchanged and supplies its
+  own `Avalonia.OpenGL.GlInterface` over a hidden WGL context, so the real shaders and pass order are
+  verified headlessly and a change to the pipeline's GL calls breaks that build instead of drifting.
+  It writes the GPU and CPU frames side by side and prints the pipeline's one-shot diagnostics.
+- Added the GPU frame pipeline for the visualizer, off by default. With `ORYNIVO_VISUALIZER_OPENGL=1`
 - Added the GPU frame pipeline for the visualizer, off by default. With `ORYNIVO_VISUALIZER_OPENGL=1`
   a preset **without** shaders renders entirely through `Orynivo.Controls.VisualizerGlPipeline`: the
   warp is a mesh draw whose fragment shader is a translation of `WarpSampling.SamplePosition`, the
@@ -132,6 +138,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   default 480 x 270, the shader-pass cutover costs 39 ms per frame on average against 57 ms before.
 
 ### Fixed
+- Fixed three bugs the first GL runs exposed. The per-vertex mesh is only built when the preset's warp
+  can be represented by one, but `ExpressionsOnly` published an all-zero mesh otherwise, which
+  clamped the zoom and rendered a flat, blocky picture; the frame now falls through to the full CPU
+  path when no mesh is available, and the caller sees that through `TryCopyMeshMotion`. The GL
+  viewport used the control's logical bounds, so the picture was drawn into the bottom-left quarter of
+  the framebuffer on a scaled display; it now uses the framebuffer size derived from the render
+  scaling. A third bug was found by the new harness: the presentation path uploaded the frame without
+  reversing its rows, so a texture's first row became its bottom in OpenGL and the picture was
+  mirrored vertically. `VisualizerGlPresenter` now reverses the rows like the pipeline does.
 - Fixed a comp shader that reads more than one blur level costing seconds per frame. The blur cache
   held a single level, so a shader that sampled `GetBlur1` and `GetBlur3` in the same pixel
   invalidated it on every sample and rebuilt a full-frame blur each time. Each level now keeps its

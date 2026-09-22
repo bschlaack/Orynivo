@@ -43,7 +43,6 @@ public partial class VisualizerWindow : Window
     private bool _glErrorLogged;
     private bool _glInfoLogged;
     private bool _glPipelineActive;
-    private bool _glMeshValid;
     private int _glMeshX;
     private int _glMeshY;
     private VisualizerFrameParameters _glParameters;
@@ -404,7 +403,8 @@ public partial class VisualizerWindow : Window
         // carries the mesh and the pass values, copied under the same lock for the same reason.
         lock (_presentLock)
         {
-            if (_renderer.ExpressionsOnly)
+            if (_renderer.ExpressionsOnly &&
+                _renderer.TryCopyMeshMotion(_glMeshSnapshot, out var meshX, out var meshY))
             {
                 // The GPU pipeline owns the frame: the CPU hands over the overlay, the mesh, and the
                 // per-frame pass values. The overlay buffer is the render size, like the frame copy.
@@ -412,7 +412,6 @@ public partial class VisualizerWindow : Window
                 if (_glOverlayBytes.Length != overlaySize)
                     _glOverlayBytes = new byte[overlaySize];
                 _renderer.OverlayFrame.WriteBgra(_glOverlayBytes);
-                _glMeshValid = _renderer.TryCopyMeshMotion(_glMeshSnapshot, out var meshX, out var meshY);
                 _glMeshX = meshX;
                 _glMeshY = meshY;
                 _glParameters = _renderer.ReadFrameParameters();
@@ -420,6 +419,8 @@ public partial class VisualizerWindow : Window
             }
             else
             {
+                // Either the CPU rendered the whole frame, or it fell back to it because the preset's
+                // warp cannot be represented by the mesh; either way the frame copy is the picture.
                 _glPipelineActive = false;
                 _presentBuffer.CopyFrom(_renderer.Output);
             }
@@ -694,5 +695,6 @@ public partial class VisualizerWindow : Window
         PresetTextBlock.Text = label;
     }
 }
+
 
 

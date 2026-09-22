@@ -108,14 +108,23 @@ public sealed class VisualizerGlPresenter : OpenGlControlBase
             if (_rgba.Length != required)
                 _rgba = new byte[required];
 
-            // GLES has no core BGRA texture format, so the swap happens here. The frame is the render
-            // resolution, not the window, so this stays small.
-            for (var index = 0; index + 3 < required; index += 4)
+            // GLES has no core BGRA texture format, so the swap happens here. The rows are also
+            // reversed: a texture's first row is its bottom in OpenGL, and the present shader maps v
+            // zero to the bottom of the screen, so an unreversed upload would mirror the picture.
+            var stride = width * 4;
+            for (var y = 0; y < height; y++)
             {
-                _rgba[index] = bgra[index + 2];
-                _rgba[index + 1] = bgra[index + 1];
-                _rgba[index + 2] = bgra[index];
-                _rgba[index + 3] = bgra[index + 3];
+                var source = y * stride;
+                var target = (height - 1 - y) * stride;
+                for (var x = 0; x < width; x++)
+                {
+                    var from = source + (x * 4);
+                    var to = target + (x * 4);
+                    _rgba[to] = bgra[from + 2];
+                    _rgba[to + 1] = bgra[from + 1];
+                    _rgba[to + 2] = bgra[from];
+                    _rgba[to + 3] = bgra[from + 3];
+                }
             }
 
             _frameWidth = width;

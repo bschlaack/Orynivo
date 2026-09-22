@@ -572,11 +572,17 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
             // and nothing else. The overlay is drawn here rather than after the passes because the
             // passes are not the CPU's job in this mode.
             PrepareMeshForGpu();
-            DrawOverlay();
-            var overlayOnly = Mark();
-            RecordTimings(0d, 0d, 0d, overlayOnly, 0d, 0d);
-            _frame++;
-            return;
+            if (_meshBuiltThisFrame)
+            {
+                DrawOverlay();
+                var overlayOnly = Mark();
+                RecordTimings(0d, 0d, 0d, overlayOnly, 0d, 0d);
+                _frame++;
+                return;
+            }
+
+            // No mesh means the GPU cannot represent this preset's warp, so the frame falls through to
+            // the full CPU path. The caller sees that through TryCopyMeshMotion returning false.
         }
         if (useShaders)
             SeedCompiledShaderFrame();
