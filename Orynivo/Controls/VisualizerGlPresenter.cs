@@ -1,6 +1,7 @@
 using System.Runtime.InteropServices;
 using Avalonia.OpenGL;
 using Avalonia.OpenGL.Controls;
+using Orynivo.Visualization;
 
 namespace Orynivo.Controls;
 
@@ -122,6 +123,56 @@ public sealed class VisualizerGlPresenter : OpenGlControlBase
         }
     }
 
+    private byte[]? _pipelineOverlay;
+    private float[]? _pipelineMesh;
+    private int _pipelineMeshX;
+    private int _pipelineMeshY;
+    private VisualizerFrameParameters _pipelineParameters;
+    private int _pipelineFrameWidth;
+    private int _pipelineFrameHeight;
+    private bool _pipelinePending;
+    private bool _pipelineFailed;
+    private readonly VisualizerGlPipeline _pipeline = new();
+
+    /// <summary>
+    /// Gets a value indicating whether the GPU pipeline failed and the caller should fall back to the
+    /// CPU frame path.
+    /// </summary>
+    public bool PipelineFailed => _pipelineFailed;
+
+    /// <summary>
+    /// Publishes the CPU half of a GPU frame: the overlay, the per-vertex mesh, and the frame's pass
+    /// values. The GPU then owns the warp, the passes, and the composite.
+    /// </summary>
+    /// <param name="overlayBgra">Overlay frame, tightly packed BGRA.</param>
+    /// <param name="frameWidth">Render width.</param>
+    /// <param name="frameHeight">Render height.</param>
+    /// <param name="mesh">Per-vertex mesh motion.</param>
+    /// <param name="meshX">Mesh grid columns.</param>
+    /// <param name="meshY">Mesh grid rows.</param>
+    /// <param name="parameters">The frame's pass values.</param>
+    public void SetPipeline(
+        byte[] overlayBgra,
+        int frameWidth,
+        int frameHeight,
+        float[] mesh,
+        int meshX,
+        int meshY,
+        VisualizerFrameParameters parameters)
+    {
+        lock (_frameLock)
+        {
+            _pipelineOverlay = overlayBgra;
+            _pipelineFrameWidth = frameWidth;
+            _pipelineFrameHeight = frameHeight;
+            _pipelineMesh = mesh;
+            _pipelineMeshX = meshX;
+            _pipelineMeshY = meshY;
+            _pipelineParameters = parameters;
+            _pipelinePending = true;
+        }
+    }
+
     /// <inheritdoc/>
     protected override void OnOpenGlInit(GlInterface gl)
     {
@@ -153,6 +204,8 @@ public sealed class VisualizerGlPresenter : OpenGlControlBase
             gl.EnableVertexAttribArray(0);
             gl.VertexAttribPointer(0, 2, GlFloat, 0, 2 * sizeof(float), IntPtr.Zero);
             gl.BindVertexArray(0);
+            if (!_pipeline.Init(gl) && _pipeline.Error is { Length: > 0 } pipelineError)
+                GlError = pipelineError;
             _glReady = true;
         }
         catch (Exception exception)
@@ -168,6 +221,7 @@ public sealed class VisualizerGlPresenter : OpenGlControlBase
         if (!_glReady)
             return;
 
+        _pipeline.Dispose(gl);
         gl.DeleteProgram(_program);
         gl.DeleteTexture(_texture);
         gl.DeleteVertexArray(_vertexArray);
@@ -183,6 +237,56 @@ public sealed class VisualizerGlPresenter : OpenGlControlBase
 
         try
         {
+            // A pending pipeline frame is the whole picture: the GPU warps, post-processes, and
+            // composites, and the CPU only supplied the overlay, the mesh, and the pass values.
+            byte[]? pipelineOverlay = null;
+            float[]? pipelineMesh = null;
+            int pipelineMeshX = 0, pipelineMeshY = 0, pipelineWidth = 0, pipelineHeight = 0;
+            VisualizerFrameParameters pipelineParameters = default;
+            lock (_frameLock)
+            {
+                if (_pipelinePending)
+                {
+                    pipelineOverlay = _pipelineOverlay;
+                    pipelineMesh = _pipelineMesh;
+                    pipelineMeshX = _pipelineMeshX;
+                    pipelineMeshY = _pipelineMeshY;
+                    pipelineWidth = _pipelineFrameWidth;
+                    pipelineHeight = _pipelineFrameHeight;
+                    pipelineParameters = _pipelineParameters;
+                    _pipelinePending = false;
+                }
+            }
+
+            if (pipelineOverlay is not null && pipelineMesh is not null && pipelineWidth > 0 && pipelineHeight > 0)
+            {
+                if (_pipeline.Render(
+                    gl,
+                    fb,
+                    Math.Max(1, (int)Bounds.Width),
+                    Math.Max(1, (int)Bounds.Height),
+                    pipelineWidth,
+                    pipelineHeight,
+                    pipelineOverlay,
+                    pipelineMesh,
+                    pipelineMeshX,
+                    pipelineMeshY,
+                    true,
+                    pipelineParameters))
+                {
+                    Frames++;
+                    RequestNextFrameRendering();
+                    return;
+                }
+
+                // A failed pipeline is fatal for the GL path: the caller falls back to the CPU frame,
+                // because only the overlay was published for this frame.
+                _pipelineFailed = true;
+                GlError = _pipeline.Error ?? "the GL pipeline failed";
+                RequestNextFrameRendering();
+                return;
+            }
+
             byte[]? frame = null;
             int frameWidth, frameHeight;
             lock (_frameLock)
@@ -280,3 +384,5 @@ public sealed class VisualizerGlPresenter : OpenGlControlBase
         return program;
     }
 }
+
+

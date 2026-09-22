@@ -497,11 +497,20 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
   hardware-accelerated. Roadmap 40f moves the pipeline onto OpenGL: `Avalonia` 12 already ships
   `Avalonia.OpenGL` with `OpenGlControlBase`, and the context is confirmed as OpenGL ES 3.0 through
   ANGLE on Windows. `Orynivo.Controls.VisualizerGlPresenter`, shown with
-  `ORYNIVO_VISUALIZER_OPENGL=1`, is step 1: it uploads the finished frame as an RGBA8 texture and
-  draws it with a `#version 300 es` program over a quad in a vertex buffer. Keep it opt-in with the
-  bitmap path as the fallback, keep a shader or context failure logged rather than fatal, and note
-  that `GlInterface` exposes no `TexSubImage2D`, so a texture update re-specifies it through
-  `TexImage2D` or goes through `GetProcAddress`.
+  `ORYNIVO_VISUALIZER_OPENGL=1`, presents the frame and owns the GPU pipeline. When the preset has no
+  shaders, `Orynivo.Controls.VisualizerGlPipeline` owns the whole frame: the warp as a mesh draw whose
+  fragment shader is a translation of `WarpSampling.SamplePosition`, the blur as the same nine-tap
+  clamped box filter with ping-pong targets, and decay, video echo, centre darkening, both border
+  bands, gamma, and the additive overlay composite in one post pass. `PresetRenderer.ExpressionsOnly`
+  is the CPU half: the per-frame block, the mesh, and the overlay, with no pixel pass. Keep it opt-in
+  with the bitmap path as the fallback, keep a shader, context, or pipeline failure logged and
+  non-fatal (a failed pipeline hands the frame back to the CPU), and remember two `GlInterface`
+  limits: it exposes only scalar uniforms, so a vector uniform is set component by component, and it
+  exposes no `TexSubImage2D`, so a texture update re-specifies it through `TexImage2D` or goes through
+  `GetProcAddress`. Every GL texture holds the frame bottom-up, which is OpenGL's natural orientation,
+  so the overlay upload and the warp shader convert between that and the engine's top-down
+  coordinates; do not mix the two. A preset with shaders keeps the CPU frame path until the comp and
+  warp shaders are ported to GLSL.
   `VisualizerWindow`
   owns `VisualizerAudioHub.IsActive`: while it is false the players skip the tap entirely, so
   a closed visualizer costs nothing. Never render, analyse, or evaluate preset expressions on

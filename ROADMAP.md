@@ -768,7 +768,8 @@ affordable. This is a project of its own and must keep the CPU path as the fallb
   managed SkiaSharp surface, so the existing CI matrix (Windows Debug/Release, the `linux-x64`
   artifact, and the macOS `Orynivo.app` bundles), the packaging scripts, and the signed release
   manifest already cover it and needed no change.
-- 40f A real GPU pipeline - `In progress`: section 40 was named "GPU pipeline", but nothing in it
+- 40f A real GPU pipeline - `Done for presets without shaders`: section 40 was named "GPU pipeline",
+  but nothing in it
   reaches the GPU. `SkiaShaderRunner` creates its surfaces with
   `SKSurface.Create(target.Info, target.GetPixels(), target.RowBytes)`, which is Skia's **raster**
   constructor over CPU memory, so every "Skia" pass is Skia's CPU runtime-effect JIT; the finished
@@ -817,6 +818,18 @@ affordable. This is a project of its own and must keep the CPU path as the fallb
   `TryCopyMeshMotion`), the clamped per-frame pass values (`ReadFrameParameters`), and the
   overlay-only frame (`RenderOverlayFrame`/`OverlayFrame`), all covered by tests. What is left is the
   GL pipeline itself in the control, which is app-side only.
+  Step 3 is done for presets without shaders. `Orynivo.Controls.VisualizerGlPipeline` runs the warp
+  as a mesh draw (the fragment shader is a translation of `WarpSampling.SamplePosition`, and every
+  texture is bottom-up so the engine's top-down coordinates are converted in the shader), the blur as
+  the same nine-tap clamped box filter with ping-pong targets, and decay, video echo, centre
+  darkening, both border bands, gamma, and the additive overlay composite in one post pass, because
+  each is a function of the same input frame. `PresetRenderer.ExpressionsOnly` is the CPU half: the
+  per-frame block, the mesh, and the overlay, with no pixel pass. `GlInterface` exposes only scalar
+  uniforms, so vector uniforms are set component by component, and it exposes no `TexSubImage2D`, so
+  the overlay texture is re-specified through `TexImage2D`. A preset with shaders keeps the CPU frame
+  path, and a pipeline failure is logged once and hands the frame back to the CPU.
+  What remains: the comp and warp shaders as GLSL, which is what makes the many shader presets
+  eligible, and then deleting the CPU frame path for the GL mode.
   The warp's sampling arithmetic now lives in the tested
 
   `Orynivo.Visualization.WarpSampling`, which the GLSL fragment shader has to translate rather than

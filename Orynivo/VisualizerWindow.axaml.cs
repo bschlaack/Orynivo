@@ -39,8 +39,31 @@ public partial class VisualizerWindow : Window
     private readonly object _presentLock = new();
     private bool _useGlPresenter;
     private byte[] _glBytes = [];
+    private byte[] _glOverlayBytes = [];
     private bool _glErrorLogged;
     private bool _glInfoLogged;
+    private bool _glPipelineActive;
+    private bool _glMeshValid;
+    private int _glMeshX;
+    private int _glMeshY;
+    private VisualizerFrameParameters _glParameters;
+    private readonly float[] _glMeshSnapshot =
+        new float[(PresetRenderer.MeshGridX + 1) * (PresetRenderer.MeshGridY + 1) * PresetRenderer.MeshValues];
+
+    /// <summary>
+    /// Applies the GL mode's renderer settings. The GPU pipeline owns the frame when the preset has no
+    /// shaders, because the GL shader dialect is a separate step; a preset with shaders keeps the CPU
+    /// frame path and only the presentation is GL.
+    /// </summary>
+    /// <param name="renderer">Renderer to configure.</param>
+    private void ConfigureRenderer(PresetRenderer renderer)
+    {
+        if (!_useGlPresenter)
+            return;
+
+        renderer.MeshRequested = true;
+        renderer.ExpressionsOnly = !renderer.HasShaders;
+    }
     private readonly VisualizerPresetLibrary _library = new();
     private readonly SilentAudioSource _silent = new();
     private readonly Stopwatch _renderClock = new();
@@ -90,12 +113,16 @@ public partial class VisualizerWindow : Window
         // because that would block the interface for as long as it takes.
         _presetDirectory = options.PresetDirectory;
         _library.LoadBuiltIns();
+        // Roadmap 40f: the GL pipeline and its presentation. It is opt-in while the GL path is
+        // proven per platform, and the bitmap presentation stays the fallback.
+        _useGlPresenter = Environment.GetEnvironmentVariable("ORYNIVO_VISUALIZER_OPENGL") == "1";
         _renderer = new PresetRenderer(_library.At(_presetIndex), _renderWidth, _renderHeight)
         {
             // The Skia runtime-effect passes are the default: they measured faster than the
             // interpreter at the default resolution and keep the interpreter as the fallback.
             UseSkiaPasses = true
         };
+        ConfigureRenderer(_renderer);
         _bitmap = new WriteableBitmap(
             new Avalonia.PixelSize(_renderWidth, _renderHeight),
             new Avalonia.Vector(96, 96),
@@ -110,9 +137,6 @@ public partial class VisualizerWindow : Window
         HintTextBlock.Text = LocalizationManager.Current.VisualizerHint;
         UpdatePresetLabel();
 
-        // Roadmap 40f: presenting through OpenGL instead of the WriteableBitmap. It is opt-in while
-        // the GL path is proven per platform, and the bitmap presentation stays the fallback.
-        _useGlPresenter = Environment.GetEnvironmentVariable("ORYNIVO_VISUALIZER_OPENGL") == "1";
         if (_useGlPresenter)
         {
             VisualizerImage.IsVisible = false;
@@ -302,6 +326,14 @@ public partial class VisualizerWindow : Window
     /// <param name="deltaSeconds">Seconds since the previous frame.</param>
     private void RenderOneFrameCore(double deltaSeconds)
     {
+        if (_useGlPresenter && _renderer.ExpressionsOnly && GlPresenter.PipelineFailed)
+        {
+            // The GPU pipeline failed, so the CPU takes the frame back rather than showing an overlay
+            // over nothing.
+            _renderer.ExpressionsOnly = false;
+            SeekDiagnostics.Log("visualizer", "GL pipeline disabled; the CPU frame path is back");
+        }
+
         if (_renderedPresetIndex != _presetIndex)
         {
             var switchClock = System.Diagnostics.Stopwatch.StartNew();
@@ -309,10 +341,8 @@ public partial class VisualizerWindow : Window
             var preset = _library.At(_presetIndex);
             var loadMs = switchClock.ElapsedMilliseconds;
             _renderer.Dispose();
-            _renderer = new PresetRenderer(preset, _renderWidth, _renderHeight)
-            {
-                UseSkiaPasses = true
-            };
+            _renderer = new PresetRenderer(preset, _renderWidth, _renderHeight);
+            ConfigureRenderer(_renderer);
             // The first frames are traced stage by stage so a frozen frame names its own stage.
             _renderer.StageLogger = message => SeekDiagnostics.Log("visualizer", message);
             // Parsing and compiling a preset happen here, on the render thread, so a preset that
@@ -370,10 +400,26 @@ public partial class VisualizerWindow : Window
         }
 
         // Hand a finished copy to the UI thread instead of the live buffer, so the next frame can
-        // start immediately without the two threads ever touching the same pixels.
+        // start immediately without the two threads ever touching the same pixels. A GL frame also
+        // carries the mesh and the pass values, copied under the same lock for the same reason.
         lock (_presentLock)
         {
-            _presentBuffer.CopyFrom(_renderer.Output);
+            if (_renderer.ExpressionsOnly)
+            {
+                // The GPU pipeline owns the frame: the CPU hands over the overlay, the mesh, and the
+                // per-frame pass values.
+                _renderer.OverlayFrame.WriteBgra(_glOverlayBytes);
+                _glMeshValid = _renderer.TryCopyMeshMotion(_glMeshSnapshot, out var meshX, out var meshY);
+                _glMeshX = meshX;
+                _glMeshY = meshY;
+                _glParameters = _renderer.ReadFrameParameters();
+                _glPipelineActive = true;
+            }
+            else
+            {
+                _glPipelineActive = false;
+                _presentBuffer.CopyFrom(_renderer.Output);
+            }
         }
 
         PostPresent(BuildDiagnostics());
@@ -496,24 +542,39 @@ public partial class VisualizerWindow : Window
     {
         if (_useGlPresenter)
         {
-            // The GL path reads the same finished presentation copy, so the lock and the copy stay
-            // exactly as they are for the bitmap path.
-            var size = _renderWidth * _renderHeight * 4;
-            if (_glBytes.Length != size)
-                _glBytes = new byte[size];
+            bool pipeline;
             lock (_presentLock)
             {
-                _presentBuffer.WriteBgra(_glBytes);
+                pipeline = _glPipelineActive;
+                if (!pipeline)
+                {
+                    var size = _renderWidth * _renderHeight * 4;
+                    if (_glBytes.Length != size)
+                        _glBytes = new byte[size];
+                    _presentBuffer.WriteBgra(_glBytes);
+                }
             }
 
-            GlPresenter.SetFrame(_glBytes, _renderWidth, _renderHeight);
+            if (pipeline)
+                GlPresenter.SetPipeline(
+                    _glOverlayBytes,
+                    _renderWidth,
+                    _renderHeight,
+                    _glMeshSnapshot,
+                    _glMeshX,
+                    _glMeshY,
+                    _glParameters);
+            else
+                GlPresenter.SetFrame(_glBytes, _renderWidth, _renderHeight);
+
             GlPresenter.RequestNextFrameRendering();
             if (!_glInfoLogged && GlPresenter.Frames > 0)
             {
                 _glInfoLogged = true;
                 SeekDiagnostics.Log(
                     "visualizer",
-                    $"OpenGL presenter active: {GlPresenter.GlInfo} (bitmap presentation disabled)");
+                    $"OpenGL presenter active: {GlPresenter.GlInfo} " +
+                    $"(pipeline={pipeline}, bitmap presentation disabled)");
             }
 
             if (GlPresenter.GlError is { Length: > 0 } glError && !_glErrorLogged)
@@ -628,3 +689,5 @@ public partial class VisualizerWindow : Window
         PresetTextBlock.Text = label;
     }
 }
+
+

@@ -7,7 +7,23 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Added
-- Completed the Core surface a GPU pipeline reads: `PresetRenderer.ReadFrameParameters` publishes the`n  clamped per-frame pass values (decay, blur passes, centre darkening, gamma, video echo, and both`n  border bands) as `VisualizerFrameParameters`, and `RenderOverlayFrame` draws the waveform,`n  spectrum, motion vectors, and shapes into `OverlayFrame` without touching the feedback buffers.`n  A GPU path composites that overlay over its own warped frame instead of re-drawing it.`n- Extracted the warp's sampling arithmetic into `Orynivo.Visualization.WarpSampling`, which is now
+- Added the GPU frame pipeline for the visualizer, off by default. With `ORYNIVO_VISUALIZER_OPENGL=1`
+  a preset **without** shaders renders entirely through `Orynivo.Controls.VisualizerGlPipeline`: the
+  warp is a mesh draw whose fragment shader is a translation of `WarpSampling.SamplePosition`, the
+  blur is the same nine-tap box filter, and decay, video echo, centre darkening, both border bands,
+  gamma, and the additive overlay composite share one pass. The CPU supplies only the per-frame
+  block, the per-vertex mesh, and the overlay, which stays a vector drawing.
+  `PresetRenderer.ExpressionsOnly` is the CPU half of that split: it runs the expressions, builds the
+  mesh, and draws the overlay without any pixel pass. A preset with shaders keeps the CPU frame path,
+  because the GL shader dialect is a separate step, and the bitmap presentation stays the fallback.
+  A pipeline failure is logged once and hands the frame back to the CPU.
+- Completed the Core surface a GPU pipeline reads: `PresetRenderer.ReadFrameParameters` publishes the
+  clamped per-frame pass values (decay, blur passes, centre darkening, gamma, video echo, and both
+  border bands) as `VisualizerFrameParameters`, and `RenderOverlayFrame` draws the waveform,
+  spectrum, motion vectors, and shapes into `OverlayFrame` without touching the feedback buffers.
+  A GPU path composites that overlay over its own warped frame instead of re-drawing it.
+- Extracted the warp's sampling arithmetic into `Orynivo.Visualization.WarpSampling`, which is now
+
   the single definition of it: the CPU warp calls it per pixel and the GPU warp's fragment shader is
   its translation, so a GPU warp cannot silently disagree with the reference. `WarpSamplingTests`
   covers the identity, zoom, offset, rotation, stretch, and radial-exponent cases. The extraction is

@@ -90,19 +90,63 @@ public sealed class PerVertexMeshTests
         Assert.True(mesh[last] > 1.02f, $"zoom at the last vertex was {mesh[last]}");
     }
 
-    /// <summary>A preset with no per-pixel motion exposes no mesh.</summary>
+    /// <summary>
+    /// A preset with no per-pixel motion still gets a mesh when one is requested, because a GPU warp
+    /// needs a mesh for every preset; the mesh is then the uniform frame motion.
+    /// </summary>
     [Fact]
-    public void RenderFrame_ExposesNoMeshWithoutPerPixelMotion()
+    public void RenderFrame_ExposesAUniformMeshWithoutPerPixelMotion()
     {
-        var renderer = new PresetRenderer(VisualizerPreset.Parse("decay = 1;"), 40, 40)
+        var renderer = new PresetRenderer(VisualizerPreset.Parse("decay = 1;\nzoom=1.5"), 40, 40)
         {
             MeshRequested = true,
         };
         renderer.RenderFrame(new FakeAudio(), 1d / 60d);
 
         var mesh = new float[(PresetRenderer.MeshGridX + 1) * (PresetRenderer.MeshGridY + 1) * PresetRenderer.MeshValues];
-        Assert.False(renderer.TryCopyMeshMotion(mesh, out _, out _));
+        Assert.True(renderer.TryCopyMeshMotion(mesh, out _, out _));
+        // Every vertex carries the frame's zoom.
+        for (var vertex = 0; vertex < mesh.Length; vertex += PresetRenderer.MeshValues)
+            Assert.Equal(1.5f, mesh[vertex], 4);
         Assert.NotNull(renderer.MeshSource);
+    }
+
+    /// <summary>Without a request, a preset with no per-pixel motion exposes no mesh.</summary>
+    [Fact]
+    public void RenderFrame_ExposesNoMeshWithoutARequest()
+    {
+        var renderer = new PresetRenderer(VisualizerPreset.Parse("decay = 1;"), 40, 40);
+        renderer.RenderFrame(new FakeAudio(), 1d / 60d);
+
+        var mesh = new float[(PresetRenderer.MeshGridX + 1) * (PresetRenderer.MeshGridY + 1) * PresetRenderer.MeshValues];
+        Assert.False(renderer.TryCopyMeshMotion(mesh, out _, out _));
+    }
+
+    /// <summary>
+    /// The expressions-only mode is the CPU half of the GPU split: it still runs the per-frame block,
+    /// builds the mesh, and draws the overlay, but skips every pixel pass.
+    /// </summary>
+    [Fact]
+    public void RenderFrame_ExpressionsOnlyBuildsTheMeshAndTheOverlay()
+    {
+        var renderer = new PresetRenderer(
+            VisualizerPreset.Parse("decay = 1;\nzoom=1.25\nwave_alpha=1;\nper_pixel_1=rot = 0.1 * x;"),
+            40,
+            40)
+        {
+            ExpressionsOnly = true,
+            MeshRequested = true,
+        };
+        renderer.RenderFrame(new FakeAudio(), 1d / 60d);
+
+        var mesh = new float[(PresetRenderer.MeshGridX + 1) * (PresetRenderer.MeshGridY + 1) * PresetRenderer.MeshValues];
+        Assert.True(renderer.TryCopyMeshMotion(mesh, out _, out _));
+        // The overlay is drawn, so the overlay frame is not empty.
+        var overlay = renderer.OverlayFrame.Pixels;
+        var any = false;
+        for (var index = 0; index < overlay.Length; index++)
+            any |= overlay[index] > 0f;
+        Assert.True(any, "the overlay should be drawn in expressions-only mode");
     }
 
     /// <summary>Renders a preset with a visible overlay so the feedback carries a picture.</summary>

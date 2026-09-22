@@ -377,6 +377,39 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
     public bool MeshRequested { get; set; }
 
     /// <summary>
+    /// Gets or sets a value indicating whether the renderer runs only the preset's expressions and
+    /// draws the overlay, leaving the frame itself to a GPU pipeline. The mesh is still built and the
+    /// overlay is still drawn into <see cref="OverlayFrame"/>; every pixel pass is skipped, so this
+    /// is the CPU half of the GPU split.
+    /// </summary>
+    public bool ExpressionsOnly { get; set; }
+
+    /// <summary>
+    /// Builds the per-vertex mesh for a GPU warp, which owns the frame itself. It is the mesh half of
+    /// <see cref="Warp"/> without any pixel work, so <see cref="ExpressionsOnly"/> can call it.
+    /// </summary>
+    public void PrepareMeshForGpu()
+    {
+        _meshBuiltThisFrame = false;
+        if (_perPixelWritesPosition || Read("mv_enabled", 0f) >= 0.5f)
+            return;
+        if (!_perPixelWritesMotion && !MeshRequested)
+            return;
+
+        BuildMesh(
+            Math.Max(0.01f, Read("zoom", Preset.Zoom)),
+            Read("zoomexp", 1f),
+            Read("rot", 0f),
+            Read("cx", 0f),
+            Read("cy", 0f),
+            Read("dx", 0f),
+            Read("dy", 0f),
+            Read("sx", 1f),
+            Read("sy", 1f));
+        _meshBuiltThisFrame = true;
+    }
+
+    /// <summary>
     /// Gets the frame the mesh warp samples: the feedback the CPU warp would read. A GPU warp binds
     /// it as its source texture, so it must stay valid until the next frame is rendered.
     /// </summary>
@@ -533,6 +566,18 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
         }
         var decay = Math.Clamp(Read("decay", Preset.Decay), 0f, 1f);
         var useShaders = HasShaders;
+        if (ExpressionsOnly)
+        {
+            // A GPU pipeline owns the frame, so the CPU runs the expressions and draws the overlay,
+            // and nothing else. The overlay is drawn here rather than after the passes because the
+            // passes are not the CPU's job in this mode.
+            PrepareMeshForGpu();
+            DrawOverlay();
+            var overlayOnly = Mark();
+            RecordTimings(0d, 0d, 0d, overlayOnly, 0d, 0d);
+            _frame++;
+            return;
+        }
         if (useShaders)
             SeedCompiledShaderFrame();
         trace?.Invoke($"stage=warp begin frame={_frame}");
@@ -969,16 +1014,15 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
         // produced across the quad. Our per-pixel path runs it for every pixel, which is finer than
         // the reference and costs more; the mesh is the faithful one. A program that writes the
         // sample position has no interpolated meaning, and one that records motion vectors keeps
-        // the per-pixel path. A GPU warp needs the mesh values even while the CPU keeps evaluating
-        // per pixel, so MeshRequested builds the mesh without switching the CPU picture over.
-        if ((MeshPerPixelEnabled || MeshRequested) &&
-            _perPixelWritesMotion &&
-            !_perPixelWritesPosition &&
-            !recordMotion)
+        // the per-pixel path. A GPU warp needs a mesh for every preset, so requesting it without a
+        // per-pixel motion program yields the uniform mesh the frame motion describes.
+        if (!_perPixelWritesPosition &&
+            !recordMotion &&
+            (_perPixelWritesMotion ? MeshPerPixelEnabled || MeshRequested : MeshRequested))
         {
             BuildMesh(zoom, zoomExp, rotation, centreX, centreY, offsetX, offsetY, stretchX, stretchY);
             _meshBuiltThisFrame = true;
-            if (MeshPerPixelEnabled)
+            if (MeshPerPixelEnabled && _perPixelWritesMotion)
             {
                 if (ParallelismEnabled)
                     ParallelRows.For(height, MeshRows);
