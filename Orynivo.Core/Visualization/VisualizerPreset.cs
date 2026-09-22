@@ -252,7 +252,7 @@ public sealed class VisualizerPreset
             Math.Max(0.05f, ReadFloat(values, "zoom", 1f)),
             ReadFloat(values, "warp", 1f),
             (int)Math.Clamp(ReadFloat(values, "blur_level", 0f), 0f, 4f),
-            Math.Clamp(ReadFloat(values, "wave_alpha", 0.8f), 0f, 1f),
+            Math.Clamp(ReadFloat(values, "wave_a", 0.8f), 0f, 1f),
             Math.Clamp(ReadFloat(values, "wave_scale", 0.25f), 0f, 1f),
             CompileBlock(values, layout, "per_point", failed),
             ParseShapes(values, layout, failed),
@@ -626,6 +626,21 @@ public sealed class VisualizerPreset
         ["bAdditiveWaves"] = "wave_additive",
         ["bWaveBrighten"] = "wave_brighten",
         ["bDarkenCenter"] = "darken_center",
+        // Milkdrop 2 spells the scalar parameters with an f-prefixed key. Without these the engine
+        // read the built-in default for every preset that only carries the Milkdrop 2 spelling, so a
+        // preset that set fWaveAlpha to 0.001 still drew a full overlay and one that set fDecay to
+        // 0.925 fed back at 0.96.
+        ["fDecay"] = "decay",
+        ["wave_alpha"] = "wave_a",
+        ["fWaveAlpha"] = "wave_a",
+        ["fWaveScale"] = "wave_scale",
+        ["fWaveSmoothing"] = "wave_smoothing",
+        ["fWaveParam"] = "wave_mystery",
+        ["fWaveR"] = "wave_r",
+        ["fWaveG"] = "wave_g",
+        ["fWaveB"] = "wave_b",
+        ["fWaveX"] = "wave_x",
+        ["fWaveY"] = "wave_y",
         // Milkdrop keeps the enable flag and the length apart: bMotionVectors turns the vectors on
         // and defaults to off, while mv_l is only their length and defaults to one. Writing the flag
         // into the length drew a grid of stray lines on every preset that set a length but never
@@ -835,11 +850,34 @@ public sealed class VisualizerPreset
         character is '+' or '-' or '*' or '/' or '%' or ',' or '(' or '[' or '<' or '>' or '='
             or '&' or '|' or '!' or '?' or '^';
 
-    private static float ReadFloat(Dictionary<string, string> values, string key, float fallback) =>
-        values.TryGetValue(key, out var text) &&
-        float.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out var value)
-            ? value
-            : fallback;
+    private static float ReadFloat(Dictionary<string, string> values, string key, float fallback)
+    {
+        if (TryReadFloat(values, key, out var value))
+            return value;
+
+        // Milkdrop 2 writes some parameters with a short key (fDecay, fWaveAlpha, ...); resolve the
+        // raw key that aliases onto the requested variable so a preset that only carries the
+        // Milkdrop 2 spelling is not read as its default.
+        foreach (var (raw, alias) in KeyAliases)
+        {
+            if (string.Equals(alias, key, StringComparison.OrdinalIgnoreCase) && TryReadFloat(values, raw, out value))
+                return value;
+        }
+
+        return fallback;
+    }
+
+    /// <summary>Reads one numeric key, reporting whether it was present and parseable.</summary>
+    /// <param name="values">Parsed preset values.</param>
+    /// <param name="key">Key to read.</param>
+    /// <param name="value">Receives the value.</param>
+    /// <returns><see langword="true"/> when the key was read.</returns>
+    private static bool TryReadFloat(Dictionary<string, string> values, string key, out float value)
+    {
+        value = 0f;
+        return values.TryGetValue(key, out var text) &&
+               float.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out value);
+    }
 }
 
 

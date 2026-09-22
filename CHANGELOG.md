@@ -7,6 +7,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Fixed
+- Fixed the visualizer ignoring Milkdrop 2's `f`-prefixed scalar keys, which made every preset that
+  carries only that spelling render with the built-in default instead of its own value. `fDecay`,
+  `fWaveAlpha`, `fWaveScale`, `fWaveSmoothing`, `fWaveParam`, and the `fWaveR/G/B/X/Y` colours now
+  resolve to the variables the engine reads, so a preset that sets `fWaveAlpha=0.001` no longer draws
+  a full waveform and spectrum over the picture and one that sets `fDecay=0.925` no longer feeds back
+  at 0.96. Measured against projectM with `scripts/projectm-oracle`, `LuxXx - BadBallz Beta` went from
+  a mean channel difference of 0.5 and a correlation of 0.03 to 0.07-0.14 and 0.36-0.41, because the
+  bright overlay it never asked for was driving the feedback. `wave_alpha` keeps working as the long
+  spelling of `wave_a`.
 - Fixed the visualizer turning into a solid white screen on comp-shader presets such as
   `LuxXx - BadBallz Beta`. The renderer fed the comp shader's output back as the next frame's
   feedback, so a comp shader that amplifies its input (the common `ret *= 10` gamma idiom)

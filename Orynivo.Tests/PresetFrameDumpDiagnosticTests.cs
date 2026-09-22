@@ -42,6 +42,10 @@ public sealed class PresetFrameDumpDiagnosticTests
         var renderer = new PresetRenderer(preset, width, height)
         {
             MeshPerPixelEnabled = mesh,
+            // The reference dump must run the shaders fully; a budget that abandons them would show
+            // the overlay over a stale frame and make the comparison meaningless.
+            ShaderTimeBudgetMilliseconds = 100_000d,
+            ShaderPassBudgetMilliseconds = 100_000d,
         };
         var audio = new ConstantAudio();
         for (var frame = 0; frame < frames; frame++)
