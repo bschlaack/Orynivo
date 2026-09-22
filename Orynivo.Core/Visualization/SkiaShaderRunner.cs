@@ -22,6 +22,24 @@ public static class SkiaShaderRunner
     /// </summary>
     private static readonly SKSamplingOptions LinearSampling = new(SKFilterMode.Linear, SKMipmapMode.None);
 
+    /// <summary>
+    /// The runtime effects of the frame passes, whose SkSL is constant. Skia compiles an effect when
+    /// it is created, so rebuilding them every frame would cost more than the passes themselves; they
+    /// live for the process.
+    /// </summary>
+    private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, SKRuntimeEffect> FrameEffects =
+        new(StringComparer.Ordinal);
+
+    /// <summary>Returns the cached runtime effect for a constant SkSL program.</summary>
+    /// <param name="sksl">SkSL source.</param>
+    /// <returns>The runtime effect.</returns>
+    /// <exception cref="PresetExpressionException">Skia rejects the program.</exception>
+    private static SKRuntimeEffect GetFrameEffect(string sksl) => FrameEffects.GetOrAdd(sksl, static source =>
+    {
+        var effect = SKRuntimeEffect.CreateShader(source, out var errors);
+        return effect ?? throw new PresetExpressionException($"SkSL was rejected: {errors}", 0);
+    });
+
     /// <summary>Renders a shader over one source frame.</summary>
     /// <param name="program">Root node returned by <see cref="ShaderParser.Parse"/>.</param>
     /// <param name="source">Source frame as RGBA components in the range zero to one.</param>
@@ -300,8 +318,7 @@ public static class SkiaShaderRunner
         if (passes == 0)
             return;
 
-        using var effect = SKRuntimeEffect.CreateShader(CompPass.BlurSkSL, out var errors)
-            ?? throw new PresetExpressionException($"SkSL was rejected: {errors}", 0);
+        var effect = GetFrameEffect(CompPass.BlurSkSL);
         using var sourceBitmap = CreateBitmap(frame.Pixels, frame.Width, frame.Height);
         using var sourceShader = sourceBitmap.ToShader(SKShaderTileMode.Clamp, SKShaderTileMode.Clamp, LinearSampling);
 
@@ -357,8 +374,7 @@ public static class SkiaShaderRunner
         zoom = Math.Clamp(zoom, 0.1f, 4f);
         orientation = Math.Clamp(orientation, 0, 3);
 
-        using var effect = SKRuntimeEffect.CreateShader(EchoSkSL, out var errors)
-            ?? throw new PresetExpressionException($"SkSL was rejected: {errors}", 0);
+        var effect = GetFrameEffect(EchoSkSL);
         using var sourceBitmap = CreateBitmap(frame.Pixels, frame.Width, frame.Height);
         using var sourceShader = sourceBitmap.ToShader(SKShaderTileMode.Clamp, SKShaderTileMode.Clamp, LinearSampling);
         var uniforms = new SKRuntimeEffectUniforms(effect)
@@ -418,8 +434,7 @@ public static class SkiaShaderRunner
         if (target.Width != overlay.Width || target.Height != overlay.Height)
             throw new ArgumentException("The frames have different sizes.", nameof(overlay));
 
-        using var effect = SKRuntimeEffect.CreateShader(CompositeSkSL, out var errors)
-            ?? throw new PresetExpressionException($"SkSL was rejected: {errors}", 0);
+        var effect = GetFrameEffect(CompositeSkSL);
         using var targetBitmap = CreateBitmap(target.Pixels, target.Width, target.Height);
         using var targetShader = targetBitmap.ToShader(SKShaderTileMode.Clamp, SKShaderTileMode.Clamp, LinearSampling);
         using var overlayBitmap = CreateBitmap(overlay.Pixels, overlay.Width, overlay.Height);
@@ -477,8 +492,7 @@ public static class SkiaShaderRunner
     public static void Borders(PixelBuffer frame, BorderBand outer, BorderBand inner)
     {
         ArgumentNullException.ThrowIfNull(frame);
-        using var effect = SKRuntimeEffect.CreateShader(BorderSkSL, out var errors)
-            ?? throw new PresetExpressionException($"SkSL was rejected: {errors}", 0);
+        var effect = GetFrameEffect(BorderSkSL);
         using var bitmap = CreateBitmap(frame.Pixels, frame.Width, frame.Height);
         using var source = bitmap.ToShader(SKShaderTileMode.Clamp, SKShaderTileMode.Clamp, LinearSampling);
         var uniforms = new SKRuntimeEffectUniforms(effect)
@@ -571,8 +585,7 @@ public static class SkiaShaderRunner
         if (previous.Width != target.Width || previous.Height != target.Height)
             throw new ArgumentException("The frames have different sizes.", nameof(target));
 
-        using var effect = SKRuntimeEffect.CreateShader(WarpSkSL, out var errors)
-            ?? throw new PresetExpressionException($"SkSL was rejected: {errors}", 0);
+        var effect = GetFrameEffect(WarpSkSL);
         using var bitmap = CreateBitmap(previous.Pixels, previous.Width, previous.Height);
         using var source = bitmap.ToShader(SKShaderTileMode.Clamp, SKShaderTileMode.Clamp, LinearSampling);
         var uniforms = new SKRuntimeEffectUniforms(effect)

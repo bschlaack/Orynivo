@@ -86,7 +86,12 @@ public partial class VisualizerWindow : Window
         // because that would block the interface for as long as it takes.
         _presetDirectory = options.PresetDirectory;
         _library.LoadBuiltIns();
-        _renderer = new PresetRenderer(_library.At(_presetIndex), _renderWidth, _renderHeight);
+        _renderer = new PresetRenderer(_library.At(_presetIndex), _renderWidth, _renderHeight)
+        {
+            // The Skia runtime-effect passes are the default: they measured faster than the
+            // interpreter at the default resolution and keep the interpreter as the fallback.
+            UseSkiaPasses = true
+        };
         _bitmap = new WriteableBitmap(
             new Avalonia.PixelSize(_renderWidth, _renderHeight),
             new Avalonia.Vector(96, 96),
@@ -291,7 +296,10 @@ public partial class VisualizerWindow : Window
             var preset = _library.At(_presetIndex);
             var loadMs = switchClock.ElapsedMilliseconds;
             _renderer.Dispose();
-            _renderer = new PresetRenderer(preset, _renderWidth, _renderHeight);
+            _renderer = new PresetRenderer(preset, _renderWidth, _renderHeight)
+            {
+                UseSkiaPasses = true
+            };
             // The first frames are traced stage by stage so a frozen frame names its own stage.
             _renderer.StageLogger = message => SeekDiagnostics.Log("visualizer", message);
             // Parsing and compiling a preset happen here, on the render thread, so a preset that

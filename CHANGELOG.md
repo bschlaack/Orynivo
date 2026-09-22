@@ -64,6 +64,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   eight-bit textures and therefore differs from the interpreter by up to one level; the interpreter
   stays the fallback, and the CPU/GPU tests keep the two within a level.
 
+### Changed
+- Made the Skia runtime-effect passes the visualizer's default. `VisualizerWindow` now creates its
+  `PresetRenderer` with `UseSkiaPasses` enabled, so the warp, blur, video echo, borders, composite,
+  and comp passes run as Skia runtime effects, and anything the Skia path cannot handle still falls
+  back to the interpreter per pass. The frame passes' runtime effects are cached for the process,
+  because their SkSL is constant and Skia compiles an effect when it is created. Measured at the
+  default 480 x 270 with a per-pixel block, a warp shader, and a comp shader, the GPU path costs
+  49 ms per frame against the interpreter's 80 ms.
+
 ### Fixed
 - Made the SkSL emitter pass a file-scope variable into a helper that reads it. SkSL runtime effects
   have no mutable globals and the helper is emitted before `main` declares them, so each helper now

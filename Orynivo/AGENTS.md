@@ -483,7 +483,11 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
   in another, under .NET 8 and .NET 10 alike. Never make the DSD conversion depend on that
   answer alone.
 - The visualizer renders through `PresetRenderer` into a low-resolution `PixelBuffer` and
-  presents it through a `WriteableBitmap` that the image control scales up. `VisualizerWindow`
+  presents it through a `WriteableBitmap` that the image control scales up. Both renderer
+  creations enable `PresetRenderer.UseSkiaPasses`, so the warp, blur, video-echo, border,
+  composite, and comp passes run as Skia runtime effects and the interpreter stays the per-pass
+  fallback; the frame-pass effects are cached for the process because their SkSL is constant.
+  `VisualizerWindow`
   owns `VisualizerAudioHub.IsActive`: while it is false the players skip the tap entirely, so
   a closed visualizer costs nothing. Never render, analyse, or evaluate preset expressions on
   the audio thread, and keep the window's `ReduceMotion` path on
