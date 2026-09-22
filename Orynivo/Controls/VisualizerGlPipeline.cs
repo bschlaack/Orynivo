@@ -282,6 +282,12 @@ internal sealed class VisualizerGlPipeline
     /// <summary>Gets the number of frames the pipeline has drawn.</summary>
     public int Frames { get; private set; }
 
+    /// <summary>
+    /// Gets a one-shot description of the first drawn frame, so a black picture can be told apart
+    /// from a broken overlay, mesh, or GL state.
+    /// </summary>
+    public string? Diagnostics { get; private set; }
+
     /// <summary>Gets the texture holding the last finished frame, for presentation.</summary>
     public int OutputTexture => _feedbackTexture;
 
@@ -441,7 +447,7 @@ internal sealed class VisualizerGlPipeline
             gl.UseProgram(_warpProgram);
             gl.ActiveTexture(GlTexture0);
             gl.BindTexture(GlTexture2D, _feedbackTexture);
-            Set(gl, _warpUniforms, "uSource", 0);
+            SetSampler(gl, _warpUniforms, "uSource", 0);
             Set(gl, _warpUniforms, "uFrameWidth", frameWidth);
             Set(gl, _warpUniforms, "uFrameHeight", frameHeight);
             Set(gl, _warpUniforms, "uNeedsRadius", needsRadius ? 1f : 0f);
@@ -469,7 +475,7 @@ internal sealed class VisualizerGlPipeline
                 gl.Viewport(0, 0, frameWidth, frameHeight);
                 gl.ActiveTexture(GlTexture0);
                 gl.BindTexture(GlTexture2D, _pingTexture[current]);
-                Set(gl, _blurUniforms, "uSource", 0);
+                SetSampler(gl, _blurUniforms, "uSource", 0);
                 Set(gl, _blurUniforms, "uTexelX", 1f / frameWidth);
                 Set(gl, _blurUniforms, "uTexelY", 1f / frameHeight);
                 DrawQuad(gl);
@@ -484,8 +490,8 @@ internal sealed class VisualizerGlPipeline
             gl.BindTexture(GlTexture2D, _pingTexture[current]);
             gl.ActiveTexture(GlTexture1);
             gl.BindTexture(GlTexture2D, _overlayTexture);
-            Set(gl, _postUniforms, "uSource", 0);
-            Set(gl, _postUniforms, "uOverlay", 1);
+            SetSampler(gl, _postUniforms, "uSource", 0);
+            SetSampler(gl, _postUniforms, "uOverlay", 1);
             Set(gl, _postUniforms, "uDecay", parameters.Decay);
             Set(gl, _postUniforms, "uEchoZoom", parameters.EchoZoom);
             Set(gl, _postUniforms, "uEchoAlpha", parameters.EchoAlpha);
@@ -524,7 +530,23 @@ internal sealed class VisualizerGlPipeline
             gl.Flush();
             Frames++;
             _frame++;
+            if (Diagnostics is null)
+            {
+                var nonZero = 0;
+                for (var index = 0; index + 2 < _overlayRgba.Length; index += 4)
+                {
+                    if (_overlayRgba[index] != 0 || _overlayRgba[index + 1] != 0 || _overlayRgba[index + 2] != 0)
+                        nonZero++;
+                }
+
+                Diagnostics =
+                    $"GL pipeline first frame: size={frameWidth}x{frameHeight} mesh={meshX}x{meshY} " +
+                    $"blur={parameters.BlurPasses} zoom={_vertices[2]:F3} overlayLit={nonZero} " +
+                    $"glError=0x{gl.GetError():X}";
+            }
+
             return true;
+
         }
         catch (Exception exception)
         {
@@ -539,6 +561,17 @@ internal sealed class VisualizerGlPipeline
     {
         gl.BindVertexArray(_quadVertexArray);
         gl.DrawArrays(GlTriangleStrip, 0, 4);
+    }
+
+    /// <summary>Sets a sampler uniform when the program declares it.</summary>
+    /// <param name="gl">GL interface.</param>
+    /// <param name="uniforms">Resolved uniform locations.</param>
+    /// <param name="name">Uniform name.</param>
+    /// <param name="value">Texture unit.</param>
+    private static void SetSampler(GlInterface gl, Dictionary<string, int> uniforms, string name, int value)
+    {
+        if (uniforms.TryGetValue(name, out var location) && location >= 0)
+            gl.Uniform1i(location, value);
     }
 
     /// <summary>Sets a scalar uniform when the program declares it.</summary>
@@ -752,4 +785,5 @@ internal sealed class VisualizerGlPipeline
         return program;
     }
 }
+
 

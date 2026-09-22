@@ -1,4 +1,5 @@
 using System.Runtime.InteropServices;
+using Avalonia.Controls;
 using Avalonia.OpenGL;
 using Avalonia.OpenGL.Controls;
 using Orynivo.Visualization;
@@ -140,6 +141,9 @@ public sealed class VisualizerGlPresenter : OpenGlControlBase
     /// </summary>
     public bool PipelineFailed => _pipelineFailed;
 
+    /// <summary>Gets the pipeline's one-shot first-frame description, or <see langword="null"/>.</summary>
+    public string? PipelineDiagnostics => _pipeline.Diagnostics;
+
     /// <summary>
     /// Publishes the CPU half of a GPU frame: the overlay, the per-vertex mesh, and the frame's pass
     /// values. The GPU then owns the warp, the passes, and the composite.
@@ -229,6 +233,16 @@ public sealed class VisualizerGlPresenter : OpenGlControlBase
         _glReady = false;
     }
 
+    /// <summary>Gets the framebuffer size in physical pixels, which is not the control's bounds.</summary>
+    /// <returns>The framebuffer width and height.</returns>
+    private (int Width, int Height) FramebufferSize()
+    {
+        var scaling = TopLevel.GetTopLevel(this)?.RenderScaling ?? 1d;
+        return (
+            Math.Max(1, (int)Math.Round(Bounds.Width * scaling)),
+            Math.Max(1, (int)Math.Round(Bounds.Height * scaling)));
+    }
+
     /// <inheritdoc/>
     protected override void OnOpenGlRender(GlInterface gl, int fb)
     {
@@ -260,11 +274,12 @@ public sealed class VisualizerGlPresenter : OpenGlControlBase
 
             if (pipelineOverlay is not null && pipelineMesh is not null && pipelineWidth > 0 && pipelineHeight > 0)
             {
+                var pipelineViewport = FramebufferSize();
                 if (_pipeline.Render(
                     gl,
                     fb,
-                    Math.Max(1, (int)Bounds.Width),
-                    Math.Max(1, (int)Bounds.Height),
+                    pipelineViewport.Width,
+                    pipelineViewport.Height,
                     pipelineWidth,
                     pipelineHeight,
                     pipelineOverlay,
@@ -333,8 +348,10 @@ public sealed class VisualizerGlPresenter : OpenGlControlBase
                     handle.Free();
                 }
 
-                gl.BindFramebuffer(0x8D40, fb);
-                gl.Viewport(0, 0, Math.Max(1, (int)Bounds.Width), Math.Max(1, (int)Bounds.Height));
+            gl.BindFramebuffer(0x8D40, fb);
+            var viewport = FramebufferSize();
+            gl.Viewport(0, 0, viewport.Width, viewport.Height);
+
                 gl.ClearColor(0f, 0f, 0f, 1f);
                 gl.Clear(GlColorBufferBit);
                 gl.UseProgram(_program);
@@ -384,5 +401,9 @@ public sealed class VisualizerGlPresenter : OpenGlControlBase
         return program;
     }
 }
+
+
+
+
 
 

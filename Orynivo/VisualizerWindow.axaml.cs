@@ -574,6 +574,8 @@ public partial class VisualizerWindow : Window
             if (!_glInfoLogged && GlPresenter.Frames > 0)
             {
                 _glInfoLogged = true;
+                if (GlPresenter.PipelineDiagnostics is { Length: > 0 } pipelineDiagnostics)
+                    SeekDiagnostics.Log("visualizer", pipelineDiagnostics);
                 SeekDiagnostics.Log(
                     "visualizer",
                     $"OpenGL presenter active: {GlPresenter.GlInfo} " +
