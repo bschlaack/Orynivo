@@ -77,6 +77,14 @@ silently changing the shared formula would also change built-in presets.
 
 ### 2. P1: Sampler names have the wrong meaning
 
+**Corrected on the interpreter and Skia paths.** `ShaderSamplerName` parses the qualifier into a wrap
+mode and a filter mode, `PixelBuffer.SampleShader` performs both, and the qualifier is stripped before
+the generated textures are resolved, so `sampler_pw_noise_lq` reads the noise texture and every
+qualified `main` sampler reads the same frame. The OpenGL pipeline resolves the base texture and binds
+every `main`-family sampler to the stage's main frame, but `GlInterface` exposes no per-sampler state,
+so a frame sampler's exact filter and wrap still applies only on the interpreter and Skia paths; the
+fixed warp still blacks out out-of-range UVs.
+
 `VisualizerGlPipeline.BindShaderSamplers` and `PresetRenderer` interpret
 `sampler_pc_main` as the previous frame. In projectM's
 `Renderer/TextureManager.cpp`, `ExtractTextureSettings`, `pc_` means **point

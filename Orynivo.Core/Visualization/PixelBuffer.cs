@@ -181,6 +181,68 @@ public sealed class PixelBuffer
         }
     }
 
+    /// <summary>
+    /// Samples a pixel the way a qualified shader sampler does: the coordinate is wrapped or clamped
+    /// first, then read with either bilinear filtering or the nearest texel. This is the sampling
+    /// behaviour of Milkdrop's <c>fw_</c>/<c>fc_</c>/<c>pw_</c>/<c>pc_</c> sampler prefixes.
+    /// </summary>
+    /// <param name="u">Horizontal coordinate, where zero is the left edge and one the right.</param>
+    /// <param name="v">Vertical coordinate, where zero is the top edge and one the bottom.</param>
+    /// <param name="wrap">Whether coordinates outside the frame repeat or clamp to the edge.</param>
+    /// <param name="nearest">Whether the nearest texel is read instead of filtering between texels.</param>
+    /// <param name="destination">Destination for the four channel values.</param>
+    public void SampleShader(float u, float v, VisualizerTextureWrap wrap, bool nearest, Span<float> destination)
+    {
+        if (destination.Length < 4)
+            throw new ArgumentException("The destination must hold four channels.", nameof(destination));
+
+        if (float.IsNaN(u) || float.IsNaN(v))
+        {
+            destination[0] = destination[1] = destination[2] = destination[3] = 0f;
+            return;
+        }
+
+        if (wrap == VisualizerTextureWrap.Repeat)
+        {
+            u -= MathF.Floor(u);
+            v -= MathF.Floor(v);
+        }
+        else
+        {
+            u = Math.Clamp(u, 0f, 1f);
+            v = Math.Clamp(v, 0f, 1f);
+        }
+
+        if (nearest)
+        {
+            var x = Math.Clamp((int)(u * Width), 0, Width - 1);
+            var y = Math.Clamp((int)(v * Height), 0, Height - 1);
+            var offset = ((y * Width) + x) * 4;
+            for (var channel = 0; channel < 4; channel++)
+                destination[channel] = _pixels[offset + channel];
+            return;
+        }
+
+        var fx = u * (Width - 1);
+        var fy = v * (Height - 1);
+        var x0 = (int)fx;
+        var y0 = (int)fy;
+        var x1 = Math.Min(x0 + 1, Width - 1);
+        var y1 = Math.Min(y0 + 1, Height - 1);
+        var dx = fx - x0;
+        var dy = fy - y0;
+        for (var channel = 0; channel < 4; channel++)
+        {
+            var topLeft = _pixels[(((y0 * Width) + x0) * 4) + channel];
+            var topRight = _pixels[(((y0 * Width) + x1) * 4) + channel];
+            var bottomLeft = _pixels[(((y1 * Width) + x0) * 4) + channel];
+            var bottomRight = _pixels[(((y1 * Width) + x1) * 4) + channel];
+            var top = topLeft + ((topRight - topLeft) * dx);
+            var bottom = bottomLeft + ((bottomRight - bottomLeft) * dx);
+            destination[channel] = top + ((bottom - top) * dy);
+        }
+    }
+
     /// <summary>Applies one three-by-three box blur pass, softening the feedback image.</summary>
     /// <param name="parallel">Whether the pass may use more than one thread.</param>
     public void Blur(bool parallel = true)

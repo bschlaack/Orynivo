@@ -21,6 +21,13 @@ public static class SkiaShaderRunner
     /// child would return a different texel between texel centres and break the comparison.
     /// </summary>
     private static readonly SKSamplingOptions LinearSampling = new(SKFilterMode.Linear, SKMipmapMode.None);
+    private static readonly SKSamplingOptions NearestSampling = new(SKFilterMode.Nearest, SKMipmapMode.None);
+
+    /// <summary>Maps a shader sampler's wrap mode onto Skia's tile mode.</summary>
+    /// <param name="wrap">Wrap mode parsed from the sampler name.</param>
+    /// <returns>The Skia tile mode.</returns>
+    private static SKShaderTileMode TileMode(VisualizerTextureWrap wrap) =>
+        wrap == VisualizerTextureWrap.Repeat ? SKShaderTileMode.Repeat : SKShaderTileMode.Clamp;
 
     /// <summary>
     /// The runtime effects of the frame passes, whose SkSL is constant. Skia compiles an effect when
@@ -111,6 +118,7 @@ public static class SkiaShaderRunner
                 effect,
                 samplers,
                 sourceShader,
+                sourceBitmap,
                 textures,
                 samplerSources,
                 ownedBitmaps,
@@ -166,6 +174,7 @@ public static class SkiaShaderRunner
     /// <param name="effect">Runtime effect the children belong to.</param>
     /// <param name="samplers">Sampler names the generated SkSL declares.</param>
     /// <param name="sourceShader">Frame shader used for a sampler without its own source.</param>
+    /// <param name="sourceBitmap">Frame bitmap, so a qualified frame sampler can pick its own mode.</param>
     /// <param name="textures">Texture bank for the noise and volume textures.</param>
     /// <param name="samplerSources">Frame each sampler reads, by sampler name.</param>
     /// <param name="ownedBitmaps">Receives the bitmaps the caller has to dispose.</param>
@@ -175,6 +184,7 @@ public static class SkiaShaderRunner
         SKRuntimeEffect effect,
         IReadOnlyList<string> samplers,
         SKShader sourceShader,
+        SKBitmap sourceBitmap,
         VisualizerTextureBank textures,
         IReadOnlyDictionary<string, SamplerSource>? samplerSources,
         List<SKBitmap> ownedBitmaps,
@@ -183,35 +193,42 @@ public static class SkiaShaderRunner
         var children = new SKRuntimeEffectChildren(effect);
         foreach (var name in samplers)
         {
+            var parsed = ShaderSamplerName.Parse(name);
             SKShader child;
-            if (name is "sampler_noisevol_lq" or "sampler_noisevol_hq")
+            if (parsed.BaseName is "noisevol_lq" or "noisevol_hq")
             {
                 child = CreateVolumeShader(
                     textures,
-                    name.EndsWith("hq", StringComparison.Ordinal)
+                    parsed.BaseName.EndsWith("hq", StringComparison.Ordinal)
                         ? VisualizerTexture.NoiseVolumeHigh
                         : VisualizerTexture.NoiseVolumeLow);
                 ownedShaders.Add(child);
             }
-            else if (VisualizerTextureBank.TryResolve(name, out var texture))
+            else if (VisualizerTextureBank.TryResolve("sampler_" + parsed.BaseName, out var texture))
             {
-                // A generated noise or random texture; the interpreter samples it with repeat.
+                // A generated noise or random texture; the qualifier picks its wrap and filter.
                 var size = VisualizerTextureBank.GetSize(texture);
                 var bitmap = CreateBitmap(textures.GetPixels(texture), size, size);
                 ownedBitmaps.Add(bitmap);
-                child = bitmap.ToShader(SKShaderTileMode.Repeat, SKShaderTileMode.Repeat, LinearSampling);
+                child = bitmap.ToShader(TileMode(parsed.Wrap), TileMode(parsed.Wrap), parsed.Nearest ? NearestSampling : LinearSampling);
                 ownedShaders.Add(child);
             }
             else if (samplerSources is not null && samplerSources.TryGetValue(name, out var sampler))
             {
                 var bitmap = CreateBitmap(sampler.Pixels, sampler.Width, sampler.Height);
                 ownedBitmaps.Add(bitmap);
-                child = bitmap.ToShader(SKShaderTileMode.Clamp, SKShaderTileMode.Clamp, LinearSampling);
+                child = bitmap.ToShader(TileMode(parsed.Wrap), TileMode(parsed.Wrap), parsed.Nearest ? NearestSampling : LinearSampling);
                 ownedShaders.Add(child);
+            }
+            else if (parsed.Wrap == VisualizerTextureWrap.Clamp && !parsed.Nearest)
+            {
+                child = sourceShader;
             }
             else
             {
-                child = sourceShader;
+                // A qualified frame sampler; it reads the same frame with its own wrap and filter.
+                child = sourceBitmap.ToShader(TileMode(parsed.Wrap), TileMode(parsed.Wrap), parsed.Nearest ? NearestSampling : LinearSampling);
+                ownedShaders.Add(child);
             }
 
             children[name] = new SKRuntimeEffectChild(child);
@@ -696,22 +713,23 @@ public static class SkiaShaderRunner
 
             foreach (var name in samplers)
             {
-                if (name is "sampler_noisevol_lq" or "sampler_noisevol_hq")
+                var parsed = ShaderSamplerName.Parse(name);
+                if (parsed.BaseName is "noisevol_lq" or "noisevol_hq")
                 {
                     var shader = CreateVolumeShader(
                         textures,
-                        name.EndsWith("hq", StringComparison.Ordinal)
+                        parsed.BaseName.EndsWith("hq", StringComparison.Ordinal)
                             ? VisualizerTexture.NoiseVolumeHigh
                             : VisualizerTexture.NoiseVolumeLow);
                     _static[name] = shader;
                     _shaders.Add(shader);
                 }
-                else if (VisualizerTextureBank.TryResolve(name, out var texture))
+                else if (VisualizerTextureBank.TryResolve("sampler_" + parsed.BaseName, out var texture))
                 {
                     var size = VisualizerTextureBank.GetSize(texture);
                     var bitmap = CreateBitmap(textures.GetPixels(texture), size, size);
                     _bitmaps.Add(bitmap);
-                    var shader = bitmap.ToShader(SKShaderTileMode.Repeat, SKShaderTileMode.Repeat, LinearSampling);
+                    var shader = bitmap.ToShader(TileMode(parsed.Wrap), TileMode(parsed.Wrap), parsed.Nearest ? NearestSampling : LinearSampling);
                     _static[name] = shader;
                     _shaders.Add(shader);
                 }
@@ -788,6 +806,7 @@ public static class SkiaShaderRunner
                 {
                     // A static noise or volume texture keeps its own shader, the blur levels are
                     // built from the previous frame, and every other frame sampler reads it directly.
+                    var parsed = ShaderSamplerName.Parse(name);
                     if (_static.TryGetValue(name, out var cached))
                     {
                         children[name] = new SKRuntimeEffectChild(cached);
@@ -795,8 +814,8 @@ public static class SkiaShaderRunner
                     }
 
                     if (_blurEffect is not null &&
-                        name.StartsWith("sampler_blur", StringComparison.Ordinal) &&
-                        int.TryParse(name.AsSpan("sampler_blur".Length), out var level) &&
+                        parsed.BaseName.StartsWith("blur", StringComparison.Ordinal) &&
+                        int.TryParse(parsed.BaseName.AsSpan("blur".Length), out var level) &&
                         level is >= 1 and <= 3)
                     {
                         children[name] = new SKRuntimeEffectChild(
@@ -804,7 +823,16 @@ public static class SkiaShaderRunner
                         continue;
                     }
 
-                    children[name] = new SKRuntimeEffectChild(sourceShader);
+                    if (parsed.Wrap == VisualizerTextureWrap.Clamp && !parsed.Nearest)
+                    {
+                        children[name] = new SKRuntimeEffectChild(sourceShader);
+                        continue;
+                    }
+
+                    var frameShader = sourceBitmap.ToShader(
+                        TileMode(parsed.Wrap), TileMode(parsed.Wrap), parsed.Nearest ? NearestSampling : LinearSampling);
+                    ownedShaders.Add(frameShader);
+                    children[name] = new SKRuntimeEffectChild(frameShader);
                 }
 
                 var uniforms = new SKRuntimeEffectUniforms(_effect);
@@ -940,22 +968,23 @@ public static class SkiaShaderRunner
 
             foreach (var name in samplers)
             {
-                if (name is "sampler_noisevol_lq" or "sampler_noisevol_hq")
+                var parsed = ShaderSamplerName.Parse(name);
+                if (parsed.BaseName is "noisevol_lq" or "noisevol_hq")
                 {
                     var shader = CreateVolumeShader(
                         textures,
-                        name.EndsWith("hq", StringComparison.Ordinal)
+                        parsed.BaseName.EndsWith("hq", StringComparison.Ordinal)
                             ? VisualizerTexture.NoiseVolumeHigh
                             : VisualizerTexture.NoiseVolumeLow);
                     _static[name] = shader;
                     _shaders.Add(shader);
                 }
-                else if (VisualizerTextureBank.TryResolve(name, out var texture))
+                else if (VisualizerTextureBank.TryResolve("sampler_" + parsed.BaseName, out var texture))
                 {
                     var size = VisualizerTextureBank.GetSize(texture);
                     var bitmap = CreateBitmap(textures.GetPixels(texture), size, size);
                     _bitmaps.Add(bitmap);
-                    var shader = bitmap.ToShader(SKShaderTileMode.Repeat, SKShaderTileMode.Repeat, LinearSampling);
+                    var shader = bitmap.ToShader(TileMode(parsed.Wrap), TileMode(parsed.Wrap), parsed.Nearest ? NearestSampling : LinearSampling);
                     _static[name] = shader;
                     _shaders.Add(shader);
                 }
@@ -1050,9 +1079,10 @@ public static class SkiaShaderRunner
 
                 // The blur levels are blurred copies of the composited frame, which is sampler_main.
                 var mainShader = sourceShader;
+                SKBitmap? mainBitmap = null;
                 if (samplerSources.TryGetValue("sampler_main", out var mainSource))
                 {
-                    var mainBitmap = CreateBitmap(mainSource.Pixels, mainSource.Width, mainSource.Height);
+                    mainBitmap = CreateBitmap(mainSource.Pixels, mainSource.Width, mainSource.Height);
                     ownedBitmaps.Add(mainBitmap);
                     mainShader = mainBitmap.ToShader(SKShaderTileMode.Clamp, SKShaderTileMode.Clamp, LinearSampling);
                     ownedShaders.Add(mainShader);
@@ -1062,6 +1092,8 @@ public static class SkiaShaderRunner
                 var children = new SKRuntimeEffectChildren(_effect);
                 foreach (var name in _samplers)
                 {
+                    var parsed = ShaderSamplerName.Parse(name);
+
                     if (_static.TryGetValue(name, out var cached))
                     {
                         children[name] = new SKRuntimeEffectChild(cached);
@@ -1069,8 +1101,8 @@ public static class SkiaShaderRunner
                     }
 
                     if (GpuBlur && _blurEffect is not null &&
-                        name.StartsWith("sampler_blur", StringComparison.Ordinal) &&
-                        int.TryParse(name.AsSpan("sampler_blur".Length), out var level) &&
+                        parsed.BaseName.StartsWith("blur", StringComparison.Ordinal) &&
+                        int.TryParse(parsed.BaseName.AsSpan("blur".Length), out var level) &&
                         level is >= 1 and <= 3)
                     {
                         children[name] = new SKRuntimeEffectChild(
@@ -1079,15 +1111,25 @@ public static class SkiaShaderRunner
                     }
 
                     SKShader child;
-                    if (name == "sampler_main")
+                    if (parsed.BaseName == "main")
                     {
-                        child = mainShader;
+                        var frame = mainBitmap ?? sourceBitmap;
+                        if (parsed.Wrap == VisualizerTextureWrap.Clamp && !parsed.Nearest)
+                        {
+                            child = mainShader;
+                        }
+                        else
+                        {
+                            child = frame.ToShader(
+                                TileMode(parsed.Wrap), TileMode(parsed.Wrap), parsed.Nearest ? NearestSampling : LinearSampling);
+                            ownedShaders.Add(child);
+                        }
                     }
                     else if (samplerSources.TryGetValue(name, out var source))
                     {
                         var bitmap = CreateBitmap(source.Pixels, source.Width, source.Height);
                         ownedBitmaps.Add(bitmap);
-                        child = bitmap.ToShader(SKShaderTileMode.Clamp, SKShaderTileMode.Clamp, LinearSampling);
+                        child = bitmap.ToShader(TileMode(parsed.Wrap), TileMode(parsed.Wrap), parsed.Nearest ? NearestSampling : LinearSampling);
                         ownedShaders.Add(child);
                     }
                     else

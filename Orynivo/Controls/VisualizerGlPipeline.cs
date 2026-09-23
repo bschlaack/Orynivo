@@ -39,6 +39,7 @@ internal sealed class VisualizerGlPipeline
     private const int GlTextureWrapS = 0x2802;
     private const int GlTextureWrapT = 0x2803;
     private const int GlLinear = 0x2601;
+    private const int GlNearest = 0x2600;
     private const int GlClampToEdge = 0x812F;
     private const int GlRepeat = 0x2901;
     private const int GlRgba = 0x1908;
@@ -1046,19 +1047,23 @@ internal sealed class VisualizerGlPipeline
             if (location < 0)
                 continue;
 
+            // The qualifier only changes the sampling mode; the base name selects the texture. Every
+            // main-family sampler therefore reads the stage's main frame (unit zero), not a different
+            // moment in time.
+            var parsed = ShaderSamplerName.Parse(name);
             int unit;
-            switch (name)
+            switch (parsed.BaseName)
             {
-                case "sampler_pc_main":
-                    unit = 1;
+                case "main":
+                    unit = 0;
                     break;
-                case "sampler_blur1":
+                case "blur1":
                     unit = 2;
                     break;
-                case "sampler_blur2":
+                case "blur2":
                     unit = 3;
                     break;
-                case "sampler_blur3":
+                case "blur3":
                     unit = 4;
                     break;
                 default:
@@ -1315,14 +1320,17 @@ internal sealed class VisualizerGlPipeline
     {
         foreach (var name in ShaderTranspiler.Samplers)
         {
-            if (!VisualizerTextureBank.TryResolve(name, out var texture))
+            // The qualifier (fc_/fw_/pc_/pw_) picks the sampling mode; the base name picks the texture.
+            var parsed = ShaderSamplerName.Parse(name);
+            if (!VisualizerTextureBank.TryResolve("sampler_" + parsed.BaseName, out var texture))
                 continue;
 
             var volume = VisualizerTextureBank.IsVolume(texture);
             var pixels = volume ? _textureBank.GetVolumeAtlasPixels(texture) : _textureBank.GetPixels(texture);
             var width = volume ? VisualizerTextureBank.VolumeAtlasWidth : VisualizerTextureBank.GetSize(texture);
             var height = volume ? VisualizerTextureBank.VolumeAtlasHeight : VisualizerTextureBank.GetSize(texture);
-            _samplerTextures[name] = UploadTexture(gl, pixels, width, height, volume);
+            _samplerTextures[name] = UploadTexture(
+                gl, pixels, width, height, volume || parsed.Wrap == VisualizerTextureWrap.Clamp, parsed.Nearest);
         }
     }
 
@@ -1332,13 +1340,14 @@ internal sealed class VisualizerGlPipeline
     /// <param name="width">Texture width.</param>
     /// <param name="height">Texture height.</param>
     /// <param name="clamp">Whether to clamp instead of repeat outside the texture.</param>
+    /// <param name="nearest">Whether to read the nearest texel instead of filtering.</param>
     /// <returns>The texture handle.</returns>
-    private static int UploadTexture(GlInterface gl, ReadOnlySpan<float> pixels, int width, int height, bool clamp)
+    private static int UploadTexture(GlInterface gl, ReadOnlySpan<float> pixels, int width, int height, bool clamp, bool nearest)
     {
         var handle = gl.GenTexture();
         gl.BindTexture(GlTexture2D, handle);
-        gl.TexParameteri(GlTexture2D, GlTextureMinFilter, GlLinear);
-        gl.TexParameteri(GlTexture2D, GlTextureMagFilter, GlLinear);
+        gl.TexParameteri(GlTexture2D, GlTextureMinFilter, nearest ? GlNearest : GlLinear);
+        gl.TexParameteri(GlTexture2D, GlTextureMagFilter, nearest ? GlNearest : GlLinear);
         gl.TexParameteri(GlTexture2D, GlTextureWrapS, clamp ? GlClampToEdge : GlRepeat);
         gl.TexParameteri(GlTexture2D, GlTextureWrapT, clamp ? GlClampToEdge : GlRepeat);
         var bytes = new byte[width * height * 4];

@@ -7,6 +7,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Changed
+- The visualizer's shader samplers now follow Milkdrop's qualifier semantics: `fc_`/`fw_`/`pc_`/`pw_`
+  (and the swapped `cf_`/`wf_`/`cp_`/`wp_` spellings) select a sampler's wrap and filter mode rather
+  than a different moment in time, so `sampler_main`, `sampler_pc_main`, and `sampler_fw_main` all read
+  the same frame. The prefix is stripped before the generated noise and random textures are resolved,
+  so `sampler_pw_noise_lq` now reads the noise texture instead of the frame. `ShaderSamplerName` is the
+  shared parser, `PixelBuffer.SampleShader` performs the wrap and filter, and the interpreter, the
+  Skia passes, and the OpenGL pipeline all use them. The OpenGL frame texture keeps its own filter and
+  wrap (GL exposes no per-sampler state through `GlInterface`), so a frame sampler's qualifier
+  currently selects only the texture it reads there.
 - The visualizer's warp now applies the reference implementation's time-dependent displacement
   (the preset's `warp` value, which defaults to one): four travelling sine/cosine waves whose phase
   depends on the vertex position and whose amplitude is `warp * 0.0035`. It sits between the stretch

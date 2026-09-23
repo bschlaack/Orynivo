@@ -2294,23 +2294,22 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
     /// <inheritdoc/>
     public ShaderValue Sample(string sampler, float u, float v)
     {
+        // The qualifier (fc_/fw_/pc_/pw_) selects the sampling mode; the base name selects the
+        // texture. Milkdrop's qualified main samplers are all the same frame, only read differently.
+        var parsed = ShaderSamplerName.Parse(sampler);
+
         // Milkdrop shaders sample the noise and random textures it ships. We generate those, so a
         // referenced sampler is resolved against the bank instead of falling back to the frame.
-        if (VisualizerTextureBank.TryResolve(sampler, out var texture))
+        if (VisualizerTextureBank.TryResolve("sampler_" + parsed.BaseName, out var texture))
         {
-            _textures.Sample(texture, u, v, VisualizerTextureWrap.Repeat).CopyTo(_sample);
+            _textures.Sample(texture, u, v, parsed.Wrap).CopyTo(_sample);
             return ShaderValue.Vector(_sample[0], _sample[1], _sample[2], _sample[3], 4);
         }
 
-        var source = sampler switch
-        {
-            // During a comp shader the frame copy holds the composited picture, which is what
-            // sampler_main means there; the faded warped frame stands in for the pre-warp one.
-            "sampler_pc_main" => _previous,
-            "sampler_fc_main" => _samplerMainIsWarped ? _warped : _frameCopy,
-            _ => _samplerMainIsWarped ? _frameCopy : _previous
-        };
-        source.SampleBilinear(u, v, _sample);
+        // Everything else is the stage's main frame: the previous frame during the warp and the
+        // composited picture during the comp pass.
+        var source = _samplerMainIsWarped ? _frameCopy : _previous;
+        source.SampleShader(u, v, parsed.Wrap, parsed.Nearest, _sample);
         return ShaderValue.Vector(_sample[0], _sample[1], _sample[2], _sample[3], 4);
     }
 

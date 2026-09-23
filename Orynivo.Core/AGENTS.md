@@ -58,6 +58,11 @@ This file applies to `Orynivo.Core/` and supplements `../AGENTS.md`.
   cannot be reproduced bit-exactly on the GPU. The `sampler_main`,
   `sampler_pc_main`, `sampler_fc_main`, `GetBlur1`-`GetBlur3`, and `GetPixel` constructs are
   HLSL shader features and belong to the shader runtime in phase 38d, not to the texture bank.
+  A sampler's `fc_`/`fw_`/`pc_`/`pw_` (or swapped) qualifier selects its wrap and filter mode, not a
+  different moment in time, so every qualified `main` sampler reads the same frame; `ShaderSamplerName`
+  is the shared parser, `PixelBuffer.SampleShader` performs the wrap and filter, and the qualifier is
+  stripped before the generated noise and random textures are resolved. Keep the interpreter, the Skia
+  passes, and the OpenGL pipeline on that one parser and one sampling rule.
   The Milkdrop format has no per-preset texture block, so unknown `tex_*` keys stay ignored.
   The shader runtime is built in three steps: `ShaderLexer` is the tokenizer and stays a pure,
   allocation-bounded function over the source, `ShaderParser` builds the tagged-union

@@ -44,6 +44,13 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
   and before drawing. `scripts/gl-harness/verify-warp-target.ps1` checks the real
   GPU pipeline with a constant-output shader at two sizes. See
   `VISUALIZER-FIDELITY-AUDIT.md` for outstanding Milkdrop compatibility issues.
+- The GL shader samplers resolve the texture from the sampler's base name (the
+  qualifier is stripped first) and bind every `main`-family sampler to the stage's
+  main frame. GL exposes no per-sampler state through `GlInterface`, so a frame
+  sampler's qualifier currently selects only the texture there; the exact frame
+  filter and wrap mode is applied on the interpreter and Skia paths. Generated
+  noise and random textures keep the qualifier's filter and wrap, because each is
+  its own texture object.
 
 - Dashboard and its Show all pages share DashboardScrollViewer. Album artwork
   assignment must update the bound ContentRow in place, never call
