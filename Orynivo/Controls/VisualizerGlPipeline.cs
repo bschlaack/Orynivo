@@ -172,7 +172,56 @@ internal sealed class VisualizerGlPipeline
         """;
 
     /// <summary>
-    /// The post-processing chain in the CPU order: decay, video echo, centre darkening, borders,
+    /// The reference implementation's weighted blur, which the shader blur levels read: a long
+    /// horizontal pass with eight weighted taps or a short vertical one with four. The weights are
+    /// folded into four distances per axis exactly as the reference computes them.
+    /// </summary>
+    private const string ShaderBlurFragmentSource = """
+        #version 300 es
+        precision highp float;
+        precision highp sampler2D;
+        in vec2 vUv;
+        out vec4 fragColor;
+        uniform sampler2D uSource;
+        uniform float uTexelX;
+        uniform float uTexelY;
+        uniform float uHorizontal;
+        void main()
+        {
+            if (uHorizontal > 0.5)
+            {
+                float w0 = 7.8;
+                float w1 = 6.4;
+                float w2 = 3.1;
+                float w3 = 1.0;
+                float d0 = 0.974359;
+                float d1 = 2.90625;
+                float d2 = 4.77419;
+                float d3 = 6.6;
+                float divisor = 0.5 / 18.3;
+                vec2 axis = vec2(uTexelX, 0.0);
+                vec3 sum = (texture(uSource, vUv + axis * d0).xyz + texture(uSource, vUv - axis * d0).xyz) * w0
+                    + (texture(uSource, vUv + axis * d1).xyz + texture(uSource, vUv - axis * d1).xyz) * w1
+                    + (texture(uSource, vUv + axis * d2).xyz + texture(uSource, vUv - axis * d2).xyz) * w2
+                    + (texture(uSource, vUv + axis * d3).xyz + texture(uSource, vUv - axis * d3).xyz) * w3;
+                fragColor = clamp(vec4(sum * divisor, 1.0), 0.0, 1.0);
+            }
+            else
+            {
+                float v0 = 14.2;
+                float v1 = 4.1;
+                float e0 = 0.901408;
+                float e1 = 2.487805;
+                float divisor = 1.0 / 36.6;
+                vec2 axis = vec2(0.0, uTexelY);
+                vec3 sum = (texture(uSource, vUv + axis * e0).xyz + texture(uSource, vUv - axis * e0).xyz) * v0
+                    + (texture(uSource, vUv + axis * e1).xyz + texture(uSource, vUv - axis * e1).xyz) * v1;
+                fragColor = clamp(vec4(sum * divisor, 1.0), 0.0, 1.0);
+            }
+        }
+        """;
+
+    /// <summary>The post-processing chain in the CPU order: decay, video echo, centre darkening, borders,
     /// gamma, then the additive overlay composite. Every step is a function of the same input frame,
     /// so they share one pass.
     /// </summary>
@@ -319,6 +368,14 @@ internal sealed class VisualizerGlPipeline
     private readonly int[] _shaderBlurTexture = new int[3];
     private readonly int[] _shaderBlurFramebuffer = new int[3];
 
+    /// <summary>The reference weighted blur program the shader blur levels are built with.</summary>
+    private int _shaderBlurProgram;
+    private Dictionary<string, int> _shaderBlurUniforms = new(StringComparer.Ordinal);
+
+    /// <summary>Scratch target for the two passes of one shader blur level.</summary>
+    private int _shaderBlurScratchTexture;
+    private int _shaderBlurScratchFramebuffer;
+
     /// <summary>Gets why the last emitted shader failed to build, or <see langword="null"/>.</summary>
     public string? ShaderError { get; private set; }
 
@@ -371,6 +428,7 @@ internal sealed class VisualizerGlPipeline
             _warpProgram = BuildProgram(gl, WarpVertexSource, WarpFragmentSource, out _);
             _blurProgram = BuildProgram(gl, QuadVertexSource, BlurFragmentSource, out _);
             _postProgram = BuildProgram(gl, QuadVertexSource, PostFragmentSource, out _);
+            _shaderBlurProgram = BuildProgram(gl, QuadVertexSource, ShaderBlurFragmentSource, out _);
 
             _warpUniforms = Uniforms(gl, _warpProgram, ["uSource", "uFrameWidth", "uFrameHeight", "uNeedsRadius"]);
             _blurUniforms = Uniforms(gl, _blurProgram, ["uSource", "uTexelX", "uTexelY"]);
@@ -384,6 +442,7 @@ internal sealed class VisualizerGlPipeline
                     "uInnerB", "uInnerA", "uFrameWidth", "uFrameHeight", "uSmaller"
                 ]);
             _quadTextureUniform = gl.GetUniformLocationString(_quadProgram, "uSource");
+            _shaderBlurUniforms = Uniforms(gl, _shaderBlurProgram, ["uSource", "uTexelX", "uTexelY", "uHorizontal"]);
 
             _quadVertexArray = gl.GenVertexArray();
             _quadVertexBuffer = gl.GenBuffer();
@@ -439,6 +498,8 @@ internal sealed class VisualizerGlPipeline
             _compFramebuffer = gl.GenFramebuffer();
             _previousTexture = gl.GenTexture();
             _previousFramebuffer = gl.GenFramebuffer();
+            _shaderBlurScratchTexture = gl.GenTexture();
+            _shaderBlurScratchFramebuffer = gl.GenFramebuffer();
             for (var index = 0; index < 3; index++)
             {
                 _shaderBlurTexture[index] = gl.GenTexture();
@@ -471,7 +532,7 @@ internal sealed class VisualizerGlPipeline
         if (!_ready)
             return;
 
-        foreach (var program in new[] { _quadProgram, _warpProgram, _blurProgram, _postProgram })
+        foreach (var program in new[] { _quadProgram, _warpProgram, _blurProgram, _postProgram, _shaderBlurProgram })
             gl.DeleteProgram(program);
         gl.DeleteVertexArray(_quadVertexArray);
         gl.DeleteBuffer(_quadVertexBuffer);
@@ -489,6 +550,8 @@ internal sealed class VisualizerGlPipeline
         gl.DeleteFramebuffer(_compFramebuffer);
         gl.DeleteTexture(_previousTexture);
         gl.DeleteFramebuffer(_previousFramebuffer);
+        gl.DeleteTexture(_shaderBlurScratchTexture);
+        gl.DeleteFramebuffer(_shaderBlurScratchFramebuffer);
         for (var index = 0; index < 3; index++)
         {
             gl.DeleteTexture(_shaderBlurTexture[index]);
@@ -834,20 +897,36 @@ internal sealed class VisualizerGlPipeline
     /// <param name="height">Frame height.</param>
     private void BuildShaderBlurLevels(GlInterface gl, int source, int width, int height)
     {
+        gl.UseProgram(_shaderBlurProgram);
         var current = source;
-        gl.UseProgram(_blurProgram);
         for (var level = 0; level < 3; level++)
         {
-            gl.BindFramebuffer(GlFramebuffer, _shaderBlurFramebuffer[level]);
-            gl.Viewport(0, 0, width, height);
-            gl.ActiveTexture(GlTexture0);
-            gl.BindTexture(GlTexture2D, current);
-            SetSampler(gl, _blurUniforms, "uSource", 0);
-            Set(gl, _blurUniforms, "uTexelX", 1f / width);
-            Set(gl, _blurUniforms, "uTexelY", 1f / height);
-            DrawQuad(gl);
+            // Each level is the reference's long horizontal pass followed by its short vertical one,
+            // and the next level continues from this one.
+            DrawShaderBlurPass(gl, current, _shaderBlurScratchFramebuffer, width, height, horizontal: true);
+            DrawShaderBlurPass(gl, _shaderBlurScratchTexture, _shaderBlurFramebuffer[level], width, height, horizontal: false);
             current = _shaderBlurTexture[level];
         }
+    }
+
+    /// <summary>Draws one pass of the reference weighted blur.</summary>
+    /// <param name="gl">GL interface.</param>
+    /// <param name="source">Texture to blur.</param>
+    /// <param name="framebuffer">Destination framebuffer.</param>
+    /// <param name="width">Frame width.</param>
+    /// <param name="height">Frame height.</param>
+    /// <param name="horizontal">Whether this is the long horizontal pass.</param>
+    private void DrawShaderBlurPass(GlInterface gl, int source, int framebuffer, int width, int height, bool horizontal)
+    {
+        gl.BindFramebuffer(GlFramebuffer, framebuffer);
+        gl.Viewport(0, 0, width, height);
+        gl.ActiveTexture(GlTexture0);
+        gl.BindTexture(GlTexture2D, source);
+        SetSampler(gl, _shaderBlurUniforms, "uSource", 0);
+        Set(gl, _shaderBlurUniforms, "uTexelX", 1f / width);
+        Set(gl, _shaderBlurUniforms, "uTexelY", 1f / height);
+        Set(gl, _shaderBlurUniforms, "uHorizontal", horizontal ? 1f : 0f);
+        DrawQuad(gl);
     }
 
     /// <summary>Copies one texture into a framebuffer.</summary>
@@ -1002,6 +1081,7 @@ internal sealed class VisualizerGlPipeline
             Allocate(gl, _pingTexture[1], _pingFramebuffer[1], width, height);
             Allocate(gl, _compTexture, _compFramebuffer, width, height);
             Allocate(gl, _previousTexture, _previousFramebuffer, width, height);
+            Allocate(gl, _shaderBlurScratchTexture, _shaderBlurScratchFramebuffer, width, height);
             for (var index = 0; index < 3; index++)
                 Allocate(gl, _shaderBlurTexture[index], _shaderBlurFramebuffer[index], width, height);
             return true;

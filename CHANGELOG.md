@@ -17,6 +17,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   echo rather than the blur.
 
 ### Fixed
+- Fixed the OpenGL pipeline building the shader blur levels with the frame pipeline's nine-tap box
+  blur while the CPU path used the reference's weighted filter, so a shader's `GetBlur1`-`GetBlur3`
+  read a different picture depending on the path. The GL pass now uses the same long horizontal and
+  short vertical weighted filter as the CPU path.
 - Fixed shader helper calls passing the argument unchanged instead of coercing it to the helper's
   declared parameter type. HLSL truncates a `float3` handed to a `float` parameter, so a real preset's
   `lavcol(float t)` called as `lavcol(ret * 2)` was handed the whole vector; the SkSL emitter then
