@@ -809,11 +809,13 @@ affordable. This is a project of its own and must keep the CPU path as the fallb
   `GenTexture`/`BindTexture`/`TexImage2D`/`TexParameteri`, `VertexAttribPointer`, `DrawArrays`,
   `Viewport`, `ClearColor`/`Clear`, and `Flush` — but **not** `TexSubImage2D`, so a texture update
   re-specifies it through `TexImage2D` or fetches the missing entry point through `GetProcAddress`.
-  Step 1 is done: `Orynivo.Controls.VisualizerGlPresenter` (shown with
-  `ORYNIVO_VISUALIZER_OPENGL=1`) uploads the finished frame as an RGBA8 texture and draws it with a
+  Step 1 is done: `Orynivo.Controls.VisualizerGlPresenter` uploads the finished frame as an RGBA8
+  texture and draws it with a
   `#version 300 es` program over a two-triangle quad in a vertex buffer, and logs the GL version once.
-  The preset pipeline still renders on the CPU; the bitmap presentation stays the fallback, and a
-  shader or context failure is logged and leaves the window on the CPU path.
+  The presenter is now the visualizer's default presentation; `ORYNIVO_VISUALIZER_OPENGL=0` forces
+  the bitmap path, and a platform whose GL context never arrives falls back to it within
+  `GlPresenterGraceSeconds`. A shader or context failure is logged and leaves the window on the CPU
+  path.
   The remaining steps, each behind its own flag with the CPU renderer as the fallback: (2) move the
   geometric warp to a mesh draw, using the interpolated per-vertex motion the mesh already computes,
   and keep the feedback in an FBO instead of a CPU buffer; (3) move the full-frame passes (blur,
@@ -874,7 +876,8 @@ affordable. This is a project of its own and must keep the CPU path as the fallb
   to the buffer two presentations old; because the render loop publishes at the configured frame rate
   while the control refreshes at the display rate, an undrawn refresh is the normal case and the
   artefact was a steady rubber band.
-  What remains: deleting the CPU frame path for the GL mode.
+  What remains: deleting the CPU frame path for the GL mode. The GL presentation is the default now;
+  the CPU frame path stays as the automatic fallback for a platform without a GL context.
   **Step 4 is done.** The GLSL emitter is `ShaderTranspiler`'s GLSL dialect next to SkSL
   (`TranspileGlsl`, `TranspileGlslComp`, `TranspileGlslWarp`): the prelude aliases `float2/3/4` onto
   `vec2/3/4` so the shared body emission is byte-identical, the samplers become `sampler2D` sampled

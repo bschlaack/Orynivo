@@ -16,6 +16,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   keeps its previous constant level.
 
 ### Fixed
+- The visualizer now renders through OpenGL by default. The GPU pipeline already existed but was
+  opt-in, so every preset ran its whole frame on the CPU: a per-pixel warp cost 18 ms and a
+  non-parallelisable one up to 70 ms at 960 x 540. A platform whose GL context never arrives falls
+  back to the bitmap presentation automatically, and setting `ORYNIVO_VISUALIZER_OPENGL=0` forces the
+  CPU presentation.
 - The visualizer's per-pixel warp is now parallel for presets that keep their working value in a
   temporary of their own, which is what the built-in **Plasma**, **Tunnel** and **Kaleidoscope**
   presets do. Measured at 960 x 540, Plasma dropped from 85 ms to 29 ms per frame, Kaleidoscope from

@@ -8,15 +8,16 @@ namespace Orynivo.Controls;
 
 /// <summary>
 /// Presents a rendered frame through OpenGL inside the visual tree instead of uploading it to a
-/// <c>WriteableBitmap</c>. The preset pipeline still renders on the CPU; this is the first step of
-/// roadmap 40f, and it proves the context, the shader compilation, the vertex buffer, and the
-/// texture upload that the later steps build on.
+/// <c>WriteableBitmap</c>, and owns the GPU half of the preset pipeline. The CPU still evaluates
+/// the preset's expressions, builds the per-vertex mesh, and draws the overlay; the GPU warps,
+/// blurs, post-processes, and composites the frame.
 /// </summary>
 /// <remarks>
-/// It is shown only when <c>ORYNIVO_VISUALIZER_OPENGL</c> is set, because whether Avalonia hands out
-/// a GL context depends on the platform and its graphics backend; the visualizer keeps its bitmap
-/// presentation until the GL path has been confirmed on every supported platform. The context is
-/// OpenGL ES 3.0 through ANGLE on Windows.
+/// It is the visualizer's default presentation. The window confirms it once it has drawn a frame
+/// and otherwise falls back to the bitmap presentation within its grace period, so a platform whose
+/// graphics backend never hands out a GL context still shows a picture. Setting
+/// <c>ORYNIVO_VISUALIZER_OPENGL=0</c> forces the bitmap path. The context is OpenGL ES 3.0 through
+/// ANGLE on Windows.
 /// </remarks>
 public sealed class VisualizerGlPresenter : OpenGlControlBase
 {

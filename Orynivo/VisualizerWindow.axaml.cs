@@ -149,6 +149,12 @@ public partial class VisualizerWindow : Window
     private string? _renderError;
     private int _renderErrorFrames;
     private string? _presentError;
+
+    /// <summary>Seconds the GL presenter gets to draw its first frame before the bitmap takes over.</summary>
+    private const double GlPresenterGraceSeconds = 1.5;
+
+    /// <summary>Whether the GL presentation has been confirmed or has fallen back to the bitmap.</summary>
+    private bool _glPresentationSettled;
     private int _presentErrorFrames;
     private volatile string? _pendingDiagnostics;
     private double _lastFrame;
@@ -185,9 +191,11 @@ public partial class VisualizerWindow : Window
         // because that would block the interface for as long as it takes.
         _presetDirectory = options.PresetDirectory;
         _library.LoadBuiltIns();
-        // Roadmap 40f: the GL pipeline and its presentation. It is opt-in while the GL path is
-        // proven per platform, and the bitmap presentation stays the fallback.
-        _useGlPresenter = Environment.GetEnvironmentVariable("ORYNIVO_VISUALIZER_OPENGL") == "1";
+        // Roadmap 40f: the GL pipeline and its presentation are the default, because the CPU frame
+        // path costs tens of milliseconds per frame for a per-pixel preset. A platform whose GL
+        // context never arrives falls back to the bitmap presentation automatically; setting
+        // ORYNIVO_VISUALIZER_OPENGL=0 forces the bitmap path.
+        _useGlPresenter = Environment.GetEnvironmentVariable("ORYNIVO_VISUALIZER_OPENGL") != "0";
         _renderer = new PresetRenderer(_library.At(_presetIndex), _renderWidth, _renderHeight)
         {
             // The Skia runtime-effect passes are the default: they measured faster than the
@@ -404,6 +412,12 @@ public partial class VisualizerWindow : Window
             // over nothing.
             _renderer.ExpressionsOnly = false;
             SeekDiagnostics.Log("visualizer", "GL pipeline disabled; the CPU frame path is back");
+        }
+        else if (!_useGlPresenter && _renderer.ExpressionsOnly)
+        {
+            // The GL presentation fell back to the bitmap, so the CPU renders the whole frame again
+            // instead of only the overlay and the mesh the pipeline needed.
+            _renderer.ExpressionsOnly = false;
         }
 
         if (_renderedPresetIndex != _presetIndex)
@@ -644,6 +658,36 @@ public partial class VisualizerWindow : Window
         }
     }
 
+    /// <summary>
+    /// Confirms the GL presentation once the presenter has drawn a frame, and hands the picture back
+    /// to the bitmap when it has not. A platform whose graphics backend never gives Avalonia a GL
+    /// context would otherwise show an empty control, because the image control is hidden while the
+    /// presenter is visible.
+    /// </summary>
+    private void CheckGlPresentation()
+    {
+        if (_glPresentationSettled || !_useGlPresenter)
+            return;
+
+        if (GlPresenter.Frames > 0)
+        {
+            _glPresentationSettled = true;
+            return;
+        }
+
+        // A reported error is immediate; otherwise the presenter gets a moment to draw.
+        if (GlPresenter.GlError is null && _renderClock.Elapsed.TotalSeconds < GlPresenterGraceSeconds)
+            return;
+
+        _glPresentationSettled = true;
+        _useGlPresenter = false;
+        GlPresenter.IsVisible = false;
+        VisualizerImage.IsVisible = true;
+        SeekDiagnostics.Log(
+            "visualizer",
+            $"GL presentation unavailable ({GlPresenter.GlError ?? "no frame drawn"}); using the bitmap path");
+    }
+
     private void PresentCore()
     {
         if (_useGlPresenter)
@@ -705,6 +749,7 @@ public partial class VisualizerWindow : Window
                 SeekDiagnostics.Log("visualizer", $"OpenGL presenter failed: {glError}");
             }
 
+            CheckGlPresentation();
             return;
         }
 

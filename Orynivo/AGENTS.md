@@ -539,14 +539,17 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
   a GPU path, and do not remove the interpreter fallback on the assumption that Skia is
   hardware-accelerated. Roadmap 40f moves the pipeline onto OpenGL: `Avalonia` 12 already ships
   `Avalonia.OpenGL` with `OpenGlControlBase`, and the context is confirmed as OpenGL ES 3.0 through
-  ANGLE on Windows. `Orynivo.Controls.VisualizerGlPresenter`, shown with
-  `ORYNIVO_VISUALIZER_OPENGL=1`, presents the frame and owns the GPU pipeline. When the preset has no
+  ANGLE on Windows. `Orynivo.Controls.VisualizerGlPresenter` presents the frame and owns the GPU
+  pipeline; it is the default, and `ORYNIVO_VISUALIZER_OPENGL=0` forces the bitmap presentation. When the preset has no
   shaders, `Orynivo.Controls.VisualizerGlPipeline` owns the whole frame: the warp as a mesh draw whose
   fragment shader is a translation of `WarpSampling.SamplePosition`, the blur as the same nine-tap
   clamped box filter with ping-pong targets, and decay, video echo, centre darkening, both border
   bands, gamma, and the additive overlay composite in one post pass. `PresetRenderer.ExpressionsOnly`
-  is the CPU half: the per-frame block, the mesh, and the overlay, with no pixel pass. Keep it opt-in
-  with the bitmap path as the fallback, keep a shader, context, or pipeline failure logged and
+  is the CPU half: the per-frame block, the mesh, and the overlay, with no pixel pass. Keep the
+  bitmap path as the fallback for a platform whose GL context never arrives: the window confirms the
+  presenter once it has drawn a frame and otherwise switches back within
+  `GlPresenterGraceSeconds`, re-enabling the complete CPU frame. Keep a shader, context, or pipeline
+  failure logged and
   non-fatal (a failed pipeline hands the frame back to the CPU), and remember two `GlInterface`
   limits: it exposes only scalar uniforms, so a vector uniform is set component by component, and it
   exposes no `TexSubImage2D`, so a texture update re-specifies it through `TexImage2D` or goes through
