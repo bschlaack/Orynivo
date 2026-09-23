@@ -14,7 +14,7 @@ public sealed class AudioSpectrumAnalyzer : IVisualizerAudioSource
     public const int BandCount = 64;
 
     /// <summary>Number of time-domain points kept for the waveform overlay.</summary>
-    public const int WaveformPoints = 256;
+    public const int WaveformPoints = 512;
 
     /// <summary>Number of frequency points kept for a spectrum-reading custom waveform.</summary>
     public const int SpectrumPoints = 256;
@@ -255,16 +255,15 @@ public sealed class AudioSpectrumAnalyzer : IVisualizerAudioSource
         FrameCount++;
     }
 
-    /// <summary>Decimates the per-channel samples into the stereo waveform buffers.</summary>
+    /// <summary>Copies the latest contiguous PCM window into the stereo waveform buffers.</summary>
     private void UpdateStereoWaveform()
     {
-        var step = Math.Max(1, _fftSize / WaveformPoints);
-        for (var point = 0; point < WaveformPoints; point++)
-        {
-            var index = Math.Min(_fftSize - 1, point * step);
-            _waveformLeft[point] = _leftSamples[index];
-            _waveformRight[point] = _rightSamples[index];
-        }
+        var copied = Math.Min(_fftSize, WaveformPoints);
+        var padding = WaveformPoints - copied;
+        Array.Clear(_waveformLeft, 0, padding);
+        Array.Clear(_waveformRight, 0, padding);
+        _leftSamples.AsSpan(_fftSize - copied, copied).CopyTo(_waveformLeft.AsSpan(padding));
+        _rightSamples.AsSpan(_fftSize - copied, copied).CopyTo(_waveformRight.AsSpan(padding));
     }
 
     /// <summary>Decimates the per-channel magnitudes into the stereo spectrum buffers.</summary>

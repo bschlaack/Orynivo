@@ -3,7 +3,7 @@ namespace Orynivo.Visualization;
 /// <summary>
 /// The shared slot layout of one preset. Milkdrop presets pass user variables such as
 /// <c>q1</c> from the per-frame stage into the per-pixel stage, so every expression block
-/// of a preset compiles against the same layout and runs over the same slot array.
+/// of a preset compiles against the same layout. Custom elements use isolated slot arrays.
 /// </summary>
 public sealed class PresetVariableLayout
 {
@@ -35,6 +35,11 @@ public sealed class PresetVariableLayout
         string[] names =
         [
             "time", "fps", "frame", "monitor",
+            "r", "g", "b", "a", "r2", "g2", "b2", "a2", "sides", "additive",
+            "border_r", "border_g", "border_b", "border_a", "thickoutline", "thick",
+            "textured", "tex_zoom", "tex_ang", "instance", "num_inst",
+            "samples", "sep", "scaling", "smoothing", "sample", "value1", "value2",
+            "fWarpAnimSpeed", "fWarpScale", "bTexWrap",
             "bass", "mid", "treb", "vol", "bass_att", "mid_att", "treb_att",
             "aspectx", "aspecty", "pixelsx", "pixelsy",
             "decay", "fDecay", "fGammaAdj", "fWarpAmount", "fWaveAlpha", "fWaveScale",

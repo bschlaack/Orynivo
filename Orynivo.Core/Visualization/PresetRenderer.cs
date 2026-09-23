@@ -151,7 +151,15 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
     /// amplifies inside the comp shader diverge to white.
     /// </summary>
     private bool _compStageRan;
-    private readonly float[] _slots;
+    private float[] _slots;
+    private double _frameDelta = 1d / 60d;
+    private static readonly string[] QNames = Enumerable.Range(1, 32).Select(i => "q" + i).ToArray();
+    private static readonly string[] TNames = Enumerable.Range(1, 8).Select(i => "t" + i).ToArray();
+    private readonly Dictionary<object, float[]> _elementFrames = [];
+    private readonly Dictionary<object, float[]> _elementPoints = [];
+    private readonly Dictionary<object, float[]> _elementInitT = [];
+    private static readonly string[] ElementInputs = ["time", "fps", "frame", "progress", "bass", "mid", "treb", "bass_att", "mid_att", "treb_att"];
+
     // Resolved once so the per-pixel loop never looks a name up in the layout again.
     private readonly int _slotX;
     private readonly int _slotY;
@@ -574,7 +582,8 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
         (int)Math.Clamp(Read("echo_orient", Read("nVideoEchoOrientation", 0f)), 0f, 3f),
         ToPublicBand(ReadBand("ob_", 0f, 0.02f)),
         ToPublicBand(ReadBand("ib_", 0.06f, 0.02f)),
-        (float)_elapsed);
+        (float)_elapsed * Read("fWarpAnimSpeed", 1f))
+        { WarpScale = Read("fWarpScale", 1f), TextureWrap = Read("bTexWrap", 0f) != 0f };
 
     /// <summary>Publishes one border band with the public frame-parameter type.</summary>
     /// <param name="band">Band read from the preset's keys.</param>
@@ -677,7 +686,8 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
         ArgumentNullException.ThrowIfNull(audio);
         _audio = audio;
         CopyAudio(audio);
-        _elapsed += Math.Clamp(deltaSeconds, 0d, 0.25d);
+        _frameDelta = double.IsFinite(deltaSeconds) && deltaSeconds > 0d ? deltaSeconds : 1d / 60d;
+        _elapsed += Math.Clamp(_frameDelta, 0d, 0.25d);
 
         _clock.Restart();
         _mark = 0d;
@@ -687,9 +697,9 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
             Preset.PerFrameInit.Execute(_slots);
             Preset.PerPixelInit.Execute(_slots);
             foreach (var wave in Preset.Waves)
-                wave.Init.Execute(_slots);
+                InitializeElement(wave, wave.Init);
             foreach (var shape in Preset.Shapes)
-                shape.Init.Execute(_slots);
+                InitializeElement(shape, shape.Init);
             _initialized = true;
         }
 
@@ -702,8 +712,6 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
         try
         {
             Preset.PerFrame.Execute(_slots);
-            foreach (var wave in Preset.Waves)
-                wave.PerFrame.Execute(_slots);
         }
         catch (Exception exception)
         {
@@ -843,6 +851,9 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
         _skipPerPixelThisFrame = false;
         _framesSinceSuspend = 0;
         Array.Clear(_slots);
+        _elementFrames.Clear();
+        _elementPoints.Clear();
+        _elementInitT.Clear();
         _audio = null;
         _initialized = false;
         _frame = 0;
@@ -881,7 +892,7 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
         _roam[3] = RoamVector(roamTime, sine: true, slow: true);
         // A first-frame fps of zero makes a preset that divides by fps produce an infinity that
         // sticks in its accumulators, so the measured rate is used from the first frame.
-        Write("fps", _elapsed > 0.0001d ? (float)(Math.Max(1, _frame) / _elapsed) : 0f);
+        Write("fps", (float)(1d / _frameDelta));
         Write("frame", _frame);
         Write("monitor", 1f);
         // Milkdrop's band variables are relative to their long-term average and can exceed one, so a
@@ -893,8 +904,9 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
         Write("bass_att", BassAttRelative);
         Write("mid_att", MidAttRelative);
         Write("treb_att", TrebleAttRelative);
-        Write("aspectx", height > 0 ? width / (float)height : 1f);
-        Write("aspecty", 1f);
+        WarpSampling.GetAspect(width, height, out var frameAspectX, out var frameAspectY);
+        Write("aspectx", frameAspectX);
+        Write("aspecty", frameAspectY);
         Write("pixelsx", width);
         Write("pixelsy", height);
         // Milkdrop's mesh is the sampling grid, and the progress through a preset's playlist time.
@@ -910,6 +922,8 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
         Write("decay", Preset.Decay);
         Write("fDecay", Preset.Decay);
         Write("fGammaAdj", 1f);
+        Write("fWarpAnimSpeed", 1f);
+        Write("fWarpScale", 1f);
         Write("zoom", Preset.Zoom);
         Write("zoomexp", 1f);
         Write("rot", 0f);
@@ -920,6 +934,9 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
         Write("warp", Preset.Warp);
         Write("sx", 1f);
         Write("sy", 1f);
+        Write("blur1_min", 0f); Write("blur1_max", 1f);
+        Write("blur2_min", 0f); Write("blur2_max", 1f);
+        Write("blur3_min", 0f); Write("blur3_max", 1f);
         Write("blur1", Preset.BlurLevel);
         Write("blur2", 0f);
         Write("blur3", 0f);
@@ -988,8 +1005,8 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
         var warpAmount = Read("warp", Preset.Warp);
         // The reference's warp animation time is the preset time times the animation speed (whose
         // default is one) and its warp scale defaults to one.
-        var warpTime = (float)_elapsed;
-        const float warpScale = 1f;
+        var warpTime = (float)_elapsed * Read("fWarpAnimSpeed", 1f);
+        var warpScale = Read("fWarpScale", 1f);
         // The polar pair costs a square root and an arctangent per pixel, so it is only computed
         // when the preset's own code or the zoom exponent actually needs it.
         var needsRadius = _perPixelUsesRadius || zoomExp != 1f;
@@ -1242,11 +1259,7 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
             WarpRows(-1, 0, height);
         }
 
-        // The mesh carries one motion value per grid vertex; a pixel reads the four vertices around
-        // it and interpolates between them.
-        float MeshValue(int vertexX, int vertexY, int value) =>
-            _meshMotion[(((vertexY * (MeshGridX + 1)) + vertexX) * MeshValues) + value];
-
+        // Sample the transformed coordinates rather than interpolating the motion parameters.
         float MeshUvValue(int vertexX, int vertexY, int value) =>
             _meshUv[((((vertexY * (MeshGridX + 1)) + vertexX) * 2) + value)];
 
@@ -1264,25 +1277,6 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
                       ((MeshUvValue(x0 + 1, y0, value) - MeshUvValue(x0, y0, value)) * fractionX);
             var bottom = MeshUvValue(x0, y0 + 1, value) +
                          ((MeshUvValue(x0 + 1, y0 + 1, value) - MeshUvValue(x0, y0 + 1, value)) * fractionX);
-            return top + ((bottom - top) * fractionY);
-        }
-
-        float InterpolateMesh(float meshX, float meshY, int value)
-        {
-            var x0 = (int)meshX;
-            if (x0 >= MeshGridX)
-                x0 = MeshGridX - 1;
-            var y0 = (int)meshY;
-            if (y0 >= MeshGridY)
-                y0 = MeshGridY - 1;
-            var fractionX = meshX - x0;
-            var fractionY = meshY - y0;
-            // A lerp, not a weighted sum: it is exact when the corners agree, which is what makes
-            // the constant-motion case byte-identical to the per-pixel path.
-            var top = MeshValue(x0, y0, value) +
-                      ((MeshValue(x0 + 1, y0, value) - MeshValue(x0, y0, value)) * fractionX);
-            var bottom = MeshValue(x0, y0 + 1, value) +
-                         ((MeshValue(x0 + 1, y0 + 1, value) - MeshValue(x0, y0 + 1, value)) * fractionX);
             return top + ((bottom - top) * fractionY);
         }
 
@@ -1438,7 +1432,7 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
         // The reference transforms the texture coordinate at each vertex and interpolates the
         // resulting coordinate, so the UV mesh is built here and the warp interpolates it.
         var uvNeedsRadius = _perPixelUsesRadius || zoomExp != 1f;
-        var uvWarpTime = (float)_elapsed;
+        var uvWarpTime = (float)_elapsed * Read("fWarpAnimSpeed", 1f);
         for (var gridY = 0; gridY <= MeshGridY; gridY++)
         {
             var normalizedY = (gridY / (float)MeshGridY * 2f) - 1f;
@@ -1463,7 +1457,7 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
                     uvNeedsRadius,
                     _meshMotion[motion + 9],
                     uvWarpTime,
-                    1f,
+                    Read("fWarpScale", 1f),
                     out var sampleX,
                     out var sampleY);
                 var uv = (((gridY * (MeshGridX + 1)) + gridX) * 2);
@@ -1574,8 +1568,8 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
         var scalars = BuildSkiaScalars(pass.PerPixelUniforms);
         // The GPU warp has to apply the same time-dependent displacement the CPU warp does.
         scalars["_orynivo_warp"] = Read("warp", Preset.Warp);
-        scalars["_orynivo_warpTime"] = (float)_elapsed;
-        scalars["_orynivo_warpScale"] = 1f;
+        scalars["_orynivo_warpTime"] = (float)_elapsed * Read("fWarpAnimSpeed", 1f);
+        scalars["_orynivo_warpScale"] = Read("fWarpScale", 1f);
         return scalars;
     }
 
@@ -2214,10 +2208,25 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
         destination["time"] = ShaderValue.Scalar(Read("time", 0f));
         destination["frame"] = ShaderValue.Scalar(Read("frame", 0f));
         destination["fps"] = ShaderValue.Scalar(Read("fps", 0f));
-        destination["bass"] = ShaderValue.Scalar(Bass);
-        destination["mid"] = ShaderValue.Scalar(Mid);
-        destination["treb"] = ShaderValue.Scalar(Treble);
+        destination["bass"] = ShaderValue.Scalar(BassRelative);
+        destination["mid"] = ShaderValue.Scalar(MidRelative);
+        destination["treb"] = ShaderValue.Scalar(TrebleRelative);
         destination["vol"] = ShaderValue.Scalar(Volume);
+        var previousMin = 0f; var previousMax = 1f;
+        for (var level = 1; level <= 3; level++)
+        {
+            var minimum = Math.Max(previousMin, Read("blur" + level + "_min", 0f));
+            var maximum = Math.Min(previousMax, Read("blur" + level + "_max", 1f));
+            if (maximum - minimum < 0.1f)
+            {
+                var middle = (minimum + maximum) * 0.5f;
+                minimum = middle - 0.05f; maximum = middle + 0.05f;
+            }
+            destination["blur" + level + "_min"] = ShaderValue.Scalar(minimum);
+            destination["blur" + level + "_max"] = ShaderValue.Scalar(maximum);
+            previousMin = minimum; previousMax = maximum;
+        }
+        destination["blur1_edge_darken"] = ShaderValue.Scalar(Read("blur1_edge_darken", 0f));
         destination["bass_att"] = ShaderValue.Scalar(Read("bass_att", 0f));
         destination["mid_att"] = ShaderValue.Scalar(Read("mid_att", 0f));
         destination["treb_att"] = ShaderValue.Scalar(Read("treb_att", 0f));
@@ -2252,8 +2261,8 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
         destination["_orynivo_offset"] = ShaderValue.Vector(Read("dx", 0f), Read("dy", 0f), 0f, 0f, 2);
         destination["_orynivo_stretch"] = ShaderValue.Vector(Read("sx", 1f), Read("sy", 1f), 0f, 0f, 2);
         destination["_orynivo_warp"] = ShaderValue.Scalar(Read("warp", Preset.Warp));
-        destination["_orynivo_warpTime"] = ShaderValue.Scalar((float)_elapsed);
-        destination["_orynivo_warpScale"] = ShaderValue.Scalar(1f);
+        destination["_orynivo_warpTime"] = ShaderValue.Scalar((float)_elapsed * Read("fWarpAnimSpeed", 1f));
+        destination["_orynivo_warpScale"] = ShaderValue.Scalar(Read("fWarpScale", 1f));
 
         if (perPixelVariables is null)
             return;
@@ -2577,34 +2586,33 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
             var end = to * stride;
             for (var index = from * stride; index < end; index += 4)
             {
-                pixels[index] = MathF.Pow(Math.Clamp(pixels[index], 0f, 1f), gamma);
-                pixels[index + 1] = MathF.Pow(Math.Clamp(pixels[index + 1], 0f, 1f), gamma);
-                pixels[index + 2] = MathF.Pow(Math.Clamp(pixels[index + 2], 0f, 1f), gamma);
+                pixels[index] = Math.Clamp(pixels[index] * gamma, 0f, 1f);
+                pixels[index + 1] = Math.Clamp(pixels[index + 1] * gamma, 0f, 1f);
+                pixels[index + 2] = Math.Clamp(pixels[index + 2] * gamma, 0f, 1f);
             }
         });
     }
 
-    /// <summary>Draws the waveform, the spectrum bars, and the custom shapes into the fresh buffer.</summary>
+    /// <summary>Draws motion vectors, shapes, custom waves and the default wave into the overlay.</summary>
     private void DrawOverlay()
     {
         _fresh.Clear();
-        DrawWaves();
         DrawMotionVectors();
         DrawShapes();
+        DrawWaves();
     }
 
     /// <summary>
-    /// Draws the default waveform with the global <c>wave_*</c> settings, then the four custom
-    /// waveforms whose <c>wavecode_N_enabled</c> is set. The two are separate in the reference: the
+    /// Draws the four custom waveforms, then the default waveform with global <c>wave_*</c> settings. The custom
+    /// waveforms require <c>wavecode_N_enabled</c>. The two are separate in the reference: the
     /// default wave uses the global mode and the global <c>per_point</c> block, while each custom
     /// wave has its own state and its own <c>wave_N_per_point</c> block.
     /// </summary>
     private void DrawWaves()
     {
-        DrawDefaultWave();
-
         foreach (var wave in Preset.Waves)
             DrawCustomWave(wave);
+        DrawDefaultWave();
     }
 
     /// <summary>Draws the default waveform with the global mode, colour, and modifiers.</summary>
@@ -2730,74 +2738,133 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
         if (left.Length < 2 || right.Length < 2)
             return;
 
-        // The per-frame block runs with the waveform's own state in the shared slots.
+        if (!_elementFrames.ContainsKey(wave)) InitializeElement(wave, wave.Init);
+        var presetSlots = _slots;
+        _slots = _elementFrames[wave];
+        try
+        {
+            CopyElementInputs(presetSlots, _slots);
+            RestoreElementT(wave);
+            SeedWave(wave);
+            wave.PerFrame.Execute(_slots);
+
+            var available = Math.Min(left.Length, right.Length);
+            var samples = Math.Min(available, (int)Math.Clamp(Read("samples", wave.Samples), 0f, 512f));
+            var separation = Math.Clamp(wave.Separation, -(available - samples), available - samples);
+            if (wave.UseDots ? samples < 1 : samples < 2)
+                return;
+
+            var scaling = Read("scaling", wave.Scaling);
+            var smoothing = Math.Clamp(Read("smoothing", wave.Smoothing), 0f, 1f);
+            var mult = scaling * Preset.WaveScale * (wave.Spectrum ? 0.15f : 128f * 0.004f);
+
+            // The reference smooths the sample data forwards and then backwards, which removes the
+            // asymmetry between the start and the end of the trace.
+            var mix1 = MathF.Pow(smoothing * 0.98f, 0.5f);
+            var mix2 = 1f - mix1;
+            for (var sample = 0; sample < samples; sample++)
+            {
+                var sourceIndex = wave.Spectrum ? sample * Math.Max(1, available - separation) / samples : sample;
+                var offsetLeft = wave.Spectrum ? 0 : (available - samples) / 2 - separation / 2;
+                var offsetRight = wave.Spectrum ? 0 : (available - samples) / 2 + separation / 2;
+                _waveSamples[sample] = left[Math.Clamp(sourceIndex + offsetLeft, 0, available - 1)];
+                _waveSamplesRight[sample] = right[Math.Clamp(sourceIndex + offsetRight, 0, available - 1)];
+            }
+
+            SmoothAndScale(_waveSamples, samples, mix1, mix2, mult);
+            SmoothAndScale(_waveSamplesRight, samples, mix1, mix2, mult);
+
+            var baseRed = Read("r", wave.Red);
+            var baseGreen = Read("g", wave.Green);
+            var baseBlue = Read("b", wave.Blue);
+            var baseAlpha = Read("a", wave.Alpha);
+            var frameSlots = _slots;
+            _slots = _elementPoints[wave];
+            CopyElementInputs(frameSlots, _slots);
+            for (var t = 1; t <= 8; t++)
+                Write(TNames[t - 1], frameSlots[Preset.Layout.IndexOf(TNames[t - 1])]);
+            var step = samples > 1 ? 1f / (samples - 1) : 0f;
+            for (var sample = 0; sample < samples; sample++)
+            {
+                // Milkdrop keeps the two channels separate: value1 is the left trace, value2 the right.
+                var value1 = _waveSamples[sample];
+                var value2 = _waveSamplesRight[sample];
+                Write("sample", sample * step);
+                Write("value1", value1);
+                Write("value2", value2);
+                Write("x", 0.5f + value1);
+                Write("y", 0.5f + value2);
+                Write("r", baseRed);
+                Write("g", baseGreen);
+                Write("b", baseBlue);
+                Write("a", baseAlpha);
+                wave.PerPoint.Execute(_slots);
+
+                _wavePointX[sample] = Read("x", 0.5f);
+                _wavePointY[sample] = Read("y", 0.5f);
+                _waveRed[sample] = Math.Clamp(Read("r", baseRed), 0f, 1f);
+                _waveGreen[sample] = Math.Clamp(Read("g", baseGreen), 0f, 1f);
+                _waveBlue[sample] = Math.Clamp(Read("b", baseBlue), 0f, 1f);
+                _waveAlpha[sample] = Math.Clamp(Read("a", baseAlpha), 0f, 1f);
+            }
+
+            var count = SmoothWavePoints(samples);
+            DrawWavePoints(count, wave);
+        }
+        finally { _slots = presetSlots; }
+    }
+
+    /// <summary>Creates isolated frame and point contexts and captures the init T values.</summary>
+    private void InitializeElement(object element, PresetProgram init)
+    {
+        var parent = _slots;
+        var context = new float[parent.Length];
+        _elementFrames[element] = context;
+        _elementPoints[element] = new float[parent.Length];
+        _slots = context;
+        try
+        {
+            CopyElementInputs(parent, context);
+            if (element is VisualizerWave wave) SeedWave(wave);
+            if (element is VisualizerShape shape) SeedShape(shape);
+            init.Execute(context);
+            var initialT = new float[8];
+            for (var t = 0; t < 8; t++) initialT[t] = Read(TNames[t], 0f);
+            _elementInitT[element] = initialT;
+        }
+        finally { _slots = parent; }
+    }
+
+    /// <summary>Transfers read-only frame inputs and Q values, never another context's user variables.</summary>
+    private void CopyElementInputs(float[] source, float[] target)
+    {
+        foreach (var name in ElementInputs)
+        {
+            var slot = Preset.Layout.IndexOf(name);
+            if (slot >= 0) target[slot] = source[slot];
+        }
+        for (var q = 1; q <= 32; q++)
+        {
+            var slot = Preset.Layout.IndexOf(QNames[q - 1]);
+            target[slot] = source[slot];
+        }
+    }
+
+    /// <summary>Restores the init T values before each frame or shape instance.</summary>
+    private void RestoreElementT(object element)
+    {
+        var initial = _elementInitT[element];
+        for (var t = 0; t < 8; t++) Write(TNames[t], initial[t]);
+    }
+
+    /// <summary>Seeds a custom wave's saved parameters before init or per-frame evaluation.</summary>
+    private void SeedWave(VisualizerWave wave)
+    {
         Write("samples", wave.Samples);
         Write("sep", wave.Separation);
         Write("scaling", wave.Scaling);
         Write("smoothing", wave.Smoothing);
-        Write("r", wave.Red);
-        Write("g", wave.Green);
-        Write("b", wave.Blue);
-        Write("a", wave.Alpha);
-        Write("x", 0.5f);
-        Write("y", 0.5f);
-        wave.PerFrame.Execute(_slots);
-
-        var separation = Math.Max(0, wave.Separation);
-        var samples = Math.Min(
-            Math.Min(left.Length, right.Length),
-            (int)Math.Clamp(Read("samples", wave.Samples), 0f, 512f)) - separation;
-        if (wave.UseDots ? samples < 1 : samples < 2)
-            return;
-
-        var scaling = Read("scaling", wave.Scaling);
-        var smoothing = Math.Clamp(Read("smoothing", wave.Smoothing), 0f, 1f);
-        var mult = scaling * Preset.WaveScale * (wave.Spectrum ? 0.15f : 0.004f);
-
-        // The reference smooths the sample data forwards and then backwards, which removes the
-        // asymmetry between the start and the end of the trace.
-        var mix1 = MathF.Pow(smoothing * 0.98f, 0.5f);
-        var mix2 = 1f - mix1;
-        for (var sample = 0; sample < samples; sample++)
-        {
-            _waveSamples[sample] = left[sample];
-            _waveSamplesRight[sample] = right[sample];
-        }
-
-        SmoothAndScale(_waveSamples, samples, mix1, mix2, mult);
-        SmoothAndScale(_waveSamplesRight, samples, mix1, mix2, mult);
-
-        var baseRed = Read("r", wave.Red);
-        var baseGreen = Read("g", wave.Green);
-        var baseBlue = Read("b", wave.Blue);
-        var baseAlpha = Read("a", wave.Alpha);
-        var step = samples > 1 ? 1f / (samples - 1) : 0f;
-        for (var sample = 0; sample < samples; sample++)
-        {
-            // Milkdrop keeps the two channels separate: value1 is the left trace, value2 the right.
-            var value1 = _waveSamples[sample];
-            var value2 = _waveSamplesRight[sample];
-            Write("sample", sample * step);
-            Write("value1", value1);
-            Write("value2", value2);
-            Write("x", 0.5f + value1);
-            Write("y", 0.5f + value2);
-            Write("r", baseRed);
-            Write("g", baseGreen);
-            Write("b", baseBlue);
-            Write("a", baseAlpha);
-            wave.PerPoint.Execute(_slots);
-
-            _wavePointX[sample] = Read("x", 0.5f);
-            _wavePointY[sample] = Read("y", 0.5f);
-            _waveRed[sample] = Math.Clamp(Read("r", baseRed), 0f, 1f);
-            _waveGreen[sample] = Math.Clamp(Read("g", baseGreen), 0f, 1f);
-            _waveBlue[sample] = Math.Clamp(Read("b", baseBlue), 0f, 1f);
-            _waveAlpha[sample] = Math.Clamp(Read("a", baseAlpha), 0f, 1f);
-        }
-
-        var count = SmoothWavePoints(samples);
-        DrawWavePoints(count, wave);
+        Write("r", wave.Red); Write("g", wave.Green); Write("b", wave.Blue); Write("a", wave.Alpha);
     }
 
     /// <summary>
@@ -3148,22 +3215,70 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
     {
         foreach (var shape in Preset.Shapes)
         {
-            SeedShape(shape);
-            shape.PerFrame.Execute(_slots);
+            if (!shape.Enabled) continue;
+            if (!_elementFrames.ContainsKey(shape)) InitializeElement(shape, shape.Init);
+            var parent = _slots;
+            _slots = _elementFrames[shape];
+            try
+            {
+                for (var instance = 0; instance < shape.Instances; instance++)
+                {
+                    CopyElementInputs(parent, _slots);
+                    RestoreElementT(shape);
+                    SeedShape(shape);
+                    Write("instance", instance);
+                    shape.PerFrame.Execute(_slots);
+                    var centreX = Read("x", shape.X);
+                    var centreY = Read("y", shape.Y);
+                    var radius = Math.Max(0f, Read("rad", shape.Radius));
+                    var angle = Read("ang", shape.Angle);
+                    var sides = (int)Math.Clamp(Read("sides", shape.Sides), shape.MilkdropCoordinates ? 3f : 0f, 100f);
+                    var red = Math.Clamp(Read("r", shape.Red), 0f, 1f);
+                    var green = Math.Clamp(Read("g", shape.Green), 0f, 1f);
+                    var blue = Math.Clamp(Read("b", shape.Blue), 0f, 1f);
+                    var alpha = Math.Clamp(Read("a", shape.Alpha), 0f, 1f);
+                    var additive = Read("additive", shape.Additive ? 1f : 0f) != 0f;
+                    var vertices = BuildVertices(shape, sides, centreX, centreY, radius, angle);
+                    if (shape.MilkdropCoordinates)
+                        FillShapeFan(vertices, centreX * 2f - 1f, 1f - centreY * 2f, red, green, blue, alpha, additive);
+                    else
+                        FillPolygon(vertices, red, green, blue, alpha, additive);
+                    DrawPolygonBorder(vertices, shape);
+                }
+            }
+            finally { _slots = parent; }
+        }
+    }
 
-            var centreX = Read("x", shape.X);
-            var centreY = Read("y", shape.Y);
-            var radius = Math.Max(0f, Read("rad", shape.Radius));
-            var angle = Read("ang", shape.Angle);
-            var sides = (int)Math.Clamp(Read("sides", shape.Sides), 0f, 64f);
-            var red = Math.Clamp(Read("r", shape.Red), 0f, 1f);
-            var green = Math.Clamp(Read("g", shape.Green), 0f, 1f);
-            var blue = Math.Clamp(Read("b", shape.Blue), 0f, 1f);
-            var alpha = Math.Clamp(Read("a", shape.Alpha), 0f, 1f);
-
-            var vertices = BuildVertices(shape, sides, centreX, centreY, radius, angle);
-            FillPolygon(vertices, red, green, blue, alpha, shape.Additive);
-            DrawPolygonBorder(vertices, shape);
+    /// <summary>Rasterizes the Milkdrop triangle fan with interpolated centre and edge colours.</summary>
+    private void FillShapeFan((float X, float Y)[] vertices, float cx, float cy,
+        float red, float green, float blue, float alpha, bool additive)
+    {
+        var red2 = Read("r2", 1f); var green2 = Read("g2", 1f);
+        var blue2 = Read("b2", 1f); var alpha2 = Read("a2", 0f);
+        var width = _fresh.Width; var height = _fresh.Height;
+        for (var i = 0; i < vertices.Length; i++)
+        {
+            var a = vertices[i]; var b = vertices[(i + 1) % vertices.Length];
+            var det = (a.Y - b.Y) * (cx - b.X) + (b.X - a.X) * (cy - b.Y);
+            if (MathF.Abs(det) < 1e-9f) continue;
+            var minX = Math.Max(0, (int)MathF.Floor((Math.Min(cx, Math.Min(a.X, b.X)) + 1f) * width * 0.5f));
+            var maxX = Math.Min(width - 1, (int)MathF.Ceiling((Math.Max(cx, Math.Max(a.X, b.X)) + 1f) * width * 0.5f));
+            var minY = Math.Max(0, (int)MathF.Floor((Math.Min(cy, Math.Min(a.Y, b.Y)) + 1f) * height * 0.5f));
+            var maxY = Math.Min(height - 1, (int)MathF.Ceiling((Math.Max(cy, Math.Max(a.Y, b.Y)) + 1f) * height * 0.5f));
+            for (var y = minY; y <= maxY; y++)
+            for (var x = minX; x <= maxX; x++)
+            {
+                var px = (x + 0.5f) * 2f / width - 1f;
+                var py = (y + 0.5f) * 2f / height - 1f;
+                var w0 = ((a.Y - b.Y) * (px - b.X) + (b.X - a.X) * (py - b.Y)) / det;
+                var w1 = ((b.Y - cy) * (px - b.X) + (cx - b.X) * (py - b.Y)) / det;
+                var w2 = 1f - w0 - w1;
+                // Half-open radial edge avoids blending shared fan edges twice.
+                if (w0 < 0f || w1 < 0f || w2 <= 0f) continue;
+                PaintPixel(x, y, red2 + (red - red2) * w0, green2 + (green - green2) * w0,
+                    blue2 + (blue - blue2) * w0, Math.Clamp(alpha2 + (alpha - alpha2) * w0, 0f, 1f), additive);
+            }
         }
     }
 
@@ -3188,9 +3303,15 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
         for (var index = 0; index < count; index++)
         {
             var t = index / (float)count;
-            var vertexAngle = angle + (t * 2f * MathF.PI);
+            var vertexAngle = angle + (t * 2f * MathF.PI) + (shape.MilkdropCoordinates ? MathF.PI * 0.25f : 0f);
             var x = centreX + (MathF.Cos(vertexAngle) * radius);
             var y = centreY + (MathF.Sin(vertexAngle) * radius);
+            if (shape.MilkdropCoordinates)
+            {
+                var aspect = Math.Min(1f, _fresh.Height / (float)_fresh.Width);
+                x = centreX * 2f - 1f + MathF.Cos(vertexAngle) * radius * aspect;
+                y = 1f - centreY * 2f + MathF.Sin(vertexAngle) * radius;
+            }
 
             if (!shape.PerPoint.IsEmpty)
             {
@@ -3262,7 +3383,7 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
     /// <param name="shape">Shape whose border colour is used.</param>
     private void DrawPolygonBorder((float X, float Y)[] vertices, VisualizerShape shape)
     {
-        if (vertices.Length < 2 || shape.BorderAlpha <= 0f)
+        if (vertices.Length < 2 || Read("border_a", shape.BorderAlpha) <= 0f)
             return;
 
         var width = _fresh.Width;
@@ -3271,22 +3392,25 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
         {
             var a = vertices[index];
             var b = vertices[(index + 1) % vertices.Length];
-            var steps = Math.Max(2, (int)(MathF.Abs(b.X - a.X) * width));
+            var steps = Math.Max(2, (int)Math.Max(MathF.Abs(b.X - a.X) * width, MathF.Abs(b.Y - a.Y) * height));
             for (var step = 0; step <= steps; step++)
             {
                 var t = step / (float)steps;
                 var x = a.X + ((b.X - a.X) * t);
                 var y = a.Y + ((b.Y - a.Y) * t);
-                var column = (int)Math.Clamp((x * 0.5f + 0.5f) * (width - 1), 0f, width - 1);
-                var row = (int)Math.Clamp((y * 0.5f + 0.5f) * (height - 1), 0f, height - 1);
+                var column = (int)((x * 0.5f + 0.5f) * (width - 1));
+                var row = (int)((y * 0.5f + 0.5f) * (height - 1));
+                var thickness = Read("thick", shape.ThickOutline ? 1f : 0f) != 0f ? 2 : 1;
+                for (var offsetY = 0; offsetY < thickness; offsetY++)
+                for (var offsetX = 0; offsetX < thickness; offsetX++)
                 PaintPixel(
-                    column,
-                    row,
-                    shape.BorderRed,
-                    shape.BorderGreen,
-                    shape.BorderBlue,
-                    shape.BorderAlpha,
-                    shape.Additive);
+                    column + offsetX,
+                    row + offsetY,
+                    Read("border_r", shape.BorderRed),
+                    Read("border_g", shape.BorderGreen),
+                    Read("border_b", shape.BorderBlue),
+                    Read("border_a", shape.BorderAlpha),
+                    Read("additive", shape.Additive ? 1f : 0f) != 0f);
             }
         }
     }
@@ -3318,7 +3442,8 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
             _fresh.Pixels[offset + 2] = Math.Clamp((_fresh.Pixels[offset + 2] * (1f - alpha)) + (blue * alpha), 0f, 1f);
         }
 
-        _fresh.Pixels[offset + 3] = 1f;
+        if (!additive)
+            _fresh.Pixels[offset + 3] += (1f - _fresh.Pixels[offset + 3]) * alpha;
     }
 
     /// <summary>Seeds a shape's default values into the shared slots.</summary>
@@ -3326,6 +3451,14 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
     private void SeedShape(VisualizerShape shape)
     {
         Write("sides", shape.Sides);
+        Write("r2", shape.Red2); Write("g2", shape.Green2); Write("b2", shape.Blue2); Write("a2", shape.Alpha2);
+        Write("border_r", shape.BorderRed); Write("border_g", shape.BorderGreen);
+        Write("border_b", shape.BorderBlue); Write("border_a", shape.BorderAlpha);
+        Write("additive", shape.Additive ? 1f : 0f);
+        Write("textured", shape.Textured ? 1f : 0f);
+        Write("tex_zoom", shape.TextureZoom); Write("tex_ang", shape.TextureAngle);
+        Write("num_inst", shape.Instances);
+        Write("thick", shape.ThickOutline ? 1f : 0f);
         Write("x", shape.X);
         Write("y", shape.Y);
         Write("rad", shape.Radius);
@@ -3336,8 +3469,8 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
         Write("a", shape.Alpha);
     }
 
-    /// <summary>Adds the freshly drawn overlay on top of the faded feedback image.</summary>
     /// <summary>
+    /// Composites premultiplied overlay RGB with separately accumulated coverage onto the feedback.
     /// Adds the overlay frame (<see cref="_fresh"/>) onto the warped frame (<see cref="_warped"/>). It
     /// runs before the centre darkening and the border, so those later passes cover the overlay the way
     /// the reference draws its shapes and waves first; <see cref="Publish"/> copies the finished frame
@@ -3345,19 +3478,6 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
     /// </summary>
     private void Composite()
     {
-        if (UseSkiaFramePasses)
-        {
-            try
-            {
-                SkiaShaderRunner.Composite(_warped, _fresh);
-                return;
-            }
-            catch (Exception exception)
-            {
-                ShaderError = "composite (skia): " + exception.GetType().Name + ": " + exception.Message;
-            }
-        }
-
         var overlay = _fresh.RawPixels;
         var warped = _warped.RawPixels;
         var stride = _warped.Width * 4;
@@ -3366,9 +3486,9 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
             var end = to * stride;
             for (var index = from * stride; index < end; index += 4)
             {
-                warped[index] = Math.Clamp(warped[index] + overlay[index], 0f, 1f);
-                warped[index + 1] = Math.Clamp(warped[index + 1] + overlay[index + 1], 0f, 1f);
-                warped[index + 2] = Math.Clamp(warped[index + 2] + overlay[index + 2], 0f, 1f);
+                warped[index] = Math.Clamp(warped[index] * (1f - overlay[index + 3]) + overlay[index], 0f, 1f);
+                warped[index + 1] = Math.Clamp(warped[index + 1] * (1f - overlay[index + 3]) + overlay[index + 1], 0f, 1f);
+                warped[index + 2] = Math.Clamp(warped[index + 2] * (1f - overlay[index + 3]) + overlay[index + 2], 0f, 1f);
                 warped[index + 3] = 1f;
             }
         });

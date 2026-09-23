@@ -39,6 +39,14 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
 
 ## Client Invariants
 
+- Every uniform passed to the fixed GL `Set` helper must first have its location
+  resolved. Resolve the mesh vertex uniforms for custom warp programs when linking
+  them as well as the fixed warp's decay/time/scale inputs. The fixed warp samples
+  bottom-up feedback without an extra Y flip. Decay is applied by the fixed warp
+  only; custom warp shaders own their fade. Run `scripts/gl-harness/verify-feedback.ps1`
+  after changing these contracts. Remaining compatibility defects are recorded in
+  `VISUALIZER-FIDELITY-RECHECK.md`; previous "corrected" notes are not fidelity proof.
+
 - Blur generation changes the active GL framebuffer and viewport. The custom warp
   pass must rebind its full-resolution ping target after `BuildShaderBlurLevels`
   and before drawing. `scripts/gl-harness/verify-warp-target.ps1` checks the real
@@ -56,13 +64,17 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
   interpolated coordinate from the vertex stage and does not re-emit the per-pixel
   block, because the mesh already ran it. Keep the two warp programs on the mesh
   vertex shader, and never draw the custom warp as a full-screen quad again.
-- The GL shader samplers resolve the texture from the sampler's base name (the
-  qualifier is stripped first) and bind every `main`-family sampler to the stage's
-  main frame. GL exposes no per-sampler state through `GlInterface`, so a frame
-  sampler's qualifier currently selects only the texture there; the exact frame
-  filter and wrap mode is applied on the interpreter and Skia paths. Generated
-  noise and random textures keep the qualifier's filter and wrap, because each is
-  its own texture object.
+- GL sampler qualifiers select independent native sampler objects resolved through
+  `GlInterface.GetProcAddress`; bind each active sampler to its own unit and clear
+  sampler bindings before fixed passes and before returning to Avalonia. Fixed warp
+  uses `bTexWrap`. Custom comp frame/blur reads convert top-down UVs to bottom-up GL
+  texture coordinates; generated noise coordinates are not flipped.
+- Legacy gamma/echo use a separate display target and must never enter feedback.
+  Gamma is a linear brightness gain. The overlay's alpha is coverage, not forced
+  opacity; non-additive elements cover feedback. The shader blur chain is retained
+  for warp, updated after warp from the previous feedback, then read by comp.
+  Apply progressive range compression, GetBlur decoding and first-level edge darkening.
+  Run both `verify-feedback.ps1` and `verify-fidelity.ps1` in `scripts/gl-harness`.
 
 - Dashboard and its Show all pages share DashboardScrollViewer. Album artwork
   assignment must update the bound ContentRow in place, never call

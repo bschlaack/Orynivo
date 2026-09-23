@@ -384,7 +384,8 @@ public sealed class PixelBuffer
 
     /// <summary>Writes the buffer as BGRA bytes for a presentation bitmap.</summary>
     /// <param name="destination">Destination of at least <c>width * height * 4</c> bytes.</param>
-    public void WriteBgra(Span<byte> destination)
+    /// <param name="preserveAlpha">Preserves overlay coverage instead of forcing opaque output.</param>
+    public void WriteBgra(Span<byte> destination, bool preserveAlpha = false)
     {
         var needed = Width * Height * 4;
         if (destination.Length < needed)
@@ -397,7 +398,7 @@ public sealed class PixelBuffer
             destination[target] = ToByte(_pixels[source + 2]);
             destination[target + 1] = ToByte(_pixels[source + 1]);
             destination[target + 2] = ToByte(_pixels[source]);
-            destination[target + 3] = ToByte(Math.Max(_pixels[source + 3], 1f));
+            destination[target + 3] = preserveAlpha ? ToByte(_pixels[source + 3]) : (byte)255;
         }
     }
 

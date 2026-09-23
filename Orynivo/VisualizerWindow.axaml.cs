@@ -489,7 +489,7 @@ public partial class VisualizerWindow : Window
                 var overlaySize = _renderWidth * _renderHeight * 4;
                 if (_glOverlayBytes.Length != overlaySize)
                     _glOverlayBytes = new byte[overlaySize];
-                _renderer.OverlayFrame.WriteBgra(_glOverlayBytes);
+                _renderer.OverlayFrame.WriteBgra(_glOverlayBytes, preserveAlpha: true);
                 _glMeshX = meshX;
                 _glMeshY = meshY;
                 _glParameters = _renderer.ReadFrameParameters();

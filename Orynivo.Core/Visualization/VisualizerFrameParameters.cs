@@ -40,4 +40,10 @@ public readonly record struct VisualizerFrameParameters(
     int EchoOrientation,
     VisualizerBorderBand OuterBorder,
     VisualizerBorderBand InnerBorder,
-    float WarpTime);
+    float WarpTime)
+{
+    /// <summary>Gets the spatial warp scale; the displacement uses its reciprocal.</summary>
+    public float WarpScale { get; init; } = 1f;
+    /// <summary>Gets whether the fixed warp repeats instead of clamping at the image edges.</summary>
+    public bool TextureWrap { get; init; }
+}

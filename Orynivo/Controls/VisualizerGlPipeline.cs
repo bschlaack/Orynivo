@@ -146,10 +146,9 @@ internal sealed class VisualizerGlPipeline
         """;
 
     /// <summary>
-    /// The warp sampling position, translated from <see cref="WarpSampling.SamplePosition"/>. The
-    /// engine's coordinates are top-down, so the row is measured from the top and the source texture,
-    /// which is bottom-up, is sampled with a flipped v. The coordinate itself is computed and
-    /// interpolated at the vertices, exactly as the reference warp vertex shader does.
+    /// Samples the bottom-up feedback texture at the coordinate interpolated by the mesh vertex
+    /// shader. Both the mesh position and texture use the GL orientation; flipping v here would
+    /// vertically reflect the feedback on every frame, even for an identity transform.
     /// </summary>
     private const string WarpFragmentSource = """
         #version 300 es
@@ -163,14 +162,11 @@ internal sealed class VisualizerGlPipeline
         {
             vec2 uv = vUv;
 
-            // Outside the frame the warp is transparent black, like the CPU sampler. The clamp keeps
-            // every pass bounded exactly like the eight-bit texture it replaces, so a preset that
-            // accumulates cannot leave the range the CPU reference and Milkdrop's textures stay in.
+            // The bound sampler implements the preset's repeat/clamp mode.
             // The decay multiplies the sampled colour, exactly like the reference warp fragment
             // shader's frag_COLOR, so the blur passes that follow see the faded frame.
-            vec4 colour = texture(uSource, vec2(uv.x, 1.0 - uv.y)) * uDecay;
-            float inside = step(0.0, uv.x) * step(uv.x, 1.0) * step(0.0, uv.y) * step(uv.y, 1.0);
-            fragColor = clamp(colour * inside, 0.0, 1.0);
+            vec4 colour = texture(uSource, uv) * uDecay;
+            fragColor = clamp(colour, 0.0, 1.0);
         }
         """;
 
@@ -215,6 +211,9 @@ internal sealed class VisualizerGlPipeline
         uniform float uTexelX;
         uniform float uTexelY;
         uniform float uHorizontal;
+        uniform float uScale;
+        uniform float uBias;
+        uniform float uEdge;
         void main()
         {
             if (uHorizontal > 0.5)
@@ -233,7 +232,7 @@ internal sealed class VisualizerGlPipeline
                     + (texture(uSource, vUv + axis * d1).xyz + texture(uSource, vUv - axis * d1).xyz) * w1
                     + (texture(uSource, vUv + axis * d2).xyz + texture(uSource, vUv - axis * d2).xyz) * w2
                     + (texture(uSource, vUv + axis * d3).xyz + texture(uSource, vUv - axis * d3).xyz) * w3;
-                fragColor = clamp(vec4(sum * divisor, 1.0), 0.0, 1.0);
+                fragColor = clamp(vec4(sum * divisor * uScale + uBias, 1.0), 0.0, 1.0);
             }
             else
             {
@@ -245,7 +244,9 @@ internal sealed class VisualizerGlPipeline
                 vec2 axis = vec2(0.0, uTexelY);
                 vec3 sum = (texture(uSource, vUv + axis * e0).xyz + texture(uSource, vUv - axis * e0).xyz) * v0
                     + (texture(uSource, vUv + axis * e1).xyz + texture(uSource, vUv - axis * e1).xyz) * v1;
-                fragColor = clamp(vec4(sum * divisor, 1.0), 0.0, 1.0);
+                float edge = min(min(vUv.x, vUv.y), 1.0 - max(vUv.x, vUv.y));
+                float attenuation = 1.0 - uEdge + uEdge * clamp(sqrt(max(0.0, edge)) * 5.0, 0.0, 1.0);
+                fragColor = clamp(vec4(sum * divisor * attenuation, 1.0), 0.0, 1.0);
             }
         }
         """;
@@ -263,6 +264,7 @@ internal sealed class VisualizerGlPipeline
         uniform sampler2D uSource;
         uniform sampler2D uOverlay;
         uniform float uDecay;
+        uniform float uDisplayOnly;
         uniform float uEchoZoom;
         uniform float uEchoAlpha;
         uniform float uEchoOrientation;
@@ -291,7 +293,9 @@ internal sealed class VisualizerGlPipeline
 
             // The overlay is composited before the centre darkening and the border, so those later
             // passes cover it, exactly as the reference draws the shapes and waves before them.
-            colour += texture(uOverlay, vUv);
+            if (uDisplayOnly < 0.5) {
+            vec4 overlay = texture(uOverlay, vUv);
+            colour.rgb = colour.rgb * (1.0 - overlay.a) + overlay.rgb;
 
             if (uDarken > 0.0)
             {
@@ -311,6 +315,7 @@ internal sealed class VisualizerGlPipeline
             if (inner.a > 0.0 && edge < uSmaller * (uInnerInset + uInnerThickness) && edge >= uSmaller * uInnerInset)
                 colour = mix(colour, vec4(inner.rgb, colour.a), inner.a);
 
+            }
             // The legacy video echo and gamma adjustment are the reference's final composite when the
             // preset has no comp shader, so they run after the border.
             if (uEchoAlpha > 0.0)
@@ -329,11 +334,47 @@ internal sealed class VisualizerGlPipeline
             }
 
             if (uGamma != 1.0)
-                colour.rgb = pow(max(colour.rgb, 0.0), vec3(uGamma));
+                colour.rgb *= uGamma;
 
             fragColor = clamp(colour, 0.0, 1.0);
         }
         """;
+
+    /// <summary>Allocates or deletes native sampler objects.</summary>
+    [UnmanagedFunctionPointer(CallingConvention.Winapi)]
+    private delegate void SamplerObjects(int count, ref int sampler);
+    /// <summary>Binds a sampler to a texture unit.</summary>
+    [UnmanagedFunctionPointer(CallingConvention.Winapi)]
+    private delegate void BindSampler(int unit, int sampler);
+    /// <summary>Sets a native sampler parameter.</summary>
+    [UnmanagedFunctionPointer(CallingConvention.Winapi)]
+    private delegate void SamplerParameter(int sampler, int parameter, int value);
+    private readonly int[] _samplerStates = new int[4];
+    private BindSampler? _bindSampler;
+    private SamplerObjects? _deleteSamplers;
+
+    /// <summary>Creates independent filter/wrap objects available in GL 3.3 and ES 3.0.</summary>
+    private void InitializeSamplers(GlInterface gl)
+    {
+        var generate = Marshal.GetDelegateForFunctionPointer<SamplerObjects>(gl.GetProcAddress("glGenSamplers"));
+        _deleteSamplers = Marshal.GetDelegateForFunctionPointer<SamplerObjects>(gl.GetProcAddress("glDeleteSamplers"));
+        _bindSampler = Marshal.GetDelegateForFunctionPointer<BindSampler>(gl.GetProcAddress("glBindSampler"));
+        var parameter = Marshal.GetDelegateForFunctionPointer<SamplerParameter>(gl.GetProcAddress("glSamplerParameteri"));
+        for (var i = 0; i < 4; i++)
+        {
+            generate(1, ref _samplerStates[i]);
+            parameter(_samplerStates[i], GlTextureMinFilter, (i & 1) != 0 ? GlNearest : GlLinear);
+            parameter(_samplerStates[i], GlTextureMagFilter, (i & 1) != 0 ? GlNearest : GlLinear);
+            parameter(_samplerStates[i], GlTextureWrapS, (i & 2) != 0 ? GlRepeat : GlClampToEdge);
+            parameter(_samplerStates[i], GlTextureWrapT, (i & 2) != 0 ? GlRepeat : GlClampToEdge);
+        }
+    }
+
+    /// <summary>Releases custom sampler bindings before fixed pipeline passes or returning to Avalonia.</summary>
+    private void ClearSamplerBindings()
+    {
+        for (var i = 0; i < 16; i++) _bindSampler?.Invoke(i, 0);
+    }
 
     private readonly float[] _vertices = new float[(PresetRenderer.MeshGridX + 1) * (PresetRenderer.MeshGridY + 1) * FloatsPerVertex];
     private readonly ushort[] _indices = BuildIndices();
@@ -385,6 +426,13 @@ internal sealed class VisualizerGlPipeline
     /// <summary>The GLSL source each shader program was built from, so a preset switch recompiles.</summary>
     private string? _warpShaderSource;
     private string? _compShaderSource;
+    private string[] _warpSamplerNames = [];
+    private string[] _compSamplerNames = [];
+
+    /// <summary>Finds every declared GLSL sampler, including qualifier aliases outside the built-in set.</summary>
+    private static string[] SamplerNames(string? source) => source is null ? [] :
+        System.Text.RegularExpressions.Regex.Matches(source, @"uniform\s+sampler2D\s+(\w+)")
+            .Select(match => match.Groups[1].Value).Distinct(StringComparer.Ordinal).ToArray();
 
     /// <summary>The uniform locations of the emitted shader programs.</summary>
     private Dictionary<string, int> _warpShaderUniforms = new(StringComparer.Ordinal);
@@ -445,6 +493,8 @@ internal sealed class VisualizerGlPipeline
         {
             _warpShaderSource = warpSource;
             _compShaderSource = compSource;
+            _warpSamplerNames = SamplerNames(warpSource);
+            _compSamplerNames = SamplerNames(compSource);
             _shadersDirty = true;
         }
     }
@@ -482,19 +532,21 @@ internal sealed class VisualizerGlPipeline
             _postProgram = BuildProgram(gl, QuadVertexSource, PostFragmentSource, out _);
             _shaderBlurProgram = BuildProgram(gl, QuadVertexSource, ShaderBlurFragmentSource, out _);
 
-            _warpUniforms = Uniforms(gl, _warpProgram, ["uSource", "uFrameWidth", "uFrameHeight", "uNeedsRadius"]);
+            _warpUniforms = Uniforms(gl, _warpProgram,
+                ["uSource", "uFrameWidth", "uFrameHeight", "uNeedsRadius", "uWarpTime", "uWarpScale", "uDecay"]);
             _blurUniforms = Uniforms(gl, _blurProgram, ["uSource", "uTexelX", "uTexelY"]);
             _postUniforms = Uniforms(
                 gl,
                 _postProgram,
                 [
-                    "uSource", "uOverlay", "uDecay", "uEchoZoom", "uEchoAlpha", "uEchoOrientation",
+                    "uSource", "uOverlay", "uDecay", "uDisplayOnly", "uEchoZoom", "uEchoAlpha", "uEchoOrientation",
                     "uDarken", "uGamma", "uOuterInset", "uOuterThickness", "uOuterR", "uOuterG",
                     "uOuterB", "uOuterA", "uInnerInset", "uInnerThickness", "uInnerR", "uInnerG",
                     "uInnerB", "uInnerA", "uFrameWidth", "uFrameHeight", "uSmaller"
                 ]);
             _quadTextureUniform = gl.GetUniformLocationString(_quadProgram, "uSource");
-            _shaderBlurUniforms = Uniforms(gl, _shaderBlurProgram, ["uSource", "uTexelX", "uTexelY", "uHorizontal"]);
+            _shaderBlurUniforms = Uniforms(gl, _shaderBlurProgram, ["uSource", "uTexelX", "uTexelY", "uHorizontal", "uScale", "uBias", "uEdge"]);
+            InitializeSamplers(gl);
             UploadSamplerTextures(gl);
 
             _quadVertexArray = gl.GenVertexArray();
@@ -587,6 +639,9 @@ internal sealed class VisualizerGlPipeline
     /// <param name="gl">GL interface.</param>
     public void Dispose(GlInterface gl)
     {
+        ClearSamplerBindings();
+        for (var i = 0; i < _samplerStates.Length; i++)
+            if (_samplerStates[i] != 0) { _deleteSamplers?.Invoke(1, ref _samplerStates[i]); _samplerStates[i] = 0; }
         if (!_ready)
             return;
 
@@ -674,12 +729,7 @@ internal sealed class VisualizerGlPipeline
             gl.Clear(GlColorBufferBit);
             if (_warpShaderProgram != 0)
             {
-                // The warp shader's GetBlur1-GetBlur3 read the blur chain of the feedback, exactly as
-                // the CPU warp stage builds it from the previous frame.
-                BuildShaderBlurLevels(gl, _feedbackTexture, frameWidth, frameHeight);
-                // Blur generation changes both the framebuffer and the viewport. Restore the
-                // full-size warp target before drawing; otherwise this writes into blur3 while
-                // that same texture is bound for sampling and the actual warp target stays black.
+                // Warp reads the retained blur chain. Draw into the full-resolution target.
                 gl.BindFramebuffer(GlFramebuffer, _pingFramebuffer[0]);
                 gl.Viewport(0, 0, frameWidth, frameHeight);
                 gl.UseProgram(_warpShaderProgram);
@@ -691,7 +741,7 @@ internal sealed class VisualizerGlPipeline
                 Set(gl, _warpShaderUniforms, "uFrameHeight", frameHeight);
                 Set(gl, _warpShaderUniforms, "uNeedsRadius", needsRadius ? 1f : 0f);
                 Set(gl, _warpShaderUniforms, "uWarpTime", parameters.WarpTime);
-                Set(gl, _warpShaderUniforms, "uWarpScale", 1f);
+                Set(gl, _warpShaderUniforms, "uWarpScale", parameters.WarpScale);
                 DrawMesh(gl);
             }
             else
@@ -699,17 +749,24 @@ internal sealed class VisualizerGlPipeline
                 gl.UseProgram(_warpProgram);
                 gl.ActiveTexture(GlTexture0);
                 gl.BindTexture(GlTexture2D, _feedbackTexture);
+                _bindSampler?.Invoke(0, _samplerStates[parameters.TextureWrap ? 2 : 0]);
                 SetSampler(gl, _warpUniforms, "uSource", 0);
                 Set(gl, _warpUniforms, "uFrameWidth", frameWidth);
                 Set(gl, _warpUniforms, "uFrameHeight", frameHeight);
                 Set(gl, _warpUniforms, "uNeedsRadius", needsRadius ? 1f : 0f);
                 Set(gl, _warpUniforms, "uWarpTime", parameters.WarpTime);
-                Set(gl, _warpUniforms, "uWarpScale", 1f);
+                Set(gl, _warpUniforms, "uWarpScale", parameters.WarpScale);
                 // The fixed warp fragment shader applies the decay itself, like the reference's
                 // frag_COLOR, so the post pass must not apply it again.
                 Set(gl, _warpUniforms, "uDecay", parameters.Decay);
                 DrawMesh(gl);
             }
+
+            ClearSamplerBindings();
+            // Milkdrop updates blur after warp from the previous feedback. The warp reads the
+            // retained chain; the comp sees the updated chain, before overlays enter feedback.
+            if (_warpShaderProgram != 0 || _compShaderProgram != 0)
+                BuildShaderBlurLevels(gl, _feedbackTexture, frameWidth, frameHeight, uniforms);
 
             // Remember the previous pre-comp frame for the comp shader before the post pass overwrites it.
             if (_compShaderProgram != 0)
@@ -742,15 +799,17 @@ internal sealed class VisualizerGlPipeline
             gl.BindTexture(GlTexture2D, _overlayTexture);
             SetSampler(gl, _postUniforms, "uSource", 0);
             SetSampler(gl, _postUniforms, "uOverlay", 1);
-            Set(gl, _postUniforms, "uDecay", _warpShaderProgram == 0 ? 1f : parameters.Decay);
+            // The fixed warp already applies decay. A custom warp owns its output colour,
+            // including any fade; applying the legacy decay here would attenuate it twice.
+            Set(gl, _postUniforms, "uDecay", 1f);
+            Set(gl, _postUniforms, "uDisplayOnly", 0f);
             Set(gl, _postUniforms, "uEchoZoom", parameters.EchoZoom);
             // The reference's final composite is either the custom comp shader or the legacy video
             // echo and gamma adjustment, never both.
-            var legacyEffects = _compShaderProgram == 0;
-            Set(gl, _postUniforms, "uEchoAlpha", legacyEffects ? parameters.EchoAlpha : 0f);
+            Set(gl, _postUniforms, "uEchoAlpha", 0f);
             Set(gl, _postUniforms, "uEchoOrientation", parameters.EchoOrientation);
             Set(gl, _postUniforms, "uDarken", parameters.DarkenCenter);
-            Set(gl, _postUniforms, "uGamma", legacyEffects ? parameters.Gamma : 1f);
+            Set(gl, _postUniforms, "uGamma", 1f);
             Set(gl, _postUniforms, "uOuterInset", parameters.OuterBorder.Inset);
             Set(gl, _postUniforms, "uOuterThickness", parameters.OuterBorder.Thickness);
             Set(gl, _postUniforms, "uOuterR", parameters.OuterBorder.Red);
@@ -773,6 +832,19 @@ internal sealed class VisualizerGlPipeline
             var output = _feedbackTexture;
             if (_compShaderProgram != 0 && RunCompShader(gl, frameWidth, frameHeight, uniforms))
                 output = _compTexture;
+
+            if (_compShaderProgram == 0)
+            {
+                gl.BindFramebuffer(GlFramebuffer, _compFramebuffer);
+                gl.UseProgram(_postProgram);
+                gl.ActiveTexture(GlTexture0);
+                gl.BindTexture(GlTexture2D, _feedbackTexture);
+                Set(gl, _postUniforms, "uDisplayOnly", 1f);
+                Set(gl, _postUniforms, "uEchoAlpha", parameters.EchoAlpha);
+                Set(gl, _postUniforms, "uGamma", parameters.Gamma);
+                DrawQuad(gl);
+                output = _compTexture;
+            }
 
             // Present the finished frame.
             gl.BindFramebuffer(GlFramebuffer, framebuffer);
@@ -814,6 +886,7 @@ internal sealed class VisualizerGlPipeline
             Error = $"{exception.GetType().Name}: {exception.Message}";
             return false;
         }
+        finally { ClearSamplerBindings(); }
     }
 
     /// <summary>Draws the static full-screen quad.</summary>
@@ -918,7 +991,11 @@ internal sealed class VisualizerGlPipeline
             // The warp shader is a fragment stage over the mesh: the vertex shader transforms the
             // per-vertex coordinate, exactly as the reference warp vertex shader does.
             if (TryBuildShaderProgram(gl, WarpVertexSource, _warpShaderSource, out var program, out var error))
+            {
                 _warpShaderProgram = program;
+                _warpShaderUniforms = Uniforms(gl, program,
+                    ["uFrameWidth", "uFrameHeight", "uNeedsRadius", "uWarpTime", "uWarpScale"]);
+            }
             else
                 ShaderError = "warp: " + error;
         }
@@ -963,9 +1040,7 @@ internal sealed class VisualizerGlPipeline
     /// <returns><see langword="true"/> when the pass was drawn.</returns>
     private bool RunCompShader(GlInterface gl, int width, int height, IReadOnlyDictionary<string, ShaderValue>? uniforms)
     {
-        // The comp shader reads the blur levels of its input, so they are built here from the
-        // composited frame, each level continuing from the one below it.
-        BuildShaderBlurLevels(gl, _feedbackTexture, width, height);
+        // The blur chain was updated from the previous feedback before the overlay composite.
 
         gl.BindFramebuffer(GlFramebuffer, _compFramebuffer);
         gl.Viewport(0, 0, width, height);
@@ -975,6 +1050,7 @@ internal sealed class VisualizerGlPipeline
         BindShaderSamplers(gl, _compShaderProgram, _compShaderUniforms, _feedbackTexture, _previousTexture);
         SetShaderUniforms(gl, _compShaderProgram, _compShaderUniforms, uniforms);
         DrawQuad(gl);
+        ClearSamplerBindings();
         return true;
     }
 
@@ -987,7 +1063,7 @@ internal sealed class VisualizerGlPipeline
     /// <param name="source">Frame to blur.</param>
     /// <param name="width">Frame width.</param>
     /// <param name="height">Frame height.</param>
-    private void BuildShaderBlurLevels(GlInterface gl, int source, int width, int height)
+    private void BuildShaderBlurLevels(GlInterface gl, int source, int width, int height, IReadOnlyDictionary<string, ShaderValue>? uniforms)
     {
         gl.UseProgram(_shaderBlurProgram);
         var current = source;
@@ -998,6 +1074,14 @@ internal sealed class VisualizerGlPipeline
             // The reference halves the blur texture per level, so each level is built from a
             // downscaled copy of the one before it.
             var (blurWidth, blurHeight) = ShaderBlurSize(width, height, level);
+            var minimum = uniforms is not null && uniforms.TryGetValue("blur" + (level + 1) + "_min", out var minValue) ? minValue.Get(0) : 0f;
+            var maximum = uniforms is not null && uniforms.TryGetValue("blur" + (level + 1) + "_max", out var maxValue) ? maxValue.Get(0) : 1f;
+            var previousMin = level > 0 && uniforms is not null && uniforms.TryGetValue("blur" + level + "_min", out var pmin) ? pmin.Get(0) : 0f;
+            var previousMax = level > 0 && uniforms is not null && uniforms.TryGetValue("blur" + level + "_max", out var pmax) ? pmax.Get(0) : 1f;
+            var range = Math.Max(0.1f, maximum - minimum);
+            Set(gl, _shaderBlurUniforms, "uScale", (previousMax - previousMin) / range);
+            Set(gl, _shaderBlurUniforms, "uBias", (previousMin - minimum) / range);
+            Set(gl, _shaderBlurUniforms, "uEdge", level == 0 && uniforms is not null && uniforms.TryGetValue("blur1_edge_darken", out var edge) ? edge.Get(0) : 0f);
             DrawShaderBlurPass(gl, current, _shaderBlurScratchFramebuffer[level], sourceWidth, sourceHeight, blurWidth, blurHeight, horizontal: true);
             DrawShaderBlurPass(gl, _shaderBlurScratchTexture[level], _shaderBlurFramebuffer[level], blurWidth, blurHeight, blurWidth, blurHeight, horizontal: false);
             current = _shaderBlurTexture[level];
@@ -1063,8 +1147,8 @@ internal sealed class VisualizerGlPipeline
     /// <param name="gl">GL interface.</param>
     /// <param name="locations">Uniform locations of the program.</param>
     /// <param name="main">The composited frame.</param>
-    /// <param name="previous">The previous pre-comp frame.</param>
-    /// <param name="comp">Whether this is the comp pass, which has real blur levels.</param>
+    /// <param name="previous">Retained previous-frame handle, reserved for legacy callers.</param>
+    /// <param name="program">The program whose active samplers are bound.</param>
     private void BindShaderSamplers(
         GlInterface gl,
         int program,
@@ -1072,64 +1156,28 @@ internal sealed class VisualizerGlPipeline
         int main,
         int previous)
     {
-        gl.ActiveTexture(GlTexture0);
-        gl.BindTexture(GlTexture2D, main);
-        gl.ActiveTexture(GlTexture1);
-        gl.BindTexture(GlTexture2D, previous);
-        for (var level = 0; level < 3; level++)
-        {
-            gl.ActiveTexture(GlTexture2 + level);
-            gl.BindTexture(GlTexture2D, _shaderBlurTexture[level]);
-        }
-
-        var nextUnit = 5;
-        foreach (var name in ShaderTranspiler.Samplers)
+        var nextUnit = 0;
+        foreach (var name in program == _warpShaderProgram ? _warpSamplerNames : _compSamplerNames)
         {
             if (!locations.TryGetValue(name, out var location))
-            {
-                location = gl.GetUniformLocationString(program, name);
-                locations[name] = location;
-            }
-
-            if (location < 0)
-                continue;
-
-            // The qualifier only changes the sampling mode; the base name selects the texture. Every
-            // main-family sampler therefore reads the stage's main frame (unit zero), not a different
-            // moment in time.
+                locations[name] = location = gl.GetUniformLocationString(program, name);
+            if (location < 0) continue;
+            if (nextUnit >= 16) throw new InvalidOperationException("Shader exceeds the supported texture unit count.");
             var parsed = ShaderSamplerName.Parse(name);
-            int unit;
-            switch (parsed.BaseName)
+            var texture = parsed.BaseName switch
             {
-                case "main":
-                    unit = 0;
-                    break;
-                case "blur1":
-                    unit = 2;
-                    break;
-                case "blur2":
-                    unit = 3;
-                    break;
-                case "blur3":
-                    unit = 4;
-                    break;
-                default:
-                    // A generated noise or volume texture binds its own unit; anything else falls back
-                    // to the frame so it is never left unbound.
-                    if (_samplerTextures.TryGetValue(name, out var texture) && nextUnit < 16)
-                    {
-                        unit = nextUnit++;
-                        gl.ActiveTexture(GlTexture0 + unit);
-                        gl.BindTexture(GlTexture2D, texture);
-                    }
-                    else
-                    {
-                        unit = 0;
-                    }
-
-                    break;
-            }
-
+                "main" => main,
+                "blur1" => _shaderBlurTexture[0],
+                "blur2" => _shaderBlurTexture[1],
+                "blur3" => _shaderBlurTexture[2],
+                _ => _samplerTextures.TryGetValue(name, out var generated) || _samplerTextures.TryGetValue("sampler_" + parsed.BaseName, out generated) ? generated : main
+            };
+            var unit = nextUnit++;
+            gl.ActiveTexture(GlTexture0 + unit);
+            gl.BindTexture(GlTexture2D, texture);
+            var mode = (parsed.Nearest ? 1 : 0) | (parsed.Wrap == VisualizerTextureWrap.Repeat ? 2 : 0);
+            if (parsed.BaseName.StartsWith("blur", StringComparison.Ordinal)) mode = 0;
+            _bindSampler?.Invoke(unit, _samplerStates[mode]);
             gl.Uniform1i(location, unit);
         }
     }
@@ -1222,6 +1270,9 @@ internal sealed class VisualizerGlPipeline
                 var (blurWidth, blurHeight) = ShaderBlurSize(width, height, index);
                 Allocate(gl, _shaderBlurTexture[index], _shaderBlurFramebuffer[index], blurWidth, blurHeight);
                 Allocate(gl, _shaderBlurScratchTexture[index], _shaderBlurScratchFramebuffer[index], blurWidth, blurHeight);
+                gl.BindFramebuffer(GlFramebuffer, _shaderBlurFramebuffer[index]);
+                gl.ClearColor(0f, 0f, 0f, 1f);
+                gl.Clear(GlColorBufferBit);
             }
 
             return true;

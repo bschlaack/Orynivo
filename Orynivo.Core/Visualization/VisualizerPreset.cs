@@ -546,11 +546,12 @@ public sealed class VisualizerPreset
     }
 
     /// <summary>
-    /// Parses the <c>shape_N_*</c> keys. Numbered shapes are read in order until the first
-    /// gap, which is how Milkdrop presets declare them.
+    /// Parses Milkdrop's numeric <c>shapecode_N_*</c> keys and <c>shape_N_*</c> equations,
+    /// retaining the legacy Orynivo numeric spelling and allowing gaps between shapes.
     /// </summary>
     /// <param name="values">Parsed preset values.</param>
     /// <param name="layout">Shared slot layout.</param>
+    /// <param name="failed">Collects failed expression blocks.</param>
     /// <returns>The declared shapes.</returns>
     private static IReadOnlyList<VisualizerShape> ParseShapes(
         Dictionary<string, string> values,
@@ -561,18 +562,20 @@ public sealed class VisualizerPreset
         for (var index = 0; index < 32; index++)
         {
             var prefix = $"shape_{index}_";
-            var hasAny = values.Keys.Any(key => key.StartsWith(prefix, StringComparison.OrdinalIgnoreCase));
+            var numericPrefix = $"shapecode_{index}_";
+            var milkdrop = values.Keys.Any(key => key.StartsWith(numericPrefix, StringComparison.OrdinalIgnoreCase));
+            var hasAny = milkdrop || values.Keys.Any(key => key.StartsWith(prefix, StringComparison.OrdinalIgnoreCase));
             if (!hasAny)
-            {
-                if (index == 0)
-                    continue;
-                break;
-            }
+                continue;
+
+            var codePrefix = prefix;
+            if (milkdrop)
+                prefix = numericPrefix;
 
             shapes.Add(new VisualizerShape(
-                (int)Math.Clamp(ReadShape(values, prefix, "sides", 4f), 0f, 64f),
-                ReadShape(values, prefix, "x", 0f),
-                ReadShape(values, prefix, "y", 0f),
+                (int)Math.Clamp(ReadShape(values, prefix, "sides", 4f), 0f, 100f),
+                ReadShape(values, prefix, "x", milkdrop ? 0.5f : 0f),
+                ReadShape(values, prefix, "y", milkdrop ? 0.5f : 0f),
                 Math.Max(0f, ReadShape(values, prefix, "rad", 0.2f)),
                 ReadShape(values, prefix, "ang", 0f),
                 Math.Clamp(ReadShape(values, prefix, "r", 1f), 0f, 1f),
@@ -584,9 +587,22 @@ public sealed class VisualizerPreset
                 Math.Clamp(ReadShape(values, prefix, "border_b", 1f), 0f, 1f),
                 Math.Clamp(ReadShape(values, prefix, "border_a", 1f), 0f, 1f),
                 ReadShape(values, prefix, "additive", 0f) >= 0.5f,
-                CompileBlock(values, layout, prefix + "init", failed),
-                CompileBlock(values, layout, prefix + "per_frame", failed),
-                CompileBlock(values, layout, prefix + "per_point", failed)));
+                CompileBlock(values, layout, codePrefix + "init", failed),
+                CompileBlock(values, layout, codePrefix + "per_frame", failed),
+                CompileBlock(values, layout, codePrefix + "per_point", failed))
+            {
+                Enabled = ReadShape(values, prefix, "enabled", milkdrop ? 0f : 1f) != 0f,
+                MilkdropCoordinates = milkdrop,
+                Instances = (int)Math.Clamp(ReadShape(values, prefix, "num_inst", 1f), 1f, 1024f),
+                Red2 = ReadShape(values, prefix, "r2", 1f),
+                Green2 = ReadShape(values, prefix, "g2", 1f),
+                Blue2 = ReadShape(values, prefix, "b2", 1f),
+                Alpha2 = ReadShape(values, prefix, "a2", 0f),
+                Textured = ReadShape(values, prefix, "textured", 0f) != 0f,
+                TextureZoom = ReadShape(values, prefix, "tex_zoom", 1f),
+                TextureAngle = ReadShape(values, prefix, "tex_ang", 0f),
+                ThickOutline = ReadShape(values, prefix, "thickOutline", 0f) != 0f
+            });
         }
 
         return shapes;
@@ -791,7 +807,8 @@ public sealed class VisualizerPreset
         // in the middle of a nested loop and losing it to a parse error.
         for (var index = 1; index <= 4096; index++)
         {
-            if (values.TryGetValue($"{prefix}_{index}", out var part) && !string.IsNullOrWhiteSpace(part))
+            if ((values.TryGetValue($"{prefix}_{index}", out var part) ||
+                 values.TryGetValue($"{prefix}{index}", out part)) && !string.IsNullOrWhiteSpace(part))
                 parts.Add(part);
         }
 

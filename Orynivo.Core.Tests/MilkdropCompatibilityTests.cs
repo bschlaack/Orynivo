@@ -121,7 +121,8 @@ public sealed class MilkdropCompatibilityTests
 
         Assert.Equal(80f, renderer.ReadVariable("pixelsx"));
         Assert.Equal(40f, renderer.ReadVariable("pixelsy"));
-        Assert.Equal(2f, renderer.ReadVariable("aspectx"));
+        Assert.Equal(1f, renderer.ReadVariable("aspectx"));
+        Assert.Equal(0.5f, renderer.ReadVariable("aspecty"));
     }
 
     /// <summary>Rotation, zoom, and stretch each change the sampled feedback.</summary>
@@ -165,14 +166,14 @@ public sealed class MilkdropCompatibilityTests
         return renderer.MeshSource.Pixels.ToArray();
     }
 
-    /// <summary>A gamma above one darkens the feedback image.</summary>
+    /// <summary>Milkdrop gamma above one is a brightness gain on the display image.</summary>
     [Fact]
-    public void RenderFrame_GammaDarkensTheFeedback()
+    public void RenderFrame_GammaBrightensTheDisplay()
     {
         var plain = RenderFeedback(string.Empty);
-        var darker = RenderFeedback("fGammaAdj = 2.5;");
+        var brighter = RenderFeedback("fGammaAdj = 2.5;");
 
-        Assert.True(Mean(darker) < Mean(plain));
+        Assert.True(Mean(brighter) > Mean(plain));
     }
 
     /// <summary>The decay is applied by the warp, so a lower decay dims the frame it carries.</summary>
@@ -217,8 +218,9 @@ public sealed class MilkdropCompatibilityTests
     [Fact]
     public void RenderFrame_UsesTheWavePerFrameBlock()
     {
-        var white = RenderOverlay(string.Empty);
-        var red = RenderOverlay("wave_0_per_frame_1=wave_g = 0; wave_b = 0;");
+        const string wave = "wave_a=0\nwavecode_0_enabled=1\nwave_0_per_point_1=x=sample;y=0.5;\n";
+        var white = RenderOverlay(wave);
+        var red = RenderOverlay(wave + "wave_0_per_frame_1=g=0;b=0;");
 
         Assert.True(MeanDifference(white, red) > 0.001f);
     }

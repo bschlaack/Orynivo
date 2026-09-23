@@ -2,12 +2,34 @@ namespace Orynivo.Visualization;
 
 /// <summary>
 /// One custom shape of a preset: a regular polygon whose default placement, colours, and
-/// vertex count come from the <c>shape_N_*</c> keys and whose per-frame and per-point
+/// vertex count come from <c>shapecode_N_*</c> (or legacy <c>shape_N_*</c>) keys and whose per-frame and per-point
 /// expression blocks may override them at runtime. The shape object itself stays immutable;
-/// the live values travel through the preset's shared slots.
+/// the renderer maintains an isolated equation context for each shape.
 /// </summary>
 public sealed class VisualizerShape
 {
+    /// <summary>Gets whether the shape is enabled.</summary>
+    public bool Enabled { get; init; } = true;
+    /// <summary>Gets whether positions use Milkdrop's zero-to-one coordinate contract.</summary>
+    public bool MilkdropCoordinates { get; init; }
+    /// <summary>Gets the number of separately evaluated instances.</summary>
+    public int Instances { get; init; } = 1;
+    /// <summary>Gets the edge red component.</summary>
+    public float Red2 { get; init; } = 1f;
+    /// <summary>Gets the edge green component.</summary>
+    public float Green2 { get; init; } = 1f;
+    /// <summary>Gets the edge blue component.</summary>
+    public float Blue2 { get; init; } = 1f;
+    /// <summary>Gets the edge opacity.</summary>
+    public float Alpha2 { get; init; }
+    /// <summary>Gets whether the preset requests feedback texturing (currently unsupported by the overlay rasterizer).</summary>
+    public bool Textured { get; init; }
+    /// <summary>Gets the texture zoom.</summary>
+    public float TextureZoom { get; init; } = 1f;
+    /// <summary>Gets the texture rotation in radians.</summary>
+    public float TextureAngle { get; init; }
+    /// <summary>Gets whether the outline is two pixels thick.</summary>
+    public bool ThickOutline { get; init; }
     /// <summary>Creates a shape from its parsed defaults.</summary>
     /// <param name="sides">Vertex count; values below three draw a filled circle.</param>
     /// <param name="x">Default horizontal position in the range -1 to 1.</param>

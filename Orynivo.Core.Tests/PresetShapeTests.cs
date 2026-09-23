@@ -42,13 +42,13 @@ public sealed class PresetShapeTests
         Assert.False(shape.PerPoint.IsEmpty);
     }
 
-    /// <summary>Numbered shapes are read in order until the first gap.</summary>
+    /// <summary>Numbered shapes remain visible even when an earlier slot is absent.</summary>
     [Fact]
     public void Parse_ReadsNumberedShapes()
     {
         var preset = VisualizerPreset.Parse("shape_0_sides=3\nshape_1_sides=4\nshape_3_sides=5");
 
-        Assert.Equal(2, preset.Shapes.Count);
+        Assert.Equal(3, preset.Shapes.Count);
     }
 
     /// <summary>A preset without shape keys has no shapes.</summary>

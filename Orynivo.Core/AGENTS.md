@@ -11,6 +11,26 @@ This file applies to `Orynivo.Core/` and supplements `../AGENTS.md`.
 
 ## Core Invariants
 
+- Milkdrop custom elements share a **layout**, never mutable frame/point slot arrays.
+  Seed saved parameters before init, preserve private user variables, restore init T
+  before each element frame/instance, copy preset Q in and frame Q/T to wave points,
+  and never write element state back into the preset. Compact numbered equation keys
+  (`wave_0_per_frame1`) and underscore variants must both parse.
+- Shapes read `shapecode_N_*` numeric keys and `shape_N_*` code, honor enabled flags
+  and sparse indices, and use zero-to-one coordinates only for the Milkdrop namespace.
+  Draw shapes before custom/default waves. The overlay stores premultiplied colour
+  plus accumulated non-additive coverage; composite as `feedback*(1-coverage)+RGB`.
+  Preserve alpha when exporting the GL overlay, but keep ordinary bitmap output opaque.
+- The stereo custom waveform has 512 contiguous normalized PCM samples. Convert by
+  128 at the custom-wave rendering boundary before applying the reference 0.004 scale.
+  This does not assert exact Winamp FFT/alignment compatibility. `fWarpAnimSpeed` and
+  `fWarpScale` must reach every warp path; GLSL audio uniforms use relative bands.
+  FPS reflects the supplied interval, and aspect factors remain at most one.
+- `MilkdropFidelityRegressionTests` and the current `VISUALIZER-FIDELITY-RECHECK.md`
+  supersede older completion claims below. Textured shapes and exact default-wave
+  geometry remain incomplete; do not describe parsing as full visual compatibility.
+
+
 - `PresetRenderer.BuildMesh` must reseed zoom, zoomexp, rot, warp, cx, cy, dx,
   dy, sx and sy from the per-frame state before every vertex equation execution.
   Restore that state afterward; compound assignments must never accumulate motion
@@ -40,8 +60,7 @@ This file applies to `Orynivo.Core/` and supplements `../AGENTS.md`.
   the audio thread. `PresetVariableLayout.RegisterStandardVariables` is the single place
   that declares the Milkdrop variable set, so every expression block of a preset shares one
   slot layout and `q1`-`q32` keep their value between the per-frame and per-pixel stages. The
-  renderer runs the stages in Milkdrop order: the init blocks once, the per-frame block and
-  the four waveform per-frame blocks, the motion warp (`zoom`, `zoomexp`, `rot`, `cx`/`cy`,
+  renderer runs the stages in Milkdrop order: the init blocks once, the preset per-frame block, the motion warp (`zoom`, `zoomexp`, `rot`, `cx`/`cy`,
   `dx`/`dy`, `sx`/`sy`) with the per-pixel block on top, the decay fade (the reference's warp
   fragment shader applies it to the sampled colour), the blur passes and the blur chain's edge
   darkening, the shapes and waves (which are added to the warped frame before the

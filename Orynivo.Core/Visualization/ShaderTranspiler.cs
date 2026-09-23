@@ -72,6 +72,11 @@ public static class ShaderTranspiler
             uniforms[name] = 4;
         }
 
+        for (var index = 1; index <= 3; index++)
+        {
+            uniforms["blur" + index + "_min"] = 1;
+            uniforms["blur" + index + "_max"] = 1;
+        }
         for (var index = 1; index <= 32; index++)
             uniforms["q" + index.ToString(CultureInfo.InvariantCulture)] = 1;
         for (var index = 1; index <= 8; index++)
@@ -241,6 +246,7 @@ public static class ShaderTranspiler
     /// the entry point: the body emission is shared so the two dialects cannot drift apart.
     /// </summary>
     private static bool _glsl;
+    private static bool _glslComp;
 
     /// <summary>
     /// The GLSL prelude. It is the SkSL prelude with GLSL ES 3.0 spelling: the samplers are
@@ -335,8 +341,12 @@ public static class ShaderTranspiler
     /// <param name="sampler">Sampler expression.</param>
     /// <param name="coordinate">Normalised or texel coordinate expression.</param>
     /// <returns>The sampling expression.</returns>
-    private static string SampleExpr(string sampler, string coordinate) =>
-        _glsl ? $"texture({sampler}, {coordinate})" : $"{sampler}.eval({coordinate})";
+    private static string SampleExpr(string sampler, string coordinate)
+    {
+        if (_glslComp && ShaderSamplerName.Parse(sampler).BaseName is "main" or "blur1" or "blur2" or "blur3")
+            coordinate = $"vec2(({coordinate}).x, 1.0 - ({coordinate}).y)";
+        return _glsl ? $"texture({sampler}, {coordinate})" : $"{sampler}.eval({coordinate})";
+    }
 
     /// <summary>
     /// The motion uniforms of a warp translation. They are prefixed so a shader that declares a
@@ -556,6 +566,7 @@ public static class ShaderTranspiler
         bool meshUv = false)
     {
         _glsl = glsl;
+        _glslComp = glsl && !warpedUv;
         var builder = new StringBuilder();
 
         // Every sampler the shader names is declared, so an unknown sampler does not become a zero
@@ -1883,11 +1894,11 @@ public static class ShaderTranspiler
                     return $"float4({SampleExpr(MainSampler, PixelCoordinate(pixel))}).rgb";
                 }
             case "getblur1":
-                return $"float4({SampleExpr("sampler_blur1", SamplerCoordinate("sampler_blur1", Coordinate(call, arguments[0], 0)))}).rgb";
+                return $"(float4({SampleExpr("sampler_blur1", SamplerCoordinate("sampler_blur1", Coordinate(call, arguments[0], 0)))}).rgb{(_glsl ? " * (blur1_max - blur1_min) + blur1_min" : "")})";
             case "getblur2":
-                return $"float4({SampleExpr("sampler_blur2", SamplerCoordinate("sampler_blur2", Coordinate(call, arguments[0], 0)))}).rgb";
+                return $"(float4({SampleExpr("sampler_blur2", SamplerCoordinate("sampler_blur2", Coordinate(call, arguments[0], 0)))}).rgb{(_glsl ? " * (blur2_max - blur2_min) + blur2_min" : "")})";
             case "getblur3":
-                return $"float4({SampleExpr("sampler_blur3", SamplerCoordinate("sampler_blur3", Coordinate(call, arguments[0], 0)))}).rgb";
+                return $"(float4({SampleExpr("sampler_blur3", SamplerCoordinate("sampler_blur3", Coordinate(call, arguments[0], 0)))}).rgb{(_glsl ? " * (blur3_max - blur3_min) + blur3_min" : "")})";
             case "saturate":
                 return $"clamp({arguments[0]}, 0.0, 1.0)";
             case "atan2":
