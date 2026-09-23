@@ -43,8 +43,8 @@ public sealed class PresetRendererTests
     {
         // Bands light only the left half, so a horizontal mirror must light the right half.
         var audio = TestAudio.LeftOnly;
-        var identity = new PresetRenderer(VisualizerPreset.Create("identity", null, null), 64, 36);
-        var mirrored = new PresetRenderer(VisualizerPreset.Create("mirror", null, "x = -x;"), 64, 36);
+        var identity = new PresetRenderer(VisualizerPreset.Create("identity", "warp = 0;", null), 64, 36);
+        var mirrored = new PresetRenderer(VisualizerPreset.Create("mirror", "warp = 0;", "x = -x;"), 64, 36);
 
         identity.RenderFrame(audio, 1d / 60d);
         mirrored.RenderFrame(audio, 1d / 60d);

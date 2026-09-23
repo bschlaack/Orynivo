@@ -132,7 +132,7 @@ public sealed class SkiaWarpPassTests
     public void RenderFrame_SkiaWarpShaderBlurMatchesTheInterpreter()
     {
         const string Preset =
-            "fDecay=1\nwave_a=0\n" +
+            "fDecay=1\nwarp=0\nwave_a=0\n" +
             "warp_1=float4 main(float2 uv : TEXCOORD0) : COLOR { ret = float3(uv.x, uv.y, 0.5) * 0.5 + GetBlur1(uv) * 0.5; }";
 
         var difference = CompareRendererPaths(Preset, frames: 3);
@@ -243,6 +243,9 @@ public sealed class SkiaWarpPassTests
                     aspectX,
                     aspectY,
                     true,
+                    0f,
+                    0f,
+                    1f,
                     out var sampleX,
                     out var sampleY);
                 if (slotRad >= 0)

@@ -7,6 +7,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Changed
+- The visualizer's warp now applies the reference implementation's time-dependent displacement
+  (the preset's `warp` value, which defaults to one): four travelling sine/cosine waves whose phase
+  depends on the vertex position and whose amplitude is `warp * 0.0035`. It sits between the stretch
+  and the rotation, is computed by `WarpSampling.WarpDisplacement`, and is carried as a tenth mesh
+  value so the CPU warp, the Skia warp pass, and the OpenGL warp shader stay identical. Because the
+  displacement is active by default, an identity warp is no longer exactly identity; this matches
+  the reference.
 - The visualizer's warp now uses the reference implementation's coordinate contract instead of the
   engine's previous formula: the sample position is scaled by the aspect, divided by the radial zoom,
   stretched, rotated, translated, and scaled back by the inverse aspect, exactly as the reference warp

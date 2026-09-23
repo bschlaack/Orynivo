@@ -237,7 +237,7 @@ This file applies to `Orynivo.Core/` and supplements `../AGENTS.md`.
   `scripts/projectm-oracle` is how that is measured.
   `MeshGridX`, `MeshGridY`, and `MeshValues` are public because a GPU warp reads the mesh as vertex
   attributes, and the value order is part of that contract: zoom, zoomexp, rot, cx, cy, dx, dy, sx,
-  sy. `MeshRequested` builds the mesh while the CPU keeps evaluating per pixel, which is the
+  sy, warp. `MeshRequested` builds the mesh while the CPU keeps evaluating per pixel, which is the
   transitional double work a GPU warp needs before it replaces the CPU warp; `TryCopyMeshMotion`
   copies the values and `MeshSource` exposes the frame the mesh samples. Requesting the mesh must
   leave the CPU frame byte-identical, which `PerVertexMeshTests` asserts.
@@ -248,12 +248,17 @@ This file applies to `Orynivo.Core/` and supplements `../AGENTS.md`.
  of the warp's sampling arithmetic: the CPU
   warp calls it per pixel and a GPU warp's fragment shader must be a translation of it, so never
   duplicate that formula. It follows the reference warp vertex shader's coordinate contract — scale
-  by the aspect, divide by the radial zoom, stretch, rotate, translate, and scale back by the inverse
-  aspect — and its result is in the engine's minus-one-to-one space, which the frame sampler expects.
-  The aspect is passed in explicitly via `WarpSampling.GetAspect` (the reference keeps both factors at
-  or below one — a landscape frame is `(1, height/width)`, a portrait frame `(width/height, 1)`) and
-  `rad`/`ang` are the aspect-scaled distance and angle the reference derives from the position.
-  `WarpSamplingTests` is the reference the translation is checked against.
+  by the aspect, divide by the radial zoom, stretch, apply the time-dependent warp displacement,
+  rotate, translate, and scale back by the inverse aspect — and its result is in the engine's
+  minus-one-to-one space, which the frame sampler expects. `WarpSampling.WarpDisplacement` is the
+  reference's four travelling waves (amplitude `warp * 0.0035`, `warp` defaults to one) and the three
+  `_orynivo_warp`/`_orynivo_warpTime`/`_orynivo_warpScale` uniforms carry it to the GPU path; every
+  declared warp uniform must be set in `SkiaShaderRunner.WarpPass.Render`, because Skia leaves an
+  unset declared uniform undefined. The aspect is passed in explicitly via `WarpSampling.GetAspect`
+  (the reference keeps both factors at or below one — a landscape frame is `(1, height/width)`, a
+  portrait frame `(width/height, 1)`) and `rad`/`ang` are the aspect-scaled distance and angle the
+  reference derives from the position. `WarpSamplingTests` is the reference the translation is
+  checked against.
   A shader's blur levels each keep their own buffer (`_blurLevels`) and build on one another, and a
   level asked for first builds the ones below it. Do not collapse them back into one cached level: a
   comp shader that samples `GetBlur1` and `GetBlur3` in the same pixel otherwise invalidates the

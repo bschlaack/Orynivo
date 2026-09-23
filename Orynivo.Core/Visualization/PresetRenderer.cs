@@ -135,6 +135,7 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
     private readonly int _slotDy;
     private readonly int _slotSx;
     private readonly int _slotSy;
+    private readonly int _slotWarp;
     private readonly float[][] _workerSlots;
     private readonly float[][] _workerSample;
     private readonly bool _canParallelizeWarp;
@@ -168,9 +169,10 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
 
     /// <summary>
     /// Motion values the mesh carries per vertex, in this order: zoom, zoomexp, rot, cx, cy, dx, dy,
-    /// sx, sy. A GPU warp reads them as vertex attributes, so the order is part of the contract.
+    /// sx, sy, warp. A GPU warp reads them as vertex attributes, so the order is part of the
+    /// contract.
     /// </summary>
-    public const int MeshValues = 9;
+    public const int MeshValues = 10;
 
     /// <summary>The interpolated motion the per-pixel program produced per mesh vertex.</summary>
     private readonly float[] _meshMotion = new float[(MeshGridX + 1) * (MeshGridY + 1) * MeshValues];
@@ -220,6 +222,7 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
         _slotDy = preset.Layout.IndexOf("dy");
         _slotSx = preset.Layout.IndexOf("sx");
         _slotSy = preset.Layout.IndexOf("sy");
+        _slotWarp = preset.Layout.IndexOf("warp");
         // A per-pixel pass may only run in parallel when everything it writes is re-seeded for
         // every pixel and no shader interpreter state is involved; otherwise one pixel could see
         // what another pixel wrote and the picture would depend on the split.
@@ -439,7 +442,8 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
             Read("dx", 0f),
             Read("dy", 0f),
             Read("sx", 1f),
-            Read("sy", 1f));
+            Read("sy", 1f),
+            Read("warp", Preset.Warp));
         _meshBuiltThisFrame = true;
     }
 
@@ -866,8 +870,11 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
         var offsetY = Read("dy", 0f);
         var stretchX = Read("sx", 1f);
         var stretchY = Read("sy", 1f);
-        var cosRotation = MathF.Cos(rotation);
-        var sinRotation = MathF.Sin(rotation);
+        var warpAmount = Read("warp", Preset.Warp);
+        // The reference's warp animation time is the preset time times the animation speed (whose
+        // default is one) and its warp scale defaults to one.
+        var warpTime = (float)_elapsed;
+        const float warpScale = 1f;
         // The polar pair costs a square root and an arctangent per pixel, so it is only computed
         // when the preset's own code or the zoom exponent actually needs it.
         var needsRadius = _perPixelUsesRadius || zoomExp != 1f;
@@ -977,6 +984,7 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
             var offsetYNow = offsetY;
             var stretchXNow = stretchX;
             var stretchYNow = stretchY;
+            var warpNow = warpAmount;
             if (perPixelMotion)
             {
                 zoomNow = Math.Max(0.01f, Read(slots, _slotZoom, zoom));
@@ -988,6 +996,7 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
                 offsetYNow = Read(slots, _slotDy, offsetY);
                 stretchXNow = Read(slots, _slotSx, stretchX);
                 stretchYNow = Read(slots, _slotSy, stretchY);
+                warpNow = Read(slots, _slotWarp, warpAmount);
             }
 
             WarpSampling.GetAspect(width, height, out var aspectX, out var aspectY);
@@ -1006,6 +1015,9 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
                 aspectX,
                 aspectY,
                 needsRadius,
+                warpNow,
+                warpTime,
+                warpScale,
                 out var warpedX,
                 out var warpedY);
             if (needsRadius || needsAngle)
@@ -1090,7 +1102,7 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
             !recordMotion &&
             (_perPixelWritesMotion ? MeshPerPixelEnabled || MeshRequested : MeshRequested))
         {
-            BuildMesh(zoom, zoomExp, rotation, centreX, centreY, offsetX, offsetY, stretchX, stretchY);
+            BuildMesh(zoom, zoomExp, rotation, centreX, centreY, offsetX, offsetY, stretchX, stretchY, warpAmount);
             _meshBuiltThisFrame = true;
             if (MeshPerPixelEnabled && _perPixelWritesMotion)
             {
@@ -1162,6 +1174,7 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
                     var offsetYNow = InterpolateMesh(meshX, meshY, 6);
                     var stretchXNow = InterpolateMesh(meshX, meshY, 7);
                     var stretchYNow = InterpolateMesh(meshX, meshY, 8);
+                    var warpNow = InterpolateMesh(meshX, meshY, 9);
 
                     WarpSampling.SamplePosition(
                         normalizedX,
@@ -1178,6 +1191,9 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
                         aspectX,
                         aspectY,
                         needsRadius,
+                        warpNow,
+                        warpTime,
+                        warpScale,
                         out var sampleX,
                         out var sampleY);
                     _previous.SampleBilinear((sampleX * 0.5f) + 0.5f, (sampleY * 0.5f) + 0.5f, sample);
@@ -1210,6 +1226,7 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
     /// <param name="offsetY">Per-frame translation y.</param>
     /// <param name="stretchX">Per-frame horizontal stretch.</param>
     /// <param name="stretchY">Per-frame vertical stretch.</param>
+    /// <param name="warp">Per-frame warp amount.</param>
     private void BuildMesh(
         float zoom,
         float zoomExp,
@@ -1219,7 +1236,8 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
         float offsetX,
         float offsetY,
         float stretchX,
-        float stretchY)
+        float stretchY,
+        float warp)
     {
         var aspectX = Read("aspectx", 1f);
         var aspectY = Read("aspecty", 1f);
@@ -1235,6 +1253,7 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
             _meshMotion[index + 6] = offsetY;
             _meshMotion[index + 7] = stretchX;
             _meshMotion[index + 8] = stretchY;
+            _meshMotion[index + 9] = warp;
         }
 
         if (_perPixelSuspended)
@@ -1253,7 +1272,7 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
         var frameOffsetY = Read(_slots, _slotDy, offsetY);
         var frameStretchX = Read(_slots, _slotSx, stretchX);
         var frameStretchY = Read(_slots, _slotSy, stretchY);
-        var frameWarp = Read("warp", Preset.Warp);
+        var frameWarp = Read(_slots, _slotWarp, warp);
         var suspended = false;
         for (var gridY = 0; gridY <= MeshGridY && !suspended; gridY++)
         {
@@ -1304,6 +1323,7 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
                 _meshMotion[index + 6] = Read(_slots, _slotDy, offsetY);
                 _meshMotion[index + 7] = Read(_slots, _slotSx, stretchX);
                 _meshMotion[index + 8] = Read(_slots, _slotSy, stretchY);
+                _meshMotion[index + 9] = Read(_slots, _slotWarp, warp);
             }
         }
 
@@ -1404,8 +1424,15 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
     /// <summary>Collects the scalar uniforms the warp shader and its per-pixel block read.</summary>
     /// <param name="pass">Warp pass whose per-pixel variables are seeded.</param>
     /// <returns>The scalar uniforms.</returns>
-    private Dictionary<string, float> BuildSkiaWarpScalars(SkiaShaderRunner.WarpPass pass) =>
-        BuildSkiaScalars(pass.PerPixelUniforms);
+    private Dictionary<string, float> BuildSkiaWarpScalars(SkiaShaderRunner.WarpPass pass)
+    {
+        var scalars = BuildSkiaScalars(pass.PerPixelUniforms);
+        // The GPU warp has to apply the same time-dependent displacement the CPU warp does.
+        scalars["_orynivo_warp"] = Read("warp", Preset.Warp);
+        scalars["_orynivo_warpTime"] = (float)_elapsed;
+        scalars["_orynivo_warpScale"] = 1f;
+        return scalars;
+    }
 
     /// <summary>Runs the warp shaders on the adaptive grid and scales the result over the frame.</summary>
     /// <param name="computeSample">Sampling-position evaluator shared with the per-pixel path.</param>
@@ -2079,6 +2106,9 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
         destination["_orynivo_centre"] = ShaderValue.Vector(Read("cx", 0f), Read("cy", 0f), 0f, 0f, 2);
         destination["_orynivo_offset"] = ShaderValue.Vector(Read("dx", 0f), Read("dy", 0f), 0f, 0f, 2);
         destination["_orynivo_stretch"] = ShaderValue.Vector(Read("sx", 1f), Read("sy", 1f), 0f, 0f, 2);
+        destination["_orynivo_warp"] = ShaderValue.Scalar(Read("warp", Preset.Warp));
+        destination["_orynivo_warpTime"] = ShaderValue.Scalar((float)_elapsed);
+        destination["_orynivo_warpScale"] = ShaderValue.Scalar(1f);
 
         if (perPixelVariables is null)
             return;

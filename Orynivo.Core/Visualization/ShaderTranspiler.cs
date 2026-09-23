@@ -350,6 +350,9 @@ public static class ShaderTranspiler
         uniform float2 _orynivo_centre;
         uniform float2 _orynivo_offset;
         uniform float2 _orynivo_stretch;
+        uniform float _orynivo_warp;
+        uniform float _orynivo_warpTime;
+        uniform float _orynivo_warpScale;
         """;
 
     /// <summary>
@@ -372,6 +375,9 @@ public static class ShaderTranspiler
         uniform float _orynivo_stretch_x;
         uniform float _orynivo_stretch_y;
         #define _orynivo_stretch float2(_orynivo_stretch_x, _orynivo_stretch_y)
+        uniform float _orynivo_warp;
+        uniform float _orynivo_warpTime;
+        uniform float _orynivo_warpScale;
         """;
 
     /// <summary>
@@ -733,6 +739,16 @@ public static class ShaderTranspiler
         builder.Append("    float _orynivo_inverseZoom = 1.0 / max(0.01, _orynivo_radialZoom);\n");
         builder.Append("    float2 _orynivo_uv = float2(_orynivo_normalized.x * _orynivo_aspectX * 0.5 * _orynivo_inverseZoom + 0.5, _orynivo_normalized.y * _orynivo_aspectY * 0.5 * _orynivo_inverseZoom + 0.5);\n");
         builder.Append("    _orynivo_uv = (_orynivo_uv - _orynivo_centre) / _orynivo_stretch + _orynivo_centre;\n");
+        builder.Append("    if (_orynivo_warp != 0.0) {\n");
+        builder.Append("        float _orynivo_scaleInv = _orynivo_warpScale == 0.0 ? 1.0 : 1.0 / _orynivo_warpScale;\n");
+        builder.Append("        float _orynivo_wf0 = 11.68 + 4.0 * cos(_orynivo_warpTime * 1.413 + 10.0);\n");
+        builder.Append("        float _orynivo_wf1 = 8.77 + 3.0 * cos(_orynivo_warpTime * 1.113 + 7.0);\n");
+        builder.Append("        float _orynivo_wf2 = 10.54 + 3.0 * cos(_orynivo_warpTime * 1.233 + 3.0);\n");
+        builder.Append("        float _orynivo_wf3 = 11.49 + 4.0 * cos(_orynivo_warpTime * 0.933 + 5.0);\n");
+        builder.Append("        float _orynivo_wa = _orynivo_warp * 0.0035;\n");
+        builder.Append("        _orynivo_uv.x += _orynivo_wa * sin(_orynivo_warpTime * 0.333 + _orynivo_scaleInv * (_orynivo_normalized.x * _orynivo_wf0 - _orynivo_normalized.y * _orynivo_wf3)) + _orynivo_wa * cos(_orynivo_warpTime * 0.753 - _orynivo_scaleInv * (_orynivo_normalized.x * _orynivo_wf1 - _orynivo_normalized.y * _orynivo_wf2));\n");
+        builder.Append("        _orynivo_uv.y += _orynivo_wa * cos(_orynivo_warpTime * 0.375 - _orynivo_scaleInv * (_orynivo_normalized.x * _orynivo_wf2 + _orynivo_normalized.y * _orynivo_wf1)) + _orynivo_wa * sin(_orynivo_warpTime * 0.825 + _orynivo_scaleInv * (_orynivo_normalized.x * _orynivo_wf0 + _orynivo_normalized.y * _orynivo_wf3));\n");
+        builder.Append("    }\n");
         builder.Append("    float _orynivo_cos = cos(_orynivo_rotation);\n");
         builder.Append("    float _orynivo_sin = sin(_orynivo_rotation);\n");
         builder.Append("    float2 _orynivo_rotated = _orynivo_uv - _orynivo_centre;\n");

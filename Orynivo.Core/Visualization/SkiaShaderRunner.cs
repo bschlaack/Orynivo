@@ -666,6 +666,9 @@ public static class SkiaShaderRunner
         private const string CentreUniform = "_orynivo_centre";
         private const string OffsetUniform = "_orynivo_offset";
         private const string StretchUniform = "_orynivo_stretch";
+        private const string WarpUniform = "_orynivo_warp";
+        private const string WarpTimeUniform = "_orynivo_warpTime";
+        private const string WarpScaleUniform = "_orynivo_warpScale";
 
         private readonly SKRuntimeEffect _effect;
         private readonly IReadOnlyList<string> _samplers;
@@ -822,6 +825,11 @@ public static class SkiaShaderRunner
                 uniforms[CentreUniform] = new float[] { parameters.CentreX, parameters.CentreY };
                 uniforms[OffsetUniform] = new float[] { parameters.OffsetX, parameters.OffsetY };
                 uniforms[StretchUniform] = new float[] { parameters.StretchX, parameters.StretchY };
+                // The caller overrides these through the scalar uniforms; the defaults disable the
+                // time-dependent displacement and leave the warp scale neutral.
+                uniforms[WarpUniform] = 0f;
+                uniforms[WarpTimeUniform] = 0f;
+                uniforms[WarpScaleUniform] = 1f;
 
                 // Every declared uniform has to be set, so the per-pixel variables default to zero
                 // and the caller fills in the slots it knows.

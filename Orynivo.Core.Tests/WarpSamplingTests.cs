@@ -11,14 +11,14 @@ namespace Orynivo.Core.Tests;
 /// </summary>
 public sealed class WarpSamplingTests
 {
-    /// <summary>An identity warp samples where it looks.</summary>
+    /// <summary>An identity warp with the warp displacement off samples where it looks.</summary>
     [Theory]
     [InlineData(0f, 0f)]
     [InlineData(0.5f, -0.25f)]
     [InlineData(-1f, 1f)]
     public void SamplePosition_IdentityKeepsThePosition(float x, float y)
     {
-        WarpSampling.SamplePosition(x, y, 1f, 1f, 0f, 0f, 0f, 0f, 0f, 1f, 1f, 1f, 1f, true, out var sx, out var sy);
+        WarpSampling.SamplePosition(x, y, 1f, 1f, 0f, 0f, 0f, 0f, 0f, 1f, 1f, 1f, 1f, true, 0f, 0f, 1f, out var sx, out var sy);
 
         Assert.Equal(x, sx, 5);
         Assert.Equal(y, sy, 5);
@@ -28,7 +28,7 @@ public sealed class WarpSamplingTests
     [Fact]
     public void SamplePosition_ZoomDividesAroundTheCentre()
     {
-        WarpSampling.SamplePosition(0.5f, 0.25f, 2f, 1f, 0f, 0f, 0f, 0f, 0f, 1f, 1f, 1f, 1f, true, out var sx, out var sy);
+        WarpSampling.SamplePosition(0.5f, 0.25f, 2f, 1f, 0f, 0f, 0f, 0f, 0f, 1f, 1f, 1f, 1f, true, 0f, 0f, 1f, out var sx, out var sy);
 
         Assert.Equal(0.25f, sx, 5);
         Assert.Equal(0.125f, sy, 5);
@@ -38,7 +38,7 @@ public sealed class WarpSamplingTests
     [Fact]
     public void SamplePosition_OffsetIsSubtractedLast()
     {
-        WarpSampling.SamplePosition(0.5f, 0.5f, 1f, 1f, 0f, 0f, 0f, 0.1f, -0.2f, 1f, 1f, 1f, 1f, true, out var sx, out var sy);
+        WarpSampling.SamplePosition(0.5f, 0.5f, 1f, 1f, 0f, 0f, 0f, 0.1f, -0.2f, 1f, 1f, 1f, 1f, true, 0f, 0f, 1f, out var sx, out var sy);
 
         Assert.Equal(0.3f, sx, 5);
         Assert.Equal(0.9f, sy, 5);
@@ -49,7 +49,7 @@ public sealed class WarpSamplingTests
     public void SamplePosition_HalfTurnMirrorsAroundTheCentre()
     {
         WarpSampling.SamplePosition(
-            0.5f, 0f, 1f, 1f, MathF.PI, 0f, 0f, 0f, 0f, 1f, 1f, 1f, 1f, true, out var sx, out var sy);
+            0.5f, 0f, 1f, 1f, MathF.PI, 0f, 0f, 0f, 0f, 1f, 1f, 1f, 1f, true, 0f, 0f, 1f, out var sx, out var sy);
 
         Assert.Equal(-2.5f, sx, 4);
         Assert.Equal(-2f, sy, 4);
@@ -59,7 +59,7 @@ public sealed class WarpSamplingTests
     [Fact]
     public void SamplePosition_StretchDividesEachAxis()
     {
-        WarpSampling.SamplePosition(0.5f, 0.5f, 1f, 1f, 0f, 0f, 0f, 0f, 0f, 2f, 0.5f, 1f, 1f, true, out var sx, out var sy);
+        WarpSampling.SamplePosition(0.5f, 0.5f, 1f, 1f, 0f, 0f, 0f, 0f, 0f, 2f, 0.5f, 1f, 1f, true, 0f, 0f, 1f, out var sx, out var sy);
 
         Assert.Equal(-0.25f, sx, 5);
         Assert.Equal(2f, sy, 5);
@@ -70,15 +70,40 @@ public sealed class WarpSamplingTests
     public void SamplePosition_RadialTermNeedsBothConditions()
     {
         // An exponent of two at radius one makes the radial zoom pow(zoom, pow(2, 1)) = zoom squared.
-        WarpSampling.SamplePosition(1f, 0f, 2f, 2f, 0f, 0f, 0f, 0f, 0f, 1f, 1f, 1f, 1f, true, out var withRadius, out _);
-        WarpSampling.SamplePosition(1f, 0f, 2f, 2f, 0f, 0f, 0f, 0f, 0f, 1f, 1f, 1f, 1f, false, out var withoutRadius, out _);
+        WarpSampling.SamplePosition(1f, 0f, 2f, 2f, 0f, 0f, 0f, 0f, 0f, 1f, 1f, 1f, 1f, true, 0f, 0f, 1f, out var withRadius, out _);
+        WarpSampling.SamplePosition(1f, 0f, 2f, 2f, 0f, 0f, 0f, 0f, 0f, 1f, 1f, 1f, 1f, false, 0f, 0f, 1f, out var withoutRadius, out _);
 
         Assert.Equal(0.5f, withoutRadius, 5);
         Assert.Equal(0.25f, withRadius, 5);
 
         // An exponent of one is a plain zoom even when the radius is wanted.
-        WarpSampling.SamplePosition(1f, 0f, 2f, 1f, 0f, 0f, 0f, 0f, 0f, 1f, 1f, 1f, 1f, true, out var plain, out _);
+        WarpSampling.SamplePosition(1f, 0f, 2f, 1f, 0f, 0f, 0f, 0f, 0f, 1f, 1f, 1f, 1f, true, 0f, 0f, 1f, out var plain, out _);
         Assert.Equal(0.5f, plain, 5);
+    }
+
+    /// <summary>A non-zero warp amount moves the sample through the time-dependent displacement.</summary>
+    [Fact]
+    public void SamplePosition_WarpAmountChangesThePosition()
+    {
+        WarpSampling.SamplePosition(0.5f, 0.25f, 1.3f, 1f, 0.2f, 0.1f, -0.1f, 0.02f, -0.03f, 1.1f, 0.9f, 1f, 1f, true, 0f, 4.5f, 1f, out var sx, out var sy);
+        WarpSampling.SamplePosition(0.5f, 0.25f, 1.3f, 1f, 0.2f, 0.1f, -0.1f, 0.02f, -0.03f, 1.1f, 0.9f, 1f, 1f, true, 1f, 4.5f, 1f, out var wx, out var wy);
+
+        Assert.NotEqual(sx, wx);
+        Assert.NotEqual(sy, wy);
+    }
+
+    /// <summary>The displacement is a bounded travelling wave that changes with time.</summary>
+    [Fact]
+    public void WarpDisplacement_IsBoundedAndTimeVarying()
+    {
+        WarpSampling.WarpDisplacement(0.5f, -0.25f, 1f, 0f, 1f, out var x0, out var y0);
+        WarpSampling.WarpDisplacement(0.5f, -0.25f, 1f, 1.7f, 1f, out var x1, out var y1);
+
+        Assert.NotEqual(x0, x1);
+        Assert.NotEqual(y0, y1);
+        // Four terms of amplitude warp * 0.0035, so the result stays under one percent of the frame.
+        Assert.InRange(x0, -0.014f, 0.014f);
+        Assert.InRange(y0, -0.014f, 0.014f);
     }
 
     /// <summary>The zoom clamp keeps a degenerate preset from collapsing the picture.</summary>

@@ -42,6 +42,15 @@ also contributing to dx. All 13 `PerVertexMeshTests` pass.
 
 ### 1. P1: Geometry and shader equation order
 
+**Partly corrected.** `WarpSampling.SamplePosition` now divides by zoom and stretch, subtracts the
+offsets, uses the reference's radial zoom `pow(zoom, pow(zoomexp, radius * 2 - 1))`, takes the
+reference's aspect via `WarpSampling.GetAspect`, and applies the reference's time-dependent `warp`
+displacement through `WarpSampling.WarpDisplacement` (carried as a tenth mesh value and the
+`_orynivo_warp`/`_orynivo_warpTime`/`_orynivo_warpScale` uniforms). The CPU warp, the Skia warp
+pass, and the OpenGL fragment shader share all of it. Still open: the emitted warp entry point
+computes the sample before the per-pixel block, and projectM interpolates UVs at the vertices while
+Orynivo interpolates motion values and transforms in the fragment shader.
+
 - `WarpSampling.SamplePosition` multiplies by zoom and stretch and adds offsets.
   projectM's `MilkdropPreset/Shaders/PresetWarpVertexShaderGlsl330.vert` divides by
   zoom and stretch and subtracts offsets. Its radial zoom is
