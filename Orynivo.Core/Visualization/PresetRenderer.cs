@@ -645,17 +645,30 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
         var blur = Mark();
 
         _warped.Scale(decay);
-        ApplyVideoEcho();
-        DarkenCenter();
-        DrawBorders();
-        ApplyGamma();
-        var postProcess = Mark();
 
+        // The reference draws the shapes and waves onto the warped frame before the centre darkening
+        // and the border, so those later passes cover the overlay instead of being covered by it.
         trace?.Invoke($"stage=overlay begin frame={_frame}");
         ProbeStage("overlay", _warped);
         DrawOverlay();
-        var overlay = Mark();
         Composite();
+        var overlay = Mark();
+
+        DarkenCenter();
+        DrawBorders();
+
+        // The reference's final composite is either the custom comp shader or the legacy video echo
+        // and gamma adjustment, never both, so a preset with a comp shader does not get the legacy
+        // effects applied to the input the comp shader reads.
+        var hasCompShader = useShaders && _compShaders.Count > 0;
+        if (!hasCompShader)
+        {
+            ApplyVideoEcho();
+            ApplyGamma();
+        }
+
+        var postProcess = Mark();
+        Publish();
         var composite = Mark();
 
         var shader = 0d;
@@ -3045,13 +3058,19 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
     }
 
     /// <summary>Adds the freshly drawn overlay on top of the faded feedback image.</summary>
+    /// <summary>
+    /// Adds the overlay frame (<see cref="_fresh"/>) onto the warped frame (<see cref="_warped"/>). It
+    /// runs before the centre darkening and the border, so those later passes cover the overlay the way
+    /// the reference draws its shapes and waves first; <see cref="Publish"/> copies the finished frame
+    /// back into the display buffer afterwards.
+    /// </summary>
     private void Composite()
     {
         if (UseSkiaFramePasses)
         {
             try
             {
-                SkiaShaderRunner.Composite(_fresh, _warped);
+                SkiaShaderRunner.Composite(_warped, _fresh);
                 return;
             }
             catch (Exception exception)
@@ -3060,21 +3079,24 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
             }
         }
 
-        var pixels = _fresh.RawPixels;
+        var overlay = _fresh.RawPixels;
         var warped = _warped.RawPixels;
-        var stride = _fresh.Width * 4;
-        ParallelRows.For(ParallelismEnabled, _fresh.Height, (worker, from, to) =>
+        var stride = _warped.Width * 4;
+        ParallelRows.For(ParallelismEnabled, _warped.Height, (worker, from, to) =>
         {
             var end = to * stride;
             for (var index = from * stride; index < end; index += 4)
             {
-                pixels[index] = Math.Clamp(warped[index] + pixels[index], 0f, 1f);
-                pixels[index + 1] = Math.Clamp(warped[index + 1] + pixels[index + 1], 0f, 1f);
-                pixels[index + 2] = Math.Clamp(warped[index + 2] + pixels[index + 2], 0f, 1f);
-                pixels[index + 3] = 1f;
+                warped[index] = Math.Clamp(warped[index] + overlay[index], 0f, 1f);
+                warped[index + 1] = Math.Clamp(warped[index + 1] + overlay[index + 1], 0f, 1f);
+                warped[index + 2] = Math.Clamp(warped[index + 2] + overlay[index + 2], 0f, 1f);
+                warped[index + 3] = 1f;
             }
         });
     }
+
+    /// <summary>Copies the finished frame into the display buffer, which the presenter shows.</summary>
+    private void Publish() => _fresh.CopyFrom(_warped);
 
     /// <summary>Reads a variable of the shared slot layout, for diagnostics and tests.</summary>
     /// <param name="name">Variable name.</param>

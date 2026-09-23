@@ -100,6 +100,13 @@ instead of implementing the preset's wrap/clamp behavior.
 
 ### 3. P1: Composite and feedback stages do not match
 
+**Partly corrected.** The final composite is now either the custom comp shader or the legacy video
+echo and gamma adjustment, never both, on the interpreter and the OpenGL paths, and the shapes and
+waves are drawn before the centre darkening and the border so those cover the overlay. The display
+output stays separate from the next frame's feedback. Still open: the decay is applied as a post
+scale rather than as the reference warp blend, and the shader blur chain is still built from the
+frame the comp shader reads rather than updated earlier in the frame.
+
 The GL post pass always applies decay, video echo, gamma and overlays before
 running the optional comp shader, and stores that result as feedback.
 projectM's `MilkdropPreset/FinalComposite.cpp` selects a custom composite shader

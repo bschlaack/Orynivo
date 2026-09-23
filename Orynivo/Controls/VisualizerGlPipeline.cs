@@ -286,20 +286,9 @@ internal sealed class VisualizerGlPipeline
             vec4 colour = texture(uSource, vUv);
             colour *= uDecay;
 
-            if (uEchoAlpha > 0.0)
-            {
-                vec2 echoUv = ((vUv - 0.5) / uEchoZoom) + 0.5;
-                if (uEchoOrientation > 0.5 && uEchoOrientation < 2.5)
-                    echoUv.x = 1.0 - echoUv.x;
-                if (uEchoOrientation > 1.5)
-                    echoUv.y = 1.0 - echoUv.y;
-
-                if (echoUv.x >= 0.0 && echoUv.x <= 1.0 && echoUv.y >= 0.0 && echoUv.y <= 1.0)
-                {
-                    vec4 echoed = texture(uSource, echoUv);
-                    colour = mix(colour, echoed, uEchoAlpha);
-                }
-            }
+            // The overlay is composited before the centre darkening and the border, so those later
+            // passes cover it, exactly as the reference draws the shapes and waves before them.
+            colour += texture(uOverlay, vUv);
 
             if (uDarken > 0.0)
             {
@@ -319,10 +308,26 @@ internal sealed class VisualizerGlPipeline
             if (inner.a > 0.0 && edge < uSmaller * (uInnerInset + uInnerThickness) && edge >= uSmaller * uInnerInset)
                 colour = mix(colour, vec4(inner.rgb, colour.a), inner.a);
 
+            // The legacy video echo and gamma adjustment are the reference's final composite when the
+            // preset has no comp shader, so they run after the border.
+            if (uEchoAlpha > 0.0)
+            {
+                vec2 echoUv = ((vUv - 0.5) / uEchoZoom) + 0.5;
+                if (uEchoOrientation > 0.5 && uEchoOrientation < 2.5)
+                    echoUv.x = 1.0 - echoUv.x;
+                if (uEchoOrientation > 1.5)
+                    echoUv.y = 1.0 - echoUv.y;
+
+                if (echoUv.x >= 0.0 && echoUv.x <= 1.0 && echoUv.y >= 0.0 && echoUv.y <= 1.0)
+                {
+                    vec4 echoed = texture(uSource, echoUv);
+                    colour = mix(colour, echoed, uEchoAlpha);
+                }
+            }
+
             if (uGamma != 1.0)
                 colour.rgb = pow(max(colour.rgb, 0.0), vec3(uGamma));
 
-            colour += texture(uOverlay, vUv);
             fragColor = clamp(colour, 0.0, 1.0);
         }
         """;
@@ -733,10 +738,13 @@ internal sealed class VisualizerGlPipeline
             SetSampler(gl, _postUniforms, "uOverlay", 1);
             Set(gl, _postUniforms, "uDecay", parameters.Decay);
             Set(gl, _postUniforms, "uEchoZoom", parameters.EchoZoom);
-            Set(gl, _postUniforms, "uEchoAlpha", parameters.EchoAlpha);
+            // The reference's final composite is either the custom comp shader or the legacy video
+            // echo and gamma adjustment, never both.
+            var legacyEffects = _compShaderProgram == 0;
+            Set(gl, _postUniforms, "uEchoAlpha", legacyEffects ? parameters.EchoAlpha : 0f);
             Set(gl, _postUniforms, "uEchoOrientation", parameters.EchoOrientation);
             Set(gl, _postUniforms, "uDarken", parameters.DarkenCenter);
-            Set(gl, _postUniforms, "uGamma", parameters.Gamma);
+            Set(gl, _postUniforms, "uGamma", legacyEffects ? parameters.Gamma : 1f);
             Set(gl, _postUniforms, "uOuterInset", parameters.OuterBorder.Inset);
             Set(gl, _postUniforms, "uOuterThickness", parameters.OuterBorder.Thickness);
             Set(gl, _postUniforms, "uOuterR", parameters.OuterBorder.Red);

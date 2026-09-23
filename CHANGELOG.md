@@ -7,6 +7,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Changed
+- The visualizer's composite stage now follows the reference's final composite. A preset with a comp
+  shader no longer gets the legacy video echo and gamma adjustment applied to the input the comp
+  shader reads, because the reference selects the custom composite shader **or** the legacy
+  echo/gamma path, never both. The shapes and waves are drawn before the centre darkening and the
+  border, so those later passes cover the overlay instead of the overlay covering them, and the
+  OpenGL post shader applies the same order. `PresetRenderer.Composite` now adds the overlay into the
+  warped frame and `PresetRenderer.Publish` copies the finished frame into the display buffer.
 - The OpenGL custom warp now draws the prepared mesh instead of a full-screen quad, so the per-pixel
   block reaches the geometry through the mesh (it runs once per vertex, as the reference's per-vertex
   program does) and the warp shader is a pure fragment stage over the interpolated coordinate.

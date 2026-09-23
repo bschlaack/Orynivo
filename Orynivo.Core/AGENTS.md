@@ -36,10 +36,15 @@ This file applies to `Orynivo.Core/` and supplements `../AGENTS.md`.
   renderer runs the stages in Milkdrop order: the init blocks once, the per-frame block and
   the four waveform per-frame blocks, the motion warp (`zoom`, `zoomexp`, `rot`, `cx`/`cy`,
   `dx`/`dy`, `sx`/`sy`) with the per-pixel block on top, the blur passes and the blur chain's edge
-  darkening, the decay fade, the
-  centre darkening, the gamma adjustment, and the overlay. The per-pixel block sees the warped
-  position in `x`/`y`, which is a deliberate deviation from Milkdrop offset semantics so the
-  built-in presets keep working; revisit it with the shader runtime in phase 38d. Numeric
+  darkening, the decay fade, the shapes and waves (which are added to the warped frame before the
+  centre darkening and the border, so those later passes cover them), the centre darkening, the
+  border, and finally the reference's final composite — either the custom comp shader or the legacy
+  video echo and gamma adjustment, never both. `Composite` adds the overlay frame into the warped
+  frame and `Publish` copies the finished frame into the display buffer, so a post effect never runs
+  after the publish. The per-pixel block sees the warped
+  position in `x`/`y` on the per-pixel fallback path, which is a deliberate deviation from Milkdrop
+  offset semantics so the built-in presets keep working; the mesh path gives it the reference's
+  aspect-scaled zero-to-one vertex position. Numeric
   preset keys are parsed into `VisualizerPreset.Defaults` and applied as the per-frame
   starting values after the computed seeds, which is how Milkdrop presets carry most of their
   settings; never drop that step or key-only presets lose their wave, border, and echo

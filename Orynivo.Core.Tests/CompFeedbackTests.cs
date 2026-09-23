@@ -46,6 +46,28 @@ public sealed class CompFeedbackTests
         Assert.True(feedback < 0.9f, $"the feedback diverged to {feedback:F3}");
     }
 
+    /// <summary>
+    /// The reference's final composite is either the custom comp shader or the legacy video echo and
+    /// gamma adjustment, so a preset with a comp shader must not have the legacy echo applied to the
+    /// input the comp shader reads. Rendering the same comp shader with the echo on and off must
+    /// therefore produce the same picture.
+    /// </summary>
+    [Fact]
+    public void CompShader_ReplacesTheLegacyVideoEcho()
+    {
+        const string body = "comp_1=float4 main(float2 uv : TEXCOORD0) : COLOR { return tex2D(sampler_main, uv); }";
+        var withEcho = CreateRenderer("wave_a=1\necho_alpha=1\necho_zoom=2\n" + body);
+        var withoutEcho = CreateRenderer("wave_a=1\necho_alpha=0\necho_zoom=2\n" + body);
+
+        for (var frame = 0; frame < 4; frame++)
+        {
+            withEcho.RenderFrame(new MovingAudio(), 1d / 60d);
+            withoutEcho.RenderFrame(new MovingAudio(), 1d / 60d);
+        }
+
+        Assert.Equal(withoutEcho.Output.Pixels.ToArray(), withEcho.Output.Pixels.ToArray());
+    }
+
     /// <summary>Creates a renderer whose shader budgets never abandon the comp pass.</summary>
     /// <param name="comp">The preset body, including its comp shader.</param>
     /// <returns>The renderer.</returns>
