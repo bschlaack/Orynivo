@@ -26,6 +26,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   keeps its previous constant level.
 
 ### Fixed
+- Shaders now receive the reference's animated hue shade as `hue_shader`. Milkdrop defines
+  `hue_shader` as the final composite quad's vertex diffuse colour (`#define hue_shader
+  _vDiffuse.xyz`) and always computes it, four corners of `0.5 + 0.5*normalised sine`, "since we don't
+  know if shader uses it or not". Orynivo bound no such variable, so every shader read zero and
+  `$$$ Royal - Mashup (138)` — whose comp shader adds `.2*(1-uv.y)*(hue_shader-.8)*4` — clamped its
+  frame to black on both the CPU and the GPU path. The four corners the legacy composite already
+  computed are now published to shaders, interpolated per pixel by the fragment's own position exactly
+  as the reference's vertex interpolation does.
 - Milkdrop shapes now use the reference's vertical orientation. Its shape space is Direct3D's y-up
   space (`v[0].y = shape_y*-2+1`), so `shape_y` counts from the top, while the overlay rasterizer
   paints rows top-down; every `shapecode_*` shape was therefore drawn vertically mirrored. Measured

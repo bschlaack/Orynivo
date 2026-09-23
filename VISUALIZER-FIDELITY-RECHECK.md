@@ -140,6 +140,19 @@ and conventions; no code is copied from it. It settled the shape conventions bel
   `INVSRCALPHA`, or `ONE` additive) and the fan's repeated first rim vertex (`v[sides+1] = v[1];`)
   were confirmed against the same source.
 
+- Shaders read `hue_shader` as zero, which blacked out every preset whose warp or comp shader uses it.
+  The reference defines `hue_shader` as the final quad's vertex diffuse (`#define hue_shader
+  _vDiffuse.xyz`) and always computes it, four corners of `0.5 + 0.5*normalised sine`
+  (`milkdropfs.cpp`, `fShaderAmount = 1; // since we don't know if shader uses it or not!`). It is now
+  bound per pixel on the CPU and mixed from the four corners on the GPU through the twelve
+  `hue_shader_<channel><corner>` uniforms; `verify-fidelity.ps1` pins it. `$$$ Royal - Mashup (138)`
+  went from a black frame to a rendered one on both paths.
+- Milkdrop's motion vectors are not an engine grid: `mv_x`/`mv_y` size the drawn arrow grid,
+  `mv_dx`/`mv_dy`/`mv_l`/`mv_a` are ordinary blendable variables (`mv_a` defaults to one, the legacy
+  key is `bMotionVectorsOn`), and `DrawMotionVectors()` only draws that grid. Orynivo's
+  `mv_enabled`-gated motion recording is its own extension and was previously described as if it were
+  reference behaviour.
+
 These corrections do **not** establish complete Winamp MilkDrop fidelity:
 
 - Textured custom-shape fills now sample the frame through the reference's fan

@@ -170,8 +170,19 @@ This file applies to `Orynivo.Core/` and supplements `../AGENTS.md`.
   body returns nothing (`ShaderInterpreter.ReturnedValue` says which case applies), `GetPixel`
   accepts both `GetPixel(x, y)` and `GetPixel(float2(x, y))`, and `aspect` is bound as the float4
   `(aspectx, aspecty, 1/aspectx, 1/aspecty)` next to the `aspectx`/`aspecty` scalars, because presets
-  read `aspect.zw` and Milkdrop/projectM define it that way. Motion vectors are gated by `bMotionVectors`
-  (`mv_enabled`, default off), never by `mv_l`, which is only their length. The interpreter
+  read `aspect.zw` and Milkdrop/projectM define it that way. `hue_shader` is bound too: the reference
+  defines it as the final quad's vertex diffuse (`#define hue_shader _vDiffuse.xyz`) and always
+  computes it, four corners of `0.5 + 0.5*normalised sine` ("since we don't know if shader uses it or
+  not"), so a warp or comp shader may read it and a shader that reads zero paints the wrong picture -
+  `$$$ Royal - Mashup (138)` clamped itself to black that way. `PresetRenderer.ComputeHueShades` runs
+  before the overlay half returns, the interpreter binds the value per pixel through
+  `HueShadeAt(originalU, originalV)`, and the GPU path carries the four corners as the twelve
+  `hue_shader_<channel><corner>` scalars that `ShaderTranspiler.EmitHueShader` mixes by the fragment's
+  own position. Motion vectors are **not** an engine grid: the reference's `mv_x`/`mv_y` are the arrow
+  grid's size, `mv_dx`/`mv_dy`/`mv_l`/`mv_a` are ordinary blendable variables (`mv_a` defaults to one,
+  the legacy key is `bMotionVectorsOn`), and `DrawMotionVectors()` only draws that arrow grid.
+  Orynivo's own `mv_enabled`-gated recording is an extension, not reference behaviour, and must be
+  documented as such. The interpreter
   walks the tree per pixel, which is the known cost limit; a JIT compiler for shaders is the
   documented follow-up if the CPU cost proves too high.
   `PresetRenderer.Timings` and `AverageTimings` carry the `RenderTimings` breakdown per frame and

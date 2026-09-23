@@ -804,6 +804,9 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
             PresetError = "per_frame: " + exception.GetType().Name + ": " + exception.Message;
         }
         var decay = Math.Clamp(Read("decay", Preset.Decay), 0f, 1f);
+        // The reference hands the animated hue shade to every shader as hue_shader, so it is computed
+        // before anything can return early; a GPU pipeline reads the values through WriteShaderUniforms.
+        ComputeHueShades();
         var useShaders = HasShaders;
         if (ExpressionsOnly)
         {
@@ -2324,6 +2327,16 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
         for (var index = 1; index <= 8; index++)
             destination["t" + index] = ShaderValue.Scalar(Read("t" + index, 0f));
 
+        // The reference's hue shade, which every shader may read as hue_shader. A single uniform cannot
+        // carry the per-pixel interpolation, so the four corners travel and the emitted shader mixes
+        // them by the fragment's own position, exactly as the reference's vertex interpolation does.
+        for (var corner = 0; corner < 4; corner++)
+        {
+            destination["hue_shader_r" + corner] = ShaderValue.Scalar(HueShadeCorner(0, corner));
+            destination["hue_shader_g" + corner] = ShaderValue.Scalar(HueShadeCorner(1, corner));
+            destination["hue_shader_b" + corner] = ShaderValue.Scalar(HueShadeCorner(2, corner));
+        }
+
         var aspectX = Read("aspectx", 1f);
         var aspectY = Read("aspecty", 1f);
         destination["aspectx"] = ShaderValue.Scalar(aspectX);
@@ -2436,8 +2449,11 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
                 1f / Math.Max(0.0001f, aspectX),
                 1f / Math.Max(0.0001f, aspectY),
                 4));
-        interpreter.SetVariable("rand_frame", ShaderValue.Vector(_randFrame[0], _randFrame[1], _randFrame[2], _randFrame[3], 4));
-        interpreter.SetVariable("roam_cos", _roam[0]);
+        // The reference passes its animated hue shade to every shader as hue_shader, interpolated from
+        // the four quad corners by the pixel's own position.
+        var hueShade = HueShadeAt(originalU, originalV);
+        interpreter.SetVariable("hue_shader", ShaderValue.Vector(hueShade.Red, hueShade.Green, hueShade.Blue, 0f, 3));
+        interpreter.SetVariable("rand_frame", ShaderValue.Vector(_randFrame[0], _randFrame[1], _randFrame[2], _randFrame[3], 4));        interpreter.SetVariable("roam_cos", _roam[0]);
         interpreter.SetVariable("roam_sin", _roam[1]);
         interpreter.SetVariable("slow_roam_cos", _roam[2]);
         interpreter.SetVariable("slow_roam_sin", _roam[3]);
@@ -2667,11 +2683,14 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
     /// across the frame, and the gamma is a linear brightness gain. Both belong to the legacy final
     /// composite, which a comp shader replaces.
     /// </summary>
-    private void ApplyHueShadeAndGamma()
+    /// <summary>
+    /// Computes the reference's animated hue shade for the four quad corners. The reference always
+    /// passes these to shaders as <c>hue_shader</c> (<c>_vDiffuse.xyz</c>, "since we don't know if the
+    /// shader uses it or not"), so they are computed for every frame, not only for the legacy
+    /// composite that also multiplies the finished frame by them.
+    /// </summary>
+    private void ComputeHueShades()
     {
-        var gamma = Math.Clamp(Read("fGammaAdj", 1f), 0.1f, 10f);
-        var width = _warped.Width;
-        var height = _warped.Height;
         var time = (float)_elapsed * 30f;
 
         // The reference's four quad corners, in its vertex order: top-left, top-right, bottom-left,
@@ -2689,6 +2708,36 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
             _hueShadeG[corner] = 0.5f + (0.5f * (green / max));
             _hueShadeB[corner] = 0.5f + (0.5f * (blue / max));
         }
+    }
+
+    /// <summary>
+    /// Gets the reference's hue shade for one corner channel, so a shader uniform can carry it.
+    /// </summary>
+    /// <param name="channel">Zero for red, one for green, two for blue.</param>
+    /// <param name="corner">Corner index in the reference's order.</param>
+    /// <returns>The shade value at that corner.</returns>
+    private float HueShadeCorner(int channel, int corner) => channel switch
+    {
+        0 => _hueShadeR[corner],
+        1 => _hueShadeG[corner],
+        _ => _hueShadeB[corner]
+    };
+
+    /// <summary>Gets the interpolated hue shade at a screen position, both in the zero-to-one range.</summary>
+    /// <param name="u">Horizontal position, zero at the left edge.</param>
+    /// <param name="v">Vertical position, zero at the top edge.</param>
+    /// <returns>The shade colour.</returns>
+    private (float Red, float Green, float Blue) HueShadeAt(float u, float v) => (
+        Lerp(Lerp(_hueShadeR[0], _hueShadeR[1], u), Lerp(_hueShadeR[2], _hueShadeR[3], u), v),
+        Lerp(Lerp(_hueShadeG[0], _hueShadeG[1], u), Lerp(_hueShadeG[2], _hueShadeG[3], u), v),
+        Lerp(Lerp(_hueShadeB[0], _hueShadeB[1], u), Lerp(_hueShadeB[2], _hueShadeB[3], u), v));
+
+    private void ApplyHueShadeAndGamma()
+    {
+        var gamma = Math.Clamp(Read("fGammaAdj", 1f), 0.1f, 10f);
+        var width = _warped.Width;
+        var height = _warped.Height;
+        ComputeHueShades();
 
         var shadeR = _hueShadeR;
         var shadeG = _hueShadeG;

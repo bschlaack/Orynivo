@@ -81,7 +81,41 @@ public static class ShaderTranspiler
             uniforms["q" + index.ToString(CultureInfo.InvariantCulture)] = 1;
         for (var index = 1; index <= 8; index++)
             uniforms["t" + index.ToString(CultureInfo.InvariantCulture)] = 1;
+        for (var channel = 0; channel < 3; channel++)
+        {
+            for (var corner = 0; corner < 4; corner++)
+                uniforms[HueShaderUniform(channel, corner)] = 1;
+        }
+
         return uniforms;
+    }
+
+    /// <summary>The uniform name that carries one corner channel of the reference's hue shade.</summary>
+    /// <param name="channel">Zero for red, one for green, two for blue.</param>
+    /// <param name="corner">Corner index in the reference's order.</param>
+    /// <returns>The uniform name.</returns>
+    private static string HueShaderUniform(int channel, int corner) =>
+        "hue_shader_" + "rgb"[channel] + corner.ToString(CultureInfo.InvariantCulture);
+
+    /// <summary>
+    /// Emits the local <c>hue_shader</c> the reference passes to every shader: its animated four-corner
+    /// shade, mixed by the fragment's own position because a single uniform cannot carry the
+    /// interpolation the reference gets from the quad's vertex colours.
+    /// </summary>
+    /// <param name="builder">Output.</param>
+    private static void EmitHueShader(StringBuilder builder)
+    {
+        builder.Append("    float2 hue_uv = fragCoord / texsize.xy;\n");
+        for (var channel = 0; channel < 3; channel++)
+        {
+            builder.Append("    float hue_").Append("rgb"[channel]).Append(" = mix(mix(")
+                .Append(HueShaderUniform(channel, 0)).Append(", ").Append(HueShaderUniform(channel, 1))
+                .Append(", hue_uv.x), mix(")
+                .Append(HueShaderUniform(channel, 2)).Append(", ").Append(HueShaderUniform(channel, 3))
+                .Append(", hue_uv.x), hue_uv.y);\n");
+        }
+
+        builder.Append("    float3 hue_shader = float3(hue_r, hue_g, hue_b);\n");
     }
 
     /// <summary>Emits the uniform declarations the literal prelude does not carry.</summary>
@@ -596,6 +630,7 @@ public static class ShaderTranspiler
             // declaration line is reached in source order, so their types are known up front.
             ["uv"] = "float2",
             ["uv_orig"] = "float2",
+            ["hue_shader"] = "float3",
             ["rad"] = "float",
             ["ang"] = "float"
         };
@@ -742,6 +777,7 @@ public static class ShaderTranspiler
     private static void EmitCompMain(StringBuilder builder, ShaderNode? program, string perPixelBody)
     {
         EmitEntryHeader(builder);
+        EmitHueShader(builder);
         builder.Append("    float2 uv_orig = fragCoord / texsize.xy;\n");
         builder.Append("    float2 uv = uv_orig;\n");
         builder.Append("    float2 centred = (uv * 2.0) - 1.0;\n");
@@ -819,6 +855,7 @@ public static class ShaderTranspiler
         }
 
         EmitEntryHeader(builder);
+        EmitHueShader(builder);
 
         if (meshUv)
         {
