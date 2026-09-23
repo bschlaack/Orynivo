@@ -904,6 +904,12 @@ affordable. This is a project of its own and must keep the CPU path as the fallb
   flipped v. `verify-fidelity.ps1`'s shape probe passes against the GPU fill, and measured at
   640 x 360 the overlay falls from 54.8 ms to 0.8 ms. The CPU still draws the polygon borders and the
   waves; moving those too is the remaining step, though they cover few pixels.
+  Reading the original MilkDrop source (the `milkdrop_225c_src` archive, BSD-style Nullsoft licence,
+  reference only) then showed the shape space is Direct3D's y-up space, so `shape_y` counts from the
+  top: every `shapecode_*` shape had been drawn vertically mirrored. `BuildVertices` and the fan
+  centre now convert, projectM confirms the corrected position (72 % versus 75 % from the top for
+  `shapecode_0_y=0.75`), and the waveform needed no change because the reference measures `wave_y`
+  from the bottom.
   **Step 4 is done.** The GLSL emitter is `ShaderTranspiler`'s GLSL dialect next to SkSL
   (`TranspileGlsl`, `TranspileGlslComp`, `TranspileGlslWarp`): the prelude aliases `float2/3/4` onto
   `vec2/3/4` so the shared body emission is byte-identical, the samplers become `sampler2D` sampled

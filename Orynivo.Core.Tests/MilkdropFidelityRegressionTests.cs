@@ -47,8 +47,10 @@ public sealed class MilkdropFidelityRegressionTests
             "shape_2_per_frame1=r=1;g=0;b=0;r2=1;g2=0;b2=0;";
         var renderer = Create(text);
         renderer.RenderFrame(new Audio(), 1d / 60d);
-        Assert.True(renderer.OverlayFrame.GetPixel(16, 16, 0) > 0.9f);
-        Assert.Equal(0f, renderer.OverlayFrame.GetPixel(16, 48, 0));
+        // Milkdrop's shape space is Direct3D's y-up space, so shape_y=0.75 sits three quarters down
+        // the frame; the same convention the reference uses for the fan centre and the rim.
+        Assert.True(renderer.OverlayFrame.GetPixel(16, 48, 0) > 0.9f);
+        Assert.Equal(0f, renderer.OverlayFrame.GetPixel(16, 16, 0));
         var disabled = Create(text.Replace("enabled=1", "enabled=0"));
         disabled.RenderFrame(new Audio(), 1d / 60d);
         Assert.Equal(0f, disabled.OverlayFrame.MeanBrightness());

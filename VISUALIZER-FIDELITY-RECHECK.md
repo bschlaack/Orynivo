@@ -126,6 +126,20 @@ actually run the custom shaders.
 
 ## Remaining compatibility limits
 
+The original MilkDrop source is available as a reference: the
+[MilkDrop-MusicVisualizer](https://github.com/xlimit91/MilkDrop-MusicVisualizer) archive carries
+`milkdrop_225c_src` (Nullsoft, BSD-style licence). It is read-only reference material for behavior
+and conventions; no code is copied from it. It settled the shape conventions below.
+
+- Milkdrop shapes were drawn vertically mirrored: the reference's shape space is Direct3D's y-up
+  space (`v[0].y = shape_y*-2+1`, `milkdropfs.cpp`), so `shape_y` counts from the top, while the
+  overlay rasterizer is y-down. A comparison against projectM put a `shapecode_0_y=0.75` shape 72 %
+  from the top while Orynivo drew it 25 % down. `BuildVertices` and the fan centre now convert, and
+  both paths land 75 % down. The waveform was already correct because the reference measures `wave_y`
+  the other way round (top is one). The shape fill's additive/normal blending (`SRCALPHA` with
+  `INVSRCALPHA`, or `ONE` additive) and the fan's repeated first rim vertex (`v[sides+1] = v[1];`)
+  were confirmed against the same source.
+
 These corrections do **not** establish complete Winamp MilkDrop fidelity:
 
 - Textured custom-shape fills now sample the frame through the reference's fan

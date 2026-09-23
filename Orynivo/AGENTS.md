@@ -550,6 +550,11 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
   with the alpha channel masked for an additive fill), which is the same "over" `PaintPixel` applies.
   The fan repeats its first rim vertex because `GL_TRIANGLE_FAN` does not wrap, its position is
   y-flipped into OpenGL's space, and a textured fill samples the blurred frame with a flipped v.
+  A Milkdrop shape's own space is Direct3D's y-up space, so `BuildVertices` negates a
+  `MilkdropCoordinates` shape's y as it leaves the preset's expression space, and the fan centre is
+  converted the same way; the overlay rasterizer itself is y-down, which is why the waveform paths
+  flip explicitly instead. Keep those two conventions apart: the reference measures `shape_y` from the
+  top but `wave_y` from the bottom.
   `CollectShapeFills` must only be set while `VisualizerGlPresenter.ShapeFillsSupported` is true,
   because the renderer then skips its own fill; the borders and waves stay on the CPU. Such a block is emitted by default as a
   warp fragment shader that computes the coordinate per pixel

@@ -25,6 +25,15 @@ This file applies to `Orynivo.Core/` and supplements `../AGENTS.md`.
   gradient: interpolate the reference's fan texture coordinates (centre at the
   texture centre, rim on a circle of radius `0.5 / tex_zoom` rotated by `tex_ang`)
   and read the frame with repeat.
+  A Milkdrop shape's space is Direct3D's y-up space (`v[0].y = shape_y*-2+1`), so a
+  `MilkdropCoordinates` shape's y is negated out of the preset's expression space in
+  `BuildVertices` and for the fan centre, because the overlay rasterizer is y-down. The
+  reference measures `shape_y` from the top and `wave_y` from the bottom (`wavePosY =
+  wave_y*2-1` where top is one), so the waveform paths flip explicitly and the shape
+  paths must not double-flip. `shape_N_*` (non-Milkdrop) shapes keep raster space.
+  Milkdrop's shape blend is `SRCALPHA`/`INVSRCALPHA` (or `ONE` additive), which the GPU
+  fill reproduces as premultiplied `ONE, ONE_MINUS_SRC_ALPHA` and `ONE, ONE`. A Milkdrop
+  fan closes by repeating its first rim vertex.
 - The stereo custom waveform has 512 contiguous normalized PCM samples, aligned to
   the previous frame. Convert by
   128 at the custom-wave rendering boundary before applying the reference 0.004 scale.

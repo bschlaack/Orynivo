@@ -3410,10 +3410,14 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
                     var vertices = BuildVertices(shape, sides, centreX, centreY, radius, angle);
                     if (shape.MilkdropCoordinates)
                     {
+                        // The fan centre is in Milkdrop's y-up space too, so it is converted the same way
+                        // as the vertices before it reaches the rasterizer or the GPU.
+                        var centreFanX = centreX * 2f - 1f;
+                        var centreFanY = 2f * centreY - 1f;
                         if (CollectShapeFills)
-                            CollectShapeFill(vertices, centreX, centreY, red, green, blue, alpha, additive);
+                            CollectShapeFill(vertices, centreFanX, centreFanY, red, green, blue, alpha, additive);
                         else
-                            FillShapeFan(vertices, centreX * 2f - 1f, 1f - centreY * 2f, red, green, blue, alpha, additive);
+                            FillShapeFan(vertices, centreFanX, centreFanY, red, green, blue, alpha, additive);
                     }
                     else
                         FillPolygon(vertices, red, green, blue, alpha, additive);
@@ -3426,14 +3430,14 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
 
     /// <summary>
     /// Publishes one Milkdrop shape's fill as a triangle fan instead of rasterizing it. The centre
-    /// vertex carries the shape's second colour and the texture centre, and the rim vertices carry its
-    /// first colour and the fan's rim coordinates, which is exactly the interpolation
+    /// vertex carries the shape's first colour and the texture centre, and the rim vertices carry its
+    /// second colour and the fan's rim coordinates, which is exactly the interpolation
     /// <see cref="FillShapeFan"/> applies.
     /// </summary>
-    /// <param name="vertices">Rim vertices in the engine's minus-one-to-one space.</param>
-    /// <param name="centreX">Fan centre in Milkdrop coordinates.</param>
-    /// <param name="centreY">Fan centre in Milkdrop coordinates.</param>
-    /// <param name="red">Rim red, zero to one.</param>
+    /// <param name="vertices">Rim vertices in the rasterizer's y-down space.</param>
+    /// <param name="centreX">Fan centre in the rasterizer's space.</param>
+    /// <param name="centreY">Fan centre in the rasterizer's space.</param>
+    /// <param name="red">Rim red, which is the shape's first colour, zero to one.</param>
     /// <param name="green">Rim green, zero to one.</param>
     /// <param name="blue">Rim blue, zero to one.</param>
     /// <param name="alpha">Rim alpha, zero to one.</param>
@@ -3457,16 +3461,16 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
         // The fan closes on itself, so the first rim vertex is repeated: GL_TRIANGLE_FAN does not wrap
         // and the CPU's rasterizer does, and the missing wedge is a visible notch.
         var fan = new ShapeFillVertex[vertices.Length + 2];
-        fan[0] = new ShapeFillVertex(centreX * 2f - 1f, 1f - centreY * 2f, red2, green2, blue2, alpha2, 0.5f, 0.5f);
+        fan[0] = new ShapeFillVertex(centreX, centreY, red, green, blue, alpha, 0.5f, 0.5f);
         for (var index = 0; index < vertices.Length; index++)
         {
             fan[index + 1] = new ShapeFillVertex(
                 vertices[index].X,
                 vertices[index].Y,
-                red,
-                green,
-                blue,
-                alpha,
+                red2,
+                green2,
+                blue2,
+                alpha2,
                 textured ? _shapeUvX[index] : 0.5f,
                 textured ? _shapeUvY[index] : 0.5f);
         }
@@ -3595,7 +3599,10 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
                 y = Read("y", y);
             }
 
-            vertices[index] = (x, y);
+            // Milkdrop's shape space is Direct3D's y-up space while the overlay rasterizer is y-down, so
+            // a Milkdrop shape's y is negated only when it leaves the preset's own expression space.
+            // Orynivo's shape_N_* keys keep the raster space they were authored in.
+            vertices[index] = shape.MilkdropCoordinates ? (x, -y) : (x, y);
         }
 
         return vertices;

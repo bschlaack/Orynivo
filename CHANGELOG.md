@@ -26,6 +26,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   keeps its previous constant level.
 
 ### Fixed
+- Milkdrop shapes now use the reference's vertical orientation. Its shape space is Direct3D's y-up
+  space (`v[0].y = shape_y*-2+1`), so `shape_y` counts from the top, while the overlay rasterizer
+  paints rows top-down; every `shapecode_*` shape was therefore drawn vertically mirrored. Measured
+  against projectM, a shape at `shapecode_0_y=0.75` now lands three quarters down the frame instead of
+  a quarter down, on both the CPU and the GPU path. The waveform is unaffected: the reference measures
+  `wave_y` the other way round (top is one) and the waveform paths already converted for it, so only
+  the shape paths needed the conversion.
 - A preset whose `per_pixel` block cannot be translated to GLSL — one that reads the shared
   `megabuf`/`gmegabuf`, for example, as `$$$ Royal - Mashup (397)` does — no longer loses its
   shaders. In the mesh path the per-pixel block runs on the mesh and is never emitted into the
