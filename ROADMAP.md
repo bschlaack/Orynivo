@@ -1120,20 +1120,31 @@ affordable. This is a project of its own and must keep the CPU path as the fallb
   test run, or release artifact. Against a few presets the correlation is weak but positive where
   the two renderers draw a similar structure, which is the signal the remaining shader and audio
   work has to move.
-  The oracle drove the first two fidelity fixes. **Milkdrop 2's `f`-prefixed scalar keys were not
+  The oracle drove the first five fidelity fixes. **Milkdrop 2's `f`-prefixed scalar keys were not
   aliased**, so `fDecay`, `fWaveAlpha`, `fWaveScale`, `fWaveSmoothing`, `fWaveParam`, and the
   `fWaveR/G/B/X/Y` colours fell back to the built-in default: `LuxXx - BadBallz Beta` asked for
   `fWaveAlpha=0.001` and got a full overlay, and its `fDecay=0.925` fed back at 0.96. With the
   aliases in place that preset went from a mean channel difference of 0.5 and a correlation of 0.03
   to 0.07-0.14 and 0.36-0.41. **A shader helper call did not coerce its argument to the declared
   parameter type**, so `lavcol(float t)` called as `lavcol(ret * 2)` ran on the whole vector and the
-  SkSL emitter produced a call Skia rejected; both paths now coerce. What remains, in the order the
-  oracle ranks them: projectM tints the comp output through `ApplyHueShaderColors` and Orynivo has no
-  hue step, the blur chain uses projectM's `blurMin`/`blurMax` scale and bias rather than a plain box
-  blur, the comp shader's `sampler_main` is the warped frame in projectM and the composited frame
-  here, and the video echo and overlay modulation still differ. The oracle's audio input is not
-  equivalent to projectM's own analysis, so a comparison must disable the overlay (for example with
-  `wave_a=0`) before the numbers mean anything.
+  SkSL emitter produced a call Skia rejected; both paths now coerce. **The shader blur levels used a
+  three-by-three box at full resolution**, while the reference runs a long horizontal and a short
+  vertical weighted filter on a downscaled copy of the frame (`blur1` a quarter, `blur2` an eighth,
+  `blur3` a sixteenth); `GetBlur1` feeds a preset's own `tan` term, so the sharper `ist` turned a soft
+  blob into a hard diamond. **The reference's roam vectors (`roam_cos`, `roam_sin`, `slow_roam_cos`,
+  `slow_roam_sin`) were never bound**, so a shader that computes `1 + normalize(slow_roam_cos)`
+  normalised a zero vector and the infinity spread a white shape across the frame; seeding them from
+  the preset time moved `Waltra - Horizon` from 0.12 to 0.04-0.06. **The GL pipeline never uploaded
+  the generated noise and volume textures**, so a `tex3D` cloud or a noise sample read the fallback
+  unit, which is the frame; it now uploads them.
+  What remains, in the order the oracle ranks them: projectM tints the frame with a per-preset
+  **random** hue (the video echo's `shade` and `ApplyHueShaderColors`), which cannot be reproduced and
+  makes an exact colour match impossible; the comp shader's `sampler_main` is the warped frame in
+  projectM and the composited frame here; and the video echo and overlay modulation still differ. The
+  oracle's audio input is not equivalent to projectM's own analysis unless both sides run silent
+  (`ORACLE_SILENT` and `GLH_SILENT`), so a comparison must use that mode before the numbers mean
+  anything, and the Orynivo side must be the GL pipeline because the CPU pass budget abandons a heavy
+  comp shader the GPU runs.
 **Tests**: each phase adds its own; 39a is the prerequisite for claiming any speed-up.
 
 **Commit**: `perf(visualizer): add render measurement` (39a), then one commit per phase
