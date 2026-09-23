@@ -35,11 +35,14 @@ This file applies to `Orynivo.Core/` and supplements `../AGENTS.md`.
   slot layout and `q1`-`q32` keep their value between the per-frame and per-pixel stages. The
   renderer runs the stages in Milkdrop order: the init blocks once, the per-frame block and
   the four waveform per-frame blocks, the motion warp (`zoom`, `zoomexp`, `rot`, `cx`/`cy`,
-  `dx`/`dy`, `sx`/`sy`) with the per-pixel block on top, the blur passes and the blur chain's edge
-  darkening, the decay fade, the shapes and waves (which are added to the warped frame before the
+  `dx`/`dy`, `sx`/`sy`) with the per-pixel block on top, the decay fade (the reference's warp
+  fragment shader applies it to the sampled colour), the blur passes and the blur chain's edge
+  darkening, the shapes and waves (which are added to the warped frame before the
   centre darkening and the border, so those later passes cover them), the centre darkening, the
   border, and finally the reference's final composite — either the custom comp shader or the legacy
-  video echo and gamma adjustment, never both. `Composite` adds the overlay frame into the warped
+  video echo and gamma adjustment, never both. The shader blur chain is built once per frame from the
+  frame being warped, so the warp shader and the comp shader read the same blurred input.
+  `Composite` adds the overlay frame into the warped
   frame and `Publish` copies the finished frame into the display buffer, so a post effect never runs
   after the publish. The per-pixel block sees the warped
   position in `x`/`y` on the per-pixel fallback path, which is a deliberate deviation from Milkdrop

@@ -7,6 +7,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Changed
+- The visualizer's decay now belongs to the warp, as in the reference. The fixed OpenGL warp fragment
+  shader multiplies the sampled colour by it (the reference's `frag_COLOR`), and the interpreter
+  applies it right after the warp and before its blur passes, so the blur passes see the faded frame.
+  The comp shader's blur levels are built from the same input frame the warp shader's are, instead of
+  being rebuilt from the composite the comp shader just produced.
 - The visualizer's composite stage now follows the reference's final composite. A preset with a comp
   shader no longer gets the legacy video echo and gamma adjustment applied to the input the comp
   shader reads, because the reference selects the custom composite shader **or** the legacy

@@ -640,11 +640,14 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
         trace?.Invoke($"stage=blur begin frame={_frame}");
         ProbeStage("blur", _warped);
 
+        // The reference's warp fragment shader multiplies the sampled colour by the decay
+        // (frag_COLOR = vec4(decay, ...)), so the decay belongs to the warp and the blur passes that
+        // follow see the faded frame.
+        _warped.Scale(decay);
+
         for (var pass = 0; pass < BlurPasses(); pass++)
             _warped.Blur();
         var blur = Mark();
-
-        _warped.Scale(decay);
 
         // The reference draws the shapes and waves onto the warped frame before the centre darkening
         // and the border, so those later passes cover the overlay instead of being covered by it.
@@ -2375,20 +2378,19 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
         var buffer = _blurLevels[level - 1];
         if (!_blurLevelReady[level - 1])
         {
-            // Blur the same picture sampler_main currently refers to: the previous frame during the
-            // warp and the composited frame during the comp pass. The GPU warp and comp passes build
-            // their blur levels from the same source, so the two execution paths agree. The cache is
-            // invalidated once per stage, because the buffer's contents change every frame while the
-            // object stays the same. A level asked for first builds the ones below it, so level 3 is
-            // three passes whether or not level 1 was read before it.
+            // The reference builds its blur textures once per frame from the frame being warped, so
+            // both the warp shader and the comp shader read the same blurred input; the comp stage
+            // must not rebuild the chain from the composite it just produced. The GPU warp and comp
+            // passes bind the same levels, so the two execution paths agree. The cache is invalidated
+            // once per stage, because the buffer's contents change every frame while the object stays
+            // the same. A level asked for first builds the ones below it, so level 3 is three passes
+            // whether or not level 1 was read before it.
             for (var build = 1; build <= level; build++)
             {
                 if (_blurLevelReady[build - 1])
                     continue;
 
-                _blurLevels[build - 1].ResampleFrom(build == 1
-                    ? (_samplerMainIsWarped ? _frameCopy : _previous)
-                    : _blurLevels[build - 2]);
+                _blurLevels[build - 1].ResampleFrom(build == 1 ? _previous : _blurLevels[build - 2]);
                 // The reference runs two passes per level: a long horizontal one and a short vertical
                 // one, so level N is N such pairs from its downscaled source.
                 for (var pass = 0; pass < build; pass++)

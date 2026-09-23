@@ -100,12 +100,16 @@ instead of implementing the preset's wrap/clamp behavior.
 
 ### 3. P1: Composite and feedback stages do not match
 
-**Partly corrected.** The final composite is now either the custom comp shader or the legacy video
-echo and gamma adjustment, never both, on the interpreter and the OpenGL paths, and the shapes and
-waves are drawn before the centre darkening and the border so those cover the overlay. The display
-output stays separate from the next frame's feedback. Still open: the decay is applied as a post
-scale rather than as the reference warp blend, and the shader blur chain is still built from the
-frame the comp shader reads rather than updated earlier in the frame.
+**Corrected.** The final composite is either the custom comp shader or the legacy video echo and
+gamma adjustment, never both, on the interpreter and the OpenGL paths; the shapes and waves are drawn
+before the centre darkening and the border so those cover the overlay; the decay belongs to the warp
+(the fixed OpenGL warp fragment shader multiplies the sampled colour, the interpreter scales right
+after the warp and before its blur passes); the shader blur chain is built once per frame from the
+frame being warped, so the warp shader and the comp shader read the same blurred input; and the
+display output stays separate from the next frame's feedback. One deliberate deviation remains: a
+preset whose custom warp shader replaces the fixed fragment stage keeps the decay applied in the post
+pass, because the reference's custom warp fragment shader has no `frag_COLOR` and removing the fade
+would let such a preset accumulate without bound.
 
 The GL post pass always applies decay, video echo, gamma and overlays before
 running the optional comp shader, and stores that result as feedback.

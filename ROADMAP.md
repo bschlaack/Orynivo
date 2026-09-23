@@ -21,10 +21,10 @@ composes the per-pixel block into its fragment effect, because a runtime effect 
 no vertex stage. Audit item 2
 (the sampler qualifiers `fc_`/`fw_`/`pc_`/`pw_`) is corrected on the interpreter and
 Skia paths; the OpenGL frame sampler still lacks per-sampler filter and wrap.
-Audit item 3 (the composite and feedback stages) is partly corrected: the final
-composite is either the custom comp shader or the legacy echo/gamma path, and the
-overlay is drawn before the centre darkening and the border; the decay placement
-and the shader blur timing remain.
+Audit item 3 (the composite and feedback stages) is corrected: the final
+composite is either the custom comp shader or the legacy echo/gamma path, the
+overlay is drawn before the centre darkening and the border, the decay belongs
+to the warp, and the shader blur chain is built from the frame being warped.
 Remaining compatibility work and its
 recommended order are recorded in [VISUALIZER-FIDELITY-AUDIT.md](VISUALIZER-FIDELITY-AUDIT.md).
 CPU/GPU agreement and successful shader compilation are not reference fidelity gates.

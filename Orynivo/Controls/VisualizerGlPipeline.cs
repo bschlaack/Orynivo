@@ -158,6 +158,7 @@ internal sealed class VisualizerGlPipeline
         in vec2 vUv;
         out vec4 fragColor;
         uniform sampler2D uSource;
+        uniform float uDecay;
         void main()
         {
             vec2 uv = vUv;
@@ -165,7 +166,9 @@ internal sealed class VisualizerGlPipeline
             // Outside the frame the warp is transparent black, like the CPU sampler. The clamp keeps
             // every pass bounded exactly like the eight-bit texture it replaces, so a preset that
             // accumulates cannot leave the range the CPU reference and Milkdrop's textures stay in.
-            vec4 colour = texture(uSource, vec2(uv.x, 1.0 - uv.y));
+            // The decay multiplies the sampled colour, exactly like the reference warp fragment
+            // shader's frag_COLOR, so the blur passes that follow see the faded frame.
+            vec4 colour = texture(uSource, vec2(uv.x, 1.0 - uv.y)) * uDecay;
             float inside = step(0.0, uv.x) * step(uv.x, 1.0) * step(0.0, uv.y) * step(uv.y, 1.0);
             fragColor = clamp(colour * inside, 0.0, 1.0);
         }
@@ -702,6 +705,9 @@ internal sealed class VisualizerGlPipeline
                 Set(gl, _warpUniforms, "uNeedsRadius", needsRadius ? 1f : 0f);
                 Set(gl, _warpUniforms, "uWarpTime", parameters.WarpTime);
                 Set(gl, _warpUniforms, "uWarpScale", 1f);
+                // The fixed warp fragment shader applies the decay itself, like the reference's
+                // frag_COLOR, so the post pass must not apply it again.
+                Set(gl, _warpUniforms, "uDecay", parameters.Decay);
                 DrawMesh(gl);
             }
 
@@ -736,7 +742,7 @@ internal sealed class VisualizerGlPipeline
             gl.BindTexture(GlTexture2D, _overlayTexture);
             SetSampler(gl, _postUniforms, "uSource", 0);
             SetSampler(gl, _postUniforms, "uOverlay", 1);
-            Set(gl, _postUniforms, "uDecay", parameters.Decay);
+            Set(gl, _postUniforms, "uDecay", _warpShaderProgram == 0 ? 1f : parameters.Decay);
             Set(gl, _postUniforms, "uEchoZoom", parameters.EchoZoom);
             // The reference's final composite is either the custom comp shader or the legacy video
             // echo and gamma adjustment, never both.
