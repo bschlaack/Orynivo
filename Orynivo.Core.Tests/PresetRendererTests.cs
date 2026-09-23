@@ -43,8 +43,13 @@ public sealed class PresetRendererTests
     {
         // Bands light only the left half, so a horizontal mirror must light the right half.
         var audio = TestAudio.LeftOnly;
-        var identity = new PresetRenderer(VisualizerPreset.Create("identity", "warp = 0;", null), 64, 36);
-        var mirrored = new PresetRenderer(VisualizerPreset.Create("mirror", "warp = 0;", "x = -x;"), 64, 36);
+        // The left-only spectrum drives a custom waveform pinned to the left half, so a horizontal
+        // mirror has to move it into the right half on the next frame.
+        const string common =
+            "decay = 1;\nwave_a = 0;\nwavecode_0_enabled=1\nwavecode_0_bSpectrum=1\nwavecode_0_samples=64\n" +
+            "wave_0_per_point_1=x = 0.25;\nwarp = 0;\n";
+        var identity = new PresetRenderer(VisualizerPreset.Parse(common + "per_pixel_1=x = x;"), 64, 36);
+        var mirrored = new PresetRenderer(VisualizerPreset.Parse(common + "per_pixel_1=x = -x;"), 64, 36);
 
         identity.RenderFrame(audio, 1d / 60d);
         mirrored.RenderFrame(audio, 1d / 60d);
@@ -120,19 +125,27 @@ public sealed class PresetRendererTests
     }
 
     /// <summary>
-    /// Small audio source with controllable bands and waveform. The mirror tests use audio
-    /// without a waveform, because the waveform overlay spans the complete frame width and
-    /// would otherwise light the half that is being asserted as empty.
+    /// Small audio source with controllable bands, waveform, and spectrum. The mirror tests use audio
+    /// without a waveform, because the default waveform overlay spans the complete frame width and
+    /// would otherwise light the half that is being asserted as empty; they draw a left-only custom
+    /// waveform from the left-only spectrum instead.
     /// </summary>
     private sealed class TestAudio : IVisualizerAudioSource
     {
         public static TestAudio Silent { get; } = new() { WaveformValue = [] };
 
-        public static TestAudio LeftOnly { get; } = new() { BandsValue = LeftOnlyBands(), WaveformValue = [] };
+        public static TestAudio LeftOnly { get; } = new()
+        {
+            BandsValue = LeftOnlyBands(),
+            WaveformValue = [],
+            SpectrumValue = LeftOnlySpectrum(),
+        };
 
         public ReadOnlySpan<float> Bands => BandsValue;
 
         public ReadOnlySpan<float> Waveform => WaveformValue;
+
+        public ReadOnlySpan<float> Spectrum => SpectrumValue;
 
         public float Bass { get; init; } = 0.5f;
 
@@ -145,6 +158,8 @@ public sealed class PresetRendererTests
         private float[] BandsValue { get; init; } = new float[AudioSpectrumAnalyzer.BandCount];
 
         private float[] WaveformValue { get; init; } = BuildWaveform();
+
+        private float[] SpectrumValue { get; init; } = [];
 
         private static float[] BuildWaveform()
         {
@@ -160,6 +175,14 @@ public sealed class PresetRendererTests
             for (var band = 0; band < bands.Length / 2; band++)
                 bands[band] = 1f;
             return bands;
+        }
+
+        private static float[] LeftOnlySpectrum()
+        {
+            var spectrum = new float[AudioSpectrumAnalyzer.SpectrumPoints];
+            for (var point = 0; point < spectrum.Length / 2; point++)
+                spectrum[point] = 1f;
+            return spectrum;
         }
     }
 }

@@ -12,6 +12,13 @@ public interface IVisualizerAudioSource
     /// <summary>Gets the recent mono samples in the range -1 to 1 for the waveform overlay.</summary>
     ReadOnlySpan<float> Waveform { get; }
 
+    /// <summary>
+    /// Gets the recent spectrum magnitudes in the range zero to one, oldest bin first, for a custom
+    /// waveform that reads the spectrum. The default is empty, so a source that has no spectrum makes
+    /// such a waveform draw nothing instead of a wrong picture.
+    /// </summary>
+    ReadOnlySpan<float> Spectrum => default;
+
     /// <summary>Gets the bass energy in the range zero to one.</summary>
     float Bass { get; }
 
@@ -143,6 +150,21 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
     // independently and therefore cannot reproduce a value carried from the previous pixel.
     private readonly bool _perPixelGpuSafe;
     private readonly float[] _sample = new float[4];
+    // Scratch for the custom waveforms: the smoothed sample data, the per-point values, and the
+    // smoothed polyline. They are reused every frame so drawing an overlay stays allocation-free.
+    private readonly float[] _waveSamples = new float[512];
+    private readonly float[] _wavePointX = new float[512];
+    private readonly float[] _wavePointY = new float[512];
+    private readonly float[] _waveRed = new float[512];
+    private readonly float[] _waveGreen = new float[512];
+    private readonly float[] _waveBlue = new float[512];
+    private readonly float[] _waveAlpha = new float[512];
+    private readonly float[] _waveOutX = new float[1024];
+    private readonly float[] _waveOutY = new float[1024];
+    private readonly float[] _waveOutRed = new float[1024];
+    private readonly float[] _waveOutGreen = new float[1024];
+    private readonly float[] _waveOutBlue = new float[1024];
+    private readonly float[] _waveOutAlpha = new float[1024];
     private IVisualizerAudioSource? _audio;
     private bool _initialized;
     private long _frame;
@@ -551,6 +573,9 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
 
     /// <summary>Gets the waveform of the last rendered frame.</summary>
     public ReadOnlySpan<float> Waveform => _audio is null ? default : _audio.Waveform;
+
+    /// <summary>Gets the spectrum of the last rendered frame.</summary>
+    public ReadOnlySpan<float> Spectrum => _audio is null ? default : _audio.Spectrum;
 
     /// <summary>Gets the bass energy of the last rendered frame.</summary>
     public float Bass { get; private set; }
@@ -2497,32 +2522,26 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
     {
         _fresh.Clear();
         DrawWaves();
-        DrawSpectrum();
         DrawMotionVectors();
         DrawShapes();
     }
 
     /// <summary>
-    /// Draws the declared Milkdrop waveforms. The first slot is always drawn as the default
-    /// wave; the other three are drawn when a preset declares a program for them. Every wave
-    /// honours the global mode and its own per-point program.
+    /// Draws the default waveform with the global <c>wave_*</c> settings, then the four custom
+    /// waveforms whose <c>wavecode_N_enabled</c> is set. The two are separate in the reference: the
+    /// default wave uses the global mode and the global <c>per_point</c> block, while each custom
+    /// wave has its own state and its own <c>wave_N_per_point</c> block.
     /// </summary>
     private void DrawWaves()
     {
-        for (var index = 0; index < Preset.Waves.Count; index++)
-        {
-            var wave = Preset.Waves[index];
-            if (index > 0 && wave.Init.IsEmpty && wave.PerFrame.IsEmpty && wave.PerPoint.IsEmpty)
-                continue;
+        DrawDefaultWave();
 
-            DrawWave(wave, index);
-        }
+        foreach (var wave in Preset.Waves)
+            DrawCustomWave(wave);
     }
 
-    /// <summary>Draws one waveform with the global mode, colour, and modifiers.</summary>
-    /// <param name="wave">Waveform programs to run.</param>
-    /// <param name="index">Waveform slot, used to offset the default line.</param>
-    private void DrawWave(VisualizerWave wave, int index)
+    /// <summary>Draws the default waveform with the global mode, colour, and modifiers.</summary>
+    private void DrawDefaultWave()
     {
         var waveform = Waveform;
         if (waveform.Length < 2)
@@ -2547,12 +2566,10 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
         var dots = Read("wave_dots", 0f) >= 0.5f;
         var thick = Read("wave_thick", 0f) >= 0.5f;
         var additive = Read("wave_additive", 1f) >= 0.5f;
-        var perPoint = wave.PerPoint;
-        if (perPoint.IsEmpty && index == 0)
-            perPoint = Preset.WavePerPoint;
+        var perPoint = Preset.WavePerPoint;
 
-        // The default line of the second slot sits slightly lower so two slots stay visible.
-        var lineOffset = index == 0 ? 0f : (index - 1.5f) * height * 0.06f;
+        // The default line is centred on wave_y; the custom waves offset their own traces.
+        const float lineOffset = 0f;
         var radius = height * 0.35f;
         for (var column = 0; column < width; column++)
         {
@@ -2625,6 +2642,213 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
 
             if (doubled)
                 PaintPixel(pixelX, (int)Math.Clamp((2 * centre) - pixelY, 0f, height - 1), red, green, blue, alpha, additive);
+        }
+    }
+
+    /// <summary>
+    /// Draws one custom waveform with the reference's contract. The sample data is built from the
+    /// waveform or the spectrum, smoothed forwards and backwards, and scaled by the wave's own
+    /// <c>scaling</c>; the per-point block then sees <c>sample</c> (the normalized index),
+    /// <c>value1</c>/<c>value2</c> (the channel samples) and may move and colour the point. Only a
+    /// waveform that asks for the spectrum reads it, so a preset without one draws no bars.
+    /// </summary>
+    /// <param name="wave">Waveform state and programs.</param>
+    private void DrawCustomWave(VisualizerWave wave)
+    {
+        if (!wave.Enabled)
+            return;
+
+        var source = wave.Spectrum ? Spectrum : Waveform;
+        if (source.Length < 2)
+            return;
+
+        // The per-frame block runs with the waveform's own state in the shared slots.
+        Write("samples", wave.Samples);
+        Write("sep", wave.Separation);
+        Write("scaling", wave.Scaling);
+        Write("smoothing", wave.Smoothing);
+        Write("r", wave.Red);
+        Write("g", wave.Green);
+        Write("b", wave.Blue);
+        Write("a", wave.Alpha);
+        Write("x", 0.5f);
+        Write("y", 0.5f);
+        wave.PerFrame.Execute(_slots);
+
+        var separation = Math.Max(0, wave.Separation);
+        var samples = Math.Min(source.Length, (int)Math.Clamp(Read("samples", wave.Samples), 0f, 512f)) - separation;
+        if (wave.UseDots ? samples < 1 : samples < 2)
+            return;
+
+        var scaling = Read("scaling", wave.Scaling);
+        var smoothing = Math.Clamp(Read("smoothing", wave.Smoothing), 0f, 1f);
+        var mult = scaling * Preset.WaveScale * (wave.Spectrum ? 0.15f : 0.004f);
+
+        // The reference smooths the sample data forwards and then backwards, which removes the
+        // asymmetry between the start and the end of the trace.
+        var mix1 = MathF.Pow(smoothing * 0.98f, 0.5f);
+        var mix2 = 1f - mix1;
+        for (var sample = 0; sample < samples; sample++)
+            _waveSamples[sample] = source[sample];
+        for (var sample = 1; sample < samples; sample++)
+            _waveSamples[sample] = (_waveSamples[sample] * mix2) + (_waveSamples[sample - 1] * mix1);
+        for (var sample = samples - 2; sample >= 0; sample--)
+            _waveSamples[sample] = (_waveSamples[sample] * mix2) + (_waveSamples[sample + 1] * mix1);
+        for (var sample = 0; sample < samples; sample++)
+            _waveSamples[sample] *= mult;
+
+        var baseRed = Read("r", wave.Red);
+        var baseGreen = Read("g", wave.Green);
+        var baseBlue = Read("b", wave.Blue);
+        var baseAlpha = Read("a", wave.Alpha);
+        var step = samples > 1 ? 1f / (samples - 1) : 0f;
+        for (var sample = 0; sample < samples; sample++)
+        {
+            // The audio source is mono, so both channels carry the same value.
+            var value = _waveSamples[sample];
+            Write("sample", sample * step);
+            Write("value1", value);
+            Write("value2", value);
+            Write("x", 0.5f + value);
+            Write("y", 0.5f + value);
+            Write("r", baseRed);
+            Write("g", baseGreen);
+            Write("b", baseBlue);
+            Write("a", baseAlpha);
+            wave.PerPoint.Execute(_slots);
+
+            _wavePointX[sample] = Read("x", 0.5f);
+            _wavePointY[sample] = Read("y", 0.5f);
+            _waveRed[sample] = Math.Clamp(Read("r", baseRed), 0f, 1f);
+            _waveGreen[sample] = Math.Clamp(Read("g", baseGreen), 0f, 1f);
+            _waveBlue[sample] = Math.Clamp(Read("b", baseBlue), 0f, 1f);
+            _waveAlpha[sample] = Math.Clamp(Read("a", baseAlpha), 0f, 1f);
+        }
+
+        var count = SmoothWavePoints(samples);
+        DrawWavePoints(count, wave);
+    }
+
+    /// <summary>
+    /// Builds the smoothed polyline from the per-point values. Each pair of points gains one extra
+    /// point, exactly like the reference's four-tap smoothing, so a trace that turns sharply does not
+    /// look like a staircase.
+    /// </summary>
+    /// <param name="samples">Number of per-point values.</param>
+    /// <returns>Number of points in the smoothed polyline.</returns>
+    private int SmoothWavePoints(int samples)
+    {
+        const float c1 = -0.15f;
+        const float c2 = 1.15f;
+        const float c3 = 1.15f;
+        const float c4 = -0.15f;
+        const float inverseSum = 1f / (c1 + c2 + c3 + c4);
+
+        var output = 0;
+        var below = 0;
+        var above2 = 1;
+        for (var input = 0; input < samples - 1; input++)
+        {
+            var above = above2;
+            above2 = Math.Min(samples - 1, input + 2);
+            _waveOutX[output] = _wavePointX[input];
+            _waveOutY[output] = _wavePointY[input];
+            _waveOutRed[output] = _waveRed[input];
+            _waveOutGreen[output] = _waveGreen[input];
+            _waveOutBlue[output] = _waveBlue[input];
+            _waveOutAlpha[output] = _waveAlpha[input];
+            output++;
+
+            _waveOutX[output] = ((c1 * _wavePointX[below]) + (c2 * _wavePointX[input]) +
+                                 (c3 * _wavePointX[above]) + (c4 * _wavePointX[above2])) * inverseSum;
+            _waveOutY[output] = ((c1 * _wavePointY[below]) + (c2 * _wavePointY[input]) +
+                                 (c3 * _wavePointY[above]) + (c4 * _wavePointY[above2])) * inverseSum;
+            _waveOutRed[output] = _waveRed[input];
+            _waveOutGreen[output] = _waveGreen[input];
+            _waveOutBlue[output] = _waveBlue[input];
+            _waveOutAlpha[output] = _waveAlpha[input];
+            output++;
+
+            below = input;
+        }
+
+        if (output < _waveOutX.Length)
+        {
+            _waveOutX[output] = _wavePointX[samples - 1];
+            _waveOutY[output] = _wavePointY[samples - 1];
+            _waveOutRed[output] = _waveRed[samples - 1];
+            _waveOutGreen[output] = _waveGreen[samples - 1];
+            _waveOutBlue[output] = _waveBlue[samples - 1];
+            _waveOutAlpha[output] = _waveAlpha[samples - 1];
+            output++;
+        }
+
+        return output;
+    }
+
+    /// <summary>Draws the smoothed polyline as dots or as connected segments.</summary>
+    /// <param name="count">Number of polyline points.</param>
+    /// <param name="wave">Waveform state, for the dot and thickness modes.</param>
+    private void DrawWavePoints(int count, VisualizerWave wave)
+    {
+        var width = _fresh.Width;
+        var height = _fresh.Height;
+        if (count < 1 || width < 1 || height < 1)
+            return;
+
+        for (var index = 0; index < count; index++)
+        {
+            var x = (int)Math.Clamp(_waveOutX[index] * (width - 1), 0f, width - 1);
+            var y = (int)Math.Clamp((1f - _waveOutY[index]) * (height - 1), 0f, height - 1);
+            var red = _waveOutRed[index];
+            var green = _waveOutGreen[index];
+            var blue = _waveOutBlue[index];
+            var alpha = _waveOutAlpha[index];
+
+            if (wave.UseDots)
+            {
+                PaintPixel(x, y, red, green, blue, alpha, wave.Additive);
+                continue;
+            }
+
+            if (index == 0)
+                continue;
+
+            var previousX = (int)Math.Clamp(_waveOutX[index - 1] * (width - 1), 0f, width - 1);
+            var previousY = (int)Math.Clamp((1f - _waveOutY[index - 1]) * (height - 1), 0f, height - 1);
+            DrawWaveSegment(previousX, previousY, x, y, red, green, blue, alpha, wave);
+        }
+    }
+
+    /// <summary>Draws one anti-aliased-free line segment of a custom waveform.</summary>
+    /// <param name="x0">Start column.</param>
+    /// <param name="y0">Start row.</param>
+    /// <param name="x1">End column.</param>
+    /// <param name="y1">End row.</param>
+    /// <param name="red">Red, zero to one.</param>
+    /// <param name="green">Green, zero to one.</param>
+    /// <param name="blue">Blue, zero to one.</param>
+    /// <param name="alpha">Opacity, zero to one.</param>
+    /// <param name="wave">Waveform state, for the additive and thickness modes.</param>
+    private void DrawWaveSegment(
+        int x0, int y0, int x1, int y1, float red, float green, float blue, float alpha, VisualizerWave wave)
+    {
+        var dx = x1 - x0;
+        var dy = y1 - y0;
+        var steps = Math.Max(Math.Abs(dx), Math.Abs(dy));
+        if (steps == 0)
+        {
+            PaintPixel(x0, y0, red, green, blue, alpha, wave.Additive);
+            return;
+        }
+
+        var thickness = wave.DrawThick ? 2 : 1;
+        for (var step = 0; step <= steps; step++)
+        {
+            var x = x0 + (int)MathF.Round(dx * step / (float)steps);
+            var y = y0 + (int)MathF.Round(dy * step / (float)steps);
+            for (var offset = 0; offset < thickness; offset++)
+                PaintPixel(x, y + offset, red, green, blue, alpha * (offset == 0 ? 1f : 0.5f), wave.Additive);
         }
     }
 
@@ -2827,43 +3051,6 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
                 }
             }
         });
-    }
-
-    /// <summary>Draws the spectrum bars.</summary>
-    private void DrawSpectrum()
-    {
-        var bands = Bands;
-        if (bands.Length == 0)
-            return;
-
-        var width = _fresh.Width;
-        var height = _fresh.Height;
-
-        // The spectrum belongs to the wave overlay, so it follows the same live variables: a preset
-        // that hides its waves or colours them must not get a hard-coded bar chart on top. Reading
-        // the static preset default here left stray bars on presets that set wave_a to zero.
-        var alpha = Math.Clamp(Read("wave_a", Preset.WaveAlpha), 0f, 1f);
-        if (alpha <= 0f)
-            return;
-
-        var red = Math.Clamp(Read("wave_r", 1f), 0f, 1f);
-        var green = Math.Clamp(Read("wave_g", 1f), 0f, 1f);
-        var blue = Math.Clamp(Read("wave_b", 1f), 0f, 1f);
-        var barWidth = Math.Max(1, width / bands.Length);
-        for (var band = 0; band < bands.Length; band++)
-        {
-            var barHeight = (int)Math.Clamp(bands[band] * height * 0.6f, 0f, height - 1);
-            for (var row = 0; row < barHeight; row++)
-            {
-                var y = height - 1 - row;
-                for (var column = 0; column < barWidth; column++)
-                {
-                    var x = (band * barWidth) + column;
-                    if (x < width)
-                        _fresh.AddPixel(x, y, red * alpha * 0.25f, green * alpha * 0.6f, blue * alpha);
-                }
-            }
-        }
     }
 
     /// <summary>Draws every custom shape of the preset.</summary>

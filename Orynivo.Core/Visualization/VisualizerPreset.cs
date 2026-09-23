@@ -682,12 +682,13 @@ public sealed class VisualizerPreset
     }
 
     /// <summary>
-    /// Parses the four Milkdrop waveforms. Every waveform always exists so the renderer can
-    /// draw the default wave without a preset declaring one.
+    /// Parses the four Milkdrop custom waveforms. Every waveform always exists so the renderer can
+    /// keep the slot list stable; a waveform without <c>wavecode_N_enabled</c> is simply not drawn.
     /// </summary>
     /// <param name="values">Parsed preset values.</param>
     /// <param name="layout">Shared slot layout.</param>
-    /// <returns>The four waveform programs.</returns>
+    /// <param name="failed">Collects the names of blocks that did not compile.</param>
+    /// <returns>The four custom waveforms.</returns>
     private static IReadOnlyList<VisualizerWave> ParseWaves(
         Dictionary<string, string> values,
         PresetVariableLayout layout,
@@ -696,11 +697,25 @@ public sealed class VisualizerPreset
         var waves = new List<VisualizerWave>(4);
         for (var index = 0; index < 4; index++)
         {
-            var prefix = $"wave_{index}_";
+            var codePrefix = $"wavecode_{index}_";
+            var wavePrefix = $"wave_{index}_";
             waves.Add(new VisualizerWave(
-                CompileBlock(values, layout, prefix + "init", failed),
-                CompileBlock(values, layout, prefix + "per_frame", failed),
-                CompileBlock(values, layout, prefix + "per_point", failed)));
+                ReadFloat(values, codePrefix + "enabled", 0f) >= 0.5f,
+                (int)Math.Clamp(ReadFloat(values, codePrefix + "samples", 512f), 0f, 512f),
+                (int)Math.Clamp(ReadFloat(values, codePrefix + "sep", 0f), 0f, 512f),
+                ReadFloat(values, codePrefix + "bSpectrum", 0f) >= 0.5f,
+                ReadFloat(values, codePrefix + "bUseDots", 0f) >= 0.5f,
+                ReadFloat(values, codePrefix + "bDrawThick", 0f) >= 0.5f,
+                ReadFloat(values, codePrefix + "bAdditive", 0f) >= 0.5f,
+                ReadFloat(values, codePrefix + "scaling", 1f),
+                Math.Clamp(ReadFloat(values, codePrefix + "smoothing", 0.5f), 0f, 1f),
+                Math.Clamp(ReadFloat(values, codePrefix + "r", 1f), 0f, 1f),
+                Math.Clamp(ReadFloat(values, codePrefix + "g", 1f), 0f, 1f),
+                Math.Clamp(ReadFloat(values, codePrefix + "b", 1f), 0f, 1f),
+                Math.Clamp(ReadFloat(values, codePrefix + "a", 1f), 0f, 1f),
+                CompileBlock(values, layout, wavePrefix + "init", failed),
+                CompileBlock(values, layout, wavePrefix + "per_frame", failed),
+                CompileBlock(values, layout, wavePrefix + "per_point", failed)));
         }
 
         return waves;

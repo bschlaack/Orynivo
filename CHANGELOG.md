@@ -7,6 +7,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Changed
+- The visualizer's custom waveforms now follow the reference's semantics. Each of the four
+  `wavecode_N_*` waveforms has its own state (enabled, samples, separation, spectrum, dots, thick,
+  additive, scaling, smoothing, and colour) and its own `wave_N_*` blocks, separate from the default
+  waveform, which keeps using the global `wave_*` settings and the global `per_point` block. The
+  per-point block receives the reference's `sample` (the normalized index), `value1`, and `value2`
+  contract and may move and colour the point, and the trace is smoothed with the reference's four-tap
+  polyline smoothing. The unconditional spectrum bars are gone: spectrum geometry is drawn only by a
+  waveform whose `wavecode_N_bSpectrum` is set. `IVisualizerAudioSource` gained a `Spectrum` member
+  that `AudioSpectrumAnalyzer` fills from the FFT, so a spectrum waveform has real data.
 - The visualizer's decay now belongs to the warp, as in the reference. The fixed OpenGL warp fragment
   shader multiplies the sampled colour by it (the reference's `frag_COLOR`), and the interpreter
   applies it right after the warp and before its blur passes, so the blur passes see the faded frame.

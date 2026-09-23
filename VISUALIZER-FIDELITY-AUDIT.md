@@ -127,6 +127,16 @@ output separate from the next frame's feedback.
 
 ### 4. P1: Custom waves are not implemented with Milkdrop semantics
 
+**Corrected.** `VisualizerWave` now carries the `wavecode_N_*` state, `VisualizerPreset.ParseWaves`
+reads it, and `PresetRenderer.DrawCustomWave` builds the sample data from the waveform or the
+spectrum, applies the reference's forward/backward smoothing and scaling, gives the per-point block
+the `sample`/`value1`/`value2` contract, and smooths the polyline with the reference's four taps. The
+default waveform is separate: it keeps the global `wave_*` settings and the global `per_point` block.
+The unconditional spectrum bars are gone, so spectrum geometry appears only for a waveform whose
+`wavecode_N_bSpectrum` is set; `IVisualizerAudioSource.Spectrum` and `AudioSpectrumAnalyzer` supply
+the spectrum. Still approximated: the default waveform's eight `wave_mode` geometries, and the traces
+are drawn with the engine's own line rasteriser rather than the reference's thick multi-pass draw.
+
 `VisualizerPreset.ParseWaves` loads equation blocks but does not construct a
 separate custom-wave parameter state from `wavecode_N_*`. `DrawWave` instead uses
 global wave settings and treats slot zero as the default waveform. projectM's

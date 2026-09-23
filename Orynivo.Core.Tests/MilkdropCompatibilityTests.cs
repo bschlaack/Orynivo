@@ -119,10 +119,26 @@ public sealed class MilkdropCompatibilityTests
     [Fact]
     public void RenderFrame_BlurKeysSmoothTheFeedback()
     {
-        var sharp = RenderFeedback(string.Empty);
-        var blurred = RenderFeedback("blur1 = 0; blur2 = 3;");
+        // The default wave is off and a custom waveform pinned to one column gives the feedback a
+        // sharp trace the blur has to soften; the feedback itself is what is measured.
+        const string body =
+            "decay = 1;\nwave_a = 0;\nwavecode_0_enabled=1\nwavecode_0_scaling=100\nwave_0_per_point_1=x = 0.5;\n";
+        var sharp = RenderFeedbackSource(body);
+        var blurred = RenderFeedbackSource(body + "per_frame_1=blur1 = 0; blur2 = 3;\n");
 
         Assert.True(Variance(blurred) < Variance(sharp));
+    }
+
+    /// <summary>Renders a preset and returns the feedback frame the next warp would sample.</summary>
+    /// <param name="text">Preset text.</param>
+    /// <returns>The feedback pixels.</returns>
+    private static float[] RenderFeedbackSource(string text)
+    {
+        var renderer = new PresetRenderer(VisualizerPreset.Parse(text), 40, 40);
+        for (var frame = 0; frame < 4; frame++)
+            renderer.RenderFrame(new FakeAudio(), 1d / 60d);
+
+        return renderer.MeshSource.Pixels.ToArray();
     }
 
     /// <summary>A gamma above one darkens the feedback image.</summary>
@@ -167,7 +183,8 @@ public sealed class MilkdropCompatibilityTests
     public void RenderFrame_UsesTheWavePrograms()
     {
         var plain = RenderOverlay(string.Empty);
-        var moved = RenderOverlay("wave_0_per_point_1=y = y * 3;");
+        var moved = RenderOverlay(
+            "wavecode_0_enabled=1\nwavecode_0_scaling=100\nwave_0_per_point_1=x = 0.2;");
 
         Assert.True(MeanDifference(plain, moved) > 0.001f);
     }
@@ -286,9 +303,31 @@ public sealed class MilkdropCompatibilityTests
     public void RenderFrame_DrawsDeclaredAdditionalWaves()
     {
         var single = RenderOverlay(string.Empty);
-        var twoWaves = RenderOverlay("wave_1_per_point_1=y = y + 0.4;");
+        var twoWaves = RenderOverlay(
+            "wavecode_1_enabled=1\nwavecode_1_scaling=100\nwave_1_per_point_1=x = 0.8;");
 
         Assert.True(MeanDifference(single, twoWaves) > 0.001f);
+    }
+
+    /// <summary>A custom waveform is only drawn when its wavecode_N_enabled key is set.</summary>
+    [Fact]
+    public void RenderFrame_CustomWaveNeedsTheEnabledFlag()
+    {
+        var plain = RenderOverlay(string.Empty);
+        var without = RenderOverlay("wave_0_per_point_1=x = 0.2;");
+
+        Assert.Equal(Mean(plain), Mean(without), 5);
+    }
+
+    /// <summary>A waveform that asks for the spectrum draws nothing when there is no spectrum data.</summary>
+    [Fact]
+    public void RenderFrame_SpectrumWaveNeedsSpectrumData()
+    {
+        var plain = RenderOverlay(string.Empty);
+        var spectrum = RenderOverlay(
+            "wavecode_0_enabled=1\nwavecode_0_bSpectrum=1\nwavecode_0_scaling=100\nwave_0_per_point_1=x = 0.2;");
+
+        Assert.Equal(Mean(plain), Mean(spectrum), 5);
     }
 
     /// <summary>The outer border paints the frame edges.</summary>

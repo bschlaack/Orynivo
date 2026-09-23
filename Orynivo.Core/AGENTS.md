@@ -57,6 +57,13 @@ This file applies to `Orynivo.Core/` and supplements `../AGENTS.md`.
   only them takes its blur amount from their `blurN_max` sum when Orynivo's own `blur_level` key is
   absent. Keep new aliases in that one table. The default wave mode is the single line (3), not the
   circular mode (0), because every built-in preset and the legacy `per_point` contract assume a line.
+  The default waveform and the four custom waveforms are separate: the default one uses the global
+  `wave_*` settings and the global `per_point` block, while each `VisualizerWave` carries its own
+  `wavecode_N_*` state and `wave_N_*` blocks. `PresetRenderer.DrawCustomWave` builds the sample data
+  from the waveform or, only when `wavecode_N_bSpectrum` is set, from `IVisualizerAudioSource.Spectrum`,
+  smooths and scales it, and gives the per-point block the reference's `sample`/`value1`/`value2`
+  contract; the polyline is smoothed with the reference's four taps. Never draw spectrum bars
+  unconditionally, and keep the waveform scratch buffers reused so an overlay stays allocation-free.
   `VisualizerTextureBank` generates the Milkdrop noise and random textures from fixed seeds
   instead of bundling third party images: keep generation deterministic and lazy, and keep the
   sizes (32, 256, 512) so shader sampling stays comparable. It also generates the two 32³ volume

@@ -16,6 +16,9 @@ public sealed class AudioSpectrumAnalyzer : IVisualizerAudioSource
     /// <summary>Number of time-domain points kept for the waveform overlay.</summary>
     public const int WaveformPoints = 256;
 
+    /// <summary>Number of frequency points kept for a spectrum-reading custom waveform.</summary>
+    public const int SpectrumPoints = 256;
+
     private readonly int _sampleRate;
     private readonly int _fftSize;
     private readonly float[] _window;
@@ -25,6 +28,7 @@ public sealed class AudioSpectrumAnalyzer : IVisualizerAudioSource
     private readonly int[] _bandEdges;
     private readonly float[] _bands = new float[BandCount];
     private readonly float[] _waveform = new float[WaveformPoints];
+    private readonly float[] _spectrum = new float[SpectrumPoints];
     private readonly float[] _rawSamples;
 
     /// <summary>Creates an analyzer for one output sample rate.</summary>
@@ -61,6 +65,13 @@ public sealed class AudioSpectrumAnalyzer : IVisualizerAudioSource
     /// the range -1 to 1, for the visualizer waveform overlay.
     /// </summary>
     public ReadOnlySpan<float> Waveform => _waveform;
+
+    /// <summary>
+    /// Gets the recent spectrum magnitudes, normalized to zero to one and decimated to
+    /// <see cref="SpectrumPoints"/> points, lowest frequency first, for a custom waveform that reads
+    /// the spectrum.
+    /// </summary>
+    public ReadOnlySpan<float> Spectrum => _spectrum;
 
     /// <summary>Gets the current bass energy, between zero and one.</summary>
     public float Bass { get; private set; }
@@ -116,6 +127,7 @@ public sealed class AudioSpectrumAnalyzer : IVisualizerAudioSource
         }
 
         UpdateWaveform();
+        UpdateSpectrum();
 
         var average = level / BandCount;
         Volume = Smooth(Volume, average);
@@ -130,6 +142,7 @@ public sealed class AudioSpectrumAnalyzer : IVisualizerAudioSource
     {
         Array.Clear(_bands);
         Array.Clear(_waveform);
+        Array.Clear(_spectrum);
         Bass = Mid = Treble = Volume = 0f;
         FrameCount = 0;
     }
@@ -145,6 +158,20 @@ public sealed class AudioSpectrumAnalyzer : IVisualizerAudioSource
             // mono samples instead by undoing the window is not possible; use the magnitudes
             // of the raw samples kept in the scratch buffer region we control.
             _waveform[point] = _rawSamples[index];
+        }
+    }
+
+    /// <summary>Decimates the FFT magnitudes into the spectrum buffer a custom waveform reads.</summary>
+    private void UpdateSpectrum()
+    {
+        var bins = Math.Max(1, _magnitudes.Length);
+        var step = Math.Max(1, bins / SpectrumPoints);
+        for (var point = 0; point < SpectrumPoints; point++)
+        {
+            var index = Math.Min(bins - 1, point * step);
+            // The bands scale the magnitudes the same way, so a spectrum-reading waveform sees the
+            // same zero-to-one range the band levels use.
+            _spectrum[point] = Math.Clamp(_magnitudes[index] * 8f, 0f, 1f);
         }
     }
 

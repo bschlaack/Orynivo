@@ -25,6 +25,10 @@ Audit item 3 (the composite and feedback stages) is corrected: the final
 composite is either the custom comp shader or the legacy echo/gamma path, the
 overlay is drawn before the centre darkening and the border, the decay belongs
 to the warp, and the shader blur chain is built from the frame being warped.
+Audit item 4 (custom waves) is corrected: the four `wavecode_N_*` waveforms have
+their own state and `sample`/`value1`/`value2` contract, separate from the default
+waveform, and spectrum geometry is drawn only when a waveform requests it. The
+default waveform's eight mode geometries remain approximated.
 Remaining compatibility work and its
 recommended order are recorded in [VISUALIZER-FIDELITY-AUDIT.md](VISUALIZER-FIDELITY-AUDIT.md).
 CPU/GPU agreement and successful shader compilation are not reference fidelity gates.
