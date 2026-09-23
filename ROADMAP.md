@@ -880,8 +880,12 @@ affordable. This is a project of its own and must keep the CPU path as the fallb
   the CPU frame path stays as the automatic fallback for a platform without a GL context. A per-pixel
   block that writes the sample position is emitted as a warp fragment shader behind
   `ORYNIVO_VISUALIZER_PIXELWARP=1` (`ShaderTranspiler.TranspileGlslWarp` over a full-screen quad, with
-  the frame motion seeded as `_orynivo_*` uniforms and the decay moved to the post pass); it becomes
-  the default once the GPU and CPU pictures have been compared on a real preset collection.
+  the frame motion seeded as `_orynivo_*` uniforms and the decay moved to the post pass).
+  `scripts/gl-harness` renders it with `GLH_PIXEL_WARP=1`. A whole-frame CPU-vs-GPU comparison is
+  **not** a valid gate for it: the display frame is dominated by the overlay, which both renderers
+  composite identically after the warp, so the frames agree to about 1/255 whether the GPU runs the
+  per-pixel warp or the fixed one. A pixel-level probe that isolates the warp's effect on the
+  feedback, or a visual comparison on a real preset, is what would let it become the default.
   **Step 4 is done.** The GLSL emitter is `ShaderTranspiler`'s GLSL dialect next to SkSL
   (`TranspileGlsl`, `TranspileGlslComp`, `TranspileGlslWarp`): the prelude aliases `float2/3/4` onto
   `vec2/3/4` so the shared body emission is byte-identical, the samplers become `sampler2D` sampled
