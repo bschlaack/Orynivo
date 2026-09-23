@@ -42,16 +42,18 @@ also contributing to dx. All 13 `PerVertexMeshTests` pass.
 
 ### 1. P1: Geometry and shader equation order
 
-**Partly corrected.** `WarpSampling.SamplePosition` now divides by zoom and stretch, subtracts the
-offsets, uses the reference's radial zoom `pow(zoom, pow(zoomexp, radius * 2 - 1))`, takes the
-reference's aspect via `WarpSampling.GetAspect`, and applies the reference's time-dependent `warp`
-displacement through `WarpSampling.WarpDisplacement` (carried as a tenth mesh value and the
-`_orynivo_warp`/`_orynivo_warpTime`/`_orynivo_warpScale` uniforms). The fixed warp now transforms at
-the mesh vertices and interpolates the resulting coordinate — the OpenGL warp in its vertex shader
-and the CPU mesh warp through a per-vertex coordinate mesh — and the per-vertex block's
-`x`/`y`/`rad`/`ang` use the reference aspect. Still open: the emitted warp entry point computes the
-sample before the per-pixel block, and the OpenGL custom-warp path still draws a full-screen quad
-instead of the mesh.
+**Corrected for the OpenGL path.** `WarpSampling.SamplePosition` now divides by zoom and stretch,
+subtracts the offsets, uses the reference's radial zoom `pow(zoom, pow(zoomexp, radius * 2 - 1))`,
+takes the reference's aspect via `WarpSampling.GetAspect`, and applies the reference's
+time-dependent `warp` displacement through `WarpSampling.WarpDisplacement` (carried as a tenth mesh
+value and the `_orynivo_warp`/`_orynivo_warpTime`/`_orynivo_warpScale` uniforms). The warp now
+transforms at the mesh vertices and interpolates the resulting coordinate: the OpenGL warp does it in
+its vertex shader for both the fixed and the custom warp (the custom warp draws the mesh, and
+`TranspileGlslWarpMesh` emits a fragment stage that no longer recomputes the position or re-emits the
+per-pixel block), and the CPU mesh warp interpolates a per-vertex coordinate mesh. The per-vertex
+block's `x`/`y`/`rad`/`ang` use the reference aspect. The Skia warp pass still composes the per-pixel
+block into the fragment effect with the warped position in `x`/`y`, because a runtime effect has no
+vertex stage.
 
 - `WarpSampling.SamplePosition` multiplies by zoom and stretch and adds offsets.
   projectM's `MilkdropPreset/Shaders/PresetWarpVertexShaderGlsl330.vert` divides by

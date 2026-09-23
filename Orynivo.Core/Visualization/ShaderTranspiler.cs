@@ -493,6 +493,29 @@ public static class ShaderTranspiler
         out IReadOnlyList<string> perPixelUniforms) =>
         TranspileCore(program, perPixel, warpedUv: true, glsl: true, out samplers, out perPixelUniforms);
 
+    /// <summary>
+    /// Translates a warp shader into the GLSL fragment stage of the mesh warp. The coordinate, the
+    /// original position, and the polar pair arrive interpolated from the vertex shader, so this stage
+    /// only runs the shader body and samples; the per-pixel block belongs to the mesh and is not
+    /// emitted here. That is the reference's split: the per-vertex program produces the mesh, the
+    /// vertex shader transforms, and the warp shader is a fragment stage over the interpolated
+    /// coordinate.
+    /// </summary>
+    /// <param name="program">Parsed warp shader body, or <see langword="null"/> for a direct sample.</param>
+    /// <param name="perPixel">
+    /// Per-pixel block, used only to collect and declare the variables the shader reads; the mesh
+    /// already carries its result, so the body itself is not emitted.
+    /// </param>
+    /// <param name="samplers">The samplers the generated GLSL declares.</param>
+    /// <param name="perPixelUniforms">Preset variables the shader reads.</param>
+    /// <returns>The generated GLSL fragment shader.</returns>
+    public static string TranspileGlslWarpMesh(
+        ShaderNode? program,
+        PresetProgram? perPixel,
+        out IReadOnlyList<string> samplers,
+        out IReadOnlyList<string> perPixelUniforms) =>
+        TranspileCore(program, perPixel, warpedUv: true, glsl: true, out samplers, out perPixelUniforms, meshUv: true);
+
     /// <summary>The shared core of both translations.</summary>
     /// <param name="program">Parsed shader body, or <see langword="null"/> for a warp without a shader.</param>
     /// <param name="perPixel">Per-pixel expression block, or <see langword="null"/>.</param>
@@ -506,7 +529,8 @@ public static class ShaderTranspiler
         bool warpedUv,
         bool glsl,
         out IReadOnlyList<string> samplers,
-        out IReadOnlyList<string> perPixelUniforms)
+        out IReadOnlyList<string> perPixelUniforms,
+        bool meshUv = false)
     {
         _glsl = glsl;
         var builder = new StringBuilder();
@@ -655,7 +679,9 @@ public static class ShaderTranspiler
             return builder.ToString();
         }
 
-        EmitWarpMain(builder, program, perPixelBody);
+        // In mesh mode the per-pixel block already ran on the mesh, so its statements are not emitted
+        // again; its variables stay declared and seeded because the shader body may read them.
+        EmitWarpMain(builder, program, meshUv ? string.Empty : perPixelBody, meshUv);
         return builder.ToString();
     }
 
@@ -727,45 +753,70 @@ public static class ShaderTranspiler
     /// <param name="builder">Output.</param>
     /// <param name="program">Parsed warp shader body, or <see langword="null"/>.</param>
     /// <param name="perPixelBody">Emitted per-pixel statements.</param>
-    private static void EmitWarpMain(StringBuilder builder, ShaderNode? program, string perPixelBody)
+    /// <param name="meshUv">
+    /// Whether the coordinate, original position, and polar pair arrive interpolated from a vertex
+    /// stage. Then the body is a pure fragment stage: no transform is computed and the per-pixel block
+    /// is not emitted, because the mesh already carries its result.
+    /// </param>
+    private static void EmitWarpMain(StringBuilder builder, ShaderNode? program, string perPixelBody, bool meshUv = false)
     {
+        if (meshUv)
+        {
+            builder.Append("in vec2 vUv;\n");
+            builder.Append("in vec2 vUvOrig;\n");
+            builder.Append("in float vRad;\n");
+            builder.Append("in float vAng;\n");
+        }
+
         EmitEntryHeader(builder);
-        builder.Append("    float2 _orynivo_uv_orig = (fragCoord - 0.5) / (_orynivo_size - 1.0);\n");
-        builder.Append("    float2 _orynivo_normalized = (_orynivo_uv_orig * 2.0) - 1.0;\n");
-        builder.Append("    float _orynivo_aspectX = texsize.y > texsize.x ? texsize.x / texsize.y : 1.0;\n");
-        builder.Append("    float _orynivo_aspectY = texsize.x > texsize.y ? texsize.y / texsize.x : 1.0;\n");
-        builder.Append("    float _orynivo_radius = length(_orynivo_normalized * float2(_orynivo_aspectX, _orynivo_aspectY));\n");
-        builder.Append("    float _orynivo_radialZoom = (_orynivo_zoomExp != 1.0) ? pow(_orynivo_zoom, pow(_orynivo_zoomExp, _orynivo_radius * 2.0 - 1.0)) : _orynivo_zoom;\n");
-        builder.Append("    float _orynivo_inverseZoom = 1.0 / max(0.01, _orynivo_radialZoom);\n");
-        builder.Append("    float2 _orynivo_uv = float2(_orynivo_normalized.x * _orynivo_aspectX * 0.5 * _orynivo_inverseZoom + 0.5, _orynivo_normalized.y * _orynivo_aspectY * 0.5 * _orynivo_inverseZoom + 0.5);\n");
-        builder.Append("    _orynivo_uv = (_orynivo_uv - _orynivo_centre) / _orynivo_stretch + _orynivo_centre;\n");
-        builder.Append("    if (_orynivo_warp != 0.0) {\n");
-        builder.Append("        float _orynivo_scaleInv = _orynivo_warpScale == 0.0 ? 1.0 : 1.0 / _orynivo_warpScale;\n");
-        builder.Append("        float _orynivo_wf0 = 11.68 + 4.0 * cos(_orynivo_warpTime * 1.413 + 10.0);\n");
-        builder.Append("        float _orynivo_wf1 = 8.77 + 3.0 * cos(_orynivo_warpTime * 1.113 + 7.0);\n");
-        builder.Append("        float _orynivo_wf2 = 10.54 + 3.0 * cos(_orynivo_warpTime * 1.233 + 3.0);\n");
-        builder.Append("        float _orynivo_wf3 = 11.49 + 4.0 * cos(_orynivo_warpTime * 0.933 + 5.0);\n");
-        builder.Append("        float _orynivo_wa = _orynivo_warp * 0.0035;\n");
-        builder.Append("        _orynivo_uv.x += _orynivo_wa * sin(_orynivo_warpTime * 0.333 + _orynivo_scaleInv * (_orynivo_normalized.x * _orynivo_wf0 - _orynivo_normalized.y * _orynivo_wf3)) + _orynivo_wa * cos(_orynivo_warpTime * 0.753 - _orynivo_scaleInv * (_orynivo_normalized.x * _orynivo_wf1 - _orynivo_normalized.y * _orynivo_wf2));\n");
-        builder.Append("        _orynivo_uv.y += _orynivo_wa * cos(_orynivo_warpTime * 0.375 - _orynivo_scaleInv * (_orynivo_normalized.x * _orynivo_wf2 + _orynivo_normalized.y * _orynivo_wf1)) + _orynivo_wa * sin(_orynivo_warpTime * 0.825 + _orynivo_scaleInv * (_orynivo_normalized.x * _orynivo_wf0 + _orynivo_normalized.y * _orynivo_wf3));\n");
-        builder.Append("    }\n");
-        builder.Append("    float _orynivo_cos = cos(_orynivo_rotation);\n");
-        builder.Append("    float _orynivo_sin = sin(_orynivo_rotation);\n");
-        builder.Append("    float2 _orynivo_rotated = _orynivo_uv - _orynivo_centre;\n");
-        builder.Append("    _orynivo_uv = float2((_orynivo_rotated.x * _orynivo_cos) - (_orynivo_rotated.y * _orynivo_sin), (_orynivo_rotated.x * _orynivo_sin) + (_orynivo_rotated.y * _orynivo_cos)) + _orynivo_centre;\n");
-        builder.Append("    _orynivo_uv -= _orynivo_offset;\n");
-        builder.Append("    _orynivo_uv = (_orynivo_uv - 0.5) / float2(_orynivo_aspectX, _orynivo_aspectY) + 0.5;\n");
-        builder.Append("    float2 _orynivo_sample = (_orynivo_uv * 2.0) - 1.0;\n");
-        builder.Append("    float _orynivo_x = _orynivo_sample.x;\n");
-        builder.Append("    float _orynivo_y = _orynivo_sample.y;\n");
-        builder.Append("    float _orynivo_rad = _orynivo_radius;\n");
-        builder.Append("    float _orynivo_ang = atan(_orynivo_rotated.y, _orynivo_rotated.x);\n");
-        builder.Append(perPixelBody);
+
+        if (meshUv)
+        {
+            builder.Append("    float2 uv = vUv;\n");
+            builder.Append("    float2 uv_orig = vUvOrig;\n");
+            builder.Append("    float rad = vRad;\n");
+            builder.Append("    float ang = vAng;\n");
+        }
+        else
+        {
+            builder.Append("    float2 _orynivo_uv_orig = (fragCoord - 0.5) / (_orynivo_size - 1.0);\n");
+            builder.Append("    float2 _orynivo_normalized = (_orynivo_uv_orig * 2.0) - 1.0;\n");
+            builder.Append("    float _orynivo_aspectX = texsize.y > texsize.x ? texsize.x / texsize.y : 1.0;\n");
+            builder.Append("    float _orynivo_aspectY = texsize.x > texsize.y ? texsize.y / texsize.x : 1.0;\n");
+            builder.Append("    float _orynivo_radius = length(_orynivo_normalized * float2(_orynivo_aspectX, _orynivo_aspectY));\n");
+            builder.Append("    float _orynivo_radialZoom = (_orynivo_zoomExp != 1.0) ? pow(_orynivo_zoom, pow(_orynivo_zoomExp, _orynivo_radius * 2.0 - 1.0)) : _orynivo_zoom;\n");
+            builder.Append("    float _orynivo_inverseZoom = 1.0 / max(0.01, _orynivo_radialZoom);\n");
+            builder.Append("    float2 _orynivo_uv = float2(_orynivo_normalized.x * _orynivo_aspectX * 0.5 * _orynivo_inverseZoom + 0.5, _orynivo_normalized.y * _orynivo_aspectY * 0.5 * _orynivo_inverseZoom + 0.5);\n");
+            builder.Append("    _orynivo_uv = (_orynivo_uv - _orynivo_centre) / _orynivo_stretch + _orynivo_centre;\n");
+            builder.Append("    if (_orynivo_warp != 0.0) {\n");
+            builder.Append("        float _orynivo_scaleInv = _orynivo_warpScale == 0.0 ? 1.0 : 1.0 / _orynivo_warpScale;\n");
+            builder.Append("        float _orynivo_wf0 = 11.68 + 4.0 * cos(_orynivo_warpTime * 1.413 + 10.0);\n");
+            builder.Append("        float _orynivo_wf1 = 8.77 + 3.0 * cos(_orynivo_warpTime * 1.113 + 7.0);\n");
+            builder.Append("        float _orynivo_wf2 = 10.54 + 3.0 * cos(_orynivo_warpTime * 1.233 + 3.0);\n");
+            builder.Append("        float _orynivo_wf3 = 11.49 + 4.0 * cos(_orynivo_warpTime * 0.933 + 5.0);\n");
+            builder.Append("        float _orynivo_wa = _orynivo_warp * 0.0035;\n");
+            builder.Append("        _orynivo_uv.x += _orynivo_wa * sin(_orynivo_warpTime * 0.333 + _orynivo_scaleInv * (_orynivo_normalized.x * _orynivo_wf0 - _orynivo_normalized.y * _orynivo_wf3)) + _orynivo_wa * cos(_orynivo_warpTime * 0.753 - _orynivo_scaleInv * (_orynivo_normalized.x * _orynivo_wf1 - _orynivo_normalized.y * _orynivo_wf2));\n");
+            builder.Append("        _orynivo_uv.y += _orynivo_wa * cos(_orynivo_warpTime * 0.375 - _orynivo_scaleInv * (_orynivo_normalized.x * _orynivo_wf2 + _orynivo_normalized.y * _orynivo_wf1)) + _orynivo_wa * sin(_orynivo_warpTime * 0.825 + _orynivo_scaleInv * (_orynivo_normalized.x * _orynivo_wf0 + _orynivo_normalized.y * _orynivo_wf3));\n");
+            builder.Append("    }\n");
+            builder.Append("    float _orynivo_cos = cos(_orynivo_rotation);\n");
+            builder.Append("    float _orynivo_sin = sin(_orynivo_rotation);\n");
+            builder.Append("    float2 _orynivo_rotated = _orynivo_uv - _orynivo_centre;\n");
+            builder.Append("    _orynivo_uv = float2((_orynivo_rotated.x * _orynivo_cos) - (_orynivo_rotated.y * _orynivo_sin), (_orynivo_rotated.x * _orynivo_sin) + (_orynivo_rotated.y * _orynivo_cos)) + _orynivo_centre;\n");
+            builder.Append("    _orynivo_uv -= _orynivo_offset;\n");
+            builder.Append("    _orynivo_uv = (_orynivo_uv - 0.5) / float2(_orynivo_aspectX, _orynivo_aspectY) + 0.5;\n");
+            builder.Append("    float2 _orynivo_sample = (_orynivo_uv * 2.0) - 1.0;\n");
+            builder.Append("    float _orynivo_x = _orynivo_sample.x;\n");
+            builder.Append("    float _orynivo_y = _orynivo_sample.y;\n");
+            builder.Append("    float _orynivo_rad = _orynivo_radius;\n");
+            builder.Append("    float _orynivo_ang = atan(_orynivo_rotated.y, _orynivo_rotated.x);\n");
+            builder.Append(perPixelBody);
+        }
 
         if (program is null)
         {
             // A warp without a shader is the geometric warp: sample the previous frame, black outside.
-            builder.Append("    float2 uv = (float2(_orynivo_x, _orynivo_y) * 0.5) + 0.5;\n");
+            if (!meshUv)
+                builder.Append("    float2 uv = (float2(_orynivo_x, _orynivo_y) * 0.5) + 0.5;\n");
             builder.Append("    if (uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0) { ")
                 .Append(_glsl ? "orynivoColor = half4(0.0); return; " : "return half4(0.0); ")
                 .Append("}\n");
@@ -777,13 +828,17 @@ public static class ShaderTranspiler
             return;
         }
 
-        // The shader sees the sampling position in uv and the pixel position in uv_orig, and its
-        // polar pair is derived from uv, exactly as the CPU binding does.
-        builder.Append("    float2 uv = (float2(_orynivo_x, _orynivo_y) * 0.5) + 0.5;\n");
-        builder.Append("    float2 uv_orig = _orynivo_uv_orig;\n");
-        builder.Append("    float2 centred = (uv * 2.0) - 1.0;\n");
-        builder.Append("    float rad = length(centred);\n");
-        builder.Append("    float ang = atan(centred.y, centred.x);\n");
+        if (!meshUv)
+        {
+            // The shader sees the sampling position in uv and the pixel position in uv_orig, and its
+            // polar pair is derived from uv, exactly as the CPU binding does.
+            builder.Append("    float2 uv = (float2(_orynivo_x, _orynivo_y) * 0.5) + 0.5;\n");
+            builder.Append("    float2 uv_orig = _orynivo_uv_orig;\n");
+            builder.Append("    float2 centred = (uv * 2.0) - 1.0;\n");
+            builder.Append("    float rad = length(centred);\n");
+            builder.Append("    float ang = atan(centred.y, centred.x);\n");
+        }
+
         builder.Append("    float3 ret = float3(0.0);\n");
         EmitMutableUniforms(builder);
         EmitEntryStatements(builder, program);

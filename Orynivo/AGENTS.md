@@ -51,7 +51,11 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
   shader only samples it. The mesh vertex layout is position plus the ten
   `PresetRenderer.MeshValues` motion values, mapped across four attributes; keep
   the attribute pointers and `PackVertices` in step when the value set changes.
-  The OpenGL custom-warp path still draws a full-screen quad.
+  The custom warp draws the same mesh with the same vertex shader: its fragment
+  stage comes from `ShaderTranspiler.TranspileGlslWarpMesh`, which reads the
+  interpolated coordinate from the vertex stage and does not re-emit the per-pixel
+  block, because the mesh already ran it. Keep the two warp programs on the mesh
+  vertex shader, and never draw the custom warp as a full-screen quad again.
 - The GL shader samplers resolve the texture from the sampler's base name (the
   qualifier is stripped first) and bind every `main`-family sampler to the stage's
   main frame. GL exposes no per-sampler state through `GlInterface`, so a frame

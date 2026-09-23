@@ -76,6 +76,9 @@ internal sealed class VisualizerGlPipeline
         layout(location = 3) in vec3 aMotion2;
         layout(location = 4) in float aWarp;
         out vec2 vUv;
+        out vec2 vUvOrig;
+        out float vRad;
+        out float vAng;
         uniform float uFrameWidth;
         uniform float uFrameHeight;
         uniform float uNeedsRadius;
@@ -135,6 +138,9 @@ internal sealed class VisualizerGlPipeline
             u = (u - 0.5) / aspectX + 0.5;
             v = (v - 0.5) / aspectY + 0.5;
             vUv = vec2(u, v);
+            vUvOrig = aPosition * 0.5 + 0.5;
+            vRad = radius;
+            vAng = -atan(aPosition.y * aspectY, aPosition.x * aspectX);
             gl_Position = vec4(aPosition, 0.0, 1.0);
         }
         """;
@@ -671,7 +677,14 @@ internal sealed class VisualizerGlPipeline
                 gl.UseProgram(_warpShaderProgram);
                 BindShaderSamplers(gl, _warpShaderProgram, _warpShaderUniforms, _feedbackTexture, _previousTexture);
                 SetShaderUniforms(gl, _warpShaderProgram, _warpShaderUniforms, uniforms);
-                DrawQuad(gl);
+                // The vertex stage owns the transform, so it needs the same motion parameters the
+                // fixed warp passes.
+                Set(gl, _warpShaderUniforms, "uFrameWidth", frameWidth);
+                Set(gl, _warpShaderUniforms, "uFrameHeight", frameHeight);
+                Set(gl, _warpShaderUniforms, "uNeedsRadius", needsRadius ? 1f : 0f);
+                Set(gl, _warpShaderUniforms, "uWarpTime", parameters.WarpTime);
+                Set(gl, _warpShaderUniforms, "uWarpScale", 1f);
+                DrawMesh(gl);
             }
             else
             {
@@ -684,19 +697,7 @@ internal sealed class VisualizerGlPipeline
                 Set(gl, _warpUniforms, "uNeedsRadius", needsRadius ? 1f : 0f);
                 Set(gl, _warpUniforms, "uWarpTime", parameters.WarpTime);
                 Set(gl, _warpUniforms, "uWarpScale", 1f);
-                gl.BindVertexArray(_meshVertexArray);
-                gl.BindBuffer(GlArrayBuffer, _meshVertexBuffer);
-                var vertices = GCHandle.Alloc(_vertices, GCHandleType.Pinned);
-                try
-                {
-                    gl.BufferData(GlArrayBuffer, (IntPtr)(_vertices.Length * sizeof(float)), vertices.AddrOfPinnedObject(), GlDynamicDraw);
-                }
-                finally
-                {
-                    vertices.Free();
-                }
-
-                gl.DrawElements(GlTriangles, _meshIndexCount, GlUnsignedShort, IntPtr.Zero);
+                DrawMesh(gl);
             }
 
             // Remember the previous pre-comp frame for the comp shader before the post pass overwrites it.
@@ -809,6 +810,25 @@ internal sealed class VisualizerGlPipeline
         gl.DrawArrays(GlTriangleStrip, 0, 4);
     }
 
+    /// <summary>Uploads the packed mesh and draws it, so the vertex stage owns the transform.</summary>
+    /// <param name="gl">GL interface.</param>
+    private void DrawMesh(GlInterface gl)
+    {
+        gl.BindVertexArray(_meshVertexArray);
+        gl.BindBuffer(GlArrayBuffer, _meshVertexBuffer);
+        var vertices = GCHandle.Alloc(_vertices, GCHandleType.Pinned);
+        try
+        {
+            gl.BufferData(GlArrayBuffer, (IntPtr)(_vertices.Length * sizeof(float)), vertices.AddrOfPinnedObject(), GlDynamicDraw);
+        }
+        finally
+        {
+            vertices.Free();
+        }
+
+        gl.DrawElements(GlTriangles, _meshIndexCount, GlUnsignedShort, IntPtr.Zero);
+    }
+
     /// <summary>Sets a sampler uniform when the program declares it.</summary>
     /// <param name="gl">GL interface.</param>
     /// <param name="uniforms">Resolved uniform locations.</param>
@@ -881,7 +901,9 @@ internal sealed class VisualizerGlPipeline
 
         if (_warpShaderSource is { Length: > 0 })
         {
-            if (TryBuildShaderProgram(gl, _warpShaderSource, out var program, out var error))
+            // The warp shader is a fragment stage over the mesh: the vertex shader transforms the
+            // per-vertex coordinate, exactly as the reference warp vertex shader does.
+            if (TryBuildShaderProgram(gl, WarpVertexSource, _warpShaderSource, out var program, out var error))
                 _warpShaderProgram = program;
             else
                 ShaderError = "warp: " + error;
@@ -889,26 +911,27 @@ internal sealed class VisualizerGlPipeline
 
         if (_compShaderSource is { Length: > 0 })
         {
-            if (TryBuildShaderProgram(gl, _compShaderSource, out var program, out var error))
+            if (TryBuildShaderProgram(gl, ShaderVertexSource, _compShaderSource, out var program, out var error))
                 _compShaderProgram = program;
             else
                 ShaderError = (ShaderError is null ? string.Empty : ShaderError + " ") + "comp: " + error;
         }
     }
 
-    /// <summary>Compiles and links one emitted fragment shader with the quad vertex shader.</summary>
+    /// <summary>Compiles and links one emitted fragment shader with a vertex shader.</summary>
     /// <param name="gl">GL interface.</param>
+    /// <param name="vertexSource">Vertex shader the fragment stage is linked with.</param>
     /// <param name="fragmentSource">Emitted GLSL fragment shader.</param>
     /// <param name="program">Receives the linked program.</param>
     /// <param name="error">Receives the compile or link log.</param>
     /// <returns><see langword="true"/> when the program linked.</returns>
-    private static bool TryBuildShaderProgram(GlInterface gl, string fragmentSource, out int program, out string? error)
+    private static bool TryBuildShaderProgram(GlInterface gl, string vertexSource, string fragmentSource, out int program, out string? error)
     {
         program = 0;
         error = null;
         try
         {
-            program = BuildProgram(gl, ShaderVertexSource, fragmentSource, out error);
+            program = BuildProgram(gl, vertexSource, fragmentSource, out error);
             return true;
         }
         catch (InvalidOperationException)

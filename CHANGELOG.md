@@ -7,6 +7,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Changed
+- The OpenGL custom warp now draws the prepared mesh instead of a full-screen quad, so the per-pixel
+  block reaches the geometry through the mesh (it runs once per vertex, as the reference's per-vertex
+  program does) and the warp shader is a pure fragment stage over the interpolated coordinate.
+  `ShaderTranspiler.TranspileGlslWarpMesh` emits that fragment stage — the per-pixel block is not
+  emitted again, because the mesh already carries its result — and the warp program links the same
+  mesh vertex shader the fixed warp uses. The emitted warp entry point therefore no longer computes
+  the sampling position before the block.
 - The visualizer's warp now transforms the texture coordinate at the mesh vertices and interpolates
   the resulting coordinate, exactly as the reference warp vertex shader does, instead of interpolating
   the motion values and transforming per pixel. The OpenGL warp does it in its vertex shader (the mesh

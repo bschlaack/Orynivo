@@ -115,7 +115,7 @@ public partial class VisualizerWindow : Window
             if (preset.WarpShaders.Count > 0)
             {
                 var perPixel = preset.PerPixel.IsEmpty ? null : preset.PerPixel;
-                warp = ShaderTranspiler.TranspileGlslWarp(preset.WarpShaders[0].Program, perPixel, out _, out var warpUniforms);
+                warp = ShaderTranspiler.TranspileGlslWarpMesh(preset.WarpShaders[0].Program, perPixel, out _, out var warpUniforms);
                 names.UnionWith(warpUniforms);
             }
 
