@@ -6,6 +6,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added
+- Added `scripts/visualizer-compare/render-compare.ps1`, which renders a preset — or every preset
+  below a folder — with Orynivo and the reference implementation under identical resolution, frame
+  count, frame time, mesh and audio, writes the frames and a settings manifest, and generates
+  `compare-tone.wav`. That tone is a deterministic 440 Hz stereo signal both renderers synthesize, so
+  a capture from a reference player such as MilkDrop in Winamp can be compared with the renders under
+  the same audio state. `ORACLE_TONE`/`GLH_ORACLE_TONE` select the tone; without them the comparison
+  keeps its previous constant level.
+
 ### Changed
 - The legacy final composite now applies the reference's animated hue shade: before the gamma gain,
   the frame is multiplied by a four-corner colour whose three channels are animated sines normalised

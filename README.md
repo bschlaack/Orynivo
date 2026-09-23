@@ -1692,6 +1692,9 @@ and display-only gamma/echo. Textured shapes, default-wave geometry, exact audio
 analysis, legacy hue shading and CPU fallback behavior still differ. See the
 [current verification report](VISUALIZER-FIDELITY-RECHECK.md) for fixes, tests and
 remaining limits; a direct Winamp MilkDrop comparison is still required.
+`scripts/visualizer-compare/render-compare.ps1` renders Orynivo and the reference
+implementation under identical resolution, frame time and audio and writes a matching
+test tone, so a capture from a reference player can be compared with the renders.
 
 **Visualisierung** in the sidebar opens a fullscreen music visualizer. It renders the playing
 audio through a Milkdrop-style preset engine at 640 x 360 and scales the frame up. Escape

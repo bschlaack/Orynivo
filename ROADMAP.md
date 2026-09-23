@@ -20,12 +20,14 @@ these changes. The oracle now uses explicit time and matching PCM input.
 
 See [the current verification report](VISUALIZER-FIDELITY-RECHECK.md) for evidence
 and remaining work: exact audio analysis, fallback-path differences and matched
-Winamp/ANGLE captures. The default waveform now uses the reference's per-mode
-geometry (`MilkdropWaveform`), textured custom shapes sample the frame through the
-reference's fan texture coordinates, and the legacy final composite applies the
-reference's animated hue shade, all replacing earlier approximations. Historical
-completed items below describe implementation milestones, not proof of full
-reference fidelity.
+Winamp/ANGLE captures. `scripts/visualizer-compare/render-compare.ps1` renders both
+engines under identical resolution, frame time and audio and writes a matching test
+tone, so a reference-player capture can be compared with the renders. The default
+waveform now uses the reference's per-mode geometry (`MilkdropWaveform`), textured
+custom shapes sample the frame through the reference's fan texture coordinates, and
+the legacy final composite applies the reference's animated hue shade, all replacing
+earlier approximations. Historical completed items below describe implementation
+milestones, not proof of full reference fidelity.
 
 ## Completed (1–14)
 

@@ -144,6 +144,9 @@ These corrections do **not** establish complete Winamp MilkDrop fidelity:
   named-preset comparisons. These tests do not prove every expression/shader dialect.
 - GPU checks use a hidden WGL context. Avalonia/ANGLE composition and a direct
   Winamp capture with identical music, preset and settings were not exercised.
+  `scripts/visualizer-compare/render-compare.ps1` now renders both engines under
+  identical resolution, frame time and audio and writes a matching test tone, so a
+  reference-player capture can be produced and compared.
 
 The old audit's blanket “Corrected” labels must not be read as completion of these
 remaining features. Use isolated reference fixtures and then a named Winamp preset
