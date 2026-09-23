@@ -228,18 +228,17 @@ This file applies to `Orynivo.Core/` and supplements `../AGENTS.md`.
   workers the same slot array, and never claim a speed-up without the identical-frame test in
   `ParallelWarpTests`.
   `PresetRenderer.MeshPerPixelEnabled` (off by default) makes the warp evaluate the per-pixel
-  program once per mesh vertex and interpolate the motion it produced across the quad, which is what
-  Milkdrop's per-vertex program does; `BuildMesh` fills the mesh from the per-frame values first, so a
-  program that exceeds the warp budget leaves a plain warp rather than an unfinished mesh, and it
-  restores the per-frame motion afterwards because a later stage means the frame's values, not the
-  last vertex's. The interpolation is a lerp, not a weighted sum, so a constant motion stays
-  byte-identical to the per-pixel path — `PerVertexMeshTests` asserts exactly that and that a varying
-  motion is interpolated. A program that writes `x` or `y`, records motion vectors, or feeds a warp
-  shader keeps the per-pixel path, because an interpolated sample position has no meaning. Keep it
-  opt-in until the engine's per-pixel `x`/`y` (the warped position in minus-one-to-one space) is
-  reconciled with Milkdrop's aspect-scaled zero-to-one vertex position: a preset that derives
-  `dx`/`dy` from `x`/`y` renders visibly differently once that offset is interpolated, and
-  `scripts/projectm-oracle` is how that is measured.
+  program once per mesh vertex and interpolate the coordinate each vertex transforms to across the
+  quad, which is what the reference warp vertex shader does; `BuildMesh` fills the mesh from the
+  per-frame values first, so a program that exceeds the warp budget leaves a plain warp rather than an
+  unfinished mesh, and it restores the per-frame motion afterwards because a later stage means the
+  frame's values, not the last vertex's. The coordinate mesh is interpolated with a lerp, so an
+  affine transform stays within floating-point precision of the per-pixel path — `PerVertexMeshTests`
+  asserts that and that a varying motion is interpolated. A program that writes `x` or `y`, records
+  motion vectors, or feeds a warp shader keeps the per-pixel path, because an interpolated sample
+  position has no meaning. `BuildMesh` writes the per-vertex `x`/`y`/`rad`/`ang` with the reference
+  aspect (`WarpSampling.GetAspect`), matching the reference's aspect-scaled zero-to-one vertex
+  position, and `scripts/projectm-oracle` is how that is measured.
   `MeshGridX`, `MeshGridY`, and `MeshValues` are public because a GPU warp reads the mesh as vertex
   attributes, and the value order is part of that contract: zoom, zoomexp, rot, cx, cy, dx, dy, sx,
   sy, warp. `MeshRequested` builds the mesh while the CPU keeps evaluating per pixel, which is the

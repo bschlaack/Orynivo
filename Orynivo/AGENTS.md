@@ -44,6 +44,14 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
   and before drawing. `scripts/gl-harness/verify-warp-target.ps1` checks the real
   GPU pipeline with a constant-output shader at two sizes. See
   `VISUALIZER-FIDELITY-AUDIT.md` for outstanding Milkdrop compatibility issues.
+- The fixed GL warp transforms the texture coordinate in its vertex shader and
+  interpolates the resulting coordinate, so `WarpVertexSource` computes the
+  reference warp arithmetic (including the time-dependent displacement, whose
+  `uWarpTime` comes from `VisualizerFrameParameters.WarpTime`) and the fragment
+  shader only samples it. The mesh vertex layout is position plus the ten
+  `PresetRenderer.MeshValues` motion values, mapped across four attributes; keep
+  the attribute pointers and `PackVertices` in step when the value set changes.
+  The OpenGL custom-warp path still draws a full-screen quad.
 - The GL shader samplers resolve the texture from the sampler's base name (the
   qualifier is stripped first) and bind every `main`-family sampler to the stage's
   main frame. GL exposes no per-sampler state through `GlInterface`, so a frame

@@ -74,67 +74,54 @@ internal sealed class VisualizerGlPipeline
         layout(location = 1) in vec3 aMotion0;
         layout(location = 2) in vec3 aMotion1;
         layout(location = 3) in vec3 aMotion2;
-        out vec3 vMotion0;
-        out vec3 vMotion1;
-        out vec3 vMotion2;
-        void main()
-        {
-            vMotion0 = aMotion0;
-            vMotion1 = aMotion1;
-            vMotion2 = aMotion2;
-            gl_Position = vec4(aPosition, 0.0, 1.0);
-        }
-        """;
-
-    /// <summary>
-    /// The warp sampling position, translated from <see cref="WarpSampling.SamplePosition"/>. The
-    /// engine's coordinates are top-down, so the row is measured from the top and the source texture,
-    /// which is bottom-up, is sampled with a flipped v.
-    /// </summary>
-    private const string WarpFragmentSource = """
-        #version 300 es
-        precision highp float;
-        precision highp sampler2D;
-        in vec3 vMotion0;
-        in vec3 vMotion1;
-        in vec3 vMotion2;
-        out vec4 fragColor;
-        uniform sampler2D uSource;
+        layout(location = 4) in float aWarp;
+        out vec2 vUv;
         uniform float uFrameWidth;
         uniform float uFrameHeight;
         uniform float uNeedsRadius;
+        uniform float uWarpTime;
+        uniform float uWarpScale;
         void main()
         {
-            float zoom = max(0.01, vMotion0.x);
-            float zoomExp = vMotion0.y;
-            float rotation = vMotion0.z;
-            float cx = vMotion1.x;
-            float cy = vMotion1.y;
-            float dx = vMotion1.z;
-            float dy = vMotion2.x;
-            float sx = vMotion2.y;
-            float sy = vMotion2.z;
+            float zoom = max(0.01, aMotion0.x);
+            float zoomExp = aMotion0.y;
+            float rotation = aMotion0.z;
+            float cx = aMotion1.x;
+            float cy = aMotion1.y;
+            float dx = aMotion1.z;
+            float dy = aMotion2.x;
+            float sx = aMotion2.y;
+            float sy = aMotion2.z;
 
-            float column = floor(gl_FragCoord.x);
-            float row = uFrameHeight - 1.0 - floor(gl_FragCoord.y);
-            vec2 normalized = vec2(
-                (column / max(uFrameWidth - 1.0, 1.0)) * 2.0 - 1.0,
-                (row / max(uFrameHeight - 1.0, 1.0)) * 2.0 - 1.0);
-
-            // The reference warp vertex shader's arithmetic: scale by the aspect, divide by the
-            // radial zoom, stretch, rotate, translate, and scale back by the inverse aspect.
+            // The reference warp vertex shader's arithmetic, applied at the vertex so the resulting
+            // texture coordinate is interpolated across the quad. aPosition is the vertex position in
+            // minus-one-to-one space.
             float aspectX = uFrameHeight > uFrameWidth ? uFrameWidth / uFrameHeight : 1.0;
             float aspectY = uFrameWidth > uFrameHeight ? uFrameHeight / uFrameWidth : 1.0;
-            float radius = uNeedsRadius > 0.5 ? length(normalized * vec2(aspectX, aspectY)) : 0.0;
+            float radius = uNeedsRadius > 0.5 ? length(aPosition * vec2(aspectX, aspectY)) : 0.0;
             float radialZoom = (uNeedsRadius > 0.5 && zoomExp != 1.0)
                 ? pow(zoom, pow(zoomExp, radius * 2.0 - 1.0))
                 : zoom;
             float inverseZoom = 1.0 / max(0.01, radialZoom);
 
-            float u = normalized.x * aspectX * 0.5 * inverseZoom + 0.5;
-            float v = normalized.y * aspectY * 0.5 * inverseZoom + 0.5;
+            float u = aPosition.x * aspectX * 0.5 * inverseZoom + 0.5;
+            float v = aPosition.y * aspectY * 0.5 * inverseZoom + 0.5;
             u = (u - cx) / max(abs(sx), 0.0001) * sign(sx) + cx;
             v = (v - cy) / max(abs(sy), 0.0001) * sign(sy) + cy;
+
+            if (aWarp != 0.0)
+            {
+                float scaleInverse = uWarpScale == 0.0 ? 1.0 : 1.0 / uWarpScale;
+                float factor0 = 11.68 + 4.0 * cos(uWarpTime * 1.413 + 10.0);
+                float factor1 = 8.77 + 3.0 * cos(uWarpTime * 1.113 + 7.0);
+                float factor2 = 10.54 + 3.0 * cos(uWarpTime * 1.233 + 3.0);
+                float factor3 = 11.49 + 4.0 * cos(uWarpTime * 0.933 + 5.0);
+                float amount = aWarp * 0.0035;
+                u += amount * sin(uWarpTime * 0.333 + scaleInverse * (aPosition.x * factor0 - aPosition.y * factor3))
+                   + amount * cos(uWarpTime * 0.753 - scaleInverse * (aPosition.x * factor1 - aPosition.y * factor2));
+                v += amount * cos(uWarpTime * 0.375 - scaleInverse * (aPosition.x * factor2 + aPosition.y * factor1))
+                   + amount * sin(uWarpTime * 0.825 + scaleInverse * (aPosition.x * factor0 + aPosition.y * factor3));
+            }
 
             float cosine = cos(rotation);
             float sine = sin(rotation);
@@ -147,7 +134,27 @@ internal sealed class VisualizerGlPipeline
             v -= dy;
             u = (u - 0.5) / aspectX + 0.5;
             v = (v - 0.5) / aspectY + 0.5;
-            vec2 uv = vec2(u, v);
+            vUv = vec2(u, v);
+            gl_Position = vec4(aPosition, 0.0, 1.0);
+        }
+        """;
+
+    /// <summary>
+    /// The warp sampling position, translated from <see cref="WarpSampling.SamplePosition"/>. The
+    /// engine's coordinates are top-down, so the row is measured from the top and the source texture,
+    /// which is bottom-up, is sampled with a flipped v. The coordinate itself is computed and
+    /// interpolated at the vertices, exactly as the reference warp vertex shader does.
+    /// </summary>
+    private const string WarpFragmentSource = """
+        #version 300 es
+        precision highp float;
+        precision highp sampler2D;
+        in vec2 vUv;
+        out vec4 fragColor;
+        uniform sampler2D uSource;
+        void main()
+        {
+            vec2 uv = vUv;
 
             // Outside the frame the warp is transparent black, like the CPU sampler. The clamp keeps
             // every pass bounded exactly like the eight-bit texture it replaces, so a preset that
@@ -155,7 +162,6 @@ internal sealed class VisualizerGlPipeline
             vec4 colour = texture(uSource, vec2(uv.x, 1.0 - uv.y));
             float inside = step(0.0, uv.x) * step(uv.x, 1.0) * step(0.0, uv.y) * step(uv.y, 1.0);
             fragColor = clamp(colour * inside, 0.0, 1.0);
-
         }
         """;
 
@@ -507,8 +513,10 @@ internal sealed class VisualizerGlPipeline
             gl.VertexAttribPointer(1, 3, GlFloat, 0, stride, (IntPtr)(2 * sizeof(float)));
             gl.EnableVertexAttribArray(2);
             gl.VertexAttribPointer(2, 3, GlFloat, 0, stride, (IntPtr)(5 * sizeof(float)));
-            gl.EnableVertexAttribArray(3);
-            gl.VertexAttribPointer(3, 3, GlFloat, 0, stride, (IntPtr)(8 * sizeof(float)));
+        gl.EnableVertexAttribArray(3);
+        gl.VertexAttribPointer(3, 3, GlFloat, 0, stride, (IntPtr)(8 * sizeof(float)));
+        gl.EnableVertexAttribArray(4);
+        gl.VertexAttribPointer(4, 1, GlFloat, 0, stride, (IntPtr)(11 * sizeof(float)));
             var indices = GCHandle.Alloc(_indices, GCHandleType.Pinned);
             try
             {
@@ -674,6 +682,8 @@ internal sealed class VisualizerGlPipeline
                 Set(gl, _warpUniforms, "uFrameWidth", frameWidth);
                 Set(gl, _warpUniforms, "uFrameHeight", frameHeight);
                 Set(gl, _warpUniforms, "uNeedsRadius", needsRadius ? 1f : 0f);
+                Set(gl, _warpUniforms, "uWarpTime", parameters.WarpTime);
+                Set(gl, _warpUniforms, "uWarpScale", 1f);
                 gl.BindVertexArray(_meshVertexArray);
                 gl.BindBuffer(GlArrayBuffer, _meshVertexBuffer);
                 var vertices = GCHandle.Alloc(_vertices, GCHandleType.Pinned);

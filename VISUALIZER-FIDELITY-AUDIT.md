@@ -46,10 +46,12 @@ also contributing to dx. All 13 `PerVertexMeshTests` pass.
 offsets, uses the reference's radial zoom `pow(zoom, pow(zoomexp, radius * 2 - 1))`, takes the
 reference's aspect via `WarpSampling.GetAspect`, and applies the reference's time-dependent `warp`
 displacement through `WarpSampling.WarpDisplacement` (carried as a tenth mesh value and the
-`_orynivo_warp`/`_orynivo_warpTime`/`_orynivo_warpScale` uniforms). The CPU warp, the Skia warp
-pass, and the OpenGL fragment shader share all of it. Still open: the emitted warp entry point
-computes the sample before the per-pixel block, and projectM interpolates UVs at the vertices while
-Orynivo interpolates motion values and transforms in the fragment shader.
+`_orynivo_warp`/`_orynivo_warpTime`/`_orynivo_warpScale` uniforms). The fixed warp now transforms at
+the mesh vertices and interpolates the resulting coordinate — the OpenGL warp in its vertex shader
+and the CPU mesh warp through a per-vertex coordinate mesh — and the per-vertex block's
+`x`/`y`/`rad`/`ang` use the reference aspect. Still open: the emitted warp entry point computes the
+sample before the per-pixel block, and the OpenGL custom-warp path still draws a full-screen quad
+instead of the mesh.
 
 - `WarpSampling.SamplePosition` multiplies by zoom and stretch and adds offsets.
   projectM's `MilkdropPreset/Shaders/PresetWarpVertexShaderGlsl330.vert` divides by

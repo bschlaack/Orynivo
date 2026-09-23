@@ -177,6 +177,12 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
     /// <summary>The interpolated motion the per-pixel program produced per mesh vertex.</summary>
     private readonly float[] _meshMotion = new float[(MeshGridX + 1) * (MeshGridY + 1) * MeshValues];
 
+    /// <summary>
+    /// The sampling position each mesh vertex transforms to, in minus-one-to-one space. The warp
+    /// interpolates this pair, not the motion, which is what the reference warp vertex shader does.
+    /// </summary>
+    private readonly float[] _meshUv = new float[(MeshGridX + 1) * (MeshGridY + 1) * 2];
+
     /// <summary>Whether <see cref="_meshMotion"/> holds the current frame's mesh.</summary>
     private bool _meshBuiltThisFrame;
 
@@ -495,7 +501,8 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
         Math.Clamp(Read("echo_alpha", Read("fVideoEchoAlpha", 0f)), 0f, 1f),
         (int)Math.Clamp(Read("echo_orient", Read("nVideoEchoOrientation", 0f)), 0f, 3f),
         ToPublicBand(ReadBand("ob_", 0f, 0.02f)),
-        ToPublicBand(ReadBand("ib_", 0.06f, 0.02f)));
+        ToPublicBand(ReadBand("ib_", 0.06f, 0.02f)),
+        (float)_elapsed);
 
     /// <summary>Publishes one border band with the public frame-parameter type.</summary>
     /// <param name="band">Band read from the preset's keys.</param>
@@ -1132,6 +1139,26 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
         float MeshValue(int vertexX, int vertexY, int value) =>
             _meshMotion[(((vertexY * (MeshGridX + 1)) + vertexX) * MeshValues) + value];
 
+        float MeshUvValue(int vertexX, int vertexY, int value) =>
+            _meshUv[((((vertexY * (MeshGridX + 1)) + vertexX) * 2) + value)];
+
+        float InterpolateUv(float meshX, float meshY, int value)
+        {
+            var x0 = (int)meshX;
+            if (x0 >= MeshGridX)
+                x0 = MeshGridX - 1;
+            var y0 = (int)meshY;
+            if (y0 >= MeshGridY)
+                y0 = MeshGridY - 1;
+            var fractionX = meshX - x0;
+            var fractionY = meshY - y0;
+            var top = MeshUvValue(x0, y0, value) +
+                      ((MeshUvValue(x0 + 1, y0, value) - MeshUvValue(x0, y0, value)) * fractionX);
+            var bottom = MeshUvValue(x0, y0 + 1, value) +
+                         ((MeshUvValue(x0 + 1, y0 + 1, value) - MeshUvValue(x0, y0 + 1, value)) * fractionX);
+            return top + ((bottom - top) * fractionY);
+        }
+
         float InterpolateMesh(float meshX, float meshY, int value)
         {
             var x0 = (int)meshX;
@@ -1155,7 +1182,6 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
         {
             var target = _warped.RawPixels;
             var sample = worker < 0 ? _sample : _workerSample[worker];
-            WarpSampling.GetAspect(width, height, out var aspectX, out var aspectY);
             for (var y = from; y < to; y++)
             {
                 var normalizedY = height > 1 ? (y / (float)(height - 1) * 2f) - 1f : 0f;
@@ -1165,37 +1191,10 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
                     var normalizedX = width > 1 ? (x / (float)(width - 1) * 2f) - 1f : 0f;
                     var meshX = Math.Clamp((normalizedX + 1f) * 0.5f * MeshGridX, 0f, MeshGridX - 0.0001f);
 
-                    var zoomNow = Math.Max(0.01f, InterpolateMesh(meshX, meshY, 0));
-                    var zoomExpNow = InterpolateMesh(meshX, meshY, 1);
-                    var rotationNow = InterpolateMesh(meshX, meshY, 2);
-                    var centreXNow = InterpolateMesh(meshX, meshY, 3);
-                    var centreYNow = InterpolateMesh(meshX, meshY, 4);
-                    var offsetXNow = InterpolateMesh(meshX, meshY, 5);
-                    var offsetYNow = InterpolateMesh(meshX, meshY, 6);
-                    var stretchXNow = InterpolateMesh(meshX, meshY, 7);
-                    var stretchYNow = InterpolateMesh(meshX, meshY, 8);
-                    var warpNow = InterpolateMesh(meshX, meshY, 9);
-
-                    WarpSampling.SamplePosition(
-                        normalizedX,
-                        normalizedY,
-                        zoomNow,
-                        zoomExpNow,
-                        rotationNow,
-                        centreXNow,
-                        centreYNow,
-                        offsetXNow,
-                        offsetYNow,
-                        stretchXNow,
-                        stretchYNow,
-                        aspectX,
-                        aspectY,
-                        needsRadius,
-                        warpNow,
-                        warpTime,
-                        warpScale,
-                        out var sampleX,
-                        out var sampleY);
+                    // The reference transforms at the vertices, so the interpolated coordinate is
+                    // what the warp samples with, not the interpolated motion.
+                    var sampleX = InterpolateUv(meshX, meshY, 0);
+                    var sampleY = InterpolateUv(meshX, meshY, 1);
                     _previous.SampleBilinear((sampleX * 0.5f) + 0.5f, (sampleY * 0.5f) + 0.5f, sample);
 
                     var offset = (((y * width) + x) * 4);
@@ -1239,8 +1238,9 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
         float stretchY,
         float warp)
     {
-        var aspectX = Read("aspectx", 1f);
-        var aspectY = Read("aspecty", 1f);
+        // The reference's per-vertex position and polar pair use its own aspect, not the preset's
+        // aspectx/aspecty variables, so the mesh must use the same factors the warp does.
+        WarpSampling.GetAspect(_warped.Width, _warped.Height, out var aspectX, out var aspectY);
         for (var vertex = 0; vertex < (MeshGridX + 1) * (MeshGridY + 1); vertex++)
         {
             var index = vertex * MeshValues;
@@ -1324,6 +1324,43 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
                 _meshMotion[index + 7] = Read(_slots, _slotSx, stretchX);
                 _meshMotion[index + 8] = Read(_slots, _slotSy, stretchY);
                 _meshMotion[index + 9] = Read(_slots, _slotWarp, warp);
+            }
+        }
+
+        // The reference transforms the texture coordinate at each vertex and interpolates the
+        // resulting coordinate, so the UV mesh is built here and the warp interpolates it.
+        var uvNeedsRadius = _perPixelUsesRadius || zoomExp != 1f;
+        var uvWarpTime = (float)_elapsed;
+        for (var gridY = 0; gridY <= MeshGridY; gridY++)
+        {
+            var normalizedY = (gridY / (float)MeshGridY * 2f) - 1f;
+            for (var gridX = 0; gridX <= MeshGridX; gridX++)
+            {
+                var normalizedX = (gridX / (float)MeshGridX * 2f) - 1f;
+                var motion = (((gridY * (MeshGridX + 1)) + gridX) * MeshValues);
+                WarpSampling.SamplePosition(
+                    normalizedX,
+                    normalizedY,
+                    _meshMotion[motion],
+                    _meshMotion[motion + 1],
+                    _meshMotion[motion + 2],
+                    _meshMotion[motion + 3],
+                    _meshMotion[motion + 4],
+                    _meshMotion[motion + 5],
+                    _meshMotion[motion + 6],
+                    _meshMotion[motion + 7],
+                    _meshMotion[motion + 8],
+                    aspectX,
+                    aspectY,
+                    uvNeedsRadius,
+                    _meshMotion[motion + 9],
+                    uvWarpTime,
+                    1f,
+                    out var sampleX,
+                    out var sampleY);
+                var uv = (((gridY * (MeshGridX + 1)) + gridX) * 2);
+                _meshUv[uv] = sampleX;
+                _meshUv[uv + 1] = sampleY;
             }
         }
 

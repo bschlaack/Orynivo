@@ -14,8 +14,9 @@ Status values: `Todo`, `In progress`, `Blocked`, `Done`.
 Visualizer fidelity review (2026-09-23): **In progress**. The custom GL warp target
 and per-vertex motion reset bugs are fixed. Audit item 1 (the geometry and shader
 equation order) now follows the reference warp vertex shader's coordinate contract —
-formula, aspect, and time-dependent `warp` displacement — except for the emitted
-warp entry point's ordering and the vertex-side UV interpolation. Audit item 2
+formula, aspect, time-dependent `warp` displacement, and vertex-side coordinate
+interpolation for the fixed warp — except for the emitted warp entry point's ordering
+and the OpenGL custom-warp path still drawing a full-screen quad. Audit item 2
 (the sampler qualifiers `fc_`/`fw_`/`pc_`/`pw_`) is corrected on the interpreter and
 Skia paths; the OpenGL frame sampler still lacks per-sampler filter and wrap.
 Remaining compatibility work and its

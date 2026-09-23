@@ -44,7 +44,11 @@ public sealed class PerVertexMeshTests
         }
     }
 
-    /// <summary>A constant motion value interpolates to itself, so both paths agree exactly.</summary>
+    /// <summary>
+    /// A constant motion value transforms to the same affine coordinate everywhere, so both paths
+    /// agree to floating-point precision. They are not byte-identical, because the mesh transforms at
+    /// the vertices and interpolates the coordinate while the per-pixel path transforms per pixel.
+    /// </summary>
     [Theory]
     [InlineData("zoom = 1.05;")]
     [InlineData("zoom = 1.02; rot = 0.03;")]
@@ -55,7 +59,9 @@ public sealed class PerVertexMeshTests
         var mesh = Render(perPixel, mesh: true);
         var perPixelPath = Render(perPixel, mesh: false);
 
-        Assert.Equal(perPixelPath, mesh);
+        Assert.Equal(perPixelPath.Length, mesh.Length);
+        for (var index = 0; index < mesh.Length; index++)
+            Assert.InRange(Math.Abs(perPixelPath[index] - mesh[index]), 0f, 5e-4f);
     }
 
     /// <summary>A motion that varies with the position is interpolated, so the mesh differs.</summary>
@@ -115,10 +121,11 @@ public sealed class PerVertexMeshTests
         Assert.True(with.TryCopyMeshMotion(mesh, out var meshX, out var meshY));
         Assert.Equal(PresetRenderer.MeshGridX, meshX);
         Assert.Equal(PresetRenderer.MeshGridY, meshY);
-        // Milkdrop hands the program the aspect-scaled vertex position in zero-to-one space, so the
-        // first vertex sits left of zero and the last one right of one; a zoom that grows with x is
-        // therefore below the constant term at the first vertex and above it at the last.
-        Assert.True(mesh[0] < 1.02f, $"zoom at the first vertex was {mesh[0]}");
+        // Milkdrop hands the program the aspect-scaled vertex position in zero-to-one space. The
+        // reference aspect is one in landscape, so the first vertex sits at zero and the last at one;
+        // a zoom that grows with x is therefore exactly the constant term at the first vertex and
+        // above it at the last.
+        Assert.True(mesh[0] <= 1.02f, $"zoom at the first vertex was {mesh[0]}");
         var last = mesh.Length - PresetRenderer.MeshValues;
         Assert.True(mesh[last] > 1.02f, $"zoom at the last vertex was {mesh[last]}");
     }
@@ -190,8 +197,9 @@ public sealed class PerVertexMeshTests
     private static float[] Render(string perPixel, bool mesh)
     {
         // The mesh is 64 x 48, so the frame has to be larger than it for the interpolation to
-        // show; at the default render size it is.
-        var text = "decay = 1;\nper_frame_1=wave_a = 1;\nper_pixel_1=" + perPixel;
+        // show; at the default render size it is. The time-dependent warp displacement is switched
+        // off so the transform stays affine and the constant-motion case is exact.
+        var text = "decay = 1;\nwarp=0\nper_frame_1=wave_a = 1;\nper_pixel_1=" + perPixel;
         var renderer = new PresetRenderer(VisualizerPreset.Parse(text), 200, 150)
 
         {

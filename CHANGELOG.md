@@ -7,6 +7,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Changed
+- The visualizer's warp now transforms the texture coordinate at the mesh vertices and interpolates
+  the resulting coordinate, exactly as the reference warp vertex shader does, instead of interpolating
+  the motion values and transforming per pixel. The OpenGL warp does it in its vertex shader (the mesh
+  now carries the tenth `warp` value as a vertex attribute and the time-dependent displacement moved
+  into the vertex stage), and the CPU mesh warp interpolates a per-vertex coordinate mesh. For an
+  affine transform the two paths still agree to floating-point precision; the change is visible where
+  the radial zoom or the warp displacement makes the transform nonlinear. The per-vertex block's
+  `x`/`y`/`rad`/`ang` also use the reference aspect now, not the preset's `aspectx`/`aspecty`
+  variables.
 - The visualizer's shader samplers now follow Milkdrop's qualifier semantics: `fc_`/`fw_`/`pc_`/`pw_`
   (and the swapped `cf_`/`wf_`/`cp_`/`wp_` spellings) select a sampler's wrap and filter mode rather
   than a different moment in time, so `sampler_main`, `sampler_pc_main`, and `sampler_fw_main` all read

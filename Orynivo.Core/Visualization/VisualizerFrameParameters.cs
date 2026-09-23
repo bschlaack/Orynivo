@@ -29,6 +29,7 @@ public readonly record struct VisualizerBorderBand(
 /// <param name="EchoOrientation">Video-echo orientation, zero to three.</param>
 /// <param name="OuterBorder">Outer border band.</param>
 /// <param name="InnerBorder">Inner border band.</param>
+/// <param name="WarpTime">Warp animation time in seconds, which drives the time-dependent warp displacement.</param>
 public readonly record struct VisualizerFrameParameters(
     float Decay,
     int BlurPasses,
@@ -38,4 +39,5 @@ public readonly record struct VisualizerFrameParameters(
     float EchoAlpha,
     int EchoOrientation,
     VisualizerBorderBand OuterBorder,
-    VisualizerBorderBand InnerBorder);
+    VisualizerBorderBand InnerBorder,
+    float WarpTime);
