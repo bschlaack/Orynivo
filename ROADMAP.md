@@ -11,31 +11,18 @@ English XML docs, add every new visible string to all seven languages, and run
 
 Status values: `Todo`, `In progress`, `Blocked`, `Done`.
 
-Visualizer fidelity review (2026-09-23): **In progress**. The custom GL warp target
-and per-vertex motion reset bugs are fixed. Audit item 1 (the geometry and shader
-equation order) is corrected for the OpenGL path: the warp follows the reference
-warp vertex shader's coordinate contract — formula, aspect, time-dependent `warp`
-displacement, and vertex-side coordinate interpolation for both the fixed and the
-custom warp, which now draws the mesh instead of a quad. The Skia warp pass still
-composes the per-pixel block into its fragment effect, because a runtime effect has
-no vertex stage. Audit item 2
-(the sampler qualifiers `fc_`/`fw_`/`pc_`/`pw_`) is corrected on the interpreter and
-Skia paths; the OpenGL frame sampler still lacks per-sampler filter and wrap.
-Audit item 3 (the composite and feedback stages) is corrected: the final
-composite is either the custom comp shader or the legacy echo/gamma path, the
-overlay is drawn before the centre darkening and the border, the decay belongs
-to the warp, and the shader blur chain is built from the frame being warped.
-Audit item 4 (custom waves) is corrected: the four `wavecode_N_*` waveforms have
-their own state and `sample`/`value1`/`value2` contract, separate from the default
-waveform, and spectrum geometry is drawn only when a waveform requests it. The
-default waveform's eight mode geometries remain approximated.
-Audit item 5 (the audio variables) is corrected: the bands are relative to their
-long-term average so `above(bass, 1.2)` can fire, and the waveform and spectrum
-inputs are stereo. All five audit items are now addressed; the remaining
-approximations are recorded in the audit.
-Remaining compatibility work and its
-recommended order are recorded in [VISUALIZER-FIDELITY-AUDIT.md](VISUALIZER-FIDELITY-AUDIT.md).
-CPU/GPU agreement and successful shader compilation are not reference fidelity gates.
+Visualizer fidelity review (2026-09-23): **In progress**. The follow-up fixes now
+cover missing GL uniforms, feedback/comp reflection, duplicate custom-wave
+execution, isolated element state, real shape keys and compact equation spellings,
+PCM waveform scaling, independent GL sampler modes, warp speed/scale, blur ranges,
+overlay alpha and display-only gamma/echo. Managed and GPU contract tests cover
+these changes. The oracle now uses explicit time and matching PCM input.
+
+See [the current verification report](VISUALIZER-FIDELITY-RECHECK.md) for evidence
+and remaining work: textured shapes, default waveform geometries, exact audio
+analysis, legacy hue shading, fallback-path differences and matched Winamp/ANGLE
+captures. Historical completed items below describe implementation milestones,
+not proof of full reference fidelity.
 
 ## Completed (1–14)
 

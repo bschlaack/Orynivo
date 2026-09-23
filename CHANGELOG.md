@@ -87,6 +87,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   echo rather than the blur.
 
 ### Fixed
+- Corrected additional MilkDrop integration defects: real `shapecode_*` parameters and compact
+  equation keys, isolated custom-wave/shape state, once-per-frame wave execution, 512-point stereo
+  PCM scaling, live warp speed/scale, independent OpenGL sampler filtering/wrapping, blur range
+  compression/decoding, and asymmetric comp sampling. Shapes now support gradient fills and
+  instances; overlay alpha correctly covers feedback. Legacy gamma/echo run only on the display
+  target. Added managed and real-GPU regressions; the comparison oracle now uses explicit frame
+  times and feeds matching PCM to both engines. Full Winamp fidelity remains incomplete; see
+  `VISUALIZER-FIDELITY-RECHECK.md` for the remaining limits.
+- Fixed missing OpenGL warp uniform bindings that erased fixed-warp feedback and
+  left custom-warp radius, aspect and animation inputs unset. Fixed an additional
+  vertical reflection of fixed-warp feedback and removed the extra legacy fade
+  applied to custom warp shaders. Added GPU feedback regressions.
+- Fixed BMP row-padding handling in the local projectM comparison tool.
 - Fixed custom OpenGL warp shaders drawing into the last blur framebuffer instead
   of the full-resolution warp target, losing their output from the feedback image.
 - Fixed per-vertex motion equations accumulating the previous vertex's motion;

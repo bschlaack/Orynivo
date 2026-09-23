@@ -1686,9 +1686,12 @@ archive in place.
 ## Visualizer
 
 Milkdrop compatibility is currently partial: loading or compiling a `.milk` preset
-does not guarantee the original appearance. Known differences include warp geometry,
-shader equation ordering, sampler semantics, audio inputs, and custom waveforms.
-See [the fidelity audit](VISUALIZER-FIDELITY-AUDIT.md) for evidence and repair priorities.
+does not guarantee the original appearance. The OpenGL path now honors sampler
+filter/wrap modes, custom-wave state, real shape keys, warp speed/scale, blur ranges,
+and display-only gamma/echo. Textured shapes, default-wave geometry, exact audio
+analysis, legacy hue shading and CPU fallback behavior still differ. See the
+[current verification report](VISUALIZER-FIDELITY-RECHECK.md) for fixes, tests and
+remaining limits; a direct Winamp MilkDrop comparison is still required.
 
 **Visualisierung** in the sidebar opens a fullscreen music visualizer. It renders the playing
 audio through a Milkdrop-style preset engine at 640 x 360 and scales the frame up. Escape

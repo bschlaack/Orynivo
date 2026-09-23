@@ -1,5 +1,10 @@
 # Milkdrop fidelity audit — 2026-09-23
 
+**Follow-up:** The "Corrected" annotations below were rechecked against the active
+GL pipeline and are not completion guarantees. See
+[the recheck](VISUALIZER-FIDELITY-RECHECK.md) for reproduced integration failures,
+additional fixes, and outstanding custom-wave/shape/audio/sampler issues.
+
 The current engine is a Milkdrop-inspired renderer, not yet a faithful Milkdrop
 implementation. Successful parsing, shader compilation, and CPU/GPU agreement
 do not establish compatibility: the CPU reference itself has different semantics.
