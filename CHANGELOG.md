@@ -31,6 +31,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   keeps its previous constant level.
 
 ### Fixed
+- The preset audio bands `bass`, `mid`, and `treble` are alive again. The reference's guard against
+  dividing an empty band by its long-term average is `0.001`, but it is written in the reference's own
+  magnitude units — projectM scales every sample by 128 and leaves its FFT unnormalized, while
+  Orynivo's magnitudes are normalized by the transform length. At that literal value the quiet middle
+  and treble sums of real music fell below the guard, so both bands reported a constant 1.0: measured
+  on a real track, projectM read `bass 0.80 / mid 0.78 / treb 1.19` while Orynivo read
+  `1.37 / 1.00 / 1.00`. The guard is now scaled by the same factor, and every preset that reacts to
+  `mid` or `treble` sees a value that changes with the music again.
 - Shaders now receive the reference's animated hue shade as `hue_shader`. Milkdrop defines
   `hue_shader` as the final composite quad's vertex diffuse colour (`#define hue_shader
   _vDiffuse.xyz`) and always computes it, four corners of `0.5 + 0.5*normalised sine`, "since we don't

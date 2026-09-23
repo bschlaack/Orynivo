@@ -79,7 +79,12 @@ This file applies to `Orynivo.Core/` and supplements `../AGENTS.md`.
   left and right waveform and spectrum separate for the custom waveforms, and the
   desktop hub measures the frame time its smoothing rates need. Never clamp the
   relative values to one, and never evaluate preset expressions or render frames on
-  the audio thread. `PresetVariableLayout.RegisterStandardVariables` is the single place
+  the audio thread. The guard that stands in for an empty band
+  (`Loudness.EmptyBandThreshold`) must stay scaled to Orynivo's magnitudes: the
+  reference's literal `0.001` assumes projectM's 128-times input scale and its
+  unnormalized FFT, and at that value the quiet middle and treble sums of real music
+  reported a constant one, which left `mid` and `treble` dead for every preset that
+  reacts to them. `PresetVariableLayout.RegisterStandardVariables` is the single place
   that declares the Milkdrop variable set, so every expression block of a preset shares one
   slot layout and `q1`-`q32` keep their value between the per-frame and per-pixel stages. The
   renderer runs the stages in Milkdrop order: the init blocks once, the preset per-frame block, the motion warp (`zoom`, `zoomexp`, `rot`, `cx`/`cy`,

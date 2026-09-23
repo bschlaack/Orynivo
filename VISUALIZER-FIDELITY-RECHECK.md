@@ -131,6 +131,18 @@ The original MilkDrop source is available as a reference: the
 `milkdrop_225c_src` (Nullsoft, BSD-style licence). It is read-only reference material for behavior
 and conventions; no code is copied from it. It settled the shape conventions below.
 
+- The loudness guard against an empty band was carried over at the reference's literal `0.001`, but
+  that number is written in the reference's magnitude units: projectM scales every sample by 128 and
+  leaves its FFT unnormalized, while Orynivo's magnitudes are normalized by the transform length. On a
+  real track the quiet middle and treble sums fell below it, so `mid` and `treble` reported a constant
+  one (projectM read `0.80/0.78/1.19` against Orynivo's `1.37/1.00/1.00`). The guard is scaled to
+  Orynivo's units now, and the three bands all follow the music.
+- The reference's logarithmic frequency equalization is still not adopted. With the guard fixed, the
+  remaining difference is the band *weighting*: the equalization lowers the reference's high-band sums,
+  and measured on the same track Orynivo's `mid`/`treble` still read about twice projectM's, which
+  makes audio-driven presets grow larger shapes than the reference. Adopting it needs the reference's
+  magnitude scale (or an equivalent normalization of the equalization curve) so the guard keeps its
+  meaning.
 - Milkdrop shapes were drawn vertically mirrored: the reference's shape space is Direct3D's y-up
   space (`v[0].y = shape_y*-2+1`, `milkdropfs.cpp`), so `shape_y` counts from the top, while the
   overlay rasterizer is y-down. A comparison against projectM put a `shapecode_0_y=0.75` shape 72 %

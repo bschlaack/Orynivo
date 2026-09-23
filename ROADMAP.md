@@ -894,10 +894,14 @@ affordable. This is a project of its own and must keep the CPU path as the fallb
   **A matched-music comparison now exists.** Most presets drive their shapes, zoom, and colours from
   the audio, so a tone could not show whether they behave like the reference.
   `scripts/projectm-oracle/run-oracle.ps1 -Audio <track>` converts a track FFmpeg can read into one raw
-  PCM file both engines consume. With `$$$ Royal - Mashup (138)` and a real track, projectM settles at
-  32 mean brightness while Orynivo reaches 131 - nearly white - so that preset (a Geiss motion-blur
-  preset whose comp shader sums `GetPixel` and `GetBlur2`) diverges roughly fourfold in the frame it
-  accumulates. Finding that divergence is the next step.
+  PCM file both engines consume, and `scripts/gl-harness` reads the same file with `GLH_ORACLE_AUDIO`.
+  It found a real defect straight away: the loudness guard stood at the reference's literal `0.001`,
+  which is written for projectM's unnormalized magnitudes, so `mid` and `treble` reported a constant
+  one for real music and every preset that reacts to them was dead. The guard is scaled to Orynivo's
+  units now. With that fixed and the same track, `$$$ Royal - Mashup (138)` runs at 96-101 mean
+  brightness against projectM's 32, and Orynivo's `mid`/`treble` bands still read about twice the
+  reference's: the remaining step is the reference's logarithmic frequency equalization, which needs
+  its magnitude scale or an equivalent normalization.
 
   The old overlay step follows. The renderer's own stage timings from a real 1920 x 1080 session
   show the overlay is now the last CPU cost - `overlayMs` 120 for `$$$ Royal - Mashup (115)` and

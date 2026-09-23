@@ -140,6 +140,15 @@ public sealed class AudioSpectrumAnalyzer : IVisualizerAudioSource
     /// </summary>
     private sealed class Loudness
     {
+        /// <summary>
+        /// The reference's guard against dividing by an empty band, scaled to these magnitudes. The
+        /// reference's own value is <c>0.001</c>, but it is written in the reference's magnitude units:
+        /// projectM scales every sample by 128 and leaves its FFT unnormalized, while these magnitudes
+        /// are normalized by the transform length. At the literal value the quiet middle and treble
+        /// bands of real music stayed at one, so the bands a preset reacts to were dead.
+        /// </summary>
+        private const float EmptyBandThreshold = 0.001f / (128f * 2048f);
+
         private float _average;
         private float _longAverage;
         private float _current;
@@ -163,8 +172,8 @@ public sealed class AudioSpectrumAnalyzer : IVisualizerAudioSource
             rate = AdjustRateToFps(frame < 50 ? 0.9f : 0.992f, secondsSinceLastFrame);
             _longAverage = (_longAverage * rate) + (current * (1f - rate));
 
-            CurrentRelative = MathF.Abs(_longAverage) < 0.001f ? 1f : current / _longAverage;
-            AverageRelative = MathF.Abs(_longAverage) < 0.001f ? 1f : _average / _longAverage;
+            CurrentRelative = MathF.Abs(_longAverage) < EmptyBandThreshold ? 1f : current / _longAverage;
+            AverageRelative = MathF.Abs(_longAverage) < EmptyBandThreshold ? 1f : _average / _longAverage;
         }
 
         /// <summary>Resets the band to its neutral state.</summary>
