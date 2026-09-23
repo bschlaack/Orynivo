@@ -891,7 +891,15 @@ affordable. This is a project of its own and must keep the CPU path as the fallb
   the brightness centroid of the remaining warped feedback: the GPU tracks the CPU within 0.08 px over
   a 23 px travel, and a control preset without the block stays 26 px away.
 
-  **Next: the overlay on the GPU.** The renderer's own stage timings from a real 1920 x 1080 session
+  **A matched-music comparison now exists.** Most presets drive their shapes, zoom, and colours from
+  the audio, so a tone could not show whether they behave like the reference.
+  `scripts/projectm-oracle/run-oracle.ps1 -Audio <track>` converts a track FFmpeg can read into one raw
+  PCM file both engines consume. With `$$$ Royal - Mashup (138)` and a real track, projectM settles at
+  32 mean brightness while Orynivo reaches 131 - nearly white - so that preset (a Geiss motion-blur
+  preset whose comp shader sums `GetPixel` and `GetBlur2`) diverges roughly fourfold in the frame it
+  accumulates. Finding that divergence is the next step.
+
+  The old overlay step follows. The renderer's own stage timings from a real 1920 x 1080 session
   show the overlay is now the last CPU cost - `overlayMs` 120 for `$$$ Royal - Mashup (115)` and
   475-500 for `(135)`, against `warpMs=0` and `compShaderMs=0` - because `PresetRenderer.FillShapeFan`
   scans every fan triangle over its own bounding box, so the centre of a 25-sided shape is tested by

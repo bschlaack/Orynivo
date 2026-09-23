@@ -7,6 +7,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Added
+- Added matched-music comparison for the visualizer: `scripts/projectm-oracle/run-oracle.ps1 -Audio
+  <file>` converts a track that FFmpeg can read into one raw 16-bit stereo PCM file both renderers
+  consume, so a comparison runs on the same music instead of a synthetic signal. The converted WAV
+  beside it is what a reference player such as Winamp should play, and `ORACLE_AUDIO`/`GLH_ORACLE_AUDIO`
+  select the file for each engine.
 - A per-pixel block that writes the sample position `x` or `y` now runs on the GPU by default. Such
   a block used to keep the CPU warp, because the mesh cannot interpolate a sample position; it is now
   emitted as a warp fragment shader that computes the coordinate per pixel instead, and
