@@ -32,6 +32,12 @@ public sealed class AudioSpectrumAnalyzer : IVisualizerAudioSource
     private readonly float[] _monoSamples;
     private readonly float[] _magnitudes;
     private readonly int[] _bandEdges;
+
+    /// <summary>
+    /// The reference's logarithmic frequency equalization, applied to the magnitudes its loudness bands
+    /// and spectrum read: <c>-0.02 * ln((half - bin) / half)</c>, zero at DC and rising with frequency.
+    /// </summary>
+    private readonly float[] _equalize;
     private readonly float[] _bands = new float[BandCount];
     private readonly float[] _waveform = new float[WaveformPoints];
     private readonly float[] _spectrum = new float[SpectrumPoints];
@@ -79,6 +85,10 @@ public sealed class AudioSpectrumAnalyzer : IVisualizerAudioSource
         _monoSamples = new float[fftSize];
         _magnitudes = new float[fftSize / 2];
         _bandEdges = BuildBandEdges(sampleRate, fftSize);
+        var half = fftSize / 2;
+        _equalize = new float[half];
+        for (var index = 0; index < half; index++)
+            _equalize[index] = -0.02f * MathF.Log((half - index) / (float)half);
         _leftSamples = new float[fftSize];
         _rightSamples = new float[fftSize];
         _leftMagnitudes = new float[fftSize / 2];
@@ -268,6 +278,14 @@ public sealed class AudioSpectrumAnalyzer : IVisualizerAudioSource
             _bands[band] = Smooth(_bands[band], value);
         }
 
+        // The reference equalizes the magnitudes on a logarithmic frequency scale before its loudness
+        // bands and its spectrum read them, which is what makes its middle and treble sums smaller than
+        // the raw ones. Orynivo's own normalized display bands above stay un-equalized, because that is
+        // a separate contract other consumers use.
+        ApplyEqualize(_magnitudes);
+        ApplyEqualize(_leftMagnitudes);
+        ApplyEqualize(_rightMagnitudes);
+
         UpdateSpectrum();
         UpdateStereoSpectrum();
         UpdateLoudness(secondsSinceLastFrame);
@@ -349,6 +367,15 @@ public sealed class AudioSpectrumAnalyzer : IVisualizerAudioSource
     {
         for (var index = samples.Length - 1; index >= 1; index--)
             samples[index] = 0.5f * (samples[index] + samples[index - 1]);
+    }
+
+    /// <summary>Applies the reference's logarithmic frequency equalization to magnitudes.</summary>
+    /// <param name="magnitudes">Magnitudes to scale in place.</param>
+    private void ApplyEqualize(float[] magnitudes)
+    {
+        var count = Math.Min(magnitudes.Length, _equalize.Length);
+        for (var index = 0; index < count; index++)
+            magnitudes[index] *= _equalize[index];
     }
 
     /// <summary>Clears every smoothed value, for example when playback stops.</summary>

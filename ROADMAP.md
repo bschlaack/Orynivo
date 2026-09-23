@@ -899,9 +899,10 @@ affordable. This is a project of its own and must keep the CPU path as the fallb
   which is written for projectM's unnormalized magnitudes, so `mid` and `treble` reported a constant
   one for real music and every preset that reacts to them was dead. The guard is scaled to Orynivo's
   units now. With that fixed and the same track, `$$$ Royal - Mashup (138)` runs at 96-101 mean
-  brightness against projectM's 32, and Orynivo's `mid`/`treble` bands still read about twice the
-  reference's: the remaining step is the reference's logarithmic frequency equalization, which needs
-  its magnitude scale or an equivalent normalization.
+  brightness against projectM's 32. The reference's logarithmic frequency equalization is adopted too,
+  which changes the band weighting rather than the ratios and therefore did not move that gap; the next
+  step is to disable the preset's shapes and see whether the extra energy comes from the overlay or from
+  the feedback accumulation.
 
   The old overlay step follows. The renderer's own stage timings from a real 1920 x 1080 session
   show the overlay is now the last CPU cost - `overlayMs` 120 for `$$$ Royal - Mashup (115)` and

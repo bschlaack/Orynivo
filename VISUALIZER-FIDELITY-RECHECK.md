@@ -137,12 +137,13 @@ and conventions; no code is copied from it. It settled the shape conventions bel
   real track the quiet middle and treble sums fell below it, so `mid` and `treble` reported a constant
   one (projectM read `0.80/0.78/1.19` against Orynivo's `1.37/1.00/1.00`). The guard is scaled to
   Orynivo's units now, and the three bands all follow the music.
-- The reference's logarithmic frequency equalization is still not adopted. With the guard fixed, the
-  remaining difference is the band *weighting*: the equalization lowers the reference's high-band sums,
-  and measured on the same track Orynivo's `mid`/`treble` still read about twice projectM's, which
-  makes audio-driven presets grow larger shapes than the reference. Adopting it needs the reference's
-  magnitude scale (or an equivalent normalization of the equalization curve) so the guard keeps its
-  meaning.
+- The reference's logarithmic frequency equalization (`-0.02 * ln((half - bin) / half)`) is now applied
+  to the magnitudes the Milkdrop loudness bands and the spectrum read; Orynivo's own normalized display
+  bands stay un-equalized. The guard had to be scaled to Orynivo's magnitudes first, which is what kept
+  the attenuated low bins above it. Measured on a real track this changes the band weighting, not the
+  ratios: it neither fixed nor worsened the remaining `$$$ Royal - Mashup (138)` brightness gap, so the
+  cause of that gap is elsewhere - the next step is to disable the preset's shapes and see whether the
+  extra energy comes from the overlay or from the feedback accumulation.
 - Milkdrop shapes were drawn vertically mirrored: the reference's shape space is Direct3D's y-up
   space (`v[0].y = shape_y*-2+1`, `milkdropfs.cpp`), so `shape_y` counts from the top, while the
   overlay rasterizer is y-down. A comparison against projectM put a `shapecode_0_y=0.75` shape 72 %

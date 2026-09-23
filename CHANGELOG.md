@@ -78,6 +78,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   this regression cannot return unnoticed.
 
 ### Changed
+- The reference's logarithmic frequency equalization is now applied to the magnitudes the Milkdrop
+  loudness bands and the spectrum a custom waveform reads use, matching projectM's own analyzer: the
+  curve is `-0.02 * ln((half - bin) / half)`, zero at DC and rising with frequency. Orynivo's own
+  normalized display bands stay un-equalized, because that is a separate contract other consumers
+  use. Measured on a real track this changes the band *weighting* only; a spectral shape change is
+  what it is for, and it neither fixed nor worsened the remaining `$$$ Royal - Mashup (138)`
+  brightness gap.
 - The visualizer draws a Milkdrop preset's shape fills on the GPU. The CPU rasterizer scanned every
   fan triangle over its own bounding box, so the centre of a 25-sided shape was tested by all 25
   triangles: at 1920 x 1080 the overlay cost 120 ms per frame for `$$$ Royal - Mashup (115)` and
