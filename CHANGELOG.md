@@ -10,12 +10,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Added an opt-in GPU per-pixel warp. A preset whose `per_pixel` block writes the sample position
   `x` or `y` normally keeps the CPU warp, because the mesh cannot interpolate a sample position;
   setting `ORYNIVO_VISUALIZER_PIXELWARP=1` emits that block as a warp fragment shader that computes
-  the coordinate per pixel on the GPU instead. `scripts/gl-harness` renders it with
-  `GLH_PIXEL_WARP=1`. A whole-frame CPU-versus-GPU comparison does not gate it: the display frame is
-  dominated by the overlay, which both renderers composite identically after the warp, so the frames
-  agree to about 1/255 whether the GPU runs the per-pixel warp or the fixed one. The CPU warp stays
-  the reference and the default until a probe that isolates the warp, or a visual comparison on a
-  real preset, confirms the picture.
+  the coordinate per pixel on the GPU instead. `scripts/gl-harness/verify-pixel-warp.ps1` verifies it:
+  a whole-frame comparison cannot see the warp, because the display frame is dominated by the overlay
+  that both renderers composite identically, so the probe draws the overlay only for the first frames
+  and follows the brightness centroid of the remaining warped feedback. The GPU tracks the CPU
+  reference within 0.08 px over a 23 px travel, and a control preset without the block stays 26 px
+  away, so the probe fails if the block does not reach the GPU. The CPU warp remains the default until
+  the picture has been confirmed on a real preset.
 - Added `scripts/visualizer-compare/render-compare.ps1`, which renders a preset — or every preset
   below a folder — with Orynivo and the reference implementation under identical resolution, frame
   count, frame time, mesh and audio, writes the frames and a settings manifest, and generates

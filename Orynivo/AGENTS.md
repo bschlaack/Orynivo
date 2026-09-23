@@ -547,7 +547,10 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
   warp fragment shader that computes the coordinate per pixel
   (`ShaderTranspiler.TranspileGlslWarp` with a null body, drawn over a full-screen quad with the
   `_orynivo_*` motion uniforms seeded from the mesh's first vertex, and the decay moved to the post
-  pass). It is opt-in until the GPU and CPU pictures have been compared on a real collection.
+  pass). It is opt-in until the picture has been confirmed on a real preset, and
+  `scripts/gl-harness/verify-pixel-warp.ps1` is its check: a whole-frame CPU comparison cannot see the
+  warp, so that probe draws the overlay only for the first frames and follows the brightness centroid
+  of the remaining warped feedback, with a control preset without the block as the negative control.
   When the preset has no
   shaders, `Orynivo.Controls.VisualizerGlPipeline` owns the whole frame: the warp as a mesh draw whose
   fragment shader is a translation of `WarpSampling.SamplePosition`, the blur as the same nine-tap
