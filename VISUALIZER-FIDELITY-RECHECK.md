@@ -138,12 +138,16 @@ These corrections do **not** establish complete Winamp MilkDrop fidelity:
   transform length, not length minus one). Two reference analysis steps are **not**
   adopted, because they change the band balance rather than just its shape:
   - The reference multiplies each magnitude by `-0.02 * ln((half - i) / half)`, a
-    logarithmic frequency equalization that is exactly zero at DC and rises to
-    `0.02 * ln(half)`. Applied to Orynivo's magnitudes — which are normalized by the
-    transform length, unlike the reference's unnormalized ones — it scales the low
-    bins to roughly `1e-4`, which drops the bass band below the loudness guard and
-    inverts the pure-tone band separation the analyzer tests assert. Adopting it
-    needs an empirical measurement of the reference's own band response first.
+    logarithmic frequency equalization. Measuring the reference itself
+    (`scripts/projectm-oracle/measure-bands.cpp`) shows this does **not** suppress
+    the bass: a 60 Hz onset drives projectM's bass band to 125 (peak 249), a 6 kHz
+    onset drives its mid band to 125, and a 12 kHz onset drives its treble band to
+    83.5. It does change how much broadband content each band sums. Adopting it
+    needs the reference's magnitude scale as well: projectM scales every sample by
+    128 and leaves its FFT unnormalized, so its magnitudes are roughly `2.6e5`
+    times Orynivo's normalized ones, and the reference's own guard
+    (`|long-term average| < 0.001`, `Loudness.cpp:49`) therefore fires on Orynivo's
+    magnitudes where it would not on the reference's.
   - The reference aligns the waveform against the previous frame with a
     multi-octave cross-correlation (`WaveformAligner`), which needs a sample margin
     larger than the exposed window. Orynivo still exposes the plain contiguous

@@ -20,9 +20,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   with the reference's one-sample pre-emphasis, which suppresses high-frequency noise, and the window
   is the reference's raised sine over the complete transform length instead of the length-minus-one
   variant, so the first and last samples are not both forced to zero. The reference's logarithmic
-  frequency equalization and its multi-octave waveform alignment are deliberately not adopted; both
-  change the band balance rather than only its shape and need a measurement of the reference's own
-  band response first.
+  frequency equalization and its multi-octave waveform alignment are deliberately not adopted; the
+  equalization changes how much broadband content each loudness band sums and needs the reference's
+  unnormalized magnitude scale to keep its guard meaningful, and the alignment needs a sample margin
+  wider than the exposed waveform window. Both are measured and recorded in
+  `VISUALIZER-FIDELITY-RECHECK.md`, and `scripts/projectm-oracle/measure-bands.cpp` reproduces the
+  reference's own band response.
 - The legacy final composite now applies the reference's animated hue shade: before the gamma gain,
   the frame is multiplied by a four-corner colour whose three channels are animated sines normalised
   so their maximum is one, blended across the frame. The offsets are the reference's per-preset hue

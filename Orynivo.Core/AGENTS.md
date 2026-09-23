@@ -56,8 +56,11 @@ This file applies to `Orynivo.Core/` and supplements `../AGENTS.md`.
   allocation-free transform. The FFT input is damped with the reference's one-sample
   pre-emphasis and windowed with its raised-sine window over the complete transform
   length; the reference's logarithmic frequency equalization and its multi-octave
-  waveform alignment are not adopted, because both change the band balance rather
-  than only its shape (`VISUALIZER-FIDELITY-RECHECK.md`). The analyzer serves two contracts: the normalized
+  waveform alignment are not adopted, because the equalization needs the reference's
+  unnormalized magnitude scale to keep its loudness guard meaningful and the aligner
+  needs a sample margin wider than the exposed window. Measure the reference itself
+  with `scripts/projectm-oracle/measure-bands.cpp` before changing this
+  (`VISUALIZER-FIDELITY-RECHECK.md`). The analyzer serves two contracts: the normalized
   `Bands`/`Bass`/`Mid`/`Treble`/`Volume` values other consumers use, and Milkdrop's
   own relative loudness (`BassRelative` and friends), where each band's sum over one
   sixth of the linear spectrum is divided by its long-term average so a value above
