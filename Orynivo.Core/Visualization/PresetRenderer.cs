@@ -2234,7 +2234,10 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
                 _blurLevels[build - 1].CopyFrom(build == 1
                     ? (_samplerMainIsWarped ? _frameCopy : _previous)
                     : _blurLevels[build - 2]);
-                _blurLevels[build - 1].Blur();
+                // The reference builds each level from a long horizontal and a short vertical pass of
+                // its weighted filter, not from a three-by-three box.
+                _blurLevels[build - 1].BlurReference(horizontal: true);
+                _blurLevels[build - 1].BlurReference(horizontal: false);
                 _blurLevelReady[build - 1] = true;
             }
         }

@@ -6,6 +6,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Changed
+- The visualizer's shader blur levels (`GetBlur1`-`GetBlur3`) now use the reference implementation's
+  weighted filter instead of a three-by-three box: a long horizontal pass with eight weighted taps
+  (about thirteen pixels wide) followed by a short vertical pass with four, each level continuing from
+  the one below it. A single box blur is far too narrow, so a preset that feeds the blurred frame into
+  its own maths (the common `GetBlur1` then a `tan` term) amplified the box's hard edges into visible
+  steps. Against projectM the `LuxXx - BadBallz Beta` correlation moved from 0.36-0.41 to 0.40-0.44;
+  `Jc - Crystal Shards` is within the noise, because its remaining difference is the comp and video
+  echo rather than the blur.
+
 ### Fixed
 - Fixed shader helper calls passing the argument unchanged instead of coercing it to the helper's
   declared parameter type. HLSL truncates a `float3` handed to a `float` parameter, so a real preset's

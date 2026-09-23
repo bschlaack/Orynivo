@@ -220,6 +220,79 @@ public sealed class PixelBuffer
         });
     }
 
+    /// <summary>
+    /// Applies one pass of the reference implementation's blur. It is a long horizontal pass with
+    /// eight weighted taps or a short vertical pass with four, and it is what a shader's
+    /// <c>GetBlur1</c>-<c>GetBlur3</c> read: a single three-by-three box is far too narrow and leaves
+    /// the hard edges a preset's own maths then amplifies.
+    /// </summary>
+    /// <param name="horizontal">Whether to blur along x (long) or y (short).</param>
+    public void BlurReference(bool horizontal)
+    {
+        // The reference weights, split into the two taps on either side of the centre.
+        ReadOnlySpan<float> weights = [4.0f, 3.8f, 3.5f, 2.9f, 1.9f, 1.2f, 0.7f, 0.3f];
+        _blurScratch ??= new float[_pixels.Length];
+        var copy = _blurScratch;
+        _pixels.CopyTo(copy, 0);
+        var pixels = _pixels;
+        var width = Width;
+        var height = Height;
+
+        // The reference folds the eight weights into four distances per axis, then divides by the
+        // summed weights so the pass preserves brightness.
+        Span<float> weight = stackalloc float[4];
+        Span<float> distance = stackalloc float[4];
+        float divisor;
+        if (horizontal)
+        {
+            weight[0] = weights[0] + weights[1];
+            weight[1] = weights[2] + weights[3];
+            weight[2] = weights[4] + weights[5];
+            weight[3] = weights[6] + weights[7];
+            distance[0] = 2f * weights[1] / weight[0];
+            distance[1] = 2f + (2f * weights[3] / weight[1]);
+            distance[2] = 4f + (2f * weights[5] / weight[2]);
+            distance[3] = 6f + (2f * weights[7] / weight[3]);
+            divisor = 0.5f / (weight[0] + weight[1] + weight[2] + weight[3]);
+        }
+        else
+        {
+            weight[0] = weights[0] + weights[1] + weights[2] + weights[3];
+            weight[1] = weights[4] + weights[5] + weights[6] + weights[7];
+            distance[0] = 2f * ((weights[2] + weights[3]) / weight[0]);
+            distance[1] = 2f + (2f * ((weights[6] + weights[7]) / weight[1]));
+            divisor = 1f / ((weight[0] + weight[1]) * 2f);
+        }
+
+        var taps = horizontal ? 4 : 2;
+        for (var y = 0; y < height; y++)
+        {
+            for (var x = 0; x < width; x++)
+            {
+                var offset = ((y * width) + x) * 4;
+                for (var channel = 0; channel < 3; channel++)
+                {
+                    var sum = 0f;
+                    for (var tap = 0; tap < taps; tap++)
+                    {
+                        var step = distance[tap];
+                        var other = horizontal
+                            ? (((y * width) + Math.Clamp((int)MathF.Round(x + step), 0, width - 1)) * 4) + channel
+                            : ((Math.Clamp((int)MathF.Round(y + step), 0, height - 1) * width) + x) * 4 + channel;
+                        var opposite = horizontal
+                            ? (((y * width) + Math.Clamp((int)MathF.Round(x - step), 0, width - 1)) * 4) + channel
+                            : ((Math.Clamp((int)MathF.Round(y - step), 0, height - 1) * width) + x) * 4 + channel;
+                        sum += (copy[other] + copy[opposite]) * weight[tap];
+                    }
+
+                    pixels[offset + channel] = sum * divisor;
+                }
+
+                pixels[offset + 3] = copy[offset + 3];
+            }
+        }
+    }
+
     /// <summary>Writes the buffer as BGRA bytes for a presentation bitmap.</summary>
     /// <param name="destination">Destination of at least <c>width * height * 4</c> bytes.</param>
     public void WriteBgra(Span<byte> destination)
