@@ -1,4 +1,4 @@
-using Orynivo.Visualization;
+﻿using Orynivo.Visualization;
 
 namespace Orynivo.Audio;
 
@@ -38,6 +38,9 @@ public sealed class AudioSpectrumAnalyzer : IVisualizerAudioSource
     /// and spectrum read: <c>-0.02 * ln((half - bin) / half)</c>, zero at DC and rising with frequency.
     /// </summary>
     private readonly float[] _equalize;
+
+    /// <summary>Channel-averaged magnitudes the reference loudness bands and spectrum read.</summary>
+    private readonly float[] _bandMagnitudes;
     private readonly float[] _bands = new float[BandCount];
     private readonly float[] _waveform = new float[WaveformPoints];
     private readonly float[] _spectrum = new float[SpectrumPoints];
@@ -62,11 +65,18 @@ public sealed class AudioSpectrumAnalyzer : IVisualizerAudioSource
     private readonly Loudness _treble = new();
     private long _analysisFrame;
 
+    /// <summary>
+    /// Samples the reference analyses per channel: its FFT takes 480 samples from a 576-sample buffer
+    /// into a 1024-point transform. Orynivo's waveform and spectrum contracts keep their own lengths;
+    /// this is what the loudness bands are computed from.
+    /// </summary>
+    public const int ReferenceAnalysisSamples = 480;
+
     /// <summary>Creates an analyzer for one output sample rate.</summary>
     /// <param name="sampleRate">Output sample rate in hertz.</param>
-    /// <param name="fftSize">FFT length; a power of two, defaulting to 2048.</param>
+    /// <param name="fftSize">FFT length; a power of two, defaulting to the reference's 1024.</param>
     /// <exception cref="ArgumentOutOfRangeException">The sample rate or FFT size is unusable.</exception>
-    public AudioSpectrumAnalyzer(int sampleRate, int fftSize = 2048)
+    public AudioSpectrumAnalyzer(int sampleRate, int fftSize = 1024)
     {
         ArgumentOutOfRangeException.ThrowIfLessThan(sampleRate, 8_000);
         if (!Fft.IsSupportedSize(fftSize))
@@ -75,10 +85,13 @@ public sealed class AudioSpectrumAnalyzer : IVisualizerAudioSource
         _sampleRate = sampleRate;
         _fftSize = fftSize;
         _window = new float[fftSize];
-        // The reference window is a raised sine whose period is the complete transform length, not
-        // the usual length-minus-one variant, so the first and last samples are not both exactly zero.
-        for (var index = 0; index < fftSize; index++)
-            _window[index] = 0.5f - (0.5f * MathF.Cos(2f * MathF.PI * index / fftSize));
+        // The reference windows the 480 samples it analyses with a raised sine over that window, so the
+        // ramp spans 480 samples and not the transform length; the samples before it stay unwindowed
+        // because the transform's front is zero anyway.
+        var windowed = Math.Min(ReferenceAnalysisSamples, fftSize);
+        var windowStart = fftSize - windowed;
+        for (var index = 0; index < windowed; index++)
+            _window[windowStart + index] = 0.5f - (0.5f * MathF.Cos(2f * MathF.PI * index / windowed));
 
         _scratch = new float[fftSize];
         _rawSamples = new float[fftSize];
@@ -86,6 +99,7 @@ public sealed class AudioSpectrumAnalyzer : IVisualizerAudioSource
         _magnitudes = new float[fftSize / 2];
         _bandEdges = BuildBandEdges(sampleRate, fftSize);
         var half = fftSize / 2;
+        _bandMagnitudes = new float[fftSize / 2];
         _equalize = new float[half];
         for (var index = 0; index < half; index++)
             _equalize[index] = -0.02f * MathF.Log((half - index) / (float)half);
@@ -157,7 +171,7 @@ public sealed class AudioSpectrumAnalyzer : IVisualizerAudioSource
         /// are normalized by the transform length. At the literal value the quiet middle and treble
         /// bands of real music stayed at one, so the bands a preset reacts to were dead.
         /// </summary>
-        private const float EmptyBandThreshold = 0.001f / (128f * 2048f);
+        private const float EmptyBandThreshold = 0.001f / (128f * 1024f);
 
         private float _average;
         private float _longAverage;
@@ -286,6 +300,12 @@ public sealed class AudioSpectrumAnalyzer : IVisualizerAudioSource
         ApplyEqualize(_leftMagnitudes);
         ApplyEqualize(_rightMagnitudes);
 
+        // The reference averages the two channels' equalized magnitudes for its loudness bands instead
+        // of transforming their mix, so a phase-inverted stereo pair is not cancelled out of the bands.
+        var bins = Math.Min(_bandMagnitudes.Length, Math.Min(_leftMagnitudes.Length, _rightMagnitudes.Length));
+        for (var index = 0; index < bins; index++)
+            _bandMagnitudes[index] = 0.5f * (_leftMagnitudes[index] + _rightMagnitudes[index]);
+
         UpdateSpectrum();
         UpdateStereoSpectrum();
         UpdateLoudness(secondsSinceLastFrame);
@@ -338,9 +358,9 @@ public sealed class AudioSpectrumAnalyzer : IVisualizerAudioSource
     /// <param name="secondsSinceLastFrame">Time since the previous analysis.</param>
     private void UpdateLoudness(double secondsSinceLastFrame)
     {
-        _bass.Update(SumSixth(_magnitudes, 0), secondsSinceLastFrame, _analysisFrame);
-        _mid.Update(SumSixth(_magnitudes, 1), secondsSinceLastFrame, _analysisFrame);
-        _treble.Update(SumSixth(_magnitudes, 2), secondsSinceLastFrame, _analysisFrame);
+        _bass.Update(SumSixth(_bandMagnitudes, 0), secondsSinceLastFrame, _analysisFrame);
+        _mid.Update(SumSixth(_bandMagnitudes, 1), secondsSinceLastFrame, _analysisFrame);
+        _treble.Update(SumSixth(_bandMagnitudes, 2), secondsSinceLastFrame, _analysisFrame);
         _analysisFrame++;
     }
 
@@ -415,14 +435,14 @@ public sealed class AudioSpectrumAnalyzer : IVisualizerAudioSource
     /// <summary>Decimates the FFT magnitudes into the spectrum buffer a custom waveform reads.</summary>
     private void UpdateSpectrum()
     {
-        var bins = Math.Max(1, _magnitudes.Length);
+        var bins = Math.Max(1, _bandMagnitudes.Length);
         var step = Math.Max(1, bins / SpectrumPoints);
         for (var point = 0; point < SpectrumPoints; point++)
         {
             var index = Math.Min(bins - 1, point * step);
             // The bands scale the magnitudes the same way, so a spectrum-reading waveform sees the
             // same zero-to-one range the band levels use.
-            _spectrum[point] = Math.Clamp(_magnitudes[index] * 8f, 0f, 1f);
+            _spectrum[point] = Math.Clamp(_bandMagnitudes[index] * 8f, 0f, 1f);
         }
     }
 

@@ -77,7 +77,13 @@ This file applies to `Orynivo.Core/` and supplements `../AGENTS.md`.
   sixth of the linear spectrum is divided by its long-term average so a value above
   one means "louder than usual" and `above(bass, 1.2)` can fire. It also keeps the
   left and right waveform and spectrum separate for the custom waveforms, and the
-  desktop hub measures the frame time its smoothing rates need. Never clamp the
+  desktop hub measures the frame time its smoothing rates need. The analysis geometry follows the
+  reference too: a 1024-point transform (`AudioSpectrumAnalyzer`'s default FFT size) over the most
+  recent `ReferenceAnalysisSamples` (480) samples of each channel, windowed with a raised sine over
+  that 480-sample window, and the loudness bands read `_bandMagnitudes`, the average of the two
+  equalized channel magnitudes, never the transform of their mix - the reference averages the channels'
+  spectra, so a phase-inverted stereo pair must not cancel. Orynivo's own `WaveformPoints` (512) and
+  `SpectrumPoints` (256) contracts keep their lengths. Never clamp the
   relative values to one, and never evaluate preset expressions or render frames on
   the audio thread. The guard that stands in for an empty band
   (`Loudness.EmptyBandThreshold`) must stay scaled to Orynivo's magnitudes: the

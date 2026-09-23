@@ -141,9 +141,15 @@ and conventions; no code is copied from it. It settled the shape conventions bel
   to the magnitudes the Milkdrop loudness bands and the spectrum read; Orynivo's own normalized display
   bands stay un-equalized. The guard had to be scaled to Orynivo's magnitudes first, which is what kept
   the attenuated low bins above it. Measured on a real track this changes the band weighting, not the
-  ratios: it neither fixed nor worsened the remaining `$$$ Royal - Mashup (138)` brightness gap, so the
-  cause of that gap is elsewhere - the next step is to disable the preset's shapes and see whether the
-  extra energy comes from the overlay or from the feedback accumulation.
+  ratios: it neither fixed nor worsened the remaining `$$$ Royal - Mashup (138)` brightness gap.
+- The analyzer now uses the reference's geometry as well: a 1024-point transform over the most recent
+  480 samples per channel, windowed over that 480-sample window, with the loudness bands averaged from
+  the two channels' equalized magnitudes. On the same track the three bands now agree with projectM's
+  within about 0.4 (projectM `2.15/2.45/2.25`, `1.30/1.11/1.23`, `0.80/0.78/1.19` against Orynivo's
+  `2.10/2.63/2.24`, `1.15/1.12/1.12`, `0.59/0.46/0.76`), where they had differed by up to a factor of
+  two. `$$$ Royal - Mashup (138)` still runs at 85-109 mean brightness against projectM's 32, so with
+  the bands ruled out the cause is the overlay's own brightness or area or the feedback accumulation:
+  the next step is to disable the preset's shapes and measure.
 - Milkdrop shapes were drawn vertically mirrored: the reference's shape space is Direct3D's y-up
   space (`v[0].y = shape_y*-2+1`, `milkdropfs.cpp`), so `shape_y` counts from the top, while the
   overlay rasterizer is y-down. A comparison against projectM put a `shapecode_0_y=0.75` shape 72 %

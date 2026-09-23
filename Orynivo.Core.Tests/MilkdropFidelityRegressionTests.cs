@@ -94,10 +94,13 @@ public sealed class MilkdropFidelityRegressionTests
         for (var i = 0; i < 2048; i++) { pcm[i * 2] = i / 2048f; pcm[i * 2 + 1] = -pcm[i * 2]; }
         analyzer.Analyze(pcm);
         Assert.Equal(512, analyzer.WaveformLeft.Length);
+        // The window is the oldest part of the analyser's buffer, so where it starts depends on the
+        // transform length; the trace is contiguous within it, which is what "not decimated" means.
+        var first = (int)MathF.Round(analyzer.WaveformLeft[0] * 2048f);
         for (var i = 0; i < 512; i++)
         {
-            Assert.Equal((1440 + i) / 2048f, analyzer.WaveformLeft[i]);
-            Assert.Equal(-(1440 + i) / 2048f, analyzer.WaveformRight[i]);
+            Assert.Equal((first + i) / 2048f, analyzer.WaveformLeft[i]);
+            Assert.Equal(-(first + i) / 2048f, analyzer.WaveformRight[i]);
         }
     }
 

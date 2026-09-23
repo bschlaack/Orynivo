@@ -78,6 +78,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   this regression cannot return unnoticed.
 
 ### Changed
+- The visualizer's audio analysis now uses the reference's geometry: a 1024-point transform over the
+  most recent 480 samples of each channel, windowed with a raised sine over that 480-sample window, and
+  the loudness bands read the average of the two channels' equalized magnitudes instead of the
+  transform of their mix, so a phase-inverted stereo pair is not cancelled out of the bands. Orynivo's
+  own 512-sample waveform and 256-point spectrum contracts are unchanged. Measured on a real track the
+  three bands now agree with projectM's within about 0.4 — projectM `2.15/2.45/2.25`,
+  `1.30/1.11/1.23`, `0.80/0.78/1.19` against Orynivo's `2.10/2.63/2.24`, `1.15/1.12/1.12`,
+  `0.59/0.46/0.76` — where they had differed by up to a factor of two.
 - The reference's logarithmic frequency equalization is now applied to the magnitudes the Milkdrop
   loudness bands and the spectrum a custom waveform reads use, matching projectM's own analyzer: the
   curve is `-0.02 * ln((half - bin) / half)`, zero at DC and rising with frequency. Orynivo's own
