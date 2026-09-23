@@ -7,6 +7,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Changed
+- Textured custom shapes now sample the frame instead of drawing a flat gradient. A shape whose
+  `shapecode_N_textured` is set interpolates the reference's texture coordinates across its triangle
+  fan — the centre maps to the texture centre and the rim to a circle of radius `0.5 / tex_zoom`
+  rotated by `tex_ang` — and reads the frame with repeat, so the presets that request texturing draw
+  their intended picture instead of the centre/edge gradient.
 - The default waveform now uses the reference's per-mode geometry instead of the earlier line/circle
   approximation. `wave_mode` selects the reference's `nWaveMode` modes — the single line is six, which
   the reference's idle preset confirms — and `MilkdropWaveform` reproduces the ring, the XY spiral,

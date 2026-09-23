@@ -201,6 +201,11 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
     private readonly float[] _wavePcmRight = new float[MilkdropWaveform.SampleCount];
     private readonly float[] _waveSecondX = new float[512];
     private readonly float[] _waveSecondY = new float[512];
+    // Texture coordinates of one shape's triangle fan, reused every shape so the overlay stays
+    // allocation-free.
+    private readonly float[] _shapeUvX = new float[128];
+    private readonly float[] _shapeUvY = new float[128];
+    private readonly float[] _shapeSample = new float[4];
     private readonly float[] _wavePointX = new float[512];
     private readonly float[] _wavePointY = new float[512];
     private readonly float[] _waveRed = new float[512];
@@ -3298,10 +3303,16 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
     {
         var red2 = Read("r2", 1f); var green2 = Read("g2", 1f);
         var blue2 = Read("b2", 1f); var alpha2 = Read("a2", 0f);
+        // A textured shape samples the frame instead of using the gradient colours.
+        var textured = Read("textured", 0f) != 0f;
         var width = _fresh.Width; var height = _fresh.Height;
+        if (textured)
+            BuildShapeTextureCoordinates(vertices.Length);
+
         for (var i = 0; i < vertices.Length; i++)
         {
             var a = vertices[i]; var b = vertices[(i + 1) % vertices.Length];
+            var next = (i + 1) % vertices.Length;
             var det = (a.Y - b.Y) * (cx - b.X) + (b.X - a.X) * (cy - b.Y);
             if (MathF.Abs(det) < 1e-9f) continue;
             var minX = Math.Max(0, (int)MathF.Floor((Math.Min(cx, Math.Min(a.X, b.X)) + 1f) * width * 0.5f));
@@ -3318,9 +3329,42 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
                 var w2 = 1f - w0 - w1;
                 // Half-open radial edge avoids blending shared fan edges twice.
                 if (w0 < 0f || w1 < 0f || w2 <= 0f) continue;
+                var pixelAlpha = Math.Clamp(alpha2 + (alpha - alpha2) * w0, 0f, 1f);
+                if (textured)
+                {
+                    // The coordinate is interpolated across the fan like the reference's textured
+                    // shape: the centre maps to the texture centre and the rim to a circle whose
+                    // radius is 0.5 / tex_zoom.
+                    var u = (0.5f * w0) + (_shapeUvX[i] * w1) + (_shapeUvX[next] * w2);
+                    var v = (0.5f * w0) + (_shapeUvY[i] * w1) + (_shapeUvY[next] * w2);
+                    _warped.SampleShader(u, v, VisualizerTextureWrap.Repeat, nearest: false, _shapeSample);
+                    PaintPixel(x, y, _shapeSample[0], _shapeSample[1], _shapeSample[2], pixelAlpha, additive);
+                    continue;
+                }
+
                 PaintPixel(x, y, red2 + (red - red2) * w0, green2 + (green - green2) * w0,
-                    blue2 + (blue - blue2) * w0, Math.Clamp(alpha2 + (alpha - alpha2) * w0, 0f, 1f), additive);
+                    blue2 + (blue - blue2) * w0, pixelAlpha, additive);
             }
+        }
+    }
+
+    /// <summary>
+    /// Builds the per-vertex texture coordinates of a textured shape. The centre of the fan maps to
+    /// the texture centre and each rim vertex to a circle whose radius is <c>0.5 / tex_zoom</c>,
+    /// rotated by <c>tex_ang</c>; the engine's frames are top-down, so the vertical axis is mirrored.
+    /// </summary>
+    /// <param name="count">Rim vertex count.</param>
+    private void BuildShapeTextureCoordinates(int count)
+    {
+        var texZoom = Math.Max(0.01f, Read("tex_zoom", 1f));
+        var texAngle = Read("tex_ang", 0f);
+        WarpSampling.GetAspect(_warped.Width, _warped.Height, out _, out var aspectY);
+        var limit = Math.Min(count, _shapeUvX.Length);
+        for (var i = 0; i < limit; i++)
+        {
+            var angle = (i / (float)count * 2f * MathF.PI) + texAngle + (MathF.PI * 0.25f);
+            _shapeUvX[i] = 0.5f + (0.5f * MathF.Cos(angle) / texZoom * aspectY);
+            _shapeUvY[i] = 0.5f - (0.5f * MathF.Sin(angle) / texZoom);
         }
     }
 

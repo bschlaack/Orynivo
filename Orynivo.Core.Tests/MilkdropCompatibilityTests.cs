@@ -357,6 +357,21 @@ public sealed class MilkdropCompatibilityTests
         Assert.Equal(Mean(plain), Mean(spectrum), 5);
     }
 
+    /// <summary>A textured shape samples the frame instead of using the gradient colours.</summary>
+    [Fact]
+    public void RenderFrame_TexturedShapeSamplesTheFrame()
+    {
+        const string shape =
+            "shapecode_0_enabled=1\nshapecode_0_x=0.5\nshapecode_0_y=0.5\nshapecode_0_rad=0.4\n" +
+            "shapecode_0_a=1\nshapecode_0_a2=1\nshapecode_0_border_a=0\n";
+        var gradient = RenderOverlay("wave_a=0\n" + shape);
+        var textured = RenderOverlay("wave_a=0\n" + shape + "shapecode_0_textured=1\n");
+
+        // The frame the overlay composites onto is black here, so the textured shape is black too.
+        Assert.True(MeanDifference(gradient, textured) > 0.001f);
+        Assert.Equal(0f, Mean(textured), 5);
+    }
+
     /// <summary>The outer border paints the frame edges.</summary>
     [Fact]
     public void RenderFrame_OuterBorderPaintsTheEdge()

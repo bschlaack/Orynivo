@@ -19,11 +19,12 @@ overlay alpha and display-only gamma/echo. Managed and GPU contract tests cover
 these changes. The oracle now uses explicit time and matching PCM input.
 
 See [the current verification report](VISUALIZER-FIDELITY-RECHECK.md) for evidence
-and remaining work: textured shapes, exact audio analysis, legacy hue shading,
-fallback-path differences and matched Winamp/ANGLE captures. The default waveform
-now uses the reference's per-mode geometry (`MilkdropWaveform`) instead of the
-earlier line/circle approximation. Historical completed items below describe
-implementation milestones, not proof of full reference fidelity.
+and remaining work: exact audio analysis, legacy hue shading, fallback-path
+differences and matched Winamp/ANGLE captures. The default waveform now uses the
+reference's per-mode geometry (`MilkdropWaveform`) and textured custom shapes sample
+the frame through the reference's fan texture coordinates, both replacing earlier
+approximations. Historical completed items below describe implementation milestones,
+not proof of full reference fidelity.
 
 ## Completed (1–14)
 

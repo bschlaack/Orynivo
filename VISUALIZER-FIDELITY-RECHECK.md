@@ -128,9 +128,10 @@ actually run the custom shaders.
 
 These corrections do **not** establish complete Winamp MilkDrop fidelity:
 
-- Textured custom-shape fills still need a GPU geometry path that can sample live
-  feedback. Their parameters are parsed, but the overlay rasterizer renders colour
-  only. CPU rasterized lines/polygons also differ from native antialiasing.
+- Textured custom-shape fills now sample the frame through the reference's fan
+  texture coordinates on the CPU overlay rasterizer; a GPU geometry path and the
+  reference's texture antialiasing are still absent, and CPU rasterized
+  lines/polygons differ from native antialiasing.
 - The default waveform's geometries are now the reference's per-mode math
   (`MilkdropWaveform`), but the spectrum FFT, windowing, waveform alignment and
   loudness history are still not a byte-exact port of Winamp's analyzer. Very

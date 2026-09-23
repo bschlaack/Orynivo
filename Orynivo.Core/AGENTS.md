@@ -21,6 +21,10 @@ This file applies to `Orynivo.Core/` and supplements `../AGENTS.md`.
   Draw shapes before custom/default waves. The overlay stores premultiplied colour
   plus accumulated non-additive coverage; composite as `feedback*(1-coverage)+RGB`.
   Preserve alpha when exporting the GL overlay, but keep ordinary bitmap output opaque.
+  A shape whose `shapecode_N_textured` is set must sample the frame instead of the
+  gradient: interpolate the reference's fan texture coordinates (centre at the
+  texture centre, rim on a circle of radius `0.5 / tex_zoom` rotated by `tex_ang`)
+  and read the frame with repeat.
 - The stereo custom waveform has 512 contiguous normalized PCM samples. Convert by
   128 at the custom-wave rendering boundary before applying the reference 0.004 scale.
   This does not assert exact Winamp FFT/alignment compatibility. `fWarpAnimSpeed` and
