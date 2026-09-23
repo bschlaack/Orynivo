@@ -17,6 +17,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   echo rather than the blur.
 
 ### Fixed
+- Fixed the GL presenter reading the render thread's shader-uniform dictionary without copying it.
+  The render thread fills that dictionary under its own lock while the presenter read it under a
+  different one, and a concurrent read of a `Dictionary` is undefined: it can throw or spin forever,
+  which is a frozen visualizer after a few frames. The presenter now takes its own copy under its
+  frame lock.
+- Fixed the roam vectors being recomputed, with per-call array allocations, for every pixel the shader
+  interpreter binds. They only depend on the frame time, so they are computed once per frame now.
 - Fixed the visualizer never binding the reference implementation's roam vectors (`roam_cos`,
   `roam_sin`, `slow_roam_cos`, `slow_roam_sin`). The prelude did not declare them, so the emitter
   treated them as unknown identifiers and gave them a zero constant; a shader that computes

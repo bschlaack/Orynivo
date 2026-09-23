@@ -200,7 +200,12 @@ public sealed class VisualizerGlPresenter : OpenGlControlBase
             _pipelineParameters = parameters;
             _pipelineWarpShader = warpShader;
             _pipelineCompShader = compShader;
-            _pipelineUniforms = uniforms;
+            // The render thread owns the caller's dictionary and writes it under its own lock, so the
+            // presenter takes its own copy here rather than reading a Dictionary the render thread may
+            // be mutating: a concurrent read of a Dictionary is undefined and can loop forever.
+            _pipelineUniforms = uniforms is null
+                ? null
+                : new Dictionary<string, ShaderValue>(uniforms);
             _pipelinePending = true;
         }
     }
