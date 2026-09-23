@@ -17,6 +17,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   echo rather than the blur.
 
 ### Fixed
+- Fixed custom OpenGL warp shaders drawing into the last blur framebuffer instead
+  of the full-resolution warp target, losing their output from the feedback image.
+- Fixed per-vertex motion equations accumulating the previous vertex's motion;
+  each vertex now starts from the per-frame motion values, matching projectM.
 - Fixed the GL presenter reading the render thread's shader-uniform dictionary without copying it.
   The render thread fills that dictionary under its own lock while the presenter read it under a
   different one, and a concurrent read of a `Dictionary` is undefined: it can throw or spin forever,

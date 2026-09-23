@@ -642,6 +642,11 @@ internal sealed class VisualizerGlPipeline
                 // The warp shader's GetBlur1-GetBlur3 read the blur chain of the feedback, exactly as
                 // the CPU warp stage builds it from the previous frame.
                 BuildShaderBlurLevels(gl, _feedbackTexture, frameWidth, frameHeight);
+                // Blur generation changes both the framebuffer and the viewport. Restore the
+                // full-size warp target before drawing; otherwise this writes into blur3 while
+                // that same texture is bound for sampling and the actual warp target stays black.
+                gl.BindFramebuffer(GlFramebuffer, _pingFramebuffer[0]);
+                gl.Viewport(0, 0, frameWidth, frameHeight);
                 gl.UseProgram(_warpShaderProgram);
                 BindShaderSamplers(gl, _warpShaderProgram, _warpShaderUniforms, _feedbackTexture, _previousTexture);
                 SetShaderUniforms(gl, _warpShaderProgram, _warpShaderUniforms, uniforms);

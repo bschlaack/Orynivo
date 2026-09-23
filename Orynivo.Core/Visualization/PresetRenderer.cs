@@ -1192,8 +1192,9 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
     /// warp can interpolate it across the frame the way Milkdrop does. The program shares the
     /// preset's slot array with the per-frame block, so it runs on the renderer's own slots and the
     /// per-frame motion values are put back afterwards; a later stage must see the frame's values,
-    /// not the last vertex's. Every vertex starts at the frame values, so a program that exceeds the
-    /// warp budget leaves a plain warp behind instead of an unfinished mesh.
+    /// not the last vertex's. All ten motion variables are reseeded before each execution, so
+    /// compound assignments cannot accumulate across vertices. Unvisited vertices retain frame
+    /// motion if the warp budget is exceeded.
     /// </summary>
     /// <param name="zoom">Per-frame zoom factor.</param>
     /// <param name="zoomExp">Per-frame zoom exponent.</param>
@@ -1247,6 +1248,7 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
         var frameOffsetY = Read(_slots, _slotDy, offsetY);
         var frameStretchX = Read(_slots, _slotSx, stretchX);
         var frameStretchY = Read(_slots, _slotSy, stretchY);
+        var frameWarp = Read("warp", Preset.Warp);
         var suspended = false;
         for (var gridY = 0; gridY <= MeshGridY && !suspended; gridY++)
         {
@@ -1261,6 +1263,19 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
                     suspended = true;
                     break;
                 }
+
+                // Motion outputs are local to a vertex. In particular, zoom *= ... must
+                // not multiply the preceding vertex's result across the entire mesh.
+                Write(_slots, _slotZoom, frameZoom);
+                Write(_slots, _slotZoomExp, frameZoomExp);
+                Write(_slots, _slotRot, frameRotation);
+                Write(_slots, _slotCx, frameCentreX);
+                Write(_slots, _slotCy, frameCentreY);
+                Write(_slots, _slotDx, frameOffsetX);
+                Write(_slots, _slotDy, frameOffsetY);
+                Write(_slots, _slotSx, frameStretchX);
+                Write(_slots, _slotSy, frameStretchY);
+                Write("warp", frameWarp);
 
                 var normalizedX = (gridX / (float)MeshGridX * 2f) - 1f;
                 // Milkdrop hands the program the vertex position and the aspect-scaled polar pair.
@@ -1298,6 +1313,7 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
         Write(_slots, _slotDy, frameOffsetY);
         Write(_slots, _slotSx, frameStretchX);
         Write(_slots, _slotSy, frameStretchY);
+        Write("warp", frameWarp);
     }
 
     /// <summary>

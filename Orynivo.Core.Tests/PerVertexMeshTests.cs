@@ -11,6 +11,39 @@ namespace Orynivo.Core.Tests;
 /// </summary>
 public sealed class PerVertexMeshTests
 {
+    /// <summary>Every vertex starts from frame motion, including when its equations use compound assignments.</summary>
+    [Fact]
+    public void RenderFrame_MeshReseedsMotionForEveryVertex()
+    {
+        var renderer = new PresetRenderer(VisualizerPreset.Parse("""
+            zoom=1.2
+            zoomexp=1
+            rot=0.1
+            cx=0.5
+            cy=0.5
+            dx=0.01
+            dy=0.02
+            sx=1
+            sy=1
+            warp=0.3
+            per_pixel_1=zoom+=0.1; zoomexp+=0.2; rot+=0.01; cx+=0.02; cy-=0.02; dx+=0.01; dy-=0.01; sx*=1.1; sy*=0.9; warp+=0.1; dx+=warp;
+            """), 40, 40)
+        {
+            ExpressionsOnly = true,
+            MeshRequested = true,
+        };
+        float[] expected = [1.3f, 1.2f, 0.11f, 0.52f, 0.48f, 0.42f, 0.01f, 1.1f, 0.9f];
+        for (var frame = 0; frame < 2; frame++)
+        {
+            renderer.RenderFrame(new FakeAudio(), 1d / 60d);
+            var mesh = new float[(PresetRenderer.MeshGridX + 1) * (PresetRenderer.MeshGridY + 1) * PresetRenderer.MeshValues];
+            Assert.True(renderer.TryCopyMeshMotion(mesh, out _, out _));
+            for (var vertex = 0; vertex < mesh.Length; vertex += PresetRenderer.MeshValues)
+                for (var component = 0; component < expected.Length; component++)
+                    Assert.Equal(expected[component], mesh[vertex + component], 5);
+        }
+    }
+
     /// <summary>A constant motion value interpolates to itself, so both paths agree exactly.</summary>
     [Theory]
     [InlineData("zoom = 1.05;")]

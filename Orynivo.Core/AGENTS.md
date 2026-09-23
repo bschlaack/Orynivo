@@ -11,6 +11,13 @@ This file applies to `Orynivo.Core/` and supplements `../AGENTS.md`.
 
 ## Core Invariants
 
+- `PresetRenderer.BuildMesh` must reseed zoom, zoomexp, rot, warp, cx, cy, dx,
+  dy, sx and sy from the per-frame state before every vertex equation execution.
+  Restore that state afterward; compound assignments must never accumulate motion
+  across vertices. `PerVertexMeshTests.RenderFrame_MeshReseedsMotionForEveryVertex`
+  covers this. See `VISUALIZER-FIDELITY-AUDIT.md` for remaining reference mismatches;
+  agreement with the CPU renderer alone does not establish Milkdrop compatibility.
+
 - Manual cover searches fetch only bounded CAA `front-250` previews, with three
   concurrent workers, a 35-second search budget and one retry for transient
   failures. Keep successes when another candidate fails. Fetch `front` originals

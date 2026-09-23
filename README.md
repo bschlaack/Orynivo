@@ -1685,6 +1685,11 @@ archive in place.
 
 ## Visualizer
 
+Milkdrop compatibility is currently partial: loading or compiling a `.milk` preset
+does not guarantee the original appearance. Known differences include warp geometry,
+shader equation ordering, sampler semantics, audio inputs, and custom waveforms.
+See [the fidelity audit](VISUALIZER-FIDELITY-AUDIT.md) for evidence and repair priorities.
+
 **Visualisierung** in the sidebar opens a fullscreen music visualizer. It renders the playing
 audio through a Milkdrop-style preset engine at 640 x 360 and scales the frame up. Escape
 closes it, a click or Space switches the preset, the arrow keys step through them, and R

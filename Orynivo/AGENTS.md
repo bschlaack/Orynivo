@@ -39,6 +39,12 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
 
 ## Client Invariants
 
+- Blur generation changes the active GL framebuffer and viewport. The custom warp
+  pass must rebind its full-resolution ping target after `BuildShaderBlurLevels`
+  and before drawing. `scripts/gl-harness/verify-warp-target.ps1` checks the real
+  GPU pipeline with a constant-output shader at two sizes. See
+  `VISUALIZER-FIDELITY-AUDIT.md` for outstanding Milkdrop compatibility issues.
+
 - Dashboard and its Show all pages share DashboardScrollViewer. Album artwork
   assignment must update the bound ContentRow in place, never call
   BuildDashboardAsync merely because that viewer is visible; this would replace
