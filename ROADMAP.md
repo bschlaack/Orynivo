@@ -878,17 +878,18 @@ affordable. This is a project of its own and must keep the CPU path as the fallb
   artefact was a steady rubber band.
   What remains: deleting the CPU frame path for the GL mode. The GL presentation is the default now;
   the CPU frame path stays as the automatic fallback for a platform without a GL context. A per-pixel
-  block that writes the sample position is emitted as a warp fragment shader behind
-  `ORYNIVO_VISUALIZER_PIXELWARP=1` (`ShaderTranspiler.TranspileGlslWarp` over a full-screen quad, with
-  the frame motion seeded as `_orynivo_*` uniforms and the decay moved to the post pass).
-  `scripts/gl-harness` renders it with `GLH_PIXEL_WARP=1`, and
+  block that writes the sample position is emitted as a warp fragment shader by default
+  (`ShaderTranspiler.TranspileGlslWarp` over a full-screen quad, with
+  the frame motion seeded as `_orynivo_*` uniforms and the decay moved to the post pass);
+  `ORYNIVO_VISUALIZER_PIXELWARP=0` forces the CPU warp. A block the dialect cannot express no longer
+  costs the preset its shaders in the mesh path, which is what sent `$$$ Royal - Mashup (397)` to the
+  CPU entirely. `scripts/gl-harness` renders it with `GLH_PIXEL_WARP=1`, and
   `scripts/gl-harness/verify-pixel-warp.ps1` verifies it. A whole-frame CPU-vs-GPU comparison is
   **not** a valid gate: the display frame is dominated by the overlay, which both renderers composite
   identically after the warp, so the frames agree to about 1/255 whether the GPU runs the per-pixel
   warp or the fixed one. The probe therefore draws the overlay only for the first frames and follows
   the brightness centroid of the remaining warped feedback: the GPU tracks the CPU within 0.08 px over
-  a 23 px travel, and a control preset without the block stays 26 px away. The CPU warp remains the
-  default until the picture has been confirmed on a real preset.
+  a 23 px travel, and a control preset without the block stays 26 px away.
   **Step 4 is done.** The GLSL emitter is `ShaderTranspiler`'s GLSL dialect next to SkSL
   (`TranspileGlsl`, `TranspileGlslComp`, `TranspileGlslWarp`): the prelude aliases `float2/3/4` onto
   `vec2/3/4` so the shared body emission is byte-identical, the samplers become `sampler2D` sampled

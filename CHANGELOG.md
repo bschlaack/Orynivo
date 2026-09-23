@@ -7,16 +7,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Added
-- Added an opt-in GPU per-pixel warp. A preset whose `per_pixel` block writes the sample position
-  `x` or `y` normally keeps the CPU warp, because the mesh cannot interpolate a sample position;
-  setting `ORYNIVO_VISUALIZER_PIXELWARP=1` emits that block as a warp fragment shader that computes
-  the coordinate per pixel on the GPU instead. `scripts/gl-harness/verify-pixel-warp.ps1` verifies it:
-  a whole-frame comparison cannot see the warp, because the display frame is dominated by the overlay
-  that both renderers composite identically, so the probe draws the overlay only for the first frames
-  and follows the brightness centroid of the remaining warped feedback. The GPU tracks the CPU
-  reference within 0.08 px over a 23 px travel, and a control preset without the block stays 26 px
-  away, so the probe fails if the block does not reach the GPU. The CPU warp remains the default until
-  the picture has been confirmed on a real preset.
+- A per-pixel block that writes the sample position `x` or `y` now runs on the GPU by default. Such
+  a block used to keep the CPU warp, because the mesh cannot interpolate a sample position; it is now
+  emitted as a warp fragment shader that computes the coordinate per pixel instead, and
+  `ORYNIVO_VISUALIZER_PIXELWARP=0` forces the CPU warp.
+  `scripts/gl-harness/verify-pixel-warp.ps1` verifies it: a whole-frame comparison cannot see the
+  warp, because the display frame is dominated by the overlay that both renderers composite
+  identically, so the probe draws the overlay only for the first frames and follows the brightness
+  centroid of the remaining warped feedback. The GPU tracks the CPU reference within 0.08 px over a
+  23 px travel, and a control preset without the block stays 26 px away, so the probe fails if the
+  block does not reach the GPU.
 - Added `scripts/visualizer-compare/render-compare.ps1`, which renders a preset — or every preset
   below a folder — with Orynivo and the reference implementation under identical resolution, frame
   count, frame time, mesh and audio, writes the frames and a settings manifest, and generates
@@ -26,6 +26,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   keeps its previous constant level.
 
 ### Fixed
+- A preset whose `per_pixel` block cannot be translated to GLSL — one that reads the shared
+  `megabuf`/`gmegabuf`, for example, as `$$$ Royal - Mashup (397)` does — no longer loses its
+  shaders. In the mesh path the per-pixel block runs on the mesh and is never emitted into the
+  shader, so failing the whole translation sent the complete frame back to the CPU; the block's
+  failure now only drops its uniforms, and the preset's warp and comp shaders stay on the GPU. The
+  mesh carries the motion the block wrote, and anything else the shader reads keeps its frame value.
 - The visualizer now presents through OpenGL by default instead of uploading every frame to a
   bitmap. The warp, the blur, the full-frame passes, and the composite then run on the GPU for a
   preset that builds a mesh; a per-pixel block that writes the sample position `x` or `y` keeps the

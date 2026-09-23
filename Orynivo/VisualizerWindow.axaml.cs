@@ -49,12 +49,12 @@ public partial class VisualizerWindow : Window
     private bool _glPixelWarp;
 
     /// <summary>
-    /// Whether a per-pixel block that writes the sample position may run on the GPU. It is opt-in
-    /// with <c>ORYNIVO_VISUALIZER_PIXELWARP=1</c> until its picture has been compared against the CPU
-    /// path on a real collection; the CPU warp is the reference and stays the default.
+    /// Whether a per-pixel block that writes the sample position may run on the GPU. It is the
+    /// default now that <c>scripts/gl-harness/verify-pixel-warp.ps1</c> verifies it against the CPU
+    /// warp; setting <c>ORYNIVO_VISUALIZER_PIXELWARP=0</c> forces the CPU warp.
     /// </summary>
     private readonly bool _pixelWarpEnabled =
-        Environment.GetEnvironmentVariable("ORYNIVO_VISUALIZER_PIXELWARP") == "1";
+        Environment.GetEnvironmentVariable("ORYNIVO_VISUALIZER_PIXELWARP") != "0";
     private readonly Dictionary<string, ShaderValue> _glUniforms = new(StringComparer.Ordinal);
     private bool _glErrorLogged;
     private bool _glInfoLogged;

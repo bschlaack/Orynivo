@@ -696,9 +696,21 @@ public static class ShaderTranspiler
         if (perPixel is not null && !perPixel.IsEmpty)
         {
             if (!PresetExpressionTranspiler.TryTranspile(perPixel, out perPixelBody, out var names, out var error))
-                throw new PresetExpressionException(error ?? "The per-pixel block has no SkSL translation.", 0);
+            {
+                // In mesh mode the per-pixel block already runs on the mesh, so its statements are
+                // never emitted here: a block the dialect cannot express - one that uses the shared
+                // memory buffer, for example - must not cost the preset its shader. The mesh carries
+                // the motion the block wrote, and anything else the shader reads keeps its frame value.
+                if (!meshUv)
+                    throw new PresetExpressionException(error ?? "The per-pixel block has no SkSL translation.", 0);
 
-            perPixelNames = [.. names];
+                perPixelBody = string.Empty;
+            }
+            else
+            {
+                perPixelNames = [.. names];
+            }
+
             if (perPixelBody.Length > 0)
                 builder.Append('\n').Append(PresetExpressionTranspiler.FmodHelper);
             foreach (var name in perPixelNames)

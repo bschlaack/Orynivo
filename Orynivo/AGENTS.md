@@ -542,12 +542,15 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
   ANGLE on Windows. `Orynivo.Controls.VisualizerGlPresenter` presents the frame and owns the GPU
   pipeline; it is the default, and `ORYNIVO_VISUALIZER_OPENGL=0` forces the bitmap presentation.
   The GPU owns the frame only for a preset that builds a mesh, which excludes a per-pixel block
-  that writes the sample position `x` or `y`; those keep the CPU warp, and the presenter then
-  uploads the finished CPU frame. `ORYNIVO_VISUALIZER_PIXELWARP=1` additionally emits that block as a
+  that writes the sample position `x` or `y` unless it can be emitted as a warp fragment shader; a
+  block that cannot be emitted keeps the CPU warp and the presenter then
+  uploads the finished CPU frame. Such a block is emitted by default as a
   warp fragment shader that computes the coordinate per pixel
   (`ShaderTranspiler.TranspileGlslWarp` with a null body, drawn over a full-screen quad with the
   `_orynivo_*` motion uniforms seeded from the mesh's first vertex, and the decay moved to the post
-  pass). It is opt-in until the picture has been confirmed on a real preset, and
+  pass); `ORYNIVO_VISUALIZER_PIXELWARP=0` forces the CPU warp. `ShaderTranspiler` must not fail the
+  mesh path over such a block: the mesh runs it and the shader never emits it, so only its uniforms
+  are lost, while the comp and Skia paths keep failing. It is verified by
   `scripts/gl-harness/verify-pixel-warp.ps1` is its check: a whole-frame CPU comparison cannot see the
   warp, so that probe draws the overlay only for the first frames and follows the brightness centroid
   of the remaining warped feedback, with a control preset without the block as the negative control.
