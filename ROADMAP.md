@@ -890,6 +890,23 @@ affordable. This is a project of its own and must keep the CPU path as the fallb
   warp or the fixed one. The probe therefore draws the overlay only for the first frames and follows
   the brightness centroid of the remaining warped feedback: the GPU tracks the CPU within 0.08 px over
   a 23 px travel, and a control preset without the block stays 26 px away.
+
+  **Next: the overlay on the GPU.** The renderer's own stage timings from a real 1920 x 1080 session
+  show the overlay is now the last CPU cost - `overlayMs` 120 for `$$$ Royal - Mashup (115)` and
+  475-500 for `(135)`, against `warpMs=0` and `compShaderMs=0` - because `PresetRenderer.FillShapeFan`
+  scans every fan triangle over its own bounding box, so the centre of a 25-sided shape is tested by
+  all 25 triangles. The design is settled and matches the CPU exactly:
+  - `PresetRenderer` publishes a per-frame list of shape fills (a triangle fan with per-vertex colour
+    and texture coordinate, plus the textured and additive flags) and skips its own fill when asked.
+  - `VisualizerGlPipeline` keeps an overlay target and draws the fans into it with premultiplied
+    `ONE, ONE_MINUS_SRC_ALPHA` blending, which is the same "over" operation `PaintPixel` applies, so
+    overlapping shapes accumulate identically; additive fills use `ONE, ONE`. A textured fill samples
+    the post-blur warped frame, which is the buffer `FillShapeFan` reads.
+  - The CPU still draws the polygon borders and the waves into the overlay bitmap; the pipeline
+    blends that bitmap over the target with the same operator, so the order stays shapes, borders,
+    waves.
+  - The post pass composites the target as today, so nothing else changes.
+  The waves and borders stay on the CPU because they cover few pixels; the fills are the cost.
   **Step 4 is done.** The GLSL emitter is `ShaderTranspiler`'s GLSL dialect next to SkSL
   (`TranspileGlsl`, `TranspileGlslComp`, `TranspileGlslWarp`): the prelude aliases `float2/3/4` onto
   `vec2/3/4` so the shared body emission is byte-identical, the samplers become `sampler2D` sampled
