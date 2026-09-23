@@ -59,8 +59,10 @@ public sealed class AudioSpectrumAnalyzer : IVisualizerAudioSource
         _sampleRate = sampleRate;
         _fftSize = fftSize;
         _window = new float[fftSize];
+        // The reference window is a raised sine whose period is the complete transform length, not
+        // the usual length-minus-one variant, so the first and last samples are not both exactly zero.
         for (var index = 0; index < fftSize; index++)
-            _window[index] = 0.5f * (1f - MathF.Cos(2f * MathF.PI * index / (fftSize - 1)));
+            _window[index] = 0.5f - (0.5f * MathF.Cos(2f * MathF.PI * index / fftSize));
 
         _scratch = new float[fftSize];
         _rawSamples = new float[fftSize];
@@ -216,6 +218,10 @@ public sealed class AudioSpectrumAnalyzer : IVisualizerAudioSource
         UpdateWaveform();
         UpdateStereoWaveform();
 
+        ApplyPreEmphasis(_monoSamples);
+        ApplyPreEmphasis(_leftSamples);
+        ApplyPreEmphasis(_rightSamples);
+
         for (var index = 0; index < _fftSize; index++)
             _monoSamples[index] *= _window[index];
 
@@ -305,6 +311,17 @@ public sealed class AudioSpectrumAnalyzer : IVisualizerAudioSource
         for (var index = start; index < end; index++)
             sum += magnitudes[index];
         return sum;
+    }
+
+    /// <summary>
+    /// Applies the reference's one-sample pre-emphasis to an FFT input, damping high-frequency
+    /// noise. Each sample is read before it is overwritten, so a backward pass stays exact.
+    /// </summary>
+    /// <param name="samples">Samples to damp in place.</param>
+    private static void ApplyPreEmphasis(float[] samples)
+    {
+        for (var index = samples.Length - 1; index >= 1; index--)
+            samples[index] = 0.5f * (samples[index] + samples[index - 1]);
     }
 
     /// <summary>Clears every smoothed value, for example when playback stops.</summary>

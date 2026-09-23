@@ -33,6 +33,24 @@ public sealed class AudioSpectrumAnalyzerTests
         Assert.True(analyzer.Treble > analyzer.Bass);
     }
 
+    /// <summary>
+    /// The reference damps the FFT input with a one-sample pre-emphasis, which cancels a signal that
+    /// alternates every sample (the Nyquist rate) exactly.
+    /// </summary>
+    [Fact]
+    public void Analyze_DampsTheNyquistBandWithPreEmphasis()
+    {
+        var analyzer = new AudioSpectrumAnalyzer(SampleRate);
+        var alternating = new float[2048 * 2];
+        for (var index = 0; index < alternating.Length; index++)
+            alternating[index] = (index & 1) == 0 ? 0.5f : -0.5f;
+
+        for (var block = 0; block < 8; block++)
+            analyzer.Analyze(alternating);
+
+        Assert.All(analyzer.Bands.ToArray(), value => Assert.Equal(0f, value, 5));
+    }
+
     /// <summary>Bands and the summary stay inside the documented range.</summary>
     [Fact]
     public void Analyze_KeepsValuesInRange()

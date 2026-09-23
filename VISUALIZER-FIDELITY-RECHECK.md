@@ -133,9 +133,23 @@ These corrections do **not** establish complete Winamp MilkDrop fidelity:
   reference's texture antialiasing are still absent, and CPU rasterized
   lines/polygons differ from native antialiasing.
 - The default waveform's geometries are now the reference's per-mode math
-  (`MilkdropWaveform`), but the spectrum FFT, windowing, waveform alignment and
-  loudness history are still not a byte-exact port of Winamp's analyzer. Very
-  large/custom waveform coordinates need fuller clipping.
+  (`MilkdropWaveform`). The analyzer now uses the reference's one-sample
+  pre-emphasis on every FFT input and its raised-sine window period (the complete
+  transform length, not length minus one). Two reference analysis steps are **not**
+  adopted, because they change the band balance rather than just its shape:
+  - The reference multiplies each magnitude by `-0.02 * ln((half - i) / half)`, a
+    logarithmic frequency equalization that is exactly zero at DC and rises to
+    `0.02 * ln(half)`. Applied to Orynivo's magnitudes — which are normalized by the
+    transform length, unlike the reference's unnormalized ones — it scales the low
+    bins to roughly `1e-4`, which drops the bass band below the loudness guard and
+    inverts the pure-tone band separation the analyzer tests assert. Adopting it
+    needs an empirical measurement of the reference's own band response first.
+  - The reference aligns the waveform against the previous frame with a
+    multi-octave cross-correlation (`WaveformAligner`), which needs a sample margin
+    larger than the exposed window. Orynivo still exposes the plain contiguous
+    window, so custom waveforms can jitter horizontally where the reference holds
+    them steady.
+  Very large/custom waveform coordinates need fuller clipping.
 - The legacy final effects now include the reference's animated hue shade and its
   brightness gain on the display target; the CPU and OpenGL paths both apply them,
   and the per-preset hue offsets are seeded from the preset name for

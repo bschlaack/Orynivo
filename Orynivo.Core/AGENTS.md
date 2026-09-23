@@ -53,7 +53,11 @@ This file applies to `Orynivo.Core/` and supplements `../AGENTS.md`.
   `PcmVisualizationTap` is the lock-free hand-off from the audio pump and must
   never block or wait (drop the oldest samples instead), `AudioSpectrumAnalyzer`
   owns windowing, FFT, band grouping, and smoothing, and `Fft` stays a pure,
-  allocation-free transform. The analyzer serves two contracts: the normalized
+  allocation-free transform. The FFT input is damped with the reference's one-sample
+  pre-emphasis and windowed with its raised-sine window over the complete transform
+  length; the reference's logarithmic frequency equalization and its multi-octave
+  waveform alignment are not adopted, because both change the band balance rather
+  than only its shape (`VISUALIZER-FIDELITY-RECHECK.md`). The analyzer serves two contracts: the normalized
   `Bands`/`Bass`/`Mid`/`Treble`/`Volume` values other consumers use, and Milkdrop's
   own relative loudness (`BassRelative` and friends), where each band's sum over one
   sixth of the linear spectrum is divided by its long-term average so a value above

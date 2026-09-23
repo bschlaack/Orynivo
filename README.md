@@ -1691,7 +1691,8 @@ filter/wrap modes, custom-wave state, real shape keys, warp speed/scale, blur ra
 and display-only gamma/echo. Textured shapes, default-wave geometry, exact audio
 analysis, legacy hue shading and CPU fallback behavior still differ. See the
 [current verification report](VISUALIZER-FIDELITY-RECHECK.md) for fixes, tests and
-remaining limits; a direct Winamp MilkDrop comparison is still required.
+remaining limits; a direct Winamp MilkDrop comparison is still required. The analyzer
+uses the reference's one-sample pre-emphasis and raised-sine window period.
 `scripts/visualizer-compare/render-compare.ps1` renders Orynivo and the reference
 implementation under identical resolution, frame time and audio and writes a matching
 test tone, so a capture from a reference player can be compared with the renders.
