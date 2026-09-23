@@ -131,9 +131,10 @@ These corrections do **not** establish complete Winamp MilkDrop fidelity:
 - Textured custom-shape fills still need a GPU geometry path that can sample live
   feedback. Their parameters are parsed, but the overlay rasterizer renders colour
   only. CPU rasterized lines/polygons also differ from native antialiasing.
-- The default waveform's eight geometries remain approximations. Spectrum FFT,
-  windowing, waveform alignment and loudness history are not a byte-exact port of
-  Winamp's analyzer. Very large/custom waveform coordinates need fuller clipping.
+- The default waveform's geometries are now the reference's per-mode math
+  (`MilkdropWaveform`), but the spectrum FFT, windowing, waveform alignment and
+  loudness history are still not a byte-exact port of Winamp's analyzer. Very
+  large/custom waveform coordinates need fuller clipping.
 - Some legacy final effects, including reference hue shading, are not implemented.
   CPU/Skia blur remains an approximation; the new range/edge contract is implemented
   in the active GL pipeline.

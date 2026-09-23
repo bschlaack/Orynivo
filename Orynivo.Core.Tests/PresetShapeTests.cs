@@ -156,16 +156,17 @@ public sealed class PresetShapeTests
 
         renderer.RenderFrame(new StubAudio(), 1d / 60d);
 
-        // y = -1 with an amplitude of 9 maps the whole line to rows 9 and 10.
-        var top = 0f;
+        // The per-point block sees the vertex position in minus-one-to-one space, so y = -1 puts the
+        // whole line on the bottom row.
+        var bottom = 0f;
         var middle = 0f;
         for (var column = 0; column < 64; column++)
         {
-            top += renderer.Output.GetPixel(column, 9, 1) + renderer.Output.GetPixel(column, 10, 1);
+            bottom += renderer.Output.GetPixel(column, 35, 1);
             middle += renderer.Output.GetPixel(column, 18, 1);
         }
 
-        Assert.True(top > 0f);
+        Assert.True(bottom > 0f);
         Assert.Equal(0f, middle, 5);
     }
 

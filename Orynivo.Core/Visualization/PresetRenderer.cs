@@ -197,6 +197,10 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
     // smoothed polyline. They are reused every frame so drawing an overlay stays allocation-free.
     private readonly float[] _waveSamples = new float[512];
     private readonly float[] _waveSamplesRight = new float[512];
+    private readonly float[] _wavePcmLeft = new float[MilkdropWaveform.SampleCount];
+    private readonly float[] _wavePcmRight = new float[MilkdropWaveform.SampleCount];
+    private readonly float[] _waveSecondX = new float[512];
+    private readonly float[] _waveSecondY = new float[512];
     private readonly float[] _wavePointX = new float[512];
     private readonly float[] _wavePointY = new float[512];
     private readonly float[] _waveRed = new float[512];
@@ -941,7 +945,8 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
         Write("blur2", 0f);
         Write("blur3", 0f);
         Write("darken_center", 0f);
-        Write("wave_mode", 3f);
+        // Milkdrop's default wave mode is the single line (six), which its idle preset confirms.
+        Write("wave_mode", 6f);
         Write("wave_r", 1f);
         Write("wave_g", 1f);
         Write("wave_b", 1f);
@@ -2615,108 +2620,144 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
         DrawDefaultWave();
     }
 
-    /// <summary>Draws the default waveform with the global mode, colour, and modifiers.</summary>
+    /// <summary>
+    /// Draws the default waveform with the global <c>wave_*</c> settings. The geometry comes from
+    /// <see cref="MilkdropWaveform"/>'s per-mode math instead of the earlier line/circle
+    /// approximation, and the global <c>per_point</c> block may still move every point.
+    /// </summary>
     private void DrawDefaultWave()
     {
-        var waveform = Waveform;
-        if (waveform.Length < 2)
-            return;
-
-        var width = _fresh.Width;
-        var height = _fresh.Height;
         var alpha = Math.Clamp(Read("wave_a", Preset.WaveAlpha), 0f, 1f);
         if (alpha <= 0f)
             return;
 
-        var amplitude = height * Preset.WaveScale * 0.5f;
-        var centre = height * Read("wave_y", 0.5f);
-        var centreX = Read("wave_x", 0.5f) * (width - 1);
+        // Milkdrop's idle preset uses mode six, the single line, and its numbering is the reference's.
+        var mode = (MilkdropWaveform.Mode)(int)Math.Clamp(Read("wave_mode", 6f), 0f, 8f);
+        var spectrum = MilkdropWaveform.IsSpectrumMode(mode);
+        var left = spectrum ? SpectrumLeft : WaveformLeft;
+        var right = spectrum ? SpectrumRight : WaveformRight;
+        if (left.Length < 2 || right.Length < 2)
+            return;
+
+        var smoothing = Math.Clamp(Read("wave_smoothing", 0f), 0f, 1f);
+        MilkdropWaveform.Prepare(left, _wavePcmLeft, Preset.WaveScale, smoothing, out var sampleCount);
+        MilkdropWaveform.Prepare(right, _wavePcmRight, Preset.WaveScale, smoothing, out _);
+
+        var width = _fresh.Width;
+        var height = _fresh.Height;
+        WarpSampling.GetAspect(width, height, out var aspectX, out var aspectY);
+        var mystery = Read("wave_mystery", 0f);
+        var waveX = (2f * Read("wave_x", 0.5f)) - 1f;
+        var waveY = (2f * Read("wave_y", 0.5f)) - 1f;
+
+        MilkdropWaveform.Generate(
+            mode,
+            _wavePcmLeft,
+            _wavePcmRight,
+            sampleCount,
+            mystery,
+            waveX,
+            waveY,
+            aspectX,
+            aspectY,
+            (float)_elapsed,
+            width,
+            _wavePointX,
+            _wavePointY,
+            _waveSecondX,
+            _waveSecondY,
+            out var count,
+            out var secondCount);
+
         var red = Math.Clamp(Read("wave_r", 1f), 0f, 1f);
         var green = Math.Clamp(Read("wave_g", 1f), 0f, 1f);
         var blue = Math.Clamp(Read("wave_b", 1f), 0f, 1f);
-        var mystery = Read("wave_mystery", 0f);
-        var mode = (int)Math.Clamp(Read("wave_mode", 3f), 0f, 7f);
-        var circular = mode <= 1;
-        var doubled = mode is 2 or 6 or 7;
         var dots = Read("wave_dots", 0f) >= 0.5f;
         var thick = Read("wave_thick", 0f) >= 0.5f;
         var additive = Read("wave_additive", 1f) >= 0.5f;
-        var perPoint = Preset.WavePerPoint;
+        var loop = MilkdropWaveform.IsLoop(mode);
 
-        // The default line is centred on wave_y; the custom waves offset their own traces.
-        const float lineOffset = 0f;
-        var radius = height * 0.35f;
-        for (var column = 0; column < width; column++)
+        ApplyDefaultWavePerPoint(count, _wavePointX, _wavePointY);
+        DrawDefaultWaveVertices(count, _wavePointX, _wavePointY, red, green, blue, alpha, dots, thick, additive, loop);
+
+        if (secondCount > 0)
         {
-            var t = width > 1 ? column / (float)(width - 1) : 0f;
-            var point = (int)((long)column * (waveform.Length - 1) / Math.Max(1, width - 1));
-            var sample = Math.Clamp(waveform[point], -1f, 1f);
+            // The reference runs no per-point code on the default wave, so only the legacy global
+            // block is honoured, and only for the first trace.
+            DrawDefaultWaveVertices(secondCount, _waveSecondX, _waveSecondY, red, green, blue, alpha, dots, thick, additive, loop: false);
+        }
+    }
 
-            float x;
-            float y;
-            if (circular)
-            {
-                var angle = (t * 2f * MathF.PI) + mystery;
-                var currentRadius = radius + (sample * amplitude * 0.6f);
-                x = (width * 0.5f) + (MathF.Cos(angle) * currentRadius);
-                y = (height * 0.5f) + (MathF.Sin(angle) * currentRadius);
-            }
-            else
-            {
-                x = (t * (width - 1)) + ((centreX - ((width - 1) * 0.5f)) * 0.5f);
-                y = centre + (sample * amplitude) + lineOffset + (mystery * amplitude);
-            }
+    /// <summary>Runs the legacy global <c>per_point</c> block over one trace of the default wave.</summary>
+    /// <param name="count">Vertex count.</param>
+    /// <param name="xs">Vertex x coordinates in minus-one-to-one space.</param>
+    /// <param name="ys">Vertex y coordinates in minus-one-to-one space.</param>
+    private void ApplyDefaultWavePerPoint(int count, float[] xs, float[] ys)
+    {
+        var perPoint = Preset.WavePerPoint;
+        if (perPoint.IsEmpty)
+            return;
 
-            if (!perPoint.IsEmpty)
-            {
-                // A line wave keeps the documented sample-unit mapping, so y = -1 still means
-                // the top of the wave band; the circular modes work in frame coordinates.
-                var normalizedX = circular
-                    ? ((x / Math.Max(1f, width - 1)) * 2f) - 1f
-                    : (t * 2f) - 1f;
-                var normalizedY = circular
-                    ? ((y / Math.Max(1f, height - 1)) * 2f) - 1f
-                    : sample;
-                Write("t", t);
-                Write("i", column);
-                Write("sample", sample);
-                Write("x", normalizedX);
-                Write("y", normalizedY);
-                perPoint.Execute(_slots);
-                normalizedX = Read("x", normalizedX);
-                normalizedY = Read("y", normalizedY);
-                if (circular)
-                {
-                    x = (normalizedX * 0.5f + 0.5f) * (width - 1);
-                    y = (normalizedY * 0.5f + 0.5f) * (height - 1);
-                }
-                else
-                {
-                    x = (normalizedX * 0.5f + 0.5f) * (width - 1);
-                    y = centre + (normalizedY * amplitude) + lineOffset + (mystery * amplitude);
-                }
-            }
+        var step = count > 1 ? 1f / (count - 1) : 0f;
+        for (var index = 0; index < count; index++)
+        {
+            Write("t", index * step);
+            Write("i", index);
+            Write("sample", ys[index]);
+            Write("x", xs[index]);
+            Write("y", ys[index]);
+            perPoint.Execute(_slots);
+            xs[index] = Read("x", xs[index]);
+            ys[index] = Read("y", ys[index]);
+        }
+    }
 
-            var pixelX = (int)Math.Clamp(x, 0f, width - 1);
-            var pixelY = (int)Math.Clamp(y, 0f, height - 1);
+    /// <summary>Draws one default-wave trace as dots or as a strip, optionally closed into a loop.</summary>
+    /// <param name="count">Vertex count.</param>
+    /// <param name="xs">Vertex x coordinates in minus-one-to-one space.</param>
+    /// <param name="ys">Vertex y coordinates in minus-one-to-one space.</param>
+    /// <param name="red">Red, zero to one.</param>
+    /// <param name="green">Green, zero to one.</param>
+    /// <param name="blue">Blue, zero to one.</param>
+    /// <param name="alpha">Opacity, zero to one.</param>
+    /// <param name="dots">Whether the trace is drawn as dots.</param>
+    /// <param name="thick">Whether the trace is drawn thick.</param>
+    /// <param name="additive">Whether the colour is added instead of alpha-blended.</param>
+    /// <param name="loop">Whether the trace is closed.</param>
+    private void DrawDefaultWaveVertices(
+        int count, float[] xs, float[] ys, float red, float green, float blue, float alpha,
+        bool dots, bool thick, bool additive, bool loop)
+    {
+        var width = _fresh.Width;
+        var height = _fresh.Height;
+        if (count < 1 || width < 1 || height < 1)
+            return;
+
+        var previousX = 0;
+        var previousY = 0;
+        for (var index = 0; index < count; index++)
+        {
+            var x = (int)Math.Clamp((xs[index] * 0.5f + 0.5f) * (width - 1), 0f, width - 1);
+            var y = (int)Math.Clamp((0.5f - (ys[index] * 0.5f)) * (height - 1), 0f, height - 1);
             if (dots)
             {
-                PaintPixel(pixelX, pixelY, red, green, blue, alpha, additive);
+                PaintPixel(x, y, red, green, blue, alpha, additive);
                 if (thick)
-                    PaintPixel(pixelX, pixelY + 1, red, green, blue, alpha * 0.6f, additive);
+                    PaintPixel(x, y + 1, red, green, blue, alpha * 0.6f, additive);
                 continue;
             }
 
-            PaintPixel(pixelX, pixelY, red, green, blue, alpha, additive);
-            PaintPixel(pixelX, pixelY + 1, red, green, blue, alpha * 0.45f, additive);
-            if (thick)
-            {
-                PaintPixel(pixelX, pixelY + 2, red, green, blue, alpha * 0.8f, additive);
-                PaintPixel(pixelX, pixelY + 3, red, green, blue, alpha * 0.5f, additive);
-            }
+            if (index > 0)
+                DrawWaveSegment(previousX, previousY, x, y, red, green, blue, alpha, additive, thick);
+            previousX = x;
+            previousY = y;
+        }
 
-            if (doubled)
-                PaintPixel(pixelX, (int)Math.Clamp((2 * centre) - pixelY, 0f, height - 1), red, green, blue, alpha, additive);
+        if (!dots && loop && count > 2)
+        {
+            var firstX = (int)Math.Clamp((xs[0] * 0.5f + 0.5f) * (width - 1), 0f, width - 1);
+            var firstY = (int)Math.Clamp((0.5f - (ys[0] * 0.5f)) * (height - 1), 0f, height - 1);
+            DrawWaveSegment(previousX, previousY, firstX, firstY, red, green, blue, alpha, additive, thick);
         }
     }
 
@@ -2973,7 +3014,7 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
 
             var previousX = (int)Math.Clamp(_waveOutX[index - 1] * (width - 1), 0f, width - 1);
             var previousY = (int)Math.Clamp((1f - _waveOutY[index - 1]) * (height - 1), 0f, height - 1);
-            DrawWaveSegment(previousX, previousY, x, y, red, green, blue, alpha, wave);
+            DrawWaveSegment(previousX, previousY, x, y, red, green, blue, alpha, wave.Additive, wave.DrawThick);
         }
     }
 
@@ -2986,26 +3027,27 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
     /// <param name="green">Green, zero to one.</param>
     /// <param name="blue">Blue, zero to one.</param>
     /// <param name="alpha">Opacity, zero to one.</param>
-    /// <param name="wave">Waveform state, for the additive and thickness modes.</param>
+    /// <param name="additive">Whether the colour is added instead of alpha-blended.</param>
+    /// <param name="thick">Whether the segment is drawn two pixels thick.</param>
     private void DrawWaveSegment(
-        int x0, int y0, int x1, int y1, float red, float green, float blue, float alpha, VisualizerWave wave)
+        int x0, int y0, int x1, int y1, float red, float green, float blue, float alpha, bool additive, bool thick)
     {
         var dx = x1 - x0;
         var dy = y1 - y0;
         var steps = Math.Max(Math.Abs(dx), Math.Abs(dy));
         if (steps == 0)
         {
-            PaintPixel(x0, y0, red, green, blue, alpha, wave.Additive);
+            PaintPixel(x0, y0, red, green, blue, alpha, additive);
             return;
         }
 
-        var thickness = wave.DrawThick ? 2 : 1;
+        var thickness = thick ? 2 : 1;
         for (var step = 0; step <= steps; step++)
         {
             var x = x0 + (int)MathF.Round(dx * step / (float)steps);
             var y = y0 + (int)MathF.Round(dy * step / (float)steps);
             for (var offset = 0; offset < thickness; offset++)
-                PaintPixel(x, y + offset, red, green, blue, alpha * (offset == 0 ? 1f : 0.5f), wave.Additive);
+                PaintPixel(x, y + offset, red, green, blue, alpha * (offset == 0 ? 1f : 0.5f), additive);
         }
     }
 

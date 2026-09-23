@@ -7,6 +7,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Changed
+- The default waveform now uses the reference's per-mode geometry instead of the earlier line/circle
+  approximation. `wave_mode` selects the reference's `nWaveMode` modes — the single line is six, which
+  the reference's idle preset confirms — and `MilkdropWaveform` reproduces the ring, the XY spiral,
+  the centred spirograph, the derivative line, the explosive hash, the line, the double line, and the
+  spectrum line from the scaled PCM data, including the edge clipping and the closed-loop modes. The
+  geometry smooths the polyline with the reference's four taps, honours
+  `wave_dots`/`wave_thick`/`wave_additive`, and still runs the legacy global `per_point` block, whose
+  `x`/`y` are now the vertex position in minus-one-to-one space. The default `wave_scale` is now one
+  and the default `wave_mode` the single line, both matching the reference.
 - The visualizer's band variables now follow Milkdrop: `bass`, `mid`, `treble`, `vol`, and their
   `_att` companions are relative to each band's long-term average instead of being clamped to zero to
   one, so a value above one means "louder than usual" and a preset condition such as

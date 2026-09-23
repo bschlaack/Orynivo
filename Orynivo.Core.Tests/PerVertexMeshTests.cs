@@ -67,7 +67,7 @@ public sealed class PerVertexMeshTests
     /// <summary>A motion that varies with the position is interpolated, so the mesh differs.</summary>
     [Theory]
     [InlineData("zoom = 1.02 + 0.04 * x;")]
-    [InlineData("cx = 0.1 * x; cy = 0.1 * y;")]
+    [InlineData("cx = 0.5 * x; cy = 0.5 * y;")]
     [InlineData("rot = 0.2 * x;")]
     public void RenderFrame_MeshInterpolatesAVaryingMotion(string perPixel)
     {

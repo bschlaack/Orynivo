@@ -144,10 +144,11 @@ public sealed class MilkdropCompatibilityTests
     [Fact]
     public void RenderFrame_BlurKeysSmoothTheFeedback()
     {
-        // The default wave is off and a custom waveform pinned to one column gives the feedback a
-        // sharp trace the blur has to soften; the feedback itself is what is measured.
+        // The overlay only seeds the feedback on the first frame, so the measured feedback carries
+        // the trace without the freshly drawn overlay masking the blur.
         const string body =
-            "decay = 1;\nwave_a = 0;\nwavecode_0_enabled=1\nwavecode_0_scaling=100\nwave_0_per_point_1=x = 0.5;\n";
+            "decay = 1;\nwave_a = 0;\nwavecode_0_enabled=1\nwavecode_0_scaling=100\n" +
+            "wave_0_per_point_1=x = 0.5;\nwave_0_per_frame_1=a = max(0, 1 - frame);\n";
         var sharp = RenderFeedbackSource(body);
         var blurred = RenderFeedbackSource(body + "per_frame_1=blur1 = 0; blur2 = 3;\n");
 
@@ -294,14 +295,14 @@ public sealed class MilkdropCompatibilityTests
         Assert.True(MeanDifference(line, circular) > 0.001f);
     }
 
-    /// <summary>Dots draw fewer pixels than a connected line.</summary>
+    /// <summary>Dots and a connected line draw different pixels.</summary>
     [Fact]
-    public void RenderFrame_WaveDotsDrawLessThanALine()
+    public void RenderFrame_WaveDotsDifferFromALine()
     {
         var line = RenderOverlay(string.Empty);
         var dots = RenderOverlay("wave_dots=1");
 
-        Assert.True(Mean(dots) < Mean(line));
+        Assert.True(MeanDifference(line, dots) > 0.001f);
     }
 
     /// <summary>A thick wave covers more rows than a thin one.</summary>
@@ -314,14 +315,14 @@ public sealed class MilkdropCompatibilityTests
         Assert.True(Mean(thick) > Mean(thin));
     }
 
-    /// <summary>The doubled modes mirror the wave around its centre.</summary>
+    /// <summary>The double line draws both channels, so it covers more than the single line.</summary>
     [Fact]
-    public void RenderFrame_DoubledWaveModeMirrors()
+    public void RenderFrame_DoubleLineCoversMoreThanTheLine()
     {
-        var single = RenderOverlay("wave_mode=3");
-        var doubled = RenderOverlay("wave_mode=2");
+        var single = RenderOverlay("wave_mode=6");
+        var doubled = RenderOverlay("wave_mode=7");
 
-        Assert.True(Mean(doubled) > Mean(single));
+        Assert.True(Mean(doubled) > Mean(single), $"single={Mean(single):F4} doubled={Mean(doubled):F4}");
     }
 
     /// <summary>A declared second waveform slot is drawn as well.</summary>

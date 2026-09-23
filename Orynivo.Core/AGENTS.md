@@ -81,8 +81,14 @@ This file applies to `Orynivo.Core/` and supplements `../AGENTS.md`.
   the variables use, so the `b1n`/`b1x`/`b1ed` and `b2`/`b3` blur and edge keys resolve to
   `blurN_min`/`blurN_max`/`blurN_edge_darken` instead of being dropped, and a preset that carries
   only them takes its blur amount from their `blurN_max` sum when Orynivo's own `blur_level` key is
-  absent. Keep new aliases in that one table. The default wave mode is the single line (3), not the
-  circular mode (0), because every built-in preset and the legacy `per_point` contract assume a line.
+  absent. Keep new aliases in that one table. The default wave mode is the single line, which is six
+  in the reference's `nWaveMode` numbering (its idle preset uses six), and the default `wave_scale`
+  is one. `MilkdropWaveform` owns the default wave's per-mode geometry — ring, spiral, centred
+  spirograph, derivative line, explosive hash, line, double line and spectrum line — with the
+  reference's edge clipping, closed-loop modes and four-tap polyline smoothing; `DrawDefaultWave`
+  only prepares the PCM, applies the legacy global `per_point` block, and draws the result. Never
+  reintroduce a line/circle approximation, and keep the geometry's sample count following the
+  source so a short buffer cannot read an empty tail.
   The default waveform and the four custom waveforms are separate: the default one uses the global
   `wave_*` settings and the global `per_point` block, while each `VisualizerWave` carries its own
   `wavecode_N_*` state and `wave_N_*` blocks. `PresetRenderer.DrawCustomWave` builds the sample data
