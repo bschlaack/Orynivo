@@ -135,8 +135,13 @@ These corrections do **not** establish complete Winamp MilkDrop fidelity:
 - The default waveform's geometries are now the reference's per-mode math
   (`MilkdropWaveform`). The analyzer now uses the reference's one-sample
   pre-emphasis on every FFT input and its raised-sine window period (the complete
-  transform length, not length minus one). Two reference analysis steps are **not**
-  adopted, because they change the band balance rather than just its shape:
+  transform length, not length minus one). The stereo waveform is aligned to the
+  previous frame with the reference's multi-octave cross-correlation
+  (`WaveformAligner`), so a custom waveform holds its shape instead of sliding. The
+  aligner keeps the reference's margin of 96 samples after the window, so the exposed
+  window is the older part of a 608-sample buffer and lags the newest audio by up to
+  96 samples, exactly as the reference does. One reference analysis step is **not**
+  adopted:
   - The reference multiplies each magnitude by `-0.02 * ln((half - i) / half)`, a
     logarithmic frequency equalization. Measuring the reference itself
     (`scripts/projectm-oracle/measure-bands.cpp`) shows this does **not** suppress
@@ -148,11 +153,6 @@ These corrections do **not** establish complete Winamp MilkDrop fidelity:
     times Orynivo's normalized ones, and the reference's own guard
     (`|long-term average| < 0.001`, `Loudness.cpp:49`) therefore fires on Orynivo's
     magnitudes where it would not on the reference's.
-  - The reference aligns the waveform against the previous frame with a
-    multi-octave cross-correlation (`WaveformAligner`), which needs a sample margin
-    larger than the exposed window. Orynivo still exposes the plain contiguous
-    window, so custom waveforms can jitter horizontally where the reference holds
-    them steady.
   Very large/custom waveform coordinates need fuller clipping.
 - The legacy final effects now include the reference's animated hue shade and its
   brightness gain on the display target; the CPU and OpenGL paths both apply them,

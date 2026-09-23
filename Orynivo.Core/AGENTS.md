@@ -25,9 +25,10 @@ This file applies to `Orynivo.Core/` and supplements `../AGENTS.md`.
   gradient: interpolate the reference's fan texture coordinates (centre at the
   texture centre, rim on a circle of radius `0.5 / tex_zoom` rotated by `tex_ang`)
   and read the frame with repeat.
-- The stereo custom waveform has 512 contiguous normalized PCM samples. Convert by
+- The stereo custom waveform has 512 contiguous normalized PCM samples, aligned to
+  the previous frame. Convert by
   128 at the custom-wave rendering boundary before applying the reference 0.004 scale.
-  This does not assert exact Winamp FFT/alignment compatibility. `fWarpAnimSpeed` and
+  This does not assert exact Winamp FFT compatibility. `fWarpAnimSpeed` and
   `fWarpScale` must reach every warp path; GLSL audio uniforms use relative bands.
   FPS reflects the supplied interval, and aspect factors remain at most one.
 - `MilkdropFidelityRegressionTests` and the current `VISUALIZER-FIDELITY-RECHECK.md`
@@ -55,11 +56,12 @@ This file applies to `Orynivo.Core/` and supplements `../AGENTS.md`.
   owns windowing, FFT, band grouping, and smoothing, and `Fft` stays a pure,
   allocation-free transform. The FFT input is damped with the reference's one-sample
   pre-emphasis and windowed with its raised-sine window over the complete transform
-  length; the reference's logarithmic frequency equalization and its multi-octave
-  waveform alignment are not adopted, because the equalization needs the reference's
-  unnormalized magnitude scale to keep its loudness guard meaningful and the aligner
-  needs a sample margin wider than the exposed window. Measure the reference itself
-  with `scripts/projectm-oracle/measure-bands.cpp` before changing this
+  length; the stereo waveform is aligned to the previous frame with the reference's
+  multi-octave cross-correlation (`WaveformAligner`), keeping the reference's 96-sample
+  margin after the window. The reference's logarithmic frequency equalization is not
+  adopted, because it needs the reference's unnormalized magnitude scale to keep its
+  loudness guard meaningful. Measure the reference itself with
+  `scripts/projectm-oracle/measure-bands.cpp` before changing this
   (`VISUALIZER-FIDELITY-RECHECK.md`). The analyzer serves two contracts: the normalized
   `Bands`/`Bass`/`Mid`/`Treble`/`Volume` values other consumers use, and Milkdrop's
   own relative loudness (`BassRelative` and friends), where each band's sum over one

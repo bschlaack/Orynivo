@@ -80,7 +80,10 @@ public sealed class MilkdropFidelityRegressionTests
         }
     }
 
-    /// <summary>The stereo trace contains a complete contiguous 512-sample window.</summary>
+    /// <summary>
+    /// The stereo trace contains a complete contiguous 512-sample window. The aligner's margin sits
+    /// after the window, exactly as in the reference, so the window is the older part of the buffer.
+    /// </summary>
     [Fact]
     public void StereoWaveformIsNotDecimated()
     {
@@ -91,10 +94,54 @@ public sealed class MilkdropFidelityRegressionTests
         Assert.Equal(512, analyzer.WaveformLeft.Length);
         for (var i = 0; i < 512; i++)
         {
-            Assert.Equal((1536 + i) / 2048f, analyzer.WaveformLeft[i]);
-            Assert.Equal(-(1536 + i) / 2048f, analyzer.WaveformRight[i]);
+            Assert.Equal((1440 + i) / 2048f, analyzer.WaveformLeft[i]);
+            Assert.Equal(-(1440 + i) / 2048f, analyzer.WaveformRight[i]);
         }
     }
+
+    /// <summary>
+    /// The aligner shifts a window so it matches the previous frame better than the unshifted window
+    /// does, which is what keeps a custom waveform from sliding sideways.
+    /// </summary>
+    [Fact]
+    public void WaveformAligner_MatchesThePreviousFrameBetterThanNoShift()
+    {
+        const int buffer = 608;
+        const int window = 512;
+        const int step = 735;
+        var aligner = new WaveformAligner(buffer, window);
+
+        // A decaying burst every 900 samples gives the search one unambiguous feature to lock onto.
+        var signal = new float[step + buffer];
+        for (var i = 0; i < signal.Length; i++)
+        {
+            var withinBurst = i % 900;
+            signal[i] = withinBurst < 200
+                ? MathF.Sin(withinBurst * 0.35f) * MathF.Exp(-withinBurst / 60f)
+                : 0f;
+        }
+
+        var first = signal.AsSpan(0, buffer).ToArray();
+        aligner.Align(first);
+        var firstWindow = first.AsSpan(0, window).ToArray();
+
+        var second = signal.AsSpan(step, buffer).ToArray();
+        var unshifted = second.AsSpan(0, window).ToArray();
+        aligner.Align(second);
+        var secondWindow = second.AsSpan(0, window).ToArray();
+
+        Assert.True(Difference(secondWindow, firstWindow) < Difference(unshifted, firstWindow));
+    }
+
+    /// <summary>Mean absolute difference over a window.</summary>
+    private static float Difference(float[] left, float[] right)
+    {
+        var total = 0f;
+        for (var i = 0; i < left.Length; i++)
+            total += MathF.Abs(left[i] - right[i]);
+        return total / left.Length;
+    }
+
 
     private static PresetRenderer Create(string text) => new(VisualizerPreset.Parse(text), 64, 64) { ExpressionsOnly = true, MeshRequested = true };
 

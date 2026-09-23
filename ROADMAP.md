@@ -19,10 +19,10 @@ overlay alpha and display-only gamma/echo. Managed and GPU contract tests cover
 these changes. The oracle now uses explicit time and matching PCM input.
 
 See [the current verification report](VISUALIZER-FIDELITY-RECHECK.md) for evidence
-and remaining work: the reference's logarithmic frequency equalization and waveform
-alignment, fallback-path differences and matched Winamp/ANGLE captures. The analyzer
-now uses the reference's one-sample pre-emphasis and raised-sine window period;
-`scripts/visualizer-compare/render-compare.ps1` renders both
+and remaining work: the reference's logarithmic frequency equalization, fallback-path
+differences and matched Winamp/ANGLE captures. The analyzer now uses the reference's
+one-sample pre-emphasis, raised-sine window period and multi-octave waveform
+alignment; `scripts/visualizer-compare/render-compare.ps1` renders both
 engines under identical resolution, frame time and audio and writes a matching test
 tone, so a reference-player capture can be compared with the renders. The default
 waveform now uses the reference's per-mode geometry (`MilkdropWaveform`), textured

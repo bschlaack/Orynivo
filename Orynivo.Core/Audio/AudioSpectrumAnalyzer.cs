@@ -19,6 +19,12 @@ public sealed class AudioSpectrumAnalyzer : IVisualizerAudioSource
     /// <summary>Number of frequency points kept for a spectrum-reading custom waveform.</summary>
     public const int SpectrumPoints = 256;
 
+    /// <summary>Samples the waveform aligner may shift a window by; the reference's own margin.</summary>
+    private const int AlignMargin = 96;
+
+    /// <summary>Samples the aligner compares to find the shift.</summary>
+    private const int AlignBufferPoints = WaveformPoints + AlignMargin;
+
     private readonly int _sampleRate;
     private readonly int _fftSize;
     private readonly float[] _window;
@@ -39,6 +45,10 @@ public sealed class AudioSpectrumAnalyzer : IVisualizerAudioSource
     private readonly float[] _rightMagnitudes;
     private readonly float[] _waveformLeft = new float[WaveformPoints];
     private readonly float[] _waveformRight = new float[WaveformPoints];
+    private readonly float[] _alignLeft = new float[AlignBufferPoints];
+    private readonly float[] _alignRight = new float[AlignBufferPoints];
+    private readonly WaveformAligner _alignerLeft = new(AlignBufferPoints, WaveformPoints);
+    private readonly WaveformAligner _alignerRight = new(AlignBufferPoints, WaveformPoints);
     private readonly float[] _spectrumLeft = new float[SpectrumPoints];
     private readonly float[] _spectrumRight = new float[SpectrumPoints];
     private readonly Loudness _bass = new();
@@ -261,15 +271,23 @@ public sealed class AudioSpectrumAnalyzer : IVisualizerAudioSource
         FrameCount++;
     }
 
-    /// <summary>Copies the latest contiguous PCM window into the stereo waveform buffers.</summary>
+    /// <summary>
+    /// Copies the latest contiguous PCM window into the stereo waveform buffers, after aligning each
+    /// channel to the previous frame so a custom waveform holds its shape instead of sliding.
+    /// </summary>
     private void UpdateStereoWaveform()
     {
-        var copied = Math.Min(_fftSize, WaveformPoints);
-        var padding = WaveformPoints - copied;
-        Array.Clear(_waveformLeft, 0, padding);
-        Array.Clear(_waveformRight, 0, padding);
-        _leftSamples.AsSpan(_fftSize - copied, copied).CopyTo(_waveformLeft.AsSpan(padding));
-        _rightSamples.AsSpan(_fftSize - copied, copied).CopyTo(_waveformRight.AsSpan(padding));
+        var copied = Math.Min(_fftSize, AlignBufferPoints);
+        var padding = AlignBufferPoints - copied;
+        Array.Clear(_alignLeft, 0, padding);
+        Array.Clear(_alignRight, 0, padding);
+        _leftSamples.AsSpan(_fftSize - copied, copied).CopyTo(_alignLeft.AsSpan(padding));
+        _rightSamples.AsSpan(_fftSize - copied, copied).CopyTo(_alignRight.AsSpan(padding));
+
+        _alignerLeft.Align(_alignLeft);
+        _alignerRight.Align(_alignRight);
+        _alignLeft.AsSpan(0, WaveformPoints).CopyTo(_waveformLeft);
+        _alignRight.AsSpan(0, WaveformPoints).CopyTo(_waveformRight);
     }
 
     /// <summary>Decimates the per-channel magnitudes into the stereo spectrum buffers.</summary>
@@ -332,6 +350,8 @@ public sealed class AudioSpectrumAnalyzer : IVisualizerAudioSource
         Array.Clear(_spectrum);
         Array.Clear(_waveformLeft);
         Array.Clear(_waveformRight);
+        _alignerLeft.Reset();
+        _alignerRight.Reset();
         Array.Clear(_spectrumLeft);
         Array.Clear(_spectrumRight);
         _bass.Reset();
