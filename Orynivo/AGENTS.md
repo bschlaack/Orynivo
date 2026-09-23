@@ -540,7 +540,10 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
   hardware-accelerated. Roadmap 40f moves the pipeline onto OpenGL: `Avalonia` 12 already ships
   `Avalonia.OpenGL` with `OpenGlControlBase`, and the context is confirmed as OpenGL ES 3.0 through
   ANGLE on Windows. `Orynivo.Controls.VisualizerGlPresenter` presents the frame and owns the GPU
-  pipeline; it is the default, and `ORYNIVO_VISUALIZER_OPENGL=0` forces the bitmap presentation. When the preset has no
+  pipeline; it is the default, and `ORYNIVO_VISUALIZER_OPENGL=0` forces the bitmap presentation.
+  The GPU owns the frame only for a preset that builds a mesh, which excludes a per-pixel block
+  that writes the sample position `x` or `y`; those keep the CPU warp, and the presenter then
+  uploads the finished CPU frame. When the preset has no
   shaders, `Orynivo.Controls.VisualizerGlPipeline` owns the whole frame: the warp as a mesh draw whose
   fragment shader is a translation of `WarpSampling.SamplePosition`, the blur as the same nine-tap
   clamped box filter with ping-pong targets, and decay, video echo, centre darkening, both border

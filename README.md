@@ -1702,9 +1702,11 @@ test tone, so a capture from a reference player can be compared with the renders
 audio through a Milkdrop-style preset engine at 640 x 360 and scales the frame up. Escape
 closes it, a click or Space switches the preset, the arrow keys step through them, and R
 resets the picture; the **Reduce motion** preference draws a static spectrum instead of
-animating. The preset pipeline runs on the GPU through OpenGL, with the per-pixel expression
-blocks evaluated on the CPU; a platform whose GL context is unavailable falls back to the
-bitmap presentation, and setting `ORYNIVO_VISUALIZER_OPENGL=0` forces it.
+animating. The frame is presented through OpenGL, and the warp, the blur, and the full-frame
+passes run on the GPU for a preset that builds a mesh; a per-pixel block that writes the sample
+position keeps the CPU warp, because an interpolated position has no meaning. A platform whose
+GL context is unavailable falls back to the bitmap presentation, and setting
+`ORYNIVO_VISUALIZER_OPENGL=0` forces it.
 
 Presets are INI-style text with `per_frame_init`, `per_frame`, and `per_pixel` expression
 blocks plus `decay`, `zoom`, `warp`, `blur_level`, `wave_alpha`, and `wave_scale`. A
