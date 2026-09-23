@@ -850,10 +850,13 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
         ProbeStage("overlay", _warped);
         DrawOverlay();
         Composite();
+        ProbeStage("overlayDone", _warped);
         var overlay = Mark();
 
         DarkenCenter();
+        ProbeStage("darken", _warped);
         DrawBorders();
+        ProbeStage("borders", _warped);
 
         // The reference's final composite is either the custom comp shader or the legacy video echo
         // and gamma adjustment, never both, so a preset with a comp shader does not get the legacy
@@ -879,6 +882,7 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
             ApplyCompShaders();
             _shaderClock.Stop();
             shader = _shaderClock.Elapsed.TotalMilliseconds;
+            ProbeStage("compDone", _fresh);
         }
 
         LastShaderMilliseconds = shader + _warpShaderMilliseconds;
@@ -888,6 +892,7 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
         // display pass and must not feed its own output back. Without a comp stage the composite is
         // already the pre-comp frame, so it is the feedback too.
         _previous.CopyFrom(_compStageRan ? _frameCopy : _fresh);
+        ProbeStage("feedback", _previous);
         _frame++;
         RecordTimings(warp, blur, postProcess, overlay, composite, LastShaderMilliseconds);
     }
