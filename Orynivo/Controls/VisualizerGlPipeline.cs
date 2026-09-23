@@ -120,21 +120,33 @@ internal sealed class VisualizerGlPipeline
                 (column / max(uFrameWidth - 1.0, 1.0)) * 2.0 - 1.0,
                 (row / max(uFrameHeight - 1.0, 1.0)) * 2.0 - 1.0);
 
-            vec2 warped = (normalized - vec2(cx, cy)) * vec2(sx, sy);
+            // The reference warp vertex shader's arithmetic: scale by the aspect, divide by the
+            // radial zoom, stretch, rotate, translate, and scale back by the inverse aspect.
+            float aspectX = uFrameWidth / max(uFrameHeight, 1.0);
+            float aspectY = 1.0;
+            float radius = uNeedsRadius > 0.5 ? length(normalized * vec2(aspectX, aspectY)) : 0.0;
+            float radialZoom = (uNeedsRadius > 0.5 && zoomExp != 1.0)
+                ? pow(zoom, pow(zoomExp, radius * 2.0 - 1.0))
+                : zoom;
+            float inverseZoom = 1.0 / max(0.01, radialZoom);
+
+            float u = normalized.x * aspectX * 0.5 * inverseZoom + 0.5;
+            float v = normalized.y * aspectY * 0.5 * inverseZoom + 0.5;
+            u = (u - cx) / max(abs(sx), 0.0001) * sign(sx) + cx;
+            v = (v - cy) / max(abs(sy), 0.0001) * sign(sy) + cy;
+
             float cosine = cos(rotation);
             float sine = sin(rotation);
-            vec2 rotated = vec2(
-                (warped.x * cosine) - (warped.y * sine),
-                (warped.x * sine) + (warped.y * cosine));
+            float rotatedU = u - cx;
+            float rotatedV = v - cy;
+            u = rotatedU * cosine - rotatedV * sine + cx;
+            v = rotatedU * sine + rotatedV * cosine + cy;
 
-            float pixelZoom = zoom;
-            if (uNeedsRadius > 0.5 && zoomExp != 1.0)
-            {
-                pixelZoom = pow(zoom, 1.0 + (zoomExp * length(rotated) * 2.0));
-            }
-
-            vec2 samplePosition = (rotated * pixelZoom) + vec2(cx, cy) + vec2(dx, dy);
-            vec2 uv = (samplePosition * 0.5) + 0.5;
+            u -= dx;
+            v -= dy;
+            u = (u - 0.5) / aspectX + 0.5;
+            v = (v - 0.5) / aspectY + 0.5;
+            vec2 uv = vec2(u, v);
 
             // Outside the frame the warp is transparent black, like the CPU sampler. The clamp keeps
             // every pass bounded exactly like the eight-bit texture it replaces, so a preset that

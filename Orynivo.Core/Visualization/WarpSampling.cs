@@ -4,6 +4,12 @@ namespace Orynivo.Visualization;
 /// The sampling position of the warp stage, from the motion values the preset produced for a mesh
 /// vertex. It is the single definition of that arithmetic: the CPU warp calls it per pixel and the
 /// GPU warp's fragment shader is its translation, so the two paths cannot drift apart.
+/// <para>
+/// The arithmetic is a translation of the reference implementation's warp vertex shader
+/// (<c>PresetWarpVertexShaderGlsl330.vert</c>): the position is scaled by the aspect, divided by the
+/// radial zoom, stretched, rotated, translated, and scaled back by the inverse aspect. The result is
+/// in the engine's minus-one-to-one space, which is what the frame sampler expects.
+/// </para>
 /// </summary>
 public static class WarpSampling
 {
@@ -20,12 +26,14 @@ public static class WarpSampling
     /// <param name="zoom">Zoom factor.</param>
     /// <param name="zoomExp">Zoom exponent; one means no radial zoom.</param>
     /// <param name="rotation">Rotation in radians.</param>
-    /// <param name="centreX">Rotation and zoom centre x.</param>
-    /// <param name="centreY">Rotation and zoom centre y.</param>
-    /// <param name="offsetX">Translation x.</param>
-    /// <param name="offsetY">Translation y.</param>
-    /// <param name="stretchX">Horizontal stretch.</param>
-    /// <param name="stretchY">Vertical stretch.</param>
+    /// <param name="centreX">Rotation and zoom centre x, in the aspect-scaled space.</param>
+    /// <param name="centreY">Rotation and zoom centre y, in the aspect-scaled space.</param>
+    /// <param name="offsetX">Translation x, in the aspect-scaled space.</param>
+    /// <param name="offsetY">Translation y, in the aspect-scaled space.</param>
+    /// <param name="stretchX">Horizontal stretch; the position is divided by it.</param>
+    /// <param name="stretchY">Vertical stretch; the position is divided by it.</param>
+    /// <param name="aspectX">Horizontal aspect factor.</param>
+    /// <param name="aspectY">Vertical aspect factor.</param>
     /// <param name="needsRadius">Whether the radial zoom term applies at all.</param>
     /// <param name="sampleX">Receives the sampling position x.</param>
     /// <param name="sampleY">Receives the sampling position y.</param>
@@ -41,26 +49,40 @@ public static class WarpSampling
         float offsetY,
         float stretchX,
         float stretchY,
+        float aspectX,
+        float aspectY,
         bool needsRadius,
         out float sampleX,
         out float sampleY)
     {
-        var warpedX = (normalizedX - centreX) * stretchX;
-        var warpedY = (normalizedY - centreY) * stretchY;
+        // The reference divides by the radial zoom and the stretch, and subtracts the translation,
+        // because it transforms the sampling coordinate the other way around.
+        var radius = needsRadius
+            ? MathF.Sqrt(((normalizedX * aspectX) * (normalizedX * aspectX)) + ((normalizedY * aspectY) * (normalizedY * aspectY)))
+            : 0f;
+        var radialZoom = needsRadius && zoomExp != 1f
+            ? MathF.Pow(zoom, MathF.Pow(zoomExp, (radius * 2f) - 1f))
+            : zoom;
+        var inverseZoom = 1f / MathF.Max(MinimumZoom, radialZoom);
+
+        var u = (normalizedX * aspectX * 0.5f * inverseZoom) + 0.5f;
+        var v = (normalizedY * aspectY * 0.5f * inverseZoom) + 0.5f;
+        u = ((u - centreX) / stretchX) + centreX;
+        v = ((v - centreY) / stretchY) + centreY;
+
         var cosine = MathF.Cos(rotation);
         var sine = MathF.Sin(rotation);
-        var rotatedX = (warpedX * cosine) - (warpedY * sine);
-        var rotatedY = (warpedX * sine) + (warpedY * cosine);
+        var rotatedU = u - centreX;
+        var rotatedV = v - centreY;
+        u = (rotatedU * cosine) - (rotatedV * sine) + centreX;
+        v = (rotatedU * sine) + (rotatedV * cosine) + centreY;
 
-        var pixelZoom = zoom;
-        if (needsRadius && zoomExp != 1f)
-        {
-            var radius = MathF.Sqrt((rotatedX * rotatedX) + (rotatedY * rotatedY));
-            pixelZoom = MathF.Pow(zoom, 1f + (zoomExp * radius * 2f));
-        }
+        u -= offsetX;
+        v -= offsetY;
+        u = ((u - 0.5f) / aspectX) + 0.5f;
+        v = ((v - 0.5f) / aspectY) + 0.5f;
 
-        sampleX = (rotatedX * pixelZoom) + centreX + offsetX;
-        sampleY = (rotatedY * pixelZoom) + centreY + offsetY;
+        sampleX = (u * 2f) - 1f;
+        sampleY = (v * 2f) - 1f;
     }
 }
-

@@ -229,7 +229,7 @@ public sealed class ShaderTranspilerTests
 
         var glsl = ShaderTranspiler.TranspileGlslWarp(node, null, out _, out _);
         Assert.Contains("mat3(", glsl, StringComparison.Ordinal);
-        Assert.Contains("_orynivo_warped", glsl, StringComparison.Ordinal);
+        Assert.Contains("_orynivo_sample", glsl, StringComparison.Ordinal);
         Assert.DoesNotContain(".eval(", glsl, StringComparison.Ordinal);
     }
 

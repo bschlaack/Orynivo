@@ -7,6 +7,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Changed
+- The visualizer's warp now uses the reference implementation's coordinate contract instead of the
+  engine's previous formula: the sample position is scaled by the aspect, divided by the radial zoom,
+  stretched, rotated, translated, and scaled back by the inverse aspect, exactly as the reference warp
+  vertex shader does. The aspect is the frame's width-to-height ratio on the horizontal axis, matching
+  the reference's landscape convention. `WarpSampling.SamplePosition` stays the single definition, so
+  the CPU warp, the Skia warp pass, and the OpenGL warp fragment shader cannot drift apart.
 - The visualizer's shader blur levels (`GetBlur1`-`GetBlur3`) now use the reference implementation's
   weighted filter instead of a three-by-three box: a long horizontal pass with eight weighted taps
   (about thirteen pixels wide) followed by a short vertical pass with four, each level continuing from

@@ -970,8 +970,7 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
         {
             var zoomNow = zoom;
             var zoomExpNow = zoomExp;
-            var cosNow = cosRotation;
-            var sinNow = sinRotation;
+            var rotationNow = rotation;
             var centreXNow = centreX;
             var centreYNow = centreY;
             var offsetXNow = offsetX;
@@ -982,9 +981,7 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
             {
                 zoomNow = Math.Max(0.01f, Read(slots, _slotZoom, zoom));
                 zoomExpNow = Read(slots, _slotZoomExp, zoomExp);
-                var rotationNow = Read(slots, _slotRot, rotation);
-                cosNow = MathF.Cos(rotationNow);
-                sinNow = MathF.Sin(rotationNow);
+                rotationNow = Read(slots, _slotRot, rotation);
                 centreXNow = Read(slots, _slotCx, centreX);
                 centreYNow = Read(slots, _slotCy, centreY);
                 offsetXNow = Read(slots, _slotDx, offsetX);
@@ -993,27 +990,34 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
                 stretchYNow = Read(slots, _slotSy, stretchY);
             }
 
-            var warpedX = (normalizedX - centreXNow) * stretchXNow;
-            var warpedY = (normalizedY - centreYNow) * stretchYNow;
-            var rotatedX = (warpedX * cosNow) - (warpedY * sinNow);
-            var rotatedY = (warpedX * sinNow) + (warpedY * cosNow);
+            var aspectX = Read("aspectx", 1f);
+            var aspectY = Read("aspecty", 1f);
+            WarpSampling.SamplePosition(
+                normalizedX,
+                normalizedY,
+                zoomNow,
+                zoomExpNow,
+                rotationNow,
+                centreXNow,
+                centreYNow,
+                offsetXNow,
+                offsetYNow,
+                stretchXNow,
+                stretchYNow,
+                aspectX,
+                aspectY,
+                needsRadius,
+                out var warpedX,
+                out var warpedY);
+
             if (needsRadius || needsAngle)
             {
-                var radius = MathF.Sqrt((rotatedX * rotatedX) + (rotatedY * rotatedY));
-                var pixelZoom = needsRadius && zoomExpNow != 1f
-                    ? MathF.Pow(zoomNow, 1f + (zoomExpNow * radius * 2f))
-                    : zoomNow;
-                warpedX = (rotatedX * pixelZoom) + centreXNow + offsetXNow;
-                warpedY = (rotatedY * pixelZoom) + centreYNow + offsetYNow;
+                var radius = MathF.Sqrt(
+                    ((normalizedX * aspectX) * (normalizedX * aspectX)) + ((normalizedY * aspectY) * (normalizedY * aspectY)));
                 if (needsRadius)
                     Write(slots, _slotRad, radius);
                 if (needsAngle)
-                    Write(slots, _slotAng, MathF.Atan2(rotatedY, rotatedX));
-            }
-            else
-            {
-                warpedX = (rotatedX * zoomNow) + centreXNow + offsetXNow;
-                warpedY = (rotatedY * zoomNow) + centreYNow + offsetYNow;
+                    Write(slots, _slotAng, MathF.Atan2(normalizedY * aspectY, normalizedX * aspectX));
             }
 
             if (_perPixelUsesX)
@@ -1172,6 +1176,8 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
                         offsetYNow,
                         stretchXNow,
                         stretchYNow,
+                        Read("aspectx", 1f),
+                        Read("aspecty", 1f),
                         needsRadius,
                         out var sampleX,
                         out var sampleY);

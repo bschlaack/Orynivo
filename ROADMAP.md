@@ -12,7 +12,10 @@ English XML docs, add every new visible string to all seven languages, and run
 Status values: `Todo`, `In progress`, `Blocked`, `Done`.
 
 Visualizer fidelity review (2026-09-23): **In progress**. The custom GL warp target
-and per-vertex motion reset bugs are fixed. Remaining compatibility work and its
+and per-vertex motion reset bugs are fixed, and audit item 1 (the geometry and
+shader equation order: the warp sampling formula, the aspect convention, and the
+UV interpolation) is done — the warp now follows the reference warp vertex
+shader's coordinate contract. Remaining compatibility work and its
 recommended order are recorded in [VISUALIZER-FIDELITY-AUDIT.md](VISUALIZER-FIDELITY-AUDIT.md).
 CPU/GPU agreement and successful shader compilation are not reference fidelity gates.
 

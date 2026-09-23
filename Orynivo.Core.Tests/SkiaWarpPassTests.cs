@@ -220,8 +220,8 @@ public sealed class SkiaWarpPassTests
         var slotAng = layout.IndexOf("ang");
         var width = target.Width;
         var height = target.Height;
-        var cos = MathF.Cos(parameters.Rotation);
-        var sin = MathF.Sin(parameters.Rotation);
+        var aspectX = width / (float)height;
+        const float aspectY = 1f;
         var sample = new float[4];
         for (var y = 0; y < height; y++)
         {
@@ -229,20 +229,28 @@ public sealed class SkiaWarpPassTests
             for (var x = 0; x < width; x++)
             {
                 var normalizedX = width > 1 ? (x / (float)(width - 1) * 2f) - 1f : 0f;
-                var warpedX = (normalizedX - parameters.CentreX) * parameters.StretchX;
-                var warpedY = (normalizedY - parameters.CentreY) * parameters.StretchY;
-                var rotatedX = (warpedX * cos) - (warpedY * sin);
-                var rotatedY = (warpedX * sin) + (warpedY * cos);
-                var radius = MathF.Sqrt((rotatedX * rotatedX) + (rotatedY * rotatedY));
-                var pixelZoom = parameters.ZoomExp != 1f
-                    ? MathF.Pow(parameters.Zoom, 1f + (parameters.ZoomExp * radius * 2f))
-                    : parameters.Zoom;
-                var sampleX = (rotatedX * pixelZoom) + parameters.CentreX + parameters.OffsetX;
-                var sampleY = (rotatedY * pixelZoom) + parameters.CentreY + parameters.OffsetY;
+                WarpSampling.SamplePosition(
+                    normalizedX,
+                    normalizedY,
+                    parameters.Zoom,
+                    parameters.ZoomExp,
+                    parameters.Rotation,
+                    parameters.CentreX,
+                    parameters.CentreY,
+                    parameters.OffsetX,
+                    parameters.OffsetY,
+                    parameters.StretchX,
+                    parameters.StretchY,
+                    aspectX,
+                    aspectY,
+                    true,
+                    out var sampleX,
+                    out var sampleY);
                 if (slotRad >= 0)
-                    slots[slotRad] = radius;
+                    slots[slotRad] = MathF.Sqrt(
+                        ((normalizedX * aspectX) * (normalizedX * aspectX)) + ((normalizedY * aspectY) * (normalizedY * aspectY)));
                 if (slotAng >= 0)
-                    slots[slotAng] = MathF.Atan2(rotatedY, rotatedX);
+                    slots[slotAng] = MathF.Atan2(normalizedY * aspectY, normalizedX * aspectX);
                 slots[slotX] = sampleX;
                 slots[slotY] = sampleY;
                 perPixel.Execute(slots);
