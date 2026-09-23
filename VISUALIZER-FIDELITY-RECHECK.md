@@ -268,3 +268,34 @@ few frames. `GLH_ORACLE_AUDIO` and `ORACLE_AUDIO` feed both engines the same raw
 16-bit stereo PCM so a preset can be compared on real music rather than a tone. The
 oracle writes `pm-NNN.bmp` and the harness writes `cpu-NNN.bmp`/`gl-NNN.bmp`, so the
 three outputs can be compared with one identical measure.
+
+## Open: the OpenGL presenter's comp shader is too dark for 138
+
+The GL presenter is the default and, for `$$$ Royal - Mashup (138)`, diverges
+more widely than the CPU path: 0.3987 mean luma at frame 299 against the CPU's
+0.2206 and projectM's 0.0889, and it is already too dark on the first frame
+(0.0325 against the CPU's 0.0564). A bisect of the GL and CPU renderers on the
+same preset with the same tone locates it:
+
+| Fixture | GL minus CPU at frame 0 |
+| ------- | ----------------------- |
+| shader-free `Jc - Lungs` | 0.0000 (the non-shader GL path is sound) |
+| 138 with a pass-through comp | 0.0000 (the comp machinery is sound) |
+| 138 with its real comp | -0.0239 (42 percent too dark) |
+
+So the GL divergence is in the **evaluation of the comp shader's own content** - not
+the feedback loop, not the overlay, not the compositing machinery. It is present
+on frame zero, where the feedback is black, so it is not an accumulation bug.
+
+138's comp is `ret = GetPixel + GetBlur2` and every blur range is the identity
+(`b1n`/`b2n`/`b3n` = 0, `b1x`/`b2x`/`b3x` = 1), so the additive
+`GetBlur2` term is the one to examine. `VisualizerGlPipeline` builds the
+shader blur chain from `_feedbackTexture` at line 953, which at that point still
+holds the *previous* frame - the post pass overwrites it later - while the comp's
+`sampler_main` is bound to the *current* frame at line 1380. That looked like the
+bug, but the CPU path builds its own levels from `_previous` as well
+(`PresetRenderer` line 2604), so the discrepancy is not proven and the actual
+`GetBlur2` values now have to be compared directly between the two renderers.
+The `blur=0` in the GL first-frame line is correct: 138 sets no `blur_level`,
+and the `b1x` alias maps to `blur1_max`, not to `blur1`, so both renderers
+run zero frame-blur passes.
