@@ -7,6 +7,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Changed
+- The visualizer's band variables now follow Milkdrop: `bass`, `mid`, `treble`, `vol`, and their
+  `_att` companions are relative to each band's long-term average instead of being clamped to zero to
+  one, so a value above one means "louder than usual" and a preset condition such as
+  `above(bass, 1.2)` can fire. `AudioSpectrumAnalyzer` computes them from one sixth of the linear
+  spectrum with the reference's frame-rate-adjusted smoothing rates, and the desktop hub measures the
+  frame time they need. The analyzer also keeps left and right separate, so a custom waveform's
+  `value1` and `value2` are the two channels and a spectrum-reading waveform can use
+  `SpectrumLeft`/`SpectrumRight`. The normalized `Bands`, `Bass`, `Mid`, `Treble`, and `Volume`
+  contract other consumers use is unchanged. `ShaderTranspiler` now serializes its translation,
+  because its static emitter state let parallel translations emit broken shaders.
 - The visualizer's custom waveforms now follow the reference's semantics. Each of the four
   `wavecode_N_*` waveforms has its own state (enabled, samples, separation, spectrum, dots, thick,
   additive, scaling, smoothing, and colour) and its own `wave_N_*` blocks, separate from the default

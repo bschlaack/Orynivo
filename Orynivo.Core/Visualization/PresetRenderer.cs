@@ -19,6 +19,41 @@ public interface IVisualizerAudioSource
     /// </summary>
     ReadOnlySpan<float> Spectrum => default;
 
+    /// <summary>
+    /// Gets the bass level relative to its long-term average, where one is neutral and a value above
+    /// one means the band is louder than usual. Milkdrop's <c>bass</c> variable is this value, so a
+    /// preset condition such as <c>above(bass, 1.2)</c> can fire; the normalized <see cref="Bass"/> is
+    /// a different contract and stays unchanged.
+    /// </summary>
+    float BassRelative => 1f;
+
+    /// <summary>Gets the mid level relative to its long-term average.</summary>
+    float MidRelative => 1f;
+
+    /// <summary>Gets the treble level relative to its long-term average.</summary>
+    float TrebleRelative => 1f;
+
+    /// <summary>Gets the attenuated (smoothed) bass level relative to its long-term average.</summary>
+    float BassAttRelative => 1f;
+
+    /// <summary>Gets the attenuated (smoothed) mid level relative to its long-term average.</summary>
+    float MidAttRelative => 1f;
+
+    /// <summary>Gets the attenuated (smoothed) treble level relative to its long-term average.</summary>
+    float TrebleAttRelative => 1f;
+
+    /// <summary>Gets the left channel's waveform samples, or the mono waveform when the source is mono.</summary>
+    ReadOnlySpan<float> WaveformLeft => Waveform;
+
+    /// <summary>Gets the right channel's waveform samples, or the mono waveform when the source is mono.</summary>
+    ReadOnlySpan<float> WaveformRight => Waveform;
+
+    /// <summary>Gets the left channel's spectrum, or the mono spectrum when the source is mono.</summary>
+    ReadOnlySpan<float> SpectrumLeft => Spectrum;
+
+    /// <summary>Gets the right channel's spectrum, or the mono spectrum when the source is mono.</summary>
+    ReadOnlySpan<float> SpectrumRight => Spectrum;
+
     /// <summary>Gets the bass energy in the range zero to one.</summary>
     float Bass { get; }
 
@@ -153,6 +188,7 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
     // Scratch for the custom waveforms: the smoothed sample data, the per-point values, and the
     // smoothed polyline. They are reused every frame so drawing an overlay stays allocation-free.
     private readonly float[] _waveSamples = new float[512];
+    private readonly float[] _waveSamplesRight = new float[512];
     private readonly float[] _wavePointX = new float[512];
     private readonly float[] _wavePointY = new float[512];
     private readonly float[] _waveRed = new float[512];
@@ -172,10 +208,6 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
     private readonly float[] _motionX = new float[MotionColumns * MotionRows];
     private readonly float[] _motionY = new float[MotionColumns * MotionRows];
     private readonly int[] _motionCount = new int[MotionColumns * MotionRows];
-    private float _attBass;
-    private float _attMid;
-    private float _attTreble;
-    private float _attVolume;
 
     /// <summary>Motion-vector grid columns.</summary>
     private const int MotionColumns = 8;
@@ -499,14 +531,32 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
     {
         ArgumentNullException.ThrowIfNull(audio);
         _audio = audio;
-        Bass = audio.Bass;
-        Mid = audio.Mid;
-        Treble = audio.Treble;
-        Volume = audio.Volume;
+        CopyAudio(audio);
         // The overlay reads the live wave and shape variables, so they have to be seeded here too;
         // without it the overlay would draw from a stale slot array.
         SeedFrameVariables();
         DrawOverlay();
+    }
+
+    /// <summary>
+    /// Copies the audio levels and the Milkdrop-relative loudness the preset expressions read. The
+    /// normalized <see cref="Bass"/> and the relative <see cref="BassRelative"/> are different
+    /// contracts: the preset's <c>bass</c> variable is the relative one, which can exceed one, so a
+    /// condition such as <c>above(bass, 1.2)</c> can fire.
+    /// </summary>
+    /// <param name="audio">Audio source of the frame.</param>
+    private void CopyAudio(IVisualizerAudioSource audio)
+    {
+        Bass = audio.Bass;
+        Mid = audio.Mid;
+        Treble = audio.Treble;
+        Volume = audio.Volume;
+        BassRelative = audio.BassRelative;
+        MidRelative = audio.MidRelative;
+        TrebleRelative = audio.TrebleRelative;
+        BassAttRelative = audio.BassAttRelative;
+        MidAttRelative = audio.MidAttRelative;
+        TrebleAttRelative = audio.TrebleAttRelative;
     }
 
     /// <summary>
@@ -589,6 +639,36 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
     /// <summary>Gets the overall level of the last rendered frame.</summary>
     public float Volume { get; private set; }
 
+    /// <summary>Gets the bass level relative to its long-term average for the last rendered frame.</summary>
+    public float BassRelative { get; private set; } = 1f;
+
+    /// <summary>Gets the mid level relative to its long-term average for the last rendered frame.</summary>
+    public float MidRelative { get; private set; } = 1f;
+
+    /// <summary>Gets the treble level relative to its long-term average for the last rendered frame.</summary>
+    public float TrebleRelative { get; private set; } = 1f;
+
+    /// <summary>Gets the attenuated bass level relative to its long-term average.</summary>
+    public float BassAttRelative { get; private set; } = 1f;
+
+    /// <summary>Gets the attenuated mid level relative to its long-term average.</summary>
+    public float MidAttRelative { get; private set; } = 1f;
+
+    /// <summary>Gets the attenuated treble level relative to its long-term average.</summary>
+    public float TrebleAttRelative { get; private set; } = 1f;
+
+    /// <summary>Gets the left channel's waveform of the last rendered frame.</summary>
+    public ReadOnlySpan<float> WaveformLeft => _audio is null ? default : _audio.WaveformLeft;
+
+    /// <summary>Gets the right channel's waveform of the last rendered frame.</summary>
+    public ReadOnlySpan<float> WaveformRight => _audio is null ? default : _audio.WaveformRight;
+
+    /// <summary>Gets the left channel's spectrum of the last rendered frame.</summary>
+    public ReadOnlySpan<float> SpectrumLeft => _audio is null ? default : _audio.SpectrumLeft;
+
+    /// <summary>Gets the right channel's spectrum of the last rendered frame.</summary>
+    public ReadOnlySpan<float> SpectrumRight => _audio is null ? default : _audio.SpectrumRight;
+
     /// <summary>Renders one frame.</summary>
     /// <param name="audio">Audio values to react to.</param>
     /// <param name="deltaSeconds">Seconds since the previous frame.</param>
@@ -596,12 +676,8 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
     {
         ArgumentNullException.ThrowIfNull(audio);
         _audio = audio;
-        Bass = audio.Bass;
-        Mid = audio.Mid;
-        Treble = audio.Treble;
-        Volume = audio.Volume;
+        CopyAudio(audio);
         _elapsed += Math.Clamp(deltaSeconds, 0d, 0.25d);
-        SmoothBands();
 
         _clock.Restart();
         _mark = 0d;
@@ -741,10 +817,7 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
     {
         ArgumentNullException.ThrowIfNull(audio);
         _audio = audio;
-        Bass = audio.Bass;
-        Mid = audio.Mid;
-        Treble = audio.Treble;
-        Volume = audio.Volume;
+        CopyAudio(audio);
         _clock.Restart();
         _mark = 0d;
         DrawOverlay();
@@ -777,8 +850,9 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
         Array.Clear(_motionX);
         Array.Clear(_motionY);
         Array.Clear(_motionCount);
-        _attBass = _attMid = _attTreble = _attVolume = 0f;
         Bass = Mid = Treble = Volume = 0f;
+        BassRelative = MidRelative = TrebleRelative = 1f;
+        BassAttRelative = MidAttRelative = TrebleAttRelative = 1f;
         Timings = default;
         ResetTimings();
     }
@@ -790,15 +864,6 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
         _skiaComp = null;
         _skiaWarp?.Dispose();
         _skiaWarp = null;
-    }
-
-    /// <summary>Keeps the smoothed <c>*_att</c> bands the presets read alongside the raw bands.</summary>
-    private void SmoothBands()
-    {
-        _attBass = (_attBass * 0.8f) + (Bass * 0.2f);
-        _attMid = (_attMid * 0.8f) + (Mid * 0.2f);
-        _attTreble = (_attTreble * 0.8f) + (Treble * 0.2f);
-        _attVolume = (_attVolume * 0.8f) + (Volume * 0.2f);
     }
 
     /// <summary>Seeds the standard variables a preset expects for this frame.</summary>
@@ -819,13 +884,15 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
         Write("fps", _elapsed > 0.0001d ? (float)(Math.Max(1, _frame) / _elapsed) : 0f);
         Write("frame", _frame);
         Write("monitor", 1f);
-        Write("bass", Bass);
-        Write("mid", Mid);
-        Write("treb", Treble);
-        Write("vol", Volume);
-        Write("bass_att", _attBass);
-        Write("mid_att", _attMid);
-        Write("treb_att", _attTreble);
+        // Milkdrop's band variables are relative to their long-term average and can exceed one, so a
+        // condition such as above(bass, 1.2) fires; the attenuated values are the smoothed relatives.
+        Write("bass", BassRelative);
+        Write("mid", MidRelative);
+        Write("treb", TrebleRelative);
+        Write("vol", (BassRelative + MidRelative + TrebleRelative) * 0.333f);
+        Write("bass_att", BassAttRelative);
+        Write("mid_att", MidAttRelative);
+        Write("treb_att", TrebleAttRelative);
         Write("aspectx", height > 0 ? width / (float)height : 1f);
         Write("aspecty", 1f);
         Write("pixelsx", width);
@@ -2658,8 +2725,9 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
         if (!wave.Enabled)
             return;
 
-        var source = wave.Spectrum ? Spectrum : Waveform;
-        if (source.Length < 2)
+        var left = wave.Spectrum ? SpectrumLeft : WaveformLeft;
+        var right = wave.Spectrum ? SpectrumRight : WaveformRight;
+        if (left.Length < 2 || right.Length < 2)
             return;
 
         // The per-frame block runs with the waveform's own state in the shared slots.
@@ -2676,7 +2744,9 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
         wave.PerFrame.Execute(_slots);
 
         var separation = Math.Max(0, wave.Separation);
-        var samples = Math.Min(source.Length, (int)Math.Clamp(Read("samples", wave.Samples), 0f, 512f)) - separation;
+        var samples = Math.Min(
+            Math.Min(left.Length, right.Length),
+            (int)Math.Clamp(Read("samples", wave.Samples), 0f, 512f)) - separation;
         if (wave.UseDots ? samples < 1 : samples < 2)
             return;
 
@@ -2689,13 +2759,13 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
         var mix1 = MathF.Pow(smoothing * 0.98f, 0.5f);
         var mix2 = 1f - mix1;
         for (var sample = 0; sample < samples; sample++)
-            _waveSamples[sample] = source[sample];
-        for (var sample = 1; sample < samples; sample++)
-            _waveSamples[sample] = (_waveSamples[sample] * mix2) + (_waveSamples[sample - 1] * mix1);
-        for (var sample = samples - 2; sample >= 0; sample--)
-            _waveSamples[sample] = (_waveSamples[sample] * mix2) + (_waveSamples[sample + 1] * mix1);
-        for (var sample = 0; sample < samples; sample++)
-            _waveSamples[sample] *= mult;
+        {
+            _waveSamples[sample] = left[sample];
+            _waveSamplesRight[sample] = right[sample];
+        }
+
+        SmoothAndScale(_waveSamples, samples, mix1, mix2, mult);
+        SmoothAndScale(_waveSamplesRight, samples, mix1, mix2, mult);
 
         var baseRed = Read("r", wave.Red);
         var baseGreen = Read("g", wave.Green);
@@ -2704,13 +2774,14 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
         var step = samples > 1 ? 1f / (samples - 1) : 0f;
         for (var sample = 0; sample < samples; sample++)
         {
-            // The audio source is mono, so both channels carry the same value.
-            var value = _waveSamples[sample];
+            // Milkdrop keeps the two channels separate: value1 is the left trace, value2 the right.
+            var value1 = _waveSamples[sample];
+            var value2 = _waveSamplesRight[sample];
             Write("sample", sample * step);
-            Write("value1", value);
-            Write("value2", value);
-            Write("x", 0.5f + value);
-            Write("y", 0.5f + value);
+            Write("value1", value1);
+            Write("value2", value2);
+            Write("x", 0.5f + value1);
+            Write("y", 0.5f + value2);
             Write("r", baseRed);
             Write("g", baseGreen);
             Write("b", baseBlue);
@@ -2727,6 +2798,25 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
 
         var count = SmoothWavePoints(samples);
         DrawWavePoints(count, wave);
+    }
+
+    /// <summary>
+    /// Smooths one channel of the sample data forwards and then backwards, which removes the
+    /// asymmetry between the start and the end of the trace, and scales it.
+    /// </summary>
+    /// <param name="samples">Sample buffer to smooth in place.</param>
+    /// <param name="count">Number of valid samples.</param>
+    /// <param name="mix1">Weight of the previous sample.</param>
+    /// <param name="mix2">Weight of the current sample.</param>
+    /// <param name="mult">Scale applied after the smoothing.</param>
+    private static void SmoothAndScale(float[] samples, int count, float mix1, float mix2, float mult)
+    {
+        for (var sample = 1; sample < count; sample++)
+            samples[sample] = (samples[sample] * mix2) + (samples[sample - 1] * mix1);
+        for (var sample = count - 2; sample >= 0; sample--)
+            samples[sample] = (samples[sample] * mix2) + (samples[sample + 1] * mix1);
+        for (var sample = 0; sample < count; sample++)
+            samples[sample] *= mult;
     }
 
     /// <summary>

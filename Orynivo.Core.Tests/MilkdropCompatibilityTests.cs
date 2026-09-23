@@ -75,16 +75,40 @@ public sealed class MilkdropCompatibilityTests
         Assert.Equal(1f, renderer.ReadVariable("q2"));
     }
 
-    /// <summary>The smoothed bands trail the raw bands.</summary>
+    /// <summary>
+    /// Milkdrop's band variables are relative to their long-term average, so a loud burst after a
+    /// quiet passage exceeds one and a condition such as <c>above(bass, 1.2)</c> can fire.
+    /// </summary>
     [Fact]
-    public void RenderFrame_SmoothsTheAttenuatedBands()
+    public void Analyze_RelativeBandsExceedOneOnABurst()
     {
-        var renderer = new PresetRenderer(VisualizerPreset.Create("test", null, null), 16, 9);
+        var analyzer = new AudioSpectrumAnalyzer(44_100);
+        var block = new float[2048 * 2];
 
-        renderer.RenderFrame(new FakeAudio(), 1d / 60d);
+        for (var frame = 0; frame < 150; frame++)
+        {
+            Fill(block, 0.02f);
+            analyzer.Analyze(block, 1d / 60d);
+        }
 
-        Assert.True(renderer.ReadVariable("bass_att") < renderer.ReadVariable("bass"));
-        Assert.True(renderer.ReadVariable("bass_att") > 0f);
+        Fill(block, 0.9f);
+        analyzer.Analyze(block, 1d / 60d);
+
+        Assert.True(analyzer.BassRelative > 1.2f, $"bass={analyzer.BassRelative:F3}");
+        Assert.True(analyzer.BassAttRelative > 1f, $"bass_att={analyzer.BassAttRelative:F3}");
+    }
+
+    /// <summary>Fills an interleaved block with a low-frequency tone at the given amplitude.</summary>
+    /// <param name="block">Interleaved stereo block.</param>
+    /// <param name="amplitude">Peak amplitude.</param>
+    private static void Fill(float[] block, float amplitude)
+    {
+        for (var index = 0; index < block.Length; index += 2)
+        {
+            var value = MathF.Sin(index * 0.05f) * amplitude;
+            block[index] = value;
+            block[index + 1] = value;
+        }
     }
 
     /// <summary>The frame size and aspect ratio are published to the preset.</summary>

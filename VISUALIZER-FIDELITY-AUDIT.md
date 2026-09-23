@@ -152,6 +152,14 @@ state and sample contracts, and only draw spectrum geometry when requested.
 
 ### 5. P1: Audio variables drive different branches
 
+**Corrected.** `AudioSpectrumAnalyzer` now exposes Milkdrop's relative loudness: each band sums one
+sixth of the linear spectrum and is divided by its own long-term average with the reference's
+frame-rate-adjusted rates, so `bass`, `mid`, `treble`, `vol`, and their `_att` companions can exceed
+one and `above(bass, 1.2)` fires. The analyzer keeps left and right separate for the custom
+waveforms' `value1`/`value2` and for `SpectrumLeft`/`SpectrumRight`, and the desktop hub measures the
+frame time the rates need. The normalized `Bands`/`Bass`/`Mid`/`Treble`/`Volume` contract other
+consumers use is untouched, and the analysis still runs on the render thread.
+
 `AudioSpectrumAnalyzer.Analyze` clamps band magnitudes to `[0,1]`, averages them
 and exposes smoothed bass/mid/treble. projectM's `Audio/Loudness.cpp` divides
 current and short-term levels by their long-term average; values can exceed one.

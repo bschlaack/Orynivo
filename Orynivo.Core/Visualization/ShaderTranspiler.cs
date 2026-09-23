@@ -523,7 +523,30 @@ public static class ShaderTranspiler
     /// <param name="samplers">The samplers the generated SkSL declares.</param>
     /// <param name="perPixelUniforms">Preset variables the per-pixel block reads.</param>
     /// <returns>The generated SkSL.</returns>
+    /// <summary>
+    /// Serializes the emitter's shared state. The translation keeps its type table, its mutable
+    /// uniform set, and the dialect flag in static fields for the recursive emitters to read, so two
+    /// translations that run at the same time would otherwise interleave and emit a broken shader.
+    /// </summary>
+    private static readonly object TranspileLock = new();
+
     private static string TranspileCore(
+        ShaderNode? program,
+        PresetProgram? perPixel,
+        bool warpedUv,
+        bool glsl,
+        out IReadOnlyList<string> samplers,
+        out IReadOnlyList<string> perPixelUniforms,
+        bool meshUv = false)
+    {
+        lock (TranspileLock)
+        {
+            return TranspileCoreLocked(
+                program, perPixel, warpedUv, glsl, out samplers, out perPixelUniforms, meshUv);
+        }
+    }
+
+    private static string TranspileCoreLocked(
         ShaderNode? program,
         PresetProgram? perPixel,
         bool warpedUv,

@@ -19,6 +19,7 @@ internal sealed class VisualizerAudioHub
     private readonly PcmVisualizationTap _tap = new();
     private readonly float[] _conversionBuffer = new float[AnalysisFrames * 2];
     private readonly float[] _analysisBuffer = new float[AnalysisFrames * 2];
+    private readonly System.Diagnostics.Stopwatch _analysisClock = new();
     private AudioSpectrumAnalyzer? _analyzer;
     private int _sampleRate;
 
@@ -116,7 +117,12 @@ internal sealed class VisualizerAudioHub
         if (frames <= 0)
             return false;
 
-        _analyzer.Analyze(_analysisBuffer.AsSpan(0, frames * 2));
+        // Milkdrop scales its loudness smoothing by the actual frame time, so the hub measures it.
+        var deltaSeconds = _analysisClock.Elapsed.TotalSeconds;
+        _analysisClock.Restart();
+        _analyzer.Analyze(
+            _analysisBuffer.AsSpan(0, frames * 2),
+            deltaSeconds <= 0d ? 1d / 60d : deltaSeconds);
         AnalyzedFrames += frames;
         source = _analyzer;
         return true;

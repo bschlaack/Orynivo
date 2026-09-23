@@ -31,6 +31,21 @@ public sealed class AudioSpectrumAnalyzer : IVisualizerAudioSource
     private readonly float[] _spectrum = new float[SpectrumPoints];
     private readonly float[] _rawSamples;
 
+    // Milkdrop's own analysis: per-channel data for the custom waveforms, and the loudness bands
+    // relative to their long-term average.
+    private readonly float[] _leftSamples;
+    private readonly float[] _rightSamples;
+    private readonly float[] _leftMagnitudes;
+    private readonly float[] _rightMagnitudes;
+    private readonly float[] _waveformLeft = new float[WaveformPoints];
+    private readonly float[] _waveformRight = new float[WaveformPoints];
+    private readonly float[] _spectrumLeft = new float[SpectrumPoints];
+    private readonly float[] _spectrumRight = new float[SpectrumPoints];
+    private readonly Loudness _bass = new();
+    private readonly Loudness _mid = new();
+    private readonly Loudness _treble = new();
+    private long _analysisFrame;
+
     /// <summary>Creates an analyzer for one output sample rate.</summary>
     /// <param name="sampleRate">Output sample rate in hertz.</param>
     /// <param name="fftSize">FFT length; a power of two, defaulting to 2048.</param>
@@ -52,6 +67,10 @@ public sealed class AudioSpectrumAnalyzer : IVisualizerAudioSource
         _monoSamples = new float[fftSize];
         _magnitudes = new float[fftSize / 2];
         _bandEdges = BuildBandEdges(sampleRate, fftSize);
+        _leftSamples = new float[fftSize];
+        _rightSamples = new float[fftSize];
+        _leftMagnitudes = new float[fftSize / 2];
+        _rightMagnitudes = new float[fftSize / 2];
     }
 
     /// <summary>Gets the sample rate this analyzer was created for.</summary>
@@ -73,6 +92,90 @@ public sealed class AudioSpectrumAnalyzer : IVisualizerAudioSource
     /// </summary>
     public ReadOnlySpan<float> Spectrum => _spectrum;
 
+    /// <inheritdoc/>
+    public ReadOnlySpan<float> WaveformLeft => _waveformLeft;
+
+    /// <inheritdoc/>
+    public ReadOnlySpan<float> WaveformRight => _waveformRight;
+
+    /// <inheritdoc/>
+    public ReadOnlySpan<float> SpectrumLeft => _spectrumLeft;
+
+    /// <inheritdoc/>
+    public ReadOnlySpan<float> SpectrumRight => _spectrumRight;
+
+    /// <inheritdoc/>
+    public float BassRelative => _bass.CurrentRelative;
+
+    /// <inheritdoc/>
+    public float MidRelative => _mid.CurrentRelative;
+
+    /// <inheritdoc/>
+    public float TrebleRelative => _treble.CurrentRelative;
+
+    /// <inheritdoc/>
+    public float BassAttRelative => _bass.AverageRelative;
+
+    /// <inheritdoc/>
+    public float MidAttRelative => _mid.AverageRelative;
+
+    /// <inheritdoc/>
+    public float TrebleAttRelative => _treble.AverageRelative;
+
+    /// <summary>
+    /// One Milkdrop loudness band: the current and attenuated band sums divided by the band's
+    /// long-term average, with the reference's frame-rate-adjusted smoothing rates.
+    /// </summary>
+    private sealed class Loudness
+    {
+        private float _average;
+        private float _longAverage;
+        private float _current;
+
+        /// <summary>Gets the current band sum divided by the long-term average.</summary>
+        public float CurrentRelative { get; private set; } = 1f;
+
+        /// <summary>Gets the attenuated band sum divided by the long-term average.</summary>
+        public float AverageRelative { get; private set; } = 1f;
+
+        /// <summary>Updates the band with this frame's sum.</summary>
+        /// <param name="current">Band sum for this frame.</param>
+        /// <param name="secondsSinceLastFrame">Time since the previous frame.</param>
+        /// <param name="frame">Frame counter, so the long-term average starts faster.</param>
+        public void Update(float current, double secondsSinceLastFrame, long frame)
+        {
+            _current = current;
+            var rate = AdjustRateToFps(current > _average ? 0.2f : 0.5f, secondsSinceLastFrame);
+            _average = (_average * rate) + (current * (1f - rate));
+
+            rate = AdjustRateToFps(frame < 50 ? 0.9f : 0.992f, secondsSinceLastFrame);
+            _longAverage = (_longAverage * rate) + (current * (1f - rate));
+
+            CurrentRelative = MathF.Abs(_longAverage) < 0.001f ? 1f : current / _longAverage;
+            AverageRelative = MathF.Abs(_longAverage) < 0.001f ? 1f : _average / _longAverage;
+        }
+
+        /// <summary>Resets the band to its neutral state.</summary>
+        public void Reset()
+        {
+            _average = 0f;
+            _longAverage = 0f;
+            _current = 0f;
+            CurrentRelative = 1f;
+            AverageRelative = 1f;
+        }
+
+        /// <summary>Scales a per-frame rate from thirty frames per second to the actual frame time.</summary>
+        /// <param name="rate">Rate at thirty frames per second.</param>
+        /// <param name="secondsSinceLastFrame">Time since the previous frame.</param>
+        /// <returns>The adjusted rate.</returns>
+        private static float AdjustRateToFps(float rate, double secondsSinceLastFrame)
+        {
+            var perSecond = MathF.Pow(rate, 30f);
+            return MathF.Pow(perSecond, (float)secondsSinceLastFrame);
+        }
+    }
+
     /// <summary>Gets the current bass energy, between zero and one.</summary>
     public float Bass { get; private set; }
 
@@ -93,24 +196,38 @@ public sealed class AudioSpectrumAnalyzer : IVisualizerAudioSource
     /// zero-padded at the front, so a freshly started player still reports a frame.
     /// </summary>
     /// <param name="interleavedStereo">Interleaved left/right samples in the range -1 to 1.</param>
-    public void Analyze(ReadOnlySpan<float> interleavedStereo)
+    /// <param name="secondsSinceLastFrame">Time since the previous analysis, for the loudness rates.</param>
+    public void Analyze(ReadOnlySpan<float> interleavedStereo, double secondsSinceLastFrame = 1d / 60d)
     {
         var frames = interleavedStereo.Length / 2;
         var copied = Math.Min(frames, _fftSize);
         var start = _fftSize - copied;
-        _monoSamples.AsSpan(0, start).Clear();
+        _leftSamples.AsSpan(0, start).Clear();
+        _rightSamples.AsSpan(0, start).Clear();
         for (var index = 0; index < copied; index++)
         {
-            var left = interleavedStereo[index * 2];
-            var right = interleavedStereo[(index * 2) + 1];
-            _monoSamples[start + index] = (left + right) * 0.5f;
+            _leftSamples[start + index] = interleavedStereo[index * 2];
+            _rightSamples[start + index] = interleavedStereo[(index * 2) + 1];
         }
 
+        for (var index = 0; index < _fftSize; index++)
+            _monoSamples[index] = (_leftSamples[index] + _rightSamples[index]) * 0.5f;
         _monoSamples.AsSpan(0, _fftSize).CopyTo(_rawSamples);
+        UpdateWaveform();
+        UpdateStereoWaveform();
+
         for (var index = 0; index < _fftSize; index++)
             _monoSamples[index] *= _window[index];
 
         Fft.ComputeMagnitudes(_monoSamples, _magnitudes, _scratch);
+
+        // The per-channel magnitudes feed the stereo spectrum a custom waveform may read.
+        for (var index = 0; index < _fftSize; index++)
+            _leftSamples[index] *= _window[index];
+        Fft.ComputeMagnitudes(_leftSamples, _leftMagnitudes, _scratch);
+        for (var index = 0; index < _fftSize; index++)
+            _rightSamples[index] *= _window[index];
+        Fft.ComputeMagnitudes(_rightSamples, _rightMagnitudes, _scratch);
 
         var level = 0f;
         for (var band = 0; band < BandCount; band++)
@@ -126,8 +243,9 @@ public sealed class AudioSpectrumAnalyzer : IVisualizerAudioSource
             _bands[band] = Smooth(_bands[band], value);
         }
 
-        UpdateWaveform();
         UpdateSpectrum();
+        UpdateStereoSpectrum();
+        UpdateLoudness(secondsSinceLastFrame);
 
         var average = level / BandCount;
         Volume = Smooth(Volume, average);
@@ -137,12 +255,73 @@ public sealed class AudioSpectrumAnalyzer : IVisualizerAudioSource
         FrameCount++;
     }
 
+    /// <summary>Decimates the per-channel samples into the stereo waveform buffers.</summary>
+    private void UpdateStereoWaveform()
+    {
+        var step = Math.Max(1, _fftSize / WaveformPoints);
+        for (var point = 0; point < WaveformPoints; point++)
+        {
+            var index = Math.Min(_fftSize - 1, point * step);
+            _waveformLeft[point] = _leftSamples[index];
+            _waveformRight[point] = _rightSamples[index];
+        }
+    }
+
+    /// <summary>Decimates the per-channel magnitudes into the stereo spectrum buffers.</summary>
+    private void UpdateStereoSpectrum()
+    {
+        var bins = Math.Max(1, _leftMagnitudes.Length);
+        var step = Math.Max(1, bins / SpectrumPoints);
+        for (var point = 0; point < SpectrumPoints; point++)
+        {
+            var index = Math.Min(bins - 1, point * step);
+            _spectrumLeft[point] = Math.Clamp(_leftMagnitudes[index] * 8f, 0f, 1f);
+            _spectrumRight[point] = Math.Clamp(_rightMagnitudes[index] * 8f, 0f, 1f);
+        }
+    }
+
+    /// <summary>
+    /// Updates Milkdrop's loudness bands. Each band sums one sixth of the linear spectrum and is
+    /// divided by its own long-term average, so a value above one means "louder than usual" and a
+    /// preset condition such as <c>above(bass, 1.2)</c> can fire.
+    /// </summary>
+    /// <param name="secondsSinceLastFrame">Time since the previous analysis.</param>
+    private void UpdateLoudness(double secondsSinceLastFrame)
+    {
+        _bass.Update(SumSixth(_magnitudes, 0), secondsSinceLastFrame, _analysisFrame);
+        _mid.Update(SumSixth(_magnitudes, 1), secondsSinceLastFrame, _analysisFrame);
+        _treble.Update(SumSixth(_magnitudes, 2), secondsSinceLastFrame, _analysisFrame);
+        _analysisFrame++;
+    }
+
+    /// <summary>Sums one sixth of the linear spectrum, the band split the reference uses.</summary>
+    /// <param name="magnitudes">Spectrum magnitudes.</param>
+    /// <param name="band">Band index, zero being the bass.</param>
+    /// <returns>The band sum.</returns>
+    private static float SumSixth(ReadOnlySpan<float> magnitudes, int band)
+    {
+        var start = magnitudes.Length * band / 6;
+        var end = magnitudes.Length * (band + 1) / 6;
+        var sum = 0f;
+        for (var index = start; index < end; index++)
+            sum += magnitudes[index];
+        return sum;
+    }
+
     /// <summary>Clears every smoothed value, for example when playback stops.</summary>
     public void Reset()
     {
         Array.Clear(_bands);
         Array.Clear(_waveform);
         Array.Clear(_spectrum);
+        Array.Clear(_waveformLeft);
+        Array.Clear(_waveformRight);
+        Array.Clear(_spectrumLeft);
+        Array.Clear(_spectrumRight);
+        _bass.Reset();
+        _mid.Reset();
+        _treble.Reset();
+        _analysisFrame = 0;
         Bass = Mid = Treble = Volume = 0f;
         FrameCount = 0;
     }

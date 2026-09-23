@@ -29,8 +29,15 @@ This file applies to `Orynivo.Core/` and supplements `../AGENTS.md`.
   `PcmVisualizationTap` is the lock-free hand-off from the audio pump and must
   never block or wait (drop the oldest samples instead), `AudioSpectrumAnalyzer`
   owns windowing, FFT, band grouping, and smoothing, and `Fft` stays a pure,
-  allocation-free transform. Never evaluate preset expressions or render frames
-  on the audio thread. `PresetVariableLayout.RegisterStandardVariables` is the single place
+  allocation-free transform. The analyzer serves two contracts: the normalized
+  `Bands`/`Bass`/`Mid`/`Treble`/`Volume` values other consumers use, and Milkdrop's
+  own relative loudness (`BassRelative` and friends), where each band's sum over one
+  sixth of the linear spectrum is divided by its long-term average so a value above
+  one means "louder than usual" and `above(bass, 1.2)` can fire. It also keeps the
+  left and right waveform and spectrum separate for the custom waveforms, and the
+  desktop hub measures the frame time its smoothing rates need. Never clamp the
+  relative values to one, and never evaluate preset expressions or render frames on
+  the audio thread. `PresetVariableLayout.RegisterStandardVariables` is the single place
   that declares the Milkdrop variable set, so every expression block of a preset shares one
   slot layout and `q1`-`q32` keep their value between the per-frame and per-pixel stages. The
   renderer runs the stages in Milkdrop order: the init blocks once, the per-frame block and

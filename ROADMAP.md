@@ -29,6 +29,10 @@ Audit item 4 (custom waves) is corrected: the four `wavecode_N_*` waveforms have
 their own state and `sample`/`value1`/`value2` contract, separate from the default
 waveform, and spectrum geometry is drawn only when a waveform requests it. The
 default waveform's eight mode geometries remain approximated.
+Audit item 5 (the audio variables) is corrected: the bands are relative to their
+long-term average so `above(bass, 1.2)` can fire, and the waveform and spectrum
+inputs are stereo. All five audit items are now addressed; the remaining
+approximations are recorded in the audit.
 Remaining compatibility work and its
 recommended order are recorded in [VISUALIZER-FIDELITY-AUDIT.md](VISUALIZER-FIDELITY-AUDIT.md).
 CPU/GPU agreement and successful shader compilation are not reference fidelity gates.
