@@ -7,6 +7,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Changed
+- The legacy final composite now applies the reference's animated hue shade: before the gamma gain,
+  the frame is multiplied by a four-corner colour whose three channels are animated sines normalised
+  so their maximum is one, blended across the frame. The offsets are the reference's per-preset hue
+  offsets, seeded from the preset name so a preset keeps the same look across runs instead of
+  changing on every load. A comp shader still replaces the whole legacy path, and the OpenGL display
+  pass applies the same shade so the two paths agree.
 - Textured custom shapes now sample the frame instead of drawing a flat gradient. A shape whose
   `shapecode_N_textured` is set interpolates the reference's texture coordinates across its triangle
   fan — the centre maps to the texture centre and the rim to a circle of radius `0.5 / tex_zoom`

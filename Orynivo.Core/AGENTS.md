@@ -70,7 +70,11 @@ This file applies to `Orynivo.Core/` and supplements `../AGENTS.md`.
   darkening, the shapes and waves (which are added to the warped frame before the
   centre darkening and the border, so those later passes cover them), the centre darkening, the
   border, and finally the reference's final composite — either the custom comp shader or the legacy
-  video echo and gamma adjustment, never both. The shader blur chain is built once per frame from the
+  video echo and gamma adjustment, never both. The legacy path also multiplies the finished frame by
+  the reference's animated hue shade, a four-corner colour whose three channels are animated sines
+  normalised so their maximum is one; the per-preset offsets are seeded from the preset name so the
+  look is reproducible, and the OpenGL display pass applies the same shade. The shader blur chain is
+  built once per frame from the
   frame being warped, so the warp shader and the comp shader read the same blurred input.
   `Composite` adds the overlay frame into the warped
   frame and `Publish` copies the finished frame into the display buffer, so a post effect never runs

@@ -265,6 +265,11 @@ internal sealed class VisualizerGlPipeline
         uniform sampler2D uOverlay;
         uniform float uDecay;
         uniform float uDisplayOnly;
+        uniform float uHueTime;
+        uniform float uHue0;
+        uniform float uHue1;
+        uniform float uHue2;
+        uniform float uHue3;
         uniform float uEchoZoom;
         uniform float uEchoAlpha;
         uniform float uEchoOrientation;
@@ -285,6 +290,17 @@ internal sealed class VisualizerGlPipeline
         uniform float uFrameWidth;
         uniform float uFrameHeight;
         uniform float uSmaller;
+
+        // The reference's animated hue shade: three sine channels normalised so their maximum is one.
+        vec3 hueShade(float corner)
+        {
+            float r = 0.6 + 0.3 * sin(uHueTime * 0.0143 + 3.0 + corner * 21.0 + uHue3);
+            float g = 0.6 + 0.3 * sin(uHueTime * 0.0107 + 1.0 + corner * 13.0 + uHue1);
+            float b = 0.6 + 0.3 * sin(uHueTime * 0.0129 + 6.0 + corner * 9.0 + uHue2);
+            float m = max(r, max(g, b));
+            m = abs(m) < 1e-6 ? 1.0 : m;
+            return vec3(0.5 + 0.5 * r / m, 0.5 + 0.5 * g / m, 0.5 + 0.5 * b / m);
+        }
 
         void main()
         {
@@ -331,6 +347,13 @@ internal sealed class VisualizerGlPipeline
                     vec4 echoed = texture(uSource, echoUv);
                     colour = mix(colour, echoed, uEchoAlpha);
                 }
+            }
+
+            if (uDisplayOnly > 0.5) {
+                // The legacy final composite tints the finished frame with its animated hue shade.
+                vec3 shade = mix(mix(hueShade(0.0), hueShade(1.0), vUv.x),
+                                 mix(hueShade(2.0), hueShade(3.0), vUv.x), 1.0 - vUv.y);
+                colour.rgb *= shade;
             }
 
             if (uGamma != 1.0)
@@ -539,7 +562,8 @@ internal sealed class VisualizerGlPipeline
                 gl,
                 _postProgram,
                 [
-                    "uSource", "uOverlay", "uDecay", "uDisplayOnly", "uEchoZoom", "uEchoAlpha", "uEchoOrientation",
+                    "uSource", "uOverlay", "uDecay", "uDisplayOnly", "uHueTime", "uHue0", "uHue1", "uHue2", "uHue3",
+                    "uEchoZoom", "uEchoAlpha", "uEchoOrientation",
                     "uDarken", "uGamma", "uOuterInset", "uOuterThickness", "uOuterR", "uOuterG",
                     "uOuterB", "uOuterA", "uInnerInset", "uInnerThickness", "uInnerR", "uInnerG",
                     "uInnerB", "uInnerA", "uFrameWidth", "uFrameHeight", "uSmaller"
@@ -842,6 +866,11 @@ internal sealed class VisualizerGlPipeline
                 Set(gl, _postUniforms, "uDisplayOnly", 1f);
                 Set(gl, _postUniforms, "uEchoAlpha", parameters.EchoAlpha);
                 Set(gl, _postUniforms, "uGamma", parameters.Gamma);
+                Set(gl, _postUniforms, "uHueTime", parameters.HueTime);
+                Set(gl, _postUniforms, "uHue0", parameters.HueOffsets.X);
+                Set(gl, _postUniforms, "uHue1", parameters.HueOffsets.Y);
+                Set(gl, _postUniforms, "uHue2", parameters.HueOffsets.Z);
+                Set(gl, _postUniforms, "uHue3", parameters.HueOffsets.W);
                 DrawQuad(gl);
                 output = _compTexture;
             }

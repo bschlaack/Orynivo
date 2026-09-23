@@ -46,4 +46,8 @@ public readonly record struct VisualizerFrameParameters(
     public float WarpScale { get; init; } = 1f;
     /// <summary>Gets whether the fixed warp repeats instead of clamping at the image edges.</summary>
     public bool TextureWrap { get; init; }
+    /// <summary>Gets the legacy composite's hue animation time in seconds.</summary>
+    public float HueTime { get; init; }
+    /// <summary>Gets the legacy composite's per-preset hue offsets.</summary>
+    public (float X, float Y, float Z, float W) HueOffsets { get; init; }
 }

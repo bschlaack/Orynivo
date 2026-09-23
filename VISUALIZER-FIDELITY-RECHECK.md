@@ -136,9 +136,10 @@ These corrections do **not** establish complete Winamp MilkDrop fidelity:
   (`MilkdropWaveform`), but the spectrum FFT, windowing, waveform alignment and
   loudness history are still not a byte-exact port of Winamp's analyzer. Very
   large/custom waveform coordinates need fuller clipping.
-- Some legacy final effects, including reference hue shading, are not implemented.
-  CPU/Skia blur remains an approximation; the new range/edge contract is implemented
-  in the active GL pipeline.
+- The legacy final effects now include the reference's animated hue shade and its
+  brightness gain on the display target; the CPU and OpenGL paths both apply them,
+  and the per-preset hue offsets are seeded from the preset name for
+  reproducibility. CPU/Skia blur remains an approximation.
 - Existing per-pixel variable lifecycle and fallback-path differences need more
   named-preset comparisons. These tests do not prove every expression/shader dialect.
 - GPU checks use a hidden WGL context. Avalonia/ANGLE composition and a direct

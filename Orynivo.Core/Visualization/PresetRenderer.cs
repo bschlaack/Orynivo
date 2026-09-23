@@ -206,6 +206,12 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
     private readonly float[] _shapeUvX = new float[128];
     private readonly float[] _shapeUvY = new float[128];
     private readonly float[] _shapeSample = new float[4];
+    // The reference's per-preset hue offsets. It seeds them randomly on every load; a stable seed
+    // from the preset name keeps a preset's look reproducible across runs.
+    private readonly float[] _hueOffsets = new float[4];
+    private readonly float[] _hueShadeR = new float[4];
+    private readonly float[] _hueShadeG = new float[4];
+    private readonly float[] _hueShadeB = new float[4];
     private readonly float[] _wavePointX = new float[512];
     private readonly float[] _wavePointY = new float[512];
     private readonly float[] _waveRed = new float[512];
@@ -300,6 +306,19 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
         _slotSx = preset.Layout.IndexOf("sx");
         _slotSy = preset.Layout.IndexOf("sy");
         _slotWarp = preset.Layout.IndexOf("warp");
+        // The reference's hue offsets are random per load; a stable seed from the preset name keeps
+        // the same preset looking the same across runs while still varying between presets.
+        var hueSeed = 2166136261u;
+        foreach (var character in preset.Name)
+        {
+            hueSeed ^= character;
+            hueSeed *= 16777619u;
+        }
+
+        _hueOffsets[0] = (hueSeed % 64841u) * 0.01f;
+        _hueOffsets[1] = ((hueSeed >> 8) % 53751u) * 0.01f;
+        _hueOffsets[2] = ((hueSeed >> 16) % 42661u) * 0.01f;
+        _hueOffsets[3] = ((hueSeed >> 24) % 31571u) * 0.01f;
         // A per-pixel pass may only run in parallel when everything it writes is re-seeded for
         // every pixel and no shader interpreter state is involved; otherwise one pixel could see
         // what another pixel wrote and the picture would depend on the split.
@@ -592,7 +611,12 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
         ToPublicBand(ReadBand("ob_", 0f, 0.02f)),
         ToPublicBand(ReadBand("ib_", 0.06f, 0.02f)),
         (float)_elapsed * Read("fWarpAnimSpeed", 1f))
-        { WarpScale = Read("fWarpScale", 1f), TextureWrap = Read("bTexWrap", 0f) != 0f };
+        {
+            WarpScale = Read("fWarpScale", 1f),
+            TextureWrap = Read("bTexWrap", 0f) != 0f,
+            HueTime = (float)_elapsed * 30f,
+            HueOffsets = (_hueOffsets[0], _hueOffsets[1], _hueOffsets[2], _hueOffsets[3]),
+        };
 
     /// <summary>Publishes one border band with the public frame-parameter type.</summary>
     /// <param name="band">Band read from the preset's keys.</param>
@@ -785,7 +809,7 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
         if (!hasCompShader)
         {
             ApplyVideoEcho();
-            ApplyGamma();
+            ApplyHueShadeAndGamma();
         }
 
         var postProcess = Mark();
@@ -2582,26 +2606,68 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
 
 
     /// <summary>Applies the preset's gamma adjustment to the warped frame.</summary>
-    private void ApplyGamma()
+    /// <summary>
+    /// Multiplies the frame by the reference's animated hue shade and its gamma gain. The shade is a
+    /// four-corner colour — three animated sine channels normalised so their maximum is one — blended
+    /// across the frame, and the gamma is a linear brightness gain. Both belong to the legacy final
+    /// composite, which a comp shader replaces.
+    /// </summary>
+    private void ApplyHueShadeAndGamma()
     {
-        var gamma = Read("fGammaAdj", 1f);
-        if (MathF.Abs(gamma - 1f) < 0.001f)
-            return;
+        var gamma = Math.Clamp(Read("fGammaAdj", 1f), 0.1f, 10f);
+        var width = _warped.Width;
+        var height = _warped.Height;
+        var time = (float)_elapsed * 30f;
 
-        gamma = Math.Clamp(gamma, 0.1f, 10f);
-        var pixels = _warped.RawPixels;
-        var stride = _warped.Width * 4;
-        ParallelRows.For(ParallelismEnabled, _warped.Height, (worker, from, to) =>
+        // The reference's four quad corners, in its vertex order: top-left, top-right, bottom-left,
+        // bottom-right.
+        for (var corner = 0; corner < 4; corner++)
         {
-            var end = to * stride;
-            for (var index = from * stride; index < end; index += 4)
+            var index = corner;
+            var red = 0.6f + (0.3f * MathF.Sin((time * 0.0143f) + 3f + (index * 21f) + _hueOffsets[3]));
+            var green = 0.6f + (0.3f * MathF.Sin((time * 0.0107f) + 1f + (index * 13f) + _hueOffsets[1]));
+            var blue = 0.6f + (0.3f * MathF.Sin((time * 0.0129f) + 6f + (index * 9f) + _hueOffsets[2]));
+            var max = MathF.Max(red, MathF.Max(green, blue));
+            if (MathF.Abs(max) < 1e-6f)
+                max = 1f;
+            _hueShadeR[corner] = 0.5f + (0.5f * (red / max));
+            _hueShadeG[corner] = 0.5f + (0.5f * (green / max));
+            _hueShadeB[corner] = 0.5f + (0.5f * (blue / max));
+        }
+
+        var shadeR = _hueShadeR;
+        var shadeG = _hueShadeG;
+        var shadeB = _hueShadeB;
+
+        var pixels = _warped.RawPixels;
+        var stride = width * 4;
+        ParallelRows.For(ParallelismEnabled, height, (worker, from, to) =>
+        {
+            for (var y = from; y < to; y++)
             {
-                pixels[index] = Math.Clamp(pixels[index] * gamma, 0f, 1f);
-                pixels[index + 1] = Math.Clamp(pixels[index + 1] * gamma, 0f, 1f);
-                pixels[index + 2] = Math.Clamp(pixels[index + 2] * gamma, 0f, 1f);
+                var v = height > 1 ? y / (float)(height - 1) : 0f;
+                var rowStart = y * stride;
+                for (var x = 0; x < width; x++)
+                {
+                    var u = width > 1 ? x / (float)(width - 1) : 0f;
+                    var redShade = Lerp(Lerp(shadeR[0], shadeR[1], u), Lerp(shadeR[2], shadeR[3], u), v);
+                    var greenShade = Lerp(Lerp(shadeG[0], shadeG[1], u), Lerp(shadeG[2], shadeG[3], u), v);
+                    var blueShade = Lerp(Lerp(shadeB[0], shadeB[1], u), Lerp(shadeB[2], shadeB[3], u), v);
+                    var index = rowStart + (x * 4);
+                    pixels[index] = Math.Clamp(pixels[index] * redShade * gamma, 0f, 1f);
+                    pixels[index + 1] = Math.Clamp(pixels[index + 1] * greenShade * gamma, 0f, 1f);
+                    pixels[index + 2] = Math.Clamp(pixels[index + 2] * blueShade * gamma, 0f, 1f);
+                }
             }
         });
     }
+
+    /// <summary>Linear interpolation.</summary>
+    /// <param name="from">Value at zero.</param>
+    /// <param name="to">Value at one.</param>
+    /// <param name="amount">Blend amount.</param>
+    /// <returns>The blended value.</returns>
+    private static float Lerp(float from, float to, float amount) => from + ((to - from) * amount);
 
     /// <summary>Draws motion vectors, shapes, custom waves and the default wave into the overlay.</summary>
     private void DrawOverlay()

@@ -372,6 +372,29 @@ public sealed class MilkdropCompatibilityTests
         Assert.Equal(0f, Mean(textured), 5);
     }
 
+    /// <summary>
+    /// The legacy final composite multiplies the frame by its animated hue shade, whose per-channel
+    /// value stays between a half and one; a comp shader replaces that path entirely.
+    /// </summary>
+    [Fact]
+    public void RenderFrame_LegacyCompositeAppliesTheHueShade()
+    {
+        var preset = VisualizerPreset.Parse(
+            "decay=1\nwave_a=0\nwarp_1=float4 main(float2 uv : TEXCOORD0) : COLOR { return float4(1, 1, 1, 1); }");
+        var renderer = new PresetRenderer(preset, 32, 32);
+        renderer.RenderFrame(new FakeAudio(), 1d / 60d);
+
+        var pixels = renderer.Output.Pixels;
+        for (var index = 0; index < pixels.Length; index += 4)
+        {
+            Assert.InRange(pixels[index], 0.49f, 1.01f);
+            Assert.InRange(pixels[index + 1], 0.49f, 1.01f);
+            Assert.InRange(pixels[index + 2], 0.49f, 1.01f);
+        }
+
+        Assert.True(Mean(pixels) < 1f);
+    }
+
     /// <summary>The outer border paints the frame edges.</summary>
     [Fact]
     public void RenderFrame_OuterBorderPaintsTheEdge()
