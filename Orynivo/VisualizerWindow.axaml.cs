@@ -44,6 +44,17 @@ public partial class VisualizerWindow : Window
     private string? _glWarpShader;
     private string? _glCompShader;
     private IReadOnlyList<string>? _glPerPixelUniforms;
+
+    /// <summary>Whether <see cref="_glWarpShader"/> computes the warp coordinate per pixel.</summary>
+    private bool _glPixelWarp;
+
+    /// <summary>
+    /// Whether a per-pixel block that writes the sample position may run on the GPU. It is opt-in
+    /// with <c>ORYNIVO_VISUALIZER_PIXELWARP=1</c> until its picture has been compared against the CPU
+    /// path on a real collection; the CPU warp is the reference and stays the default.
+    /// </summary>
+    private readonly bool _pixelWarpEnabled =
+        Environment.GetEnvironmentVariable("ORYNIVO_VISUALIZER_PIXELWARP") == "1";
     private readonly Dictionary<string, ShaderValue> _glUniforms = new(StringComparer.Ordinal);
     private bool _glErrorLogged;
     private bool _glInfoLogged;
@@ -69,8 +80,23 @@ public partial class VisualizerWindow : Window
         _glWarpShader = null;
         _glCompShader = null;
         _glPerPixelUniforms = null;
+        _glPixelWarp = false;
         if (!renderer.HasShaders)
         {
+            // A per-pixel block that writes the sample position keeps the CPU warp in the mesh
+            // pipeline, because an interpolated sample position has no meaning. Emitting it as a warp
+            // fragment shader that computes the coordinate itself puts that work on the GPU, which is
+            // exactly what the CPU per-pixel path does today.
+            if (_pixelWarpEnabled && TryEmitPixelWarp(renderer, out var pixelWarp, out var pixelUniforms))
+            {
+                renderer.ExpressionsOnly = true;
+                renderer.MeshForPixelWarp = true;
+                _glWarpShader = pixelWarp;
+                _glPerPixelUniforms = pixelUniforms;
+                _glPixelWarp = true;
+                return;
+            }
+
             renderer.ExpressionsOnly = true;
             return;
         }
@@ -134,6 +160,40 @@ public partial class VisualizerWindow : Window
 
         uniforms = [.. names];
         return true;
+    }
+
+    /// <summary>
+    /// Emits a per-pixel warp for a preset without a warp shader whose per-pixel block writes the
+    /// sample position. The block then runs per pixel on the GPU instead of on the CPU; a block the
+    /// GLSL dialect cannot express, or one whose writes another pixel could read, keeps the CPU warp.
+    /// </summary>
+    /// <param name="renderer">Renderer whose preset to translate.</param>
+    /// <param name="warp">Receives the warp GLSL, or <see langword="null"/>.</param>
+    /// <param name="uniforms">Receives the preset variables the block reads, or <see langword="null"/>.</param>
+    /// <returns><see langword="true"/> when the block translated.</returns>
+    private static bool TryEmitPixelWarp(
+        PresetRenderer renderer,
+        out string? warp,
+        out IReadOnlyList<string>? uniforms)
+    {
+        warp = null;
+        uniforms = null;
+        var perPixel = renderer.Preset.PerPixel;
+        if (!perPixel.Writes("x") && !perPixel.Writes("y"))
+            return false;
+        if (!PresetExpressionTranspiler.CanRunInParallel(perPixel))
+            return false;
+
+        try
+        {
+            warp = ShaderTranspiler.TranspileGlslWarp(null, perPixel, out _, out var pixelUniforms);
+            uniforms = pixelUniforms;
+            return true;
+        }
+        catch (PresetExpressionException)
+        {
+            return false;
+        }
     }
     private readonly VisualizerPresetLibrary _library = new();
     private readonly SilentAudioSource _silent = new();
@@ -724,7 +784,8 @@ public partial class VisualizerWindow : Window
                         _glParameters,
                         _glWarpShader,
                         _glCompShader,
-                        _glUniforms);
+                        _glUniforms,
+                        _glPixelWarp);
                 }
             }
 

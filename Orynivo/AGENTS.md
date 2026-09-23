@@ -543,7 +543,12 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
   pipeline; it is the default, and `ORYNIVO_VISUALIZER_OPENGL=0` forces the bitmap presentation.
   The GPU owns the frame only for a preset that builds a mesh, which excludes a per-pixel block
   that writes the sample position `x` or `y`; those keep the CPU warp, and the presenter then
-  uploads the finished CPU frame. When the preset has no
+  uploads the finished CPU frame. `ORYNIVO_VISUALIZER_PIXELWARP=1` additionally emits that block as a
+  warp fragment shader that computes the coordinate per pixel
+  (`ShaderTranspiler.TranspileGlslWarp` with a null body, drawn over a full-screen quad with the
+  `_orynivo_*` motion uniforms seeded from the mesh's first vertex, and the decay moved to the post
+  pass). It is opt-in until the GPU and CPU pictures have been compared on a real collection.
+  When the preset has no
   shaders, `Orynivo.Controls.VisualizerGlPipeline` owns the whole frame: the warp as a mesh draw whose
   fragment shader is a translation of `WarpSampling.SamplePosition`, the blur as the same nine-tap
   clamped box filter with ping-pong targets, and decay, video echo, centre darkening, both border

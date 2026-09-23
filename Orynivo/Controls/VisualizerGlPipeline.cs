@@ -509,18 +509,28 @@ internal sealed class VisualizerGlPipeline
     /// </summary>
     /// <param name="warpSource">GLSL for the warp shader, or <see langword="null"/>.</param>
     /// <param name="compSource">GLSL for the comp shader, or <see langword="null"/>.</param>
-    public void SetShaders(string? warpSource, string? compSource)
+    /// <param name="perPixelWarp">
+    /// Whether <paramref name="warpSource"/> is a per-pixel warp: it computes the coordinate from the
+    /// fragment position, so it is drawn over a full-screen quad and the frame motion reaches it as
+    /// the <c>_orynivo_*</c> uniforms instead of through the mesh vertices.
+    /// </param>
+    public void SetShaders(string? warpSource, string? compSource, bool perPixelWarp = false)
     {
         if (!string.Equals(_warpShaderSource, warpSource, StringComparison.Ordinal) ||
-            !string.Equals(_compShaderSource, compSource, StringComparison.Ordinal))
+            !string.Equals(_compShaderSource, compSource, StringComparison.Ordinal) ||
+            _perPixelWarp != perPixelWarp)
         {
             _warpShaderSource = warpSource;
             _compShaderSource = compSource;
+            _perPixelWarp = perPixelWarp;
             _warpSamplerNames = SamplerNames(warpSource);
             _compSamplerNames = SamplerNames(compSource);
             _shadersDirty = true;
         }
     }
+
+    /// <summary>Whether the published warp shader computes the coordinate per pixel.</summary>
+    private bool _perPixelWarp;
 
     private bool _shadersDirty;
 
@@ -766,7 +776,17 @@ internal sealed class VisualizerGlPipeline
                 Set(gl, _warpShaderUniforms, "uNeedsRadius", needsRadius ? 1f : 0f);
                 Set(gl, _warpShaderUniforms, "uWarpTime", parameters.WarpTime);
                 Set(gl, _warpShaderUniforms, "uWarpScale", parameters.WarpScale);
-                DrawMesh(gl);
+                if (_perPixelWarp)
+                {
+                    // The fragment stage owns the whole warp, so the frame motion is seeded as
+                    // uniforms and the quad covers the frame instead of the warped mesh.
+                    SeedPixelWarpMotion(gl, mesh, frameWidth, frameHeight, parameters);
+                    DrawQuad(gl);
+                }
+                else
+                {
+                    DrawMesh(gl);
+                }
             }
             else
             {
@@ -824,8 +844,10 @@ internal sealed class VisualizerGlPipeline
             SetSampler(gl, _postUniforms, "uSource", 0);
             SetSampler(gl, _postUniforms, "uOverlay", 1);
             // The fixed warp already applies decay. A custom warp owns its output colour,
-            // including any fade; applying the legacy decay here would attenuate it twice.
-            Set(gl, _postUniforms, "uDecay", 1f);
+            // including any fade; applying the legacy decay here would attenuate it twice. A
+            // per-pixel warp is a geometric warp like the fixed one, so its decay lands here
+            // instead, after the blur, which is linear and therefore order-independent.
+            Set(gl, _postUniforms, "uDecay", _perPixelWarp ? parameters.Decay : 1f);
             Set(gl, _postUniforms, "uDisplayOnly", 0f);
             Set(gl, _postUniforms, "uEchoZoom", parameters.EchoZoom);
             // The reference's final composite is either the custom comp shader or the legacy video
@@ -916,6 +938,46 @@ internal sealed class VisualizerGlPipeline
             return false;
         }
         finally { ClearSamplerBindings(); }
+    }
+
+    /// <summary>
+    /// Seeds a per-pixel warp's motion uniforms from the frame motion. The mesh carries one value set
+    /// per vertex, in <see cref="PresetRenderer.MeshValues"/> order; a per-pixel warp runs on the
+    /// uniform mesh the frame motion describes, so the first vertex is the frame's own values.
+    /// </summary>
+    /// <param name="gl">GL interface.</param>
+    /// <param name="mesh">Packed per-vertex motion.</param>
+    /// <param name="frameWidth">Frame width in pixels.</param>
+    /// <param name="frameHeight">Frame height in pixels.</param>
+    /// <param name="parameters">The frame's pass values.</param>
+    private void SeedPixelWarpMotion(
+        GlInterface gl,
+        float[] mesh,
+        int frameWidth,
+        int frameHeight,
+        VisualizerFrameParameters parameters)
+    {
+        if (mesh.Length >= PresetRenderer.MeshValues)
+        {
+            Set(gl, _warpShaderUniforms, "_orynivo_zoom", Math.Max(0.01f, mesh[0]));
+            Set(gl, _warpShaderUniforms, "_orynivo_zoomExp", mesh[1]);
+            Set(gl, _warpShaderUniforms, "_orynivo_rotation", mesh[2]);
+            Set(gl, _warpShaderUniforms, "_orynivo_centre_x", mesh[3]);
+            Set(gl, _warpShaderUniforms, "_orynivo_centre_y", mesh[4]);
+            Set(gl, _warpShaderUniforms, "_orynivo_offset_x", mesh[5]);
+            Set(gl, _warpShaderUniforms, "_orynivo_offset_y", mesh[6]);
+            Set(gl, _warpShaderUniforms, "_orynivo_stretch_x", mesh[7]);
+            Set(gl, _warpShaderUniforms, "_orynivo_stretch_y", mesh[8]);
+            Set(gl, _warpShaderUniforms, "_orynivo_warp", mesh[9]);
+        }
+
+        Set(gl, _warpShaderUniforms, "_orynivo_size_x", frameWidth);
+        Set(gl, _warpShaderUniforms, "_orynivo_size_y", frameHeight);
+        Set(gl, _warpShaderUniforms, "_orynivo_warpTime", parameters.WarpTime);
+        Set(gl, _warpShaderUniforms, "_orynivo_warpScale", parameters.WarpScale);
+        // The warp samples the full-resolution feedback, so texsize is the frame, not a shader grid.
+        Set(gl, _warpShaderUniforms, "texsize_x", frameWidth);
+        Set(gl, _warpShaderUniforms, "texsize_y", frameHeight);
     }
 
     /// <summary>Draws the static full-screen quad.</summary>
@@ -1017,13 +1079,24 @@ internal sealed class VisualizerGlPipeline
 
         if (_warpShaderSource is { Length: > 0 })
         {
-            // The warp shader is a fragment stage over the mesh: the vertex shader transforms the
-            // per-vertex coordinate, exactly as the reference warp vertex shader does.
-            if (TryBuildShaderProgram(gl, WarpVertexSource, _warpShaderSource, out var program, out var error))
+            // A per-pixel warp computes the coordinate from the fragment position, so it is linked
+            // with the pass-through quad vertex shader and drawn over the whole frame; the mesh warp
+            // keeps the vertex stage that transforms and interpolates.
+            var warpVertexSource = _perPixelWarp ? QuadVertexSource : WarpVertexSource;
+            if (TryBuildShaderProgram(gl, warpVertexSource, _warpShaderSource, out var program, out var error))
             {
                 _warpShaderProgram = program;
-                _warpShaderUniforms = Uniforms(gl, program,
-                    ["uFrameWidth", "uFrameHeight", "uNeedsRadius", "uWarpTime", "uWarpScale"]);
+                _warpShaderUniforms = Uniforms(gl, program, _perPixelWarp
+                    ?
+                    [
+                        "uFrameWidth", "uFrameHeight", "uNeedsRadius", "uWarpTime", "uWarpScale",
+                        "texsize_x", "texsize_y",
+                        "_orynivo_size_x", "_orynivo_size_y", "_orynivo_zoom", "_orynivo_zoomExp",
+                        "_orynivo_rotation", "_orynivo_centre_x", "_orynivo_centre_y",
+                        "_orynivo_offset_x", "_orynivo_offset_y", "_orynivo_stretch_x", "_orynivo_stretch_y",
+                        "_orynivo_warp", "_orynivo_warpTime", "_orynivo_warpScale"
+                    ]
+                    : ["uFrameWidth", "uFrameHeight", "uNeedsRadius", "uWarpTime", "uWarpScale"]);
             }
             else
                 ShaderError = "warp: " + error;

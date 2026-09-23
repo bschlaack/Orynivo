@@ -534,6 +534,15 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
     public bool MeshRequested { get; set; }
 
     /// <summary>
+    /// Gets or sets a value indicating whether the mesh is built even when the per-pixel program
+    /// writes the sample position <c>x</c> or <c>y</c>. A GPU warp that evaluates that block in its
+    /// fragment stage still needs the mesh for the frame motion and the geometry, so the caller sets
+    /// this while it owns the frame. The CPU path is unaffected: the mesh is an extra product, not a
+    /// replacement, and the per-pixel warp still runs unless <see cref="ExpressionsOnly"/> is set.
+    /// </summary>
+    public bool MeshForPixelWarp { get; set; }
+
+    /// <summary>
     /// Gets or sets a value indicating whether the renderer runs only the preset's expressions and
     /// draws the overlay, leaving the frame itself to a GPU pipeline. The mesh is still built and the
     /// overlay is still drawn into <see cref="OverlayFrame"/>; every pixel pass is skipped, so this
@@ -1293,7 +1302,7 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
         // sample position has no interpolated meaning, and one that records motion vectors keeps
         // the per-pixel path. A GPU warp needs a mesh for every preset, so requesting it without a
         // per-pixel motion program yields the uniform mesh the frame motion describes.
-        if (!_perPixelWritesPosition &&
+        if ((!_perPixelWritesPosition || MeshForPixelWarp) &&
             !recordMotion &&
             (_perPixelWritesMotion ? MeshPerPixelEnabled || MeshRequested : MeshRequested))
         {

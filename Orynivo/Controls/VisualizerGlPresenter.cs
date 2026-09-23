@@ -148,6 +148,7 @@ public sealed class VisualizerGlPresenter : OpenGlControlBase
     private string? _pipelineCompShader;
     private IReadOnlyDictionary<string, ShaderValue>? _pipelineUniforms;
     private bool _pipelinePending;
+    private bool _pipelinePixelWarp;
     private bool _pipelineFailed;
     private readonly VisualizerGlPipeline _pipeline = new();
 
@@ -178,6 +179,10 @@ public sealed class VisualizerGlPresenter : OpenGlControlBase
     /// <param name="warpShader">Emitted GLSL for the warp shader, or <see langword="null"/>.</param>
     /// <param name="compShader">Emitted GLSL for the comp shader, or <see langword="null"/>.</param>
     /// <param name="uniforms">Shader uniforms to seed, or <see langword="null"/>.</param>
+    /// <param name="perPixelWarp">
+    /// Whether <paramref name="warpShader"/> computes the coordinate per pixel, so the pipeline draws
+    /// it over a full-screen quad with the frame motion as uniforms.
+    /// </param>
     public void SetPipeline(
         byte[] overlayBgra,
         int frameWidth,
@@ -188,7 +193,8 @@ public sealed class VisualizerGlPresenter : OpenGlControlBase
         VisualizerFrameParameters parameters,
         string? warpShader = null,
         string? compShader = null,
-        IReadOnlyDictionary<string, ShaderValue>? uniforms = null)
+        IReadOnlyDictionary<string, ShaderValue>? uniforms = null,
+        bool perPixelWarp = false)
     {
         lock (_frameLock)
         {
@@ -201,6 +207,7 @@ public sealed class VisualizerGlPresenter : OpenGlControlBase
             _pipelineParameters = parameters;
             _pipelineWarpShader = warpShader;
             _pipelineCompShader = compShader;
+            _pipelinePixelWarp = perPixelWarp;
             // The render thread owns the caller's dictionary and writes it under its own lock, so the
             // presenter takes its own copy here rather than reading a Dictionary the render thread may
             // be mutating: a concurrent read of a Dictionary is undefined and can loop forever.
@@ -315,6 +322,7 @@ public sealed class VisualizerGlPresenter : OpenGlControlBase
             VisualizerFrameParameters pipelineParameters = default;
             string? pipelineWarpShader = null, pipelineCompShader = null;
             IReadOnlyDictionary<string, ShaderValue>? pipelineUniforms = null;
+            var pipelinePixelWarp = false;
             byte[]? frame = null;
             int frameWidth = 0, frameHeight = 0;
             lock (_frameLock)
@@ -331,6 +339,7 @@ public sealed class VisualizerGlPresenter : OpenGlControlBase
                     pipelineWarpShader = _pipelineWarpShader;
                     pipelineCompShader = _pipelineCompShader;
                     pipelineUniforms = _pipelineUniforms;
+                    pipelinePixelWarp = _pipelinePixelWarp;
                     _pipelinePending = false;
                 }
                 else if (_hasFrame)
@@ -345,7 +354,7 @@ public sealed class VisualizerGlPresenter : OpenGlControlBase
             if (pipelineOverlay is not null && pipelineMesh is not null && pipelineWidth > 0 && pipelineHeight > 0)
             {
                 var pipelineViewport = FramebufferSize();
-                _pipeline.SetShaders(pipelineWarpShader, pipelineCompShader);
+                _pipeline.SetShaders(pipelineWarpShader, pipelineCompShader, pipelinePixelWarp);
                 if (_pipeline.Render(
                     gl,
                     fb,

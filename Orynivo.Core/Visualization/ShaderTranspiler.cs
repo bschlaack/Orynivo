@@ -566,7 +566,11 @@ public static class ShaderTranspiler
         bool meshUv = false)
     {
         _glsl = glsl;
-        _glslComp = glsl && !warpedUv;
+        // A GL frame texture is bottom-up while the comp stage and a per-pixel warp derive their
+        // coordinate from the fragment position in the engine's top-down convention, so those reads
+        // flip. The mesh warp does not: its coordinate arrives from the vertex stage already in the
+        // texture's orientation.
+        _glslComp = glsl && (!warpedUv || !meshUv);
         var builder = new StringBuilder();
 
         // Every sampler the shader names is declared, so an unknown sampler does not become a zero

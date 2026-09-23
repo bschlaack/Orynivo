@@ -877,7 +877,11 @@ affordable. This is a project of its own and must keep the CPU path as the fallb
   while the control refreshes at the display rate, an undrawn refresh is the normal case and the
   artefact was a steady rubber band.
   What remains: deleting the CPU frame path for the GL mode. The GL presentation is the default now;
-  the CPU frame path stays as the automatic fallback for a platform without a GL context.
+  the CPU frame path stays as the automatic fallback for a platform without a GL context. A per-pixel
+  block that writes the sample position is emitted as a warp fragment shader behind
+  `ORYNIVO_VISUALIZER_PIXELWARP=1` (`ShaderTranspiler.TranspileGlslWarp` over a full-screen quad, with
+  the frame motion seeded as `_orynivo_*` uniforms and the decay moved to the post pass); it becomes
+  the default once the GPU and CPU pictures have been compared on a real preset collection.
   **Step 4 is done.** The GLSL emitter is `ShaderTranspiler`'s GLSL dialect next to SkSL
   (`TranspileGlsl`, `TranspileGlslComp`, `TranspileGlslWarp`): the prelude aliases `float2/3/4` onto
   `vec2/3/4` so the shared body emission is byte-identical, the samplers become `sampler2D` sampled
