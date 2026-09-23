@@ -40,6 +40,7 @@ internal sealed class VisualizerGlPipeline
     private const int GlTextureWrapT = 0x2803;
     private const int GlLinear = 0x2601;
     private const int GlClampToEdge = 0x812F;
+    private const int GlRepeat = 0x2901;
     private const int GlRgba = 0x1908;
     private const int GlRgba8 = 0x8058;
     private const int GlRgba16f = 0x881A;
@@ -372,6 +373,10 @@ internal sealed class VisualizerGlPipeline
     private int _shaderBlurProgram;
     private Dictionary<string, int> _shaderBlurUniforms = new(StringComparer.Ordinal);
 
+    /// <summary>The generated noise and volume textures a shader samples, by sampler name.</summary>
+    private readonly VisualizerTextureBank _textureBank = new();
+    private readonly Dictionary<string, int> _samplerTextures = new(StringComparer.Ordinal);
+
     /// <summary>Scratch target for the two passes of one shader blur level, one per level size.</summary>
     private readonly int[] _shaderBlurScratchTexture = new int[3];
     private readonly int[] _shaderBlurScratchFramebuffer = new int[3];
@@ -457,6 +462,7 @@ internal sealed class VisualizerGlPipeline
                 ]);
             _quadTextureUniform = gl.GetUniformLocationString(_quadProgram, "uSource");
             _shaderBlurUniforms = Uniforms(gl, _shaderBlurProgram, ["uSource", "uTexelX", "uTexelY", "uHorizontal"]);
+            UploadSamplerTextures(gl);
 
             _quadVertexArray = gl.GenVertexArray();
             _quadVertexBuffer = gl.GenBuffer();
@@ -574,6 +580,10 @@ internal sealed class VisualizerGlPipeline
             gl.DeleteTexture(_shaderBlurScratchTexture[index]);
             gl.DeleteFramebuffer(_shaderBlurScratchFramebuffer[index]);
         }
+
+        foreach (var texture in _samplerTextures.Values)
+            gl.DeleteTexture(texture);
+        _samplerTextures.Clear();
 
         if (_warpShaderProgram != 0)
             gl.DeleteProgram(_warpShaderProgram);
@@ -1007,6 +1017,7 @@ internal sealed class VisualizerGlPipeline
             gl.BindTexture(GlTexture2D, _shaderBlurTexture[level]);
         }
 
+        var nextUnit = 5;
         foreach (var name in ShaderTranspiler.Samplers)
         {
             if (!locations.TryGetValue(name, out var location))
@@ -1018,14 +1029,38 @@ internal sealed class VisualizerGlPipeline
             if (location < 0)
                 continue;
 
-            var unit = name switch
+            int unit;
+            switch (name)
             {
-                "sampler_pc_main" => 1,
-                "sampler_blur1" => 2,
-                "sampler_blur2" => 3,
-                "sampler_blur3" => 4,
-                _ => 0
-            };
+                case "sampler_pc_main":
+                    unit = 1;
+                    break;
+                case "sampler_blur1":
+                    unit = 2;
+                    break;
+                case "sampler_blur2":
+                    unit = 3;
+                    break;
+                case "sampler_blur3":
+                    unit = 4;
+                    break;
+                default:
+                    // A generated noise or volume texture binds its own unit; anything else falls back
+                    // to the frame so it is never left unbound.
+                    if (_samplerTextures.TryGetValue(name, out var texture) && nextUnit < 16)
+                    {
+                        unit = nextUnit++;
+                        gl.ActiveTexture(GlTexture0 + unit);
+                        gl.BindTexture(GlTexture2D, texture);
+                    }
+                    else
+                    {
+                        unit = 0;
+                    }
+
+                    break;
+            }
+
             gl.Uniform1i(location, unit);
         }
     }
@@ -1251,6 +1286,62 @@ internal sealed class VisualizerGlPipeline
         }
 
         return indices;
+    }
+
+    /// <summary>
+    /// Uploads the generated noise and volume textures a shader may sample. Without them a shader that
+    /// reads one (a <c>tex3D</c> cloud, or a noise texture) samples whatever the fallback unit holds,
+    /// which is the frame.
+    /// </summary>
+    /// <param name="gl">GL interface.</param>
+    private void UploadSamplerTextures(GlInterface gl)
+    {
+        foreach (var name in ShaderTranspiler.Samplers)
+        {
+            if (!VisualizerTextureBank.TryResolve(name, out var texture))
+                continue;
+
+            var volume = VisualizerTextureBank.IsVolume(texture);
+            var pixels = volume ? _textureBank.GetVolumeAtlasPixels(texture) : _textureBank.GetPixels(texture);
+            var width = volume ? VisualizerTextureBank.VolumeAtlasWidth : VisualizerTextureBank.GetSize(texture);
+            var height = volume ? VisualizerTextureBank.VolumeAtlasHeight : VisualizerTextureBank.GetSize(texture);
+            _samplerTextures[name] = UploadTexture(gl, pixels, width, height, volume);
+        }
+    }
+
+    /// <summary>Uploads one generated texture as RGBA8.</summary>
+    /// <param name="gl">GL interface.</param>
+    /// <param name="pixels">RGBA floats in the range zero to one.</param>
+    /// <param name="width">Texture width.</param>
+    /// <param name="height">Texture height.</param>
+    /// <param name="clamp">Whether to clamp instead of repeat outside the texture.</param>
+    /// <returns>The texture handle.</returns>
+    private static int UploadTexture(GlInterface gl, ReadOnlySpan<float> pixels, int width, int height, bool clamp)
+    {
+        var handle = gl.GenTexture();
+        gl.BindTexture(GlTexture2D, handle);
+        gl.TexParameteri(GlTexture2D, GlTextureMinFilter, GlLinear);
+        gl.TexParameteri(GlTexture2D, GlTextureMagFilter, GlLinear);
+        gl.TexParameteri(GlTexture2D, GlTextureWrapS, clamp ? GlClampToEdge : GlRepeat);
+        gl.TexParameteri(GlTexture2D, GlTextureWrapT, clamp ? GlClampToEdge : GlRepeat);
+        var bytes = new byte[width * height * 4];
+        for (var index = 0; index < bytes.Length; index++)
+        {
+            var value = index < pixels.Length ? pixels[index] : 0f;
+            bytes[index] = (byte)Math.Clamp((int)((value * 255f) + 0.5f), 0, 255);
+        }
+
+        var pinned = GCHandle.Alloc(bytes, GCHandleType.Pinned);
+        try
+        {
+            gl.TexImage2D(GlTexture2D, 0, GlRgba8, width, height, 0, GlRgba, GlUnsignedByte, pinned.AddrOfPinnedObject());
+        }
+        finally
+        {
+            pinned.Free();
+        }
+
+        return handle;
     }
 
     /// <summary>Compiles and links a program.</summary>

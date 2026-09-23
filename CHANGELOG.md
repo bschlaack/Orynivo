@@ -17,6 +17,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   echo rather than the blur.
 
 ### Fixed
+- Fixed the visualizer never binding the reference implementation's roam vectors (`roam_cos`,
+  `roam_sin`, `slow_roam_cos`, `slow_roam_sin`). The prelude did not declare them, so the emitter
+  treated them as unknown identifiers and gave them a zero constant; a shader that computes
+  `1 + normalize(slow_roam_cos)` then normalised a zero vector, and the resulting infinity spread a
+  white shape across the frame. `Waltra - Horizon` uses exactly that, and its mean channel difference
+  against projectM fell from 0.12 to 0.04-0.06 once the four vectors are seeded from the preset time
+  as the reference does. The interpreter, the SkSL path, and the OpenGL path all bind them.
+- Fixed the OpenGL pipeline not uploading the generated noise and volume textures, so a shader that
+  samples one (`tex3D` clouds, or a `tex2D` noise) read the fallback texture unit, which is the frame.
+  The pipeline now uploads every generated texture `VisualizerTextureBank` resolves and binds each to
+  its own unit.
 - Fixed the visualizer's shader blur levels using full-resolution buffers. The reference implementation
   halves each level: `GetBlur1` reads a quarter-size copy of the frame, `GetBlur2` an eighth, and
   `GetBlur3` a sixteenth, so its blurred picture is far smoother than a full-resolution blur. A preset

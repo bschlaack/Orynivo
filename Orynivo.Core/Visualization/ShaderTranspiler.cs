@@ -31,7 +31,8 @@ public static class ShaderTranspiler
     private static readonly HashSet<string> LiteralUniforms = new(StringComparer.Ordinal)
     {
         "texsize", "time", "frame", "fps", "bass", "mid", "treb", "vol",
-        "bass_att", "mid_att", "treb_att", "aspect", "rand_frame", "rand_preset"
+        "bass_att", "mid_att", "treb_att", "aspect", "rand_frame", "rand_preset",
+        "roam_cos", "roam_sin", "slow_roam_cos", "slow_roam_sin"
     };
 
     /// <summary>Builds the uniform table.</summary>
@@ -55,7 +56,11 @@ public static class ShaderTranspiler
             ["aspectx"] = 1,
             ["aspecty"] = 1,
             ["rand_frame"] = 4,
-            ["rand_preset"] = 4
+            ["rand_preset"] = 4,
+            ["roam_cos"] = 4,
+            ["roam_sin"] = 4,
+            ["slow_roam_cos"] = 4,
+            ["slow_roam_sin"] = 4
         };
         foreach (var name in new[]
         {
@@ -203,6 +208,10 @@ public static class ShaderTranspiler
         uniform float4 aspect;
         uniform float4 rand_frame;
         uniform float4 rand_preset;
+        uniform float4 roam_cos;
+        uniform float4 roam_sin;
+        uniform float4 slow_roam_cos;
+        uniform float4 slow_roam_sin;
         uniform shader sampler_main;
         uniform shader sampler_blur1;
         uniform shader sampler_blur2;
@@ -279,6 +288,26 @@ public static class ShaderTranspiler
         uniform float rand_preset_z;
         uniform float rand_preset_w;
         #define rand_preset float4(rand_preset_x, rand_preset_y, rand_preset_z, rand_preset_w)
+        uniform float roam_cos_x;
+        uniform float roam_cos_y;
+        uniform float roam_cos_z;
+        uniform float roam_cos_w;
+        #define roam_cos float4(roam_cos_x, roam_cos_y, roam_cos_z, roam_cos_w)
+        uniform float roam_sin_x;
+        uniform float roam_sin_y;
+        uniform float roam_sin_z;
+        uniform float roam_sin_w;
+        #define roam_sin float4(roam_sin_x, roam_sin_y, roam_sin_z, roam_sin_w)
+        uniform float slow_roam_cos_x;
+        uniform float slow_roam_cos_y;
+        uniform float slow_roam_cos_z;
+        uniform float slow_roam_cos_w;
+        #define slow_roam_cos float4(slow_roam_cos_x, slow_roam_cos_y, slow_roam_cos_z, slow_roam_cos_w)
+        uniform float slow_roam_sin_x;
+        uniform float slow_roam_sin_y;
+        uniform float slow_roam_sin_z;
+        uniform float slow_roam_sin_w;
+        #define slow_roam_sin float4(slow_roam_sin_x, slow_roam_sin_y, slow_roam_sin_z, slow_roam_sin_w)
         uniform sampler2D sampler_main;
         uniform sampler2D sampler_blur1;
         uniform sampler2D sampler_blur2;

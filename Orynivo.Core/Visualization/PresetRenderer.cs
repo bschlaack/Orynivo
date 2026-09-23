@@ -2034,6 +2034,11 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
             1f / Math.Max(0.0001f, aspectY),
             4);
         destination["rand_frame"] = ShaderValue.Vector(_randFrame[0], _randFrame[1], _randFrame[2], _randFrame[3], 4);
+        var roamTime = Read("time", 0f);
+        destination["roam_cos"] = RoamVector(roamTime, sine: false, slow: false);
+        destination["roam_sin"] = RoamVector(roamTime, sine: true, slow: false);
+        destination["slow_roam_cos"] = RoamVector(roamTime, sine: false, slow: true);
+        destination["slow_roam_sin"] = RoamVector(roamTime, sine: true, slow: true);
 
         // The motion uniforms of the warp entry point. They are the per-frame values the CPU warp
         // reads, so the GPU warp reproduces the same sampling position.
@@ -2055,6 +2060,33 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
             destination[PresetExpressionTranspiler.UniformName(name)] =
                 ShaderValue.Scalar(slot >= 0 && slot < _slots.Length ? _slots[slot] : 0f);
         }
+    }
+
+    /// <summary>
+    /// Builds one of the reference implementation's roam vectors: a cosine or sine at four frequencies,
+    /// mapped into the upper half of the range. A shader that normalises one without it bound gets a
+    /// zero vector, and <c>normalize(0)</c> is an infinity that spreads across the frame.
+    /// </summary>
+    /// <param name="time">Preset time in seconds.</param>
+    /// <param name="sine">Whether to use sine instead of cosine.</param>
+    /// <param name="slow">Whether to use the slow frequency set.</param>
+    /// <returns>The roam vector.</returns>
+    private static ShaderValue RoamVector(float time, bool sine, bool slow)
+    {
+        ReadOnlySpan<float> frequencies = slow
+            ? [0.0050f, 0.0085f, 0.0133f, 0.0217f]
+            : [0.329f, 1.293f, 5.070f, 20.051f];
+        ReadOnlySpan<float> phases = slow
+            ? [2.7f, 5.3f, 4.5f, 3.8f]
+            : [1.2f, 3.9f, 2.5f, 5.4f];
+        var result = new float[4];
+        for (var index = 0; index < 4; index++)
+        {
+            var angle = (time * frequencies[index]) + phases[index];
+            result[index] = 0.5f + (0.5f * (sine ? MathF.Sin(angle) : MathF.Cos(angle)));
+        }
+
+        return ShaderValue.Vector(result[0], result[1], result[2], result[3], 4);
     }
 
     /// <summary>Writes the variables every shader can read for this pixel.</summary>
@@ -2101,6 +2133,11 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
                 1f / Math.Max(0.0001f, aspectY),
                 4));
         interpreter.SetVariable("rand_frame", ShaderValue.Vector(_randFrame[0], _randFrame[1], _randFrame[2], _randFrame[3], 4));
+        var roamTime = Read("time", 0f);
+        interpreter.SetVariable("roam_cos", RoamVector(roamTime, sine: false, slow: false));
+        interpreter.SetVariable("roam_sin", RoamVector(roamTime, sine: true, slow: false));
+        interpreter.SetVariable("slow_roam_cos", RoamVector(roamTime, sine: false, slow: true));
+        interpreter.SetVariable("slow_roam_sin", RoamVector(roamTime, sine: true, slow: true));
         var x = (u * 2f) - 1f;
         var y = (v * 2f) - 1f;
         interpreter.SetVariable("rad", MathF.Sqrt((x * x) + (y * y)));
