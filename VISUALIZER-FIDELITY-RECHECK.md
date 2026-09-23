@@ -215,3 +215,56 @@ These corrections do **not** establish complete Winamp MilkDrop fidelity:
 The old audit's blanket “Corrected” labels must not be read as completion of these
 remaining features. Use isolated reference fixtures and then a named Winamp preset
 with matched audio, time, resolution and settings to assess the remaining difference.
+
+## Open: `$$$ Royal - Mashup (138)` stays bright where the reference fades
+
+The user reports this preset rendering far too bright. It was measured with a
+matched 440 Hz tone at 320x180, 300 frames, comparing the same quantity - the mean
+luma of the saved output frames - in all three renderers:
+
+| Frame | projectM | Orynivo CPU | Orynivo GL |
+| ----- | -------- | ----------- | ---------- |
+| 10 | 0.1366 | 0.1445 | 0.0747 |
+| 50 | 0.1427 | 0.3056 | 0.3632 |
+| 150 | 0.2219 | 0.2300 | 0.3303 |
+| 299 | 0.0889 | 0.2206 | 0.3987 |
+
+Two findings, both new:
+
+1. **The divergence is in the tail, not the body.** At frame 150 the CPU path is
+   within four percent of the reference (0.2300 against 0.2219). The reference then
+   fades to 0.0889 by frame 299 while Orynivo holds its brightness. The preset is
+   not simply "too bright"; it fails to fade.
+2. **The GL presentation path diverges more than the CPU path.** It starts far too
+   dark (0.0747 against 0.1445 on the CPU and 0.1366 in the reference), overshoots by
+   frame 50, and ends about 4.5 times as bright as projectM. Whatever is wrong there
+   is separate from the CPU path, so a GL fix and a CPU fix are two tasks.
+
+An earlier reading of this preset compared a *modified* fixture (shapes, waveform and
+comp replaced) against a *band* measurement of the reference, and it compared
+"warp pass input" against "blur stage output" - the stage probe named `blur` reports
+the output of the warp, because it runs before the decay scale and the blur passes.
+That misattribution made the frame blur look like the source of the growth. It is not:
+within every frame the blur input and the overlay input are identical, and the frame's
+own `per_frame_1=decay=1` means neither engine is damping.
+
+What has been ruled out by measurement, so it is not retried: the shapes (disabling
+every `shapecode_*` leaves the mean unchanged), the waveform and overlay (`wave_a=0`
+unchanged), the composite's additive term (a pass-through comp matches the real one),
+the comp pass (its own mean rise does not reach the feedback - the stored feedback is
+byte-equal to the pre-comp frame), the frame blur, and the sampling geometry
+(`WarpSampling.SamplePosition` is an exact identity at zoom one and zero rotation).
+
+The next step is the matched-input method that has worked for the rest of this work:
+print the per-frame feedback variables (`zoom`, `zoomexp`, `rot`, `cx`, `cy`, `dx`,
+`dy`, `sx`, `sy`, `warp`, `decay`) and the per-pixel outputs from both engines at the
+same frames, and compare them directly. The GL path's early darkness should be
+diagnosed separately from the CPU tail-brightness issue.
+
+## Harness and oracle diagnostics added
+
+`GLH_STAGES=1` prints the mean brightness of the buffer each render stage reads, for a
+few frames. `GLH_ORACLE_AUDIO` and `ORACLE_AUDIO` feed both engines the same raw signed
+16-bit stereo PCM so a preset can be compared on real music rather than a tone. The
+oracle writes `pm-NNN.bmp` and the harness writes `cpu-NNN.bmp`/`gl-NNN.bmp`, so the
+three outputs can be compared with one identical measure.
