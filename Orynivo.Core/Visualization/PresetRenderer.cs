@@ -591,6 +591,23 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
     public PixelBuffer OverlayFrame => _fresh;
 
     /// <summary>
+    /// Gets or sets a value indicating whether the renderer publishes the Milkdrop shape fills as
+    /// geometry instead of rasterizing them into <see cref="OverlayFrame"/>. A GPU overlay draws
+    /// <see cref="ShapeFills"/> and blends the overlay bitmap over it, which still carries the shape
+    /// borders and the waves. The rasterized fill is skipped while this is set, so a caller that
+    /// publishes the fills must draw them.
+    /// </summary>
+    public bool CollectShapeFills { get; set; }
+
+    /// <summary>
+    /// Gets the shape fills collected for the last frame, in draw order. The list is empty unless
+    /// <see cref="CollectShapeFills"/> is set.
+    /// </summary>
+    public IReadOnlyList<ShapeFill> ShapeFills => _shapeFills;
+
+    private readonly List<ShapeFill> _shapeFills = [];
+
+    /// <summary>
     /// Draws only the waveform and spectrum overlay, without touching the feedback buffers, and
     /// leaves it in <see cref="OverlayFrame"/>. It is the overlay half of the frame for a GPU
     /// pipeline, which owns the warp and the frame passes itself.
@@ -3364,6 +3381,7 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
     /// <summary>Draws every custom shape of the preset.</summary>
     private void DrawShapes()
     {
+        _shapeFills.Clear();
         foreach (var shape in Preset.Shapes)
         {
             if (!shape.Enabled) continue;
@@ -3391,7 +3409,12 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
                     var additive = Read("additive", shape.Additive ? 1f : 0f) != 0f;
                     var vertices = BuildVertices(shape, sides, centreX, centreY, radius, angle);
                     if (shape.MilkdropCoordinates)
-                        FillShapeFan(vertices, centreX * 2f - 1f, 1f - centreY * 2f, red, green, blue, alpha, additive);
+                    {
+                        if (CollectShapeFills)
+                            CollectShapeFill(vertices, centreX, centreY, red, green, blue, alpha, additive);
+                        else
+                            FillShapeFan(vertices, centreX * 2f - 1f, 1f - centreY * 2f, red, green, blue, alpha, additive);
+                    }
                     else
                         FillPolygon(vertices, red, green, blue, alpha, additive);
                     DrawPolygonBorder(vertices, shape);
@@ -3399,6 +3422,57 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
             }
             finally { _slots = parent; }
         }
+    }
+
+    /// <summary>
+    /// Publishes one Milkdrop shape's fill as a triangle fan instead of rasterizing it. The centre
+    /// vertex carries the shape's second colour and the texture centre, and the rim vertices carry its
+    /// first colour and the fan's rim coordinates, which is exactly the interpolation
+    /// <see cref="FillShapeFan"/> applies.
+    /// </summary>
+    /// <param name="vertices">Rim vertices in the engine's minus-one-to-one space.</param>
+    /// <param name="centreX">Fan centre in Milkdrop coordinates.</param>
+    /// <param name="centreY">Fan centre in Milkdrop coordinates.</param>
+    /// <param name="red">Rim red, zero to one.</param>
+    /// <param name="green">Rim green, zero to one.</param>
+    /// <param name="blue">Rim blue, zero to one.</param>
+    /// <param name="alpha">Rim alpha, zero to one.</param>
+    /// <param name="additive">Whether the fill adds to the frame instead of blending over it.</param>
+    private void CollectShapeFill(
+        (float X, float Y)[] vertices,
+        float centreX,
+        float centreY,
+        float red,
+        float green,
+        float blue,
+        float alpha,
+        bool additive)
+    {
+        var red2 = Read("r2", 1f); var green2 = Read("g2", 1f);
+        var blue2 = Read("b2", 1f); var alpha2 = Read("a2", 0f);
+        var textured = Read("textured", 0f) != 0f;
+        if (textured)
+            BuildShapeTextureCoordinates(vertices.Length);
+
+        // The fan closes on itself, so the first rim vertex is repeated: GL_TRIANGLE_FAN does not wrap
+        // and the CPU's rasterizer does, and the missing wedge is a visible notch.
+        var fan = new ShapeFillVertex[vertices.Length + 2];
+        fan[0] = new ShapeFillVertex(centreX * 2f - 1f, 1f - centreY * 2f, red2, green2, blue2, alpha2, 0.5f, 0.5f);
+        for (var index = 0; index < vertices.Length; index++)
+        {
+            fan[index + 1] = new ShapeFillVertex(
+                vertices[index].X,
+                vertices[index].Y,
+                red,
+                green,
+                blue,
+                alpha,
+                textured ? _shapeUvX[index] : 0.5f,
+                textured ? _shapeUvY[index] : 0.5f);
+        }
+
+        fan[^1] = fan[1];
+        _shapeFills.Add(new ShapeFill(fan, textured, additive));
     }
 
     /// <summary>Rasterizes the Milkdrop triangle fan with interpolated centre and edge colours.</summary>

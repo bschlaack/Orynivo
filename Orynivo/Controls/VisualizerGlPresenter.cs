@@ -1,4 +1,4 @@
-using System.Runtime.InteropServices;
+﻿using System.Runtime.InteropServices;
 using Avalonia.Controls;
 using Avalonia.OpenGL;
 using Avalonia.OpenGL.Controls;
@@ -149,6 +149,7 @@ public sealed class VisualizerGlPresenter : OpenGlControlBase
     private IReadOnlyDictionary<string, ShaderValue>? _pipelineUniforms;
     private bool _pipelinePending;
     private bool _pipelinePixelWarp;
+    private IReadOnlyList<ShapeFill>? _pipelineShapeFills;
     private bool _pipelineFailed;
     private readonly VisualizerGlPipeline _pipeline = new();
 
@@ -157,6 +158,13 @@ public sealed class VisualizerGlPresenter : OpenGlControlBase
     /// CPU frame path.
     /// </summary>
     public bool PipelineFailed => _pipelineFailed;
+
+    /// <summary>
+    /// Gets a value indicating whether the pipeline can draw overlay shape fills. A caller must only
+    /// set <c>PresetRenderer.CollectShapeFills</c> while this is <see langword="true"/>, because the
+    /// renderer then skips its own rasterized fill.
+    /// </summary>
+    public bool ShapeFillsSupported => _pipeline.ShapeFillsSupported;
 
     /// <summary>Gets the pipeline's one-shot first-frame description, or <see langword="null"/>.</summary>
     public string? PipelineDiagnostics => _pipeline.Diagnostics;
@@ -183,6 +191,7 @@ public sealed class VisualizerGlPresenter : OpenGlControlBase
     /// Whether <paramref name="warpShader"/> computes the coordinate per pixel, so the pipeline draws
     /// it over a full-screen quad with the frame motion as uniforms.
     /// </param>
+    /// <param name="shapeFills">Overlay shape fills the GPU draws itself, or <see langword="null"/>.</param>
     public void SetPipeline(
         byte[] overlayBgra,
         int frameWidth,
@@ -194,7 +203,8 @@ public sealed class VisualizerGlPresenter : OpenGlControlBase
         string? warpShader = null,
         string? compShader = null,
         IReadOnlyDictionary<string, ShaderValue>? uniforms = null,
-        bool perPixelWarp = false)
+        bool perPixelWarp = false,
+        IReadOnlyList<ShapeFill>? shapeFills = null)
     {
         lock (_frameLock)
         {
@@ -208,6 +218,7 @@ public sealed class VisualizerGlPresenter : OpenGlControlBase
             _pipelineWarpShader = warpShader;
             _pipelineCompShader = compShader;
             _pipelinePixelWarp = perPixelWarp;
+            _pipelineShapeFills = shapeFills;
             // The render thread owns the caller's dictionary and writes it under its own lock, so the
             // presenter takes its own copy here rather than reading a Dictionary the render thread may
             // be mutating: a concurrent read of a Dictionary is undefined and can loop forever.
@@ -323,6 +334,7 @@ public sealed class VisualizerGlPresenter : OpenGlControlBase
             string? pipelineWarpShader = null, pipelineCompShader = null;
             IReadOnlyDictionary<string, ShaderValue>? pipelineUniforms = null;
             var pipelinePixelWarp = false;
+            IReadOnlyList<ShapeFill>? pipelineShapeFills = null;
             byte[]? frame = null;
             int frameWidth = 0, frameHeight = 0;
             lock (_frameLock)
@@ -340,6 +352,7 @@ public sealed class VisualizerGlPresenter : OpenGlControlBase
                     pipelineCompShader = _pipelineCompShader;
                     pipelineUniforms = _pipelineUniforms;
                     pipelinePixelWarp = _pipelinePixelWarp;
+                    pipelineShapeFills = _pipelineShapeFills;
                     _pipelinePending = false;
                 }
                 else if (_hasFrame)
@@ -368,7 +381,8 @@ public sealed class VisualizerGlPresenter : OpenGlControlBase
                     pipelineMeshY,
                     true,
                     pipelineParameters,
-                    pipelineUniforms))
+                    pipelineUniforms,
+                    pipelineShapeFills))
                 {
                     _lastPresented = _pipeline.OutputTexture;
                     Frames++;

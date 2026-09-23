@@ -50,6 +50,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   this regression cannot return unnoticed.
 
 ### Changed
+- The visualizer draws a Milkdrop preset's shape fills on the GPU. The CPU rasterizer scanned every
+  fan triangle over its own bounding box, so the centre of a 25-sided shape was tested by all 25
+  triangles: at 1920 x 1080 the overlay cost 120 ms per frame for `$$$ Royal - Mashup (115)` and
+  475-500 ms for `(135)`, against `warpMs` and `compShaderMs` of zero. The renderer now publishes the
+  fans as geometry and the GPU draws them with the same premultiplied "over" blend `PaintPixel`
+  applies, so overlapping shapes accumulate identically and the picture is unchanged. Measured at
+  640 x 360 the overlay falls from 54.8 ms to 0.8 ms. The polygon borders and the waves stay on the
+  CPU, because they cover few pixels; a preset whose fill cannot be drawn keeps the CPU path.
 - The visualizer's audio analysis now follows the reference more closely: every FFT input is damped
   with the reference's one-sample pre-emphasis, which suppresses high-frequency noise, and the window
   is the reference's raised sine over the complete transform length instead of the length-minus-one

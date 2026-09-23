@@ -544,7 +544,14 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
   The GPU owns the frame only for a preset that builds a mesh, which excludes a per-pixel block
   that writes the sample position `x` or `y` unless it can be emitted as a warp fragment shader; a
   block that cannot be emitted keeps the CPU warp and the presenter then
-  uploads the finished CPU frame. Such a block is emitted by default as a
+  uploads the finished CPU frame. A Milkdrop shape fill runs on the GPU too:
+  `PresetRenderer.CollectShapeFills` publishes `ShapeFills`, and `VisualizerGlPipeline.DrawShapeFills`
+  draws the fans into the post's source with premultiplied `ONE, ONE_MINUS_SRC_ALPHA` (and `ONE, ONE`
+  with the alpha channel masked for an additive fill), which is the same "over" `PaintPixel` applies.
+  The fan repeats its first rim vertex because `GL_TRIANGLE_FAN` does not wrap, its position is
+  y-flipped into OpenGL's space, and a textured fill samples the blurred frame with a flipped v.
+  `CollectShapeFills` must only be set while `VisualizerGlPresenter.ShapeFillsSupported` is true,
+  because the renderer then skips its own fill; the borders and waves stay on the CPU. Such a block is emitted by default as a
   warp fragment shader that computes the coordinate per pixel
   (`ShaderTranspiler.TranspileGlslWarp` with a null body, drawn over a full-screen quad with the
   `_orynivo_*` motion uniforms seeded from the mesh's first vertex, and the decay moved to the post

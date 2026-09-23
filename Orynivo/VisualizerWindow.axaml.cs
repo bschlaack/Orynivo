@@ -48,6 +48,9 @@ public partial class VisualizerWindow : Window
     /// <summary>Whether <see cref="_glWarpShader"/> computes the warp coordinate per pixel.</summary>
     private bool _glPixelWarp;
 
+    /// <summary>Overlay shape fills the GPU draws itself, copied under the presentation lock.</summary>
+    private readonly List<ShapeFill> _glShapeFills = [];
+
     /// <summary>
     /// Whether a per-pixel block that writes the sample position may run on the GPU. It is the
     /// default now that <c>scripts/gl-harness/verify-pixel-warp.ps1</c> verifies it against the CPU
@@ -518,6 +521,9 @@ public partial class VisualizerWindow : Window
             audio = _silent;
 
         var frameClock = System.Diagnostics.Stopwatch.StartNew();
+        // The GPU overlay draws the shape fills itself once its program is ready; until then the CPU
+        // keeps rasterizing them, which is also the path the bitmap presentation uses.
+        _renderer.CollectShapeFills = _useGlPresenter && GlPresenter.ShapeFillsSupported;
         if (ReduceMotion)
             _renderer.RenderOverlayOnly(audio);
         else
@@ -567,6 +573,10 @@ public partial class VisualizerWindow : Window
                 _glMeshX = meshX;
                 _glMeshY = meshY;
                 _glParameters = _renderer.ReadFrameParameters();
+                // The shape fills are copied under the same lock, because the render thread rebuilds
+                // them on the next frame.
+                _glShapeFills.Clear();
+                _glShapeFills.AddRange(_renderer.ShapeFills);
                 // The uniforms are filled under the same lock the presenter reads them under, so the
                 // GPU pipeline seeds the frame the CPU just computed.
                 _renderer.WriteShaderUniforms(_glUniforms, _glPerPixelUniforms);
@@ -785,7 +795,8 @@ public partial class VisualizerWindow : Window
                         _glWarpShader,
                         _glCompShader,
                         _glUniforms,
-                        _glPixelWarp);
+                        _glPixelWarp,
+                        _glShapeFills);
                 }
             }
 

@@ -51,6 +51,55 @@ internal sealed class VisualizerGlPipeline
     private const int GlColorAttachment0 = 0x8CE0;
     private const int GlFramebufferComplete = 0x8CD5;
     private const int GlColorBufferBit = 0x4000;
+    private const int GlBlend = 0x0BE2;
+    private const int GlOne = 1;
+    private const int GlOneMinusSrcAlpha = 0x0303;
+    private const int GlTriangleFan = 0x0006;
+
+    /// <summary>
+    /// Draws one shape fill's triangle fan. The position arrives in the engine's minus-one-to-one
+    /// space with y up, exactly like the CPU fan, so it is flipped here to match the overlay bitmap,
+    /// whose rows the presenter uploads reversed.
+    /// </summary>
+    private const string ShapeVertexSource = """
+        #version 300 es
+        precision highp float;
+        layout(location = 0) in vec2 aPosition;
+        layout(location = 1) in vec4 aColor;
+        layout(location = 2) in vec2 aUv;
+        out vec4 vColor;
+        out vec2 vUv;
+        void main()
+        {
+            // The CPU's fan is rasterized in the overlay's top-down space, so the position is flipped
+            // into OpenGL's y-up space; the frame readback flips it back.
+            gl_Position = vec4(aPosition.x, -aPosition.y, 0.0, 1.0);
+            vColor = aColor;
+            vUv = aUv;
+        }
+        """;
+
+    /// <summary>
+    /// Colours one shape fill. A textured fill samples the blurred frame the CPU's fan reads, whose
+    /// texture is bottom-up while the fan coordinate is top-down; otherwise the interpolated vertex
+    /// colour is used. The output is premultiplied, which is what the CPU's <c>PaintPixel</c> writes,
+    /// so the blend reproduces its "over" operation exactly.
+    /// </summary>
+    private const string ShapeFragmentSource = """
+        #version 300 es
+        precision highp float;
+        precision highp sampler2D;
+        in vec4 vColor;
+        in vec2 vUv;
+        out vec4 fragColor;
+        uniform sampler2D uFrame;
+        uniform float uTextured;
+        void main()
+        {
+            vec4 colour = uTextured != 0.0 ? texture(uFrame, vec2(vUv.x, 1.0 - vUv.y)) : vColor;
+            fragColor = vec4(colour.rgb * colour.a, colour.a);
+        }
+        """;
 
     /// <summary>Floats per mesh vertex: the position pair and the nine motion values.</summary>
     private const int FloatsPerVertex = 2 + PresetRenderer.MeshValues;
@@ -376,6 +425,47 @@ internal sealed class VisualizerGlPipeline
     private BindSampler? _bindSampler;
     private SamplerObjects? _deleteSamplers;
 
+    /// <summary>Sets the source and destination blend factors.</summary>
+    [UnmanagedFunctionPointer(CallingConvention.Winapi)]
+    private delegate void BlendFunc(int source, int destination);
+
+    /// <summary>Enables or disables writing each colour channel.</summary>
+    [UnmanagedFunctionPointer(CallingConvention.Winapi)]
+    private delegate void ColorMask(byte red, byte green, byte blue, byte alpha);
+
+    private BlendFunc? _blendFunc;
+    private ColorMask? _colorMask;
+
+    /// <summary>Enables or disables a GL capability.</summary>
+    [UnmanagedFunctionPointer(CallingConvention.Winapi)]
+    private delegate void SetCapability(int capability);
+
+    private SetCapability? _enableCapability;
+    private SetCapability? _disableCapability;
+
+    /// <summary>
+    /// Resolves the blend entry points the shape fills need. <see cref="GlInterface"/> exposes
+    /// neither, so they are fetched by name like the sampler objects.
+    /// </summary>
+    /// <param name="gl">GL interface.</param>
+    /// <returns><see langword="true"/> when every entry point is available.</returns>
+    private bool InitializeBlend(GlInterface gl)
+    {
+        try
+        {
+            _blendFunc = Marshal.GetDelegateForFunctionPointer<BlendFunc>(gl.GetProcAddress("glBlendFunc"));
+            _colorMask = Marshal.GetDelegateForFunctionPointer<ColorMask>(gl.GetProcAddress("glColorMask"));
+            _enableCapability = Marshal.GetDelegateForFunctionPointer<SetCapability>(gl.GetProcAddress("glEnable"));
+            _disableCapability = Marshal.GetDelegateForFunctionPointer<SetCapability>(gl.GetProcAddress("glDisable"));
+            return true;
+        }
+        catch (Exception exception)
+        {
+            ShapeError = $"{exception.GetType().Name}: {exception.Message}";
+            return false;
+        }
+    }
+
     /// <summary>Creates independent filter/wrap objects available in GL 3.3 and ES 3.0.</summary>
     private void InitializeSamplers(GlInterface gl)
     {
@@ -412,6 +502,16 @@ internal sealed class VisualizerGlPipeline
     private int _postProgram;
     private int _quadVertexArray;
     private int _quadVertexBuffer;
+
+    /// <summary>The shape-fill program, its uniforms, and its vertex buffer.</summary>
+    private int _shapeProgram;
+    private Dictionary<string, int> _shapeUniforms = new(StringComparer.Ordinal);
+    private int _shapeVertexArray;
+    private int _shapeVertexBuffer;
+    private float[] _shapeVertices = new float[FloatsPerShapeVertex * 64];
+
+    /// <summary>Floats per shape-fill vertex: position, colour, and texture coordinate.</summary>
+    private const int FloatsPerShapeVertex = 8;
     private int _meshVertexArray;
     private int _meshVertexBuffer;
     private int _meshIndexBuffer;
@@ -501,6 +601,16 @@ internal sealed class VisualizerGlPipeline
 
     /// <summary>Gets why the last emitted shader failed to build, or <see langword="null"/>.</summary>
     public string? ShaderError { get; private set; }
+
+    /// <summary>Gets why the shape-fill program failed to build, or <see langword="null"/>.</summary>
+    public string? ShapeError { get; private set; }
+
+    /// <summary>
+    /// Gets a value indicating whether the pipeline can draw overlay shape fills. A caller that sets
+    /// <c>PresetRenderer.CollectShapeFills</c> must only do so while this is <see langword="true"/>,
+    /// because the renderer then skips its own rasterized fill.
+    /// </summary>
+    public bool ShapeFillsSupported => _shapeProgram != 0;
 
     /// <summary>
     /// Publishes the emitted GLSL for the current preset. The sources are compiled on the next frame,
@@ -600,6 +710,33 @@ internal sealed class VisualizerGlPipeline
             gl.EnableVertexAttribArray(0);
             gl.VertexAttribPointer(0, 2, GlFloat, 0, 2 * sizeof(float), IntPtr.Zero);
 
+            if (TryBuildShaderProgram(gl, ShapeVertexSource, ShapeFragmentSource, out var shapeProgram, out var shapeError))
+            {
+                _shapeProgram = shapeProgram;
+                _shapeUniforms = Uniforms(gl, shapeProgram, ["uFrame", "uTextured"]);
+                if (!InitializeBlend(gl))
+                {
+                    gl.DeleteProgram(_shapeProgram);
+                    _shapeProgram = 0;
+                }
+            }
+            else
+            {
+                ShapeError = shapeError;
+            }
+
+            _shapeVertexArray = gl.GenVertexArray();
+            _shapeVertexBuffer = gl.GenBuffer();
+            gl.BindVertexArray(_shapeVertexArray);
+            gl.BindBuffer(GlArrayBuffer, _shapeVertexBuffer);
+            var shapeStride = FloatsPerShapeVertex * sizeof(float);
+            gl.EnableVertexAttribArray(0);
+            gl.VertexAttribPointer(0, 2, GlFloat, 0, shapeStride, IntPtr.Zero);
+            gl.EnableVertexAttribArray(1);
+            gl.VertexAttribPointer(1, 4, GlFloat, 0, shapeStride, (IntPtr)(2 * sizeof(float)));
+            gl.EnableVertexAttribArray(2);
+            gl.VertexAttribPointer(2, 2, GlFloat, 0, shapeStride, (IntPtr)(6 * sizeof(float)));
+
             _meshVertexArray = gl.GenVertexArray();
             _meshVertexBuffer = gl.GenBuffer();
             _meshIndexBuffer = gl.GenBuffer();
@@ -679,10 +816,12 @@ internal sealed class VisualizerGlPipeline
         if (!_ready)
             return;
 
-        foreach (var program in new[] { _quadProgram, _warpProgram, _blurProgram, _postProgram, _shaderBlurProgram })
+        foreach (var program in new[] { _quadProgram, _warpProgram, _blurProgram, _postProgram, _shaderBlurProgram, _shapeProgram })
             gl.DeleteProgram(program);
         gl.DeleteVertexArray(_quadVertexArray);
         gl.DeleteBuffer(_quadVertexBuffer);
+        gl.DeleteVertexArray(_shapeVertexArray);
+        gl.DeleteBuffer(_shapeVertexBuffer);
         gl.DeleteVertexArray(_meshVertexArray);
         gl.DeleteBuffer(_meshVertexBuffer);
         gl.DeleteBuffer(_meshIndexBuffer);
@@ -744,7 +883,8 @@ internal sealed class VisualizerGlPipeline
         int meshY,
         bool needsRadius,
         VisualizerFrameParameters parameters,
-        IReadOnlyDictionary<string, ShaderValue>? uniforms = null)
+        IReadOnlyDictionary<string, ShaderValue>? uniforms = null,
+        IReadOnlyList<ShapeFill>? shapeFills = null)
     {
         if (!_ready || frameWidth <= 0 || frameHeight <= 0)
             return false;
@@ -831,6 +971,17 @@ internal sealed class VisualizerGlPipeline
                 Set(gl, _blurUniforms, "uTexelY", 1f / frameHeight);
                 DrawQuad(gl);
                 current = next;
+            }
+
+            // The overlay's shape fills run on the GPU: the CPU publishes the fans, and they are drawn
+            // into the post's source with the same "over" that PaintPixel applies. A textured fill
+            // samples the blurred frame, so the draw targets the other ping and the post reads it back.
+            if (shapeFills is { Count: > 0 } && _shapeProgram != 0)
+            {
+                var shapeTarget = 1 - current;
+                Blit(gl, _pingTexture[current], _pingFramebuffer[shapeTarget], frameWidth, frameHeight);
+                DrawShapeFills(gl, shapeFills, _pingTexture[current], frameWidth, frameHeight, shapeTarget);
+                current = shapeTarget;
             }
 
             // Post-processing and the overlay composite, into the next feedback.
@@ -982,8 +1133,7 @@ internal sealed class VisualizerGlPipeline
 
     /// <summary>Draws the static full-screen quad.</summary>
     /// <param name="gl">GL interface.</param>
-    private void DrawQuad(GlInterface gl)
-    {
+    private void DrawQuad(GlInterface gl)    {
         gl.BindVertexArray(_quadVertexArray);
         gl.DrawArrays(GlTriangleStrip, 0, 4);
     }
@@ -1005,6 +1155,84 @@ internal sealed class VisualizerGlPipeline
         }
 
         gl.DrawElements(GlTriangles, _meshIndexCount, GlUnsignedShort, IntPtr.Zero);
+    }
+
+    /// <summary>
+    /// Draws the overlay's shape fills with the blending the CPU's <c>PaintPixel</c> uses: a
+    /// premultiplied "over" for a normal fill, which accumulates the coverage exactly as the CPU's
+    /// does, and a plain add for an additive one, whose alpha channel stays untouched.
+    /// </summary>
+    /// <param name="gl">GL interface.</param>
+    /// <param name="fills">Fills to draw, in order.</param>
+    /// <param name="frameTexture">The blurred frame a textured fill samples.</param>
+    /// <param name="width">Frame width.</param>
+    /// <param name="height">Frame height.</param>
+    /// <param name="target">Ping target index to draw into.</param>
+    private void DrawShapeFills(
+        GlInterface gl,
+        IReadOnlyList<ShapeFill> fills,
+        int frameTexture,
+        int width,
+        int height,
+        int target)
+    {
+        gl.BindFramebuffer(GlFramebuffer, _pingFramebuffer[target]);
+        gl.Viewport(0, 0, width, height);
+        gl.UseProgram(_shapeProgram);
+        gl.ActiveTexture(GlTexture0);
+        gl.BindTexture(GlTexture2D, frameTexture);
+        SetSampler(gl, _shapeUniforms, "uFrame", 0);
+        gl.BindVertexArray(_shapeVertexArray);
+        gl.BindBuffer(GlArrayBuffer, _shapeVertexBuffer);
+        _enableCapability?.Invoke(GlBlend);
+        foreach (var fill in fills)
+        {
+            if (fill.Vertices.Count < 3)
+                continue;
+
+            PackShapeFill(gl, fill);
+            _blendFunc?.Invoke(GlOne, fill.Additive ? GlOne : GlOneMinusSrcAlpha);
+            _colorMask?.Invoke(1, 1, 1, fill.Additive ? (byte)0 : (byte)1);
+            Set(gl, _shapeUniforms, "uTextured", fill.Textured ? 1f : 0f);
+            gl.DrawArrays(GlTriangleFan, 0, fill.Vertices.Count);
+        }
+
+        _colorMask?.Invoke(1, 1, 1, 1);
+        _disableCapability?.Invoke(GlBlend);
+    }
+
+    /// <summary>Uploads one fill's fan into the shape vertex buffer.</summary>
+    /// <param name="gl">GL interface.</param>
+    /// <param name="fill">Fill to upload.</param>
+    private void PackShapeFill(GlInterface gl, ShapeFill fill)
+    {
+        var required = fill.Vertices.Count * FloatsPerShapeVertex;
+        if (_shapeVertices.Length < required)
+            _shapeVertices = new float[required];
+
+        var target = 0;
+        foreach (var vertex in fill.Vertices)
+        {
+            _shapeVertices[target] = vertex.X;
+            _shapeVertices[target + 1] = vertex.Y;
+            _shapeVertices[target + 2] = vertex.Red;
+            _shapeVertices[target + 3] = vertex.Green;
+            _shapeVertices[target + 4] = vertex.Blue;
+            _shapeVertices[target + 5] = vertex.Alpha;
+            _shapeVertices[target + 6] = vertex.U;
+            _shapeVertices[target + 7] = vertex.V;
+            target += FloatsPerShapeVertex;
+        }
+
+        var handle = GCHandle.Alloc(_shapeVertices, GCHandleType.Pinned);
+        try
+        {
+            gl.BufferData(GlArrayBuffer, (IntPtr)(required * sizeof(float)), handle.AddrOfPinnedObject(), GlDynamicDraw);
+        }
+        finally
+        {
+            handle.Free();
+        }
     }
 
     /// <summary>Sets a sampler uniform when the program declares it.</summary>

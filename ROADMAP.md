@@ -895,18 +895,15 @@ affordable. This is a project of its own and must keep the CPU path as the fallb
   show the overlay is now the last CPU cost - `overlayMs` 120 for `$$$ Royal - Mashup (115)` and
   475-500 for `(135)`, against `warpMs=0` and `compShaderMs=0` - because `PresetRenderer.FillShapeFan`
   scans every fan triangle over its own bounding box, so the centre of a 25-sided shape is tested by
-  all 25 triangles. The design is settled and matches the CPU exactly:
-  - `PresetRenderer` publishes a per-frame list of shape fills (a triangle fan with per-vertex colour
-    and texture coordinate, plus the textured and additive flags) and skips its own fill when asked.
-  - `VisualizerGlPipeline` keeps an overlay target and draws the fans into it with premultiplied
-    `ONE, ONE_MINUS_SRC_ALPHA` blending, which is the same "over" operation `PaintPixel` applies, so
-    overlapping shapes accumulate identically; additive fills use `ONE, ONE`. A textured fill samples
-    the post-blur warped frame, which is the buffer `FillShapeFan` reads.
-  - The CPU still draws the polygon borders and the waves into the overlay bitmap; the pipeline
-    blends that bitmap over the target with the same operator, so the order stays shapes, borders,
-    waves.
-  - The post pass composites the target as today, so nothing else changes.
-  The waves and borders stay on the CPU because they cover few pixels; the fills are the cost.
+  all 25 triangles. **The shape fills are done.** `PresetRenderer.CollectShapeFills` publishes
+  `ShapeFills` and `VisualizerGlPipeline.DrawShapeFills` draws them into the post's source with
+  premultiplied `ONE, ONE_MINUS_SRC_ALPHA` blending - the same "over" `PaintPixel` applies, so
+  overlapping shapes accumulate identically - and `ONE, ONE` with the alpha channel masked for an
+  additive fill. The fan repeats its first rim vertex because `GL_TRIANGLE_FAN` does not wrap, the
+  position is y-flipped into OpenGL's space, and a textured fill samples the blurred frame with a
+  flipped v. `verify-fidelity.ps1`'s shape probe passes against the GPU fill, and measured at
+  640 x 360 the overlay falls from 54.8 ms to 0.8 ms. The CPU still draws the polygon borders and the
+  waves; moving those too is the remaining step, though they cover few pixels.
   **Step 4 is done.** The GLSL emitter is `ShaderTranspiler`'s GLSL dialect next to SkSL
   (`TranspileGlsl`, `TranspileGlslComp`, `TranspileGlslWarp`): the prelude aliases `float2/3/4` onto
   `vec2/3/4` so the shared body emission is byte-identical, the samplers become `sampler2D` sampled
