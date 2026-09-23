@@ -372,9 +372,23 @@ internal sealed class VisualizerGlPipeline
     private int _shaderBlurProgram;
     private Dictionary<string, int> _shaderBlurUniforms = new(StringComparer.Ordinal);
 
-    /// <summary>Scratch target for the two passes of one shader blur level.</summary>
-    private int _shaderBlurScratchTexture;
-    private int _shaderBlurScratchFramebuffer;
+    /// <summary>Scratch target for the two passes of one shader blur level, one per level size.</summary>
+    private readonly int[] _shaderBlurScratchTexture = new int[3];
+    private readonly int[] _shaderBlurScratchFramebuffer = new int[3];
+
+    /// <summary>
+    /// The size of each shader blur level, which the reference implementation halves per level: blur1
+    /// is a quarter of the frame, blur2 an eighth, and blur3 a sixteenth.
+    /// </summary>
+    /// <param name="frameWidth">Frame width.</param>
+    /// <param name="frameHeight">Frame height.</param>
+    /// <param name="level">Level index, zero to two.</param>
+    /// <returns>The level's width and height.</returns>
+    private static (int Width, int Height) ShaderBlurSize(int frameWidth, int frameHeight, int level)
+    {
+        var divisor = 4 << level;
+        return (Math.Max(16, frameWidth / divisor), Math.Max(16, frameHeight / divisor));
+    }
 
     /// <summary>Gets why the last emitted shader failed to build, or <see langword="null"/>.</summary>
     public string? ShaderError { get; private set; }
@@ -498,8 +512,11 @@ internal sealed class VisualizerGlPipeline
             _compFramebuffer = gl.GenFramebuffer();
             _previousTexture = gl.GenTexture();
             _previousFramebuffer = gl.GenFramebuffer();
-            _shaderBlurScratchTexture = gl.GenTexture();
-            _shaderBlurScratchFramebuffer = gl.GenFramebuffer();
+            for (var level = 0; level < 3; level++)
+            {
+                _shaderBlurScratchTexture[level] = gl.GenTexture();
+                _shaderBlurScratchFramebuffer[level] = gl.GenFramebuffer();
+            }
             for (var index = 0; index < 3; index++)
             {
                 _shaderBlurTexture[index] = gl.GenTexture();
@@ -550,12 +567,12 @@ internal sealed class VisualizerGlPipeline
         gl.DeleteFramebuffer(_compFramebuffer);
         gl.DeleteTexture(_previousTexture);
         gl.DeleteFramebuffer(_previousFramebuffer);
-        gl.DeleteTexture(_shaderBlurScratchTexture);
-        gl.DeleteFramebuffer(_shaderBlurScratchFramebuffer);
         for (var index = 0; index < 3; index++)
         {
             gl.DeleteTexture(_shaderBlurTexture[index]);
             gl.DeleteFramebuffer(_shaderBlurFramebuffer[index]);
+            gl.DeleteTexture(_shaderBlurScratchTexture[index]);
+            gl.DeleteFramebuffer(_shaderBlurScratchFramebuffer[index]);
         }
 
         if (_warpShaderProgram != 0)
@@ -899,13 +916,18 @@ internal sealed class VisualizerGlPipeline
     {
         gl.UseProgram(_shaderBlurProgram);
         var current = source;
+        var sourceWidth = width;
+        var sourceHeight = height;
         for (var level = 0; level < 3; level++)
         {
-            // Each level is the reference's long horizontal pass followed by its short vertical one,
-            // and the next level continues from this one.
-            DrawShaderBlurPass(gl, current, _shaderBlurScratchFramebuffer, width, height, horizontal: true);
-            DrawShaderBlurPass(gl, _shaderBlurScratchTexture, _shaderBlurFramebuffer[level], width, height, horizontal: false);
+            // The reference halves the blur texture per level, so each level is built from a
+            // downscaled copy of the one before it.
+            var (blurWidth, blurHeight) = ShaderBlurSize(width, height, level);
+            DrawShaderBlurPass(gl, current, _shaderBlurScratchFramebuffer[level], sourceWidth, sourceHeight, blurWidth, blurHeight, horizontal: true);
+            DrawShaderBlurPass(gl, _shaderBlurScratchTexture[level], _shaderBlurFramebuffer[level], blurWidth, blurHeight, blurWidth, blurHeight, horizontal: false);
             current = _shaderBlurTexture[level];
+            sourceWidth = blurWidth;
+            sourceHeight = blurHeight;
         }
     }
 
@@ -913,18 +935,28 @@ internal sealed class VisualizerGlPipeline
     /// <param name="gl">GL interface.</param>
     /// <param name="source">Texture to blur.</param>
     /// <param name="framebuffer">Destination framebuffer.</param>
-    /// <param name="width">Frame width.</param>
-    /// <param name="height">Frame height.</param>
+    /// <param name="sourceWidth">Source width, for the tap offsets.</param>
+    /// <param name="sourceHeight">Source height, for the tap offsets.</param>
+    /// <param name="targetWidth">Destination width.</param>
+    /// <param name="targetHeight">Destination height.</param>
     /// <param name="horizontal">Whether this is the long horizontal pass.</param>
-    private void DrawShaderBlurPass(GlInterface gl, int source, int framebuffer, int width, int height, bool horizontal)
+    private void DrawShaderBlurPass(
+        GlInterface gl,
+        int source,
+        int framebuffer,
+        int sourceWidth,
+        int sourceHeight,
+        int targetWidth,
+        int targetHeight,
+        bool horizontal)
     {
         gl.BindFramebuffer(GlFramebuffer, framebuffer);
-        gl.Viewport(0, 0, width, height);
+        gl.Viewport(0, 0, targetWidth, targetHeight);
         gl.ActiveTexture(GlTexture0);
         gl.BindTexture(GlTexture2D, source);
         SetSampler(gl, _shaderBlurUniforms, "uSource", 0);
-        Set(gl, _shaderBlurUniforms, "uTexelX", 1f / width);
-        Set(gl, _shaderBlurUniforms, "uTexelY", 1f / height);
+        Set(gl, _shaderBlurUniforms, "uTexelX", 1f / Math.Max(1, sourceWidth));
+        Set(gl, _shaderBlurUniforms, "uTexelY", 1f / Math.Max(1, sourceHeight));
         Set(gl, _shaderBlurUniforms, "uHorizontal", horizontal ? 1f : 0f);
         DrawQuad(gl);
     }
@@ -1081,9 +1113,13 @@ internal sealed class VisualizerGlPipeline
             Allocate(gl, _pingTexture[1], _pingFramebuffer[1], width, height);
             Allocate(gl, _compTexture, _compFramebuffer, width, height);
             Allocate(gl, _previousTexture, _previousFramebuffer, width, height);
-            Allocate(gl, _shaderBlurScratchTexture, _shaderBlurScratchFramebuffer, width, height);
             for (var index = 0; index < 3; index++)
-                Allocate(gl, _shaderBlurTexture[index], _shaderBlurFramebuffer[index], width, height);
+            {
+                var (blurWidth, blurHeight) = ShaderBlurSize(width, height, index);
+                Allocate(gl, _shaderBlurTexture[index], _shaderBlurFramebuffer[index], blurWidth, blurHeight);
+                Allocate(gl, _shaderBlurScratchTexture[index], _shaderBlurScratchFramebuffer[index], blurWidth, blurHeight);
+            }
+
             return true;
         }
         catch (InvalidOperationException)

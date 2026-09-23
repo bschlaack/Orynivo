@@ -17,6 +17,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   echo rather than the blur.
 
 ### Fixed
+- Fixed the visualizer's shader blur levels using full-resolution buffers. The reference implementation
+  halves each level: `GetBlur1` reads a quarter-size copy of the frame, `GetBlur2` an eighth, and
+  `GetBlur3` a sixteenth, so its blurred picture is far smoother than a full-resolution blur. A preset
+  that feeds the blur into its own maths amplifies the difference: `LuxXx - BadBallz Beta`'s
+  `tan(4*ist*1.58)` turned Orynivo's sharper `ist` into a hard white diamond where the reference draws a
+  soft blob. The levels are now downscaled and blurred at their own size, on both the CPU and the GL
+  path.
 - Fixed the OpenGL pipeline building the shader blur levels with the frame pipeline's nine-tap box
   blur while the CPU path used the reference's weighted filter, so a shader's `GetBlur1`-`GetBlur3`
   read a different picture depending on the path. The GL pass now uses the same long horizontal and

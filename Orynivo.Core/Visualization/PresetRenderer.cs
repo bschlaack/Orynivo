@@ -187,7 +187,16 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
         _warped = new PixelBuffer(width, height);
         _fresh = new PixelBuffer(width, height);
         _frameCopy = new PixelBuffer(width, height);
-        _blurLevels = [new PixelBuffer(width, height), new PixelBuffer(width, height), new PixelBuffer(width, height)];
+        // The reference implementation builds each blur level from a downscaled copy of the frame:
+        // blur1 is a quarter, blur2 an eighth, and blur3 a sixteenth of the size. Blurring at full
+        // resolution keeps far more detail than the reference, and a preset that feeds the blur into
+        // its own maths (a `tan` term) turns that detail into hard edges instead of soft rings.
+        _blurLevels =
+        [
+            new PixelBuffer(Math.Max(16, width / 4), Math.Max(16, height / 4)),
+            new PixelBuffer(Math.Max(16, width / 8), Math.Max(16, height / 8)),
+            new PixelBuffer(Math.Max(16, width / 16), Math.Max(16, height / 16))
+        ];
         _slots = new float[preset.Layout.Count];
         _slotX = preset.Layout.IndexOf("x");
         _slotY = preset.Layout.IndexOf("y");
@@ -2231,13 +2240,17 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
                 if (_blurLevelReady[build - 1])
                     continue;
 
-                _blurLevels[build - 1].CopyFrom(build == 1
+                _blurLevels[build - 1].ResampleFrom(build == 1
                     ? (_samplerMainIsWarped ? _frameCopy : _previous)
                     : _blurLevels[build - 2]);
-                // The reference builds each level from a long horizontal and a short vertical pass of
-                // its weighted filter, not from a three-by-three box.
-                _blurLevels[build - 1].BlurReference(horizontal: true);
-                _blurLevels[build - 1].BlurReference(horizontal: false);
+                // The reference runs two passes per level: a long horizontal one and a short vertical
+                // one, so level N is N such pairs from its downscaled source.
+                for (var pass = 0; pass < build; pass++)
+                {
+                    _blurLevels[build - 1].BlurReference(horizontal: true);
+                    _blurLevels[build - 1].BlurReference(horizontal: false);
+                }
+
                 _blurLevelReady[build - 1] = true;
             }
         }

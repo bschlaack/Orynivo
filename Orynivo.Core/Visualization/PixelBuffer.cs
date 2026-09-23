@@ -293,6 +293,33 @@ public sealed class PixelBuffer
         }
     }
 
+    /// <summary>
+    /// Resamples another buffer into this one with bilinear filtering, which is how the reference
+    /// implementation builds a downscaled blur texture from the frame.
+    /// </summary>
+    /// <param name="source">Source buffer.</param>
+    /// <exception cref="ArgumentNullException"><paramref name="source"/> is <see langword="null"/>.</exception>
+    public void ResampleFrom(PixelBuffer source)
+    {
+        ArgumentNullException.ThrowIfNull(source);
+        var width = Width;
+        var height = Height;
+        Span<float> sample = stackalloc float[4];
+        for (var y = 0; y < height; y++)
+        {
+            var v = (y + 0.5f) / height;
+            for (var x = 0; x < width; x++)
+            {
+                source.SampleBilinear((x + 0.5f) / width, v, sample);
+                var offset = ((y * width) + x) * 4;
+                _pixels[offset] = sample[0];
+                _pixels[offset + 1] = sample[1];
+                _pixels[offset + 2] = sample[2];
+                _pixels[offset + 3] = sample[3];
+            }
+        }
+    }
+
     /// <summary>Writes the buffer as BGRA bytes for a presentation bitmap.</summary>
     /// <param name="destination">Destination of at least <c>width * height * 4</c> bytes.</param>
     public void WriteBgra(Span<byte> destination)
