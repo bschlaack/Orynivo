@@ -524,6 +524,12 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
   creations enable `PresetRenderer.UseSkiaPasses`, so the comp shader and a warp shader run as
   Skia runtime effects and the interpreter stays the per-pass fallback; the full-frame passes stay
   on the interpreter, and their effects are cached for the process because their SkSL is constant.
+  A per-pixel warp program prefers the **parallel interpreter** over the Skia warp pass, because
+  Skia rasterises a runtime effect on one thread while the interpreter splits the rows across
+  every core: measured at 960 x 540, a parallelizable program costs about 18 ms through the
+  interpreter against 65 ms through Skia. The Skia warp pass therefore only runs for a program
+  the interpreter cannot split, which is why the built-in presets keep their per-pixel angle in
+  their own temporary (`spin`, `wedge`, `s`) instead of a standard name like `a2`.
   Be clear about what that is: `SkiaShaderRunner` builds its surfaces with
   `SKSurface.Create(Info, pixels, rowBytes)`, which is Skia's **raster** constructor, so those
   "Skia" passes are Skia's CPU runtime-effect JIT and **no part of the preset pipeline runs on the

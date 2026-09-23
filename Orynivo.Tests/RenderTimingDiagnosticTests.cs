@@ -25,22 +25,29 @@ public sealed class RenderTimingDiagnosticTests
     /// <param name="output">Test output writer.</param>
     public RenderTimingDiagnosticTests(ITestOutputHelper output) => _output = output;
 
-    /// <summary>Every built-in preset costs more at four times the pixel count.</summary>
+    /// <summary>Every built-in preset costs more at four times the pixel count, on both paths.</summary>
     [Fact]
     public void Measure_BuiltInPresetsScaleWithThePixelCount()
     {
-        _output.WriteLine("preset                 size        total    warp    blur    post overlay   comp");
-        foreach (var preset in VisualizerPresets.BuiltIn)
+        // The visualizer renders with the Skia runtime-effect passes by default and keeps the
+        // interpreter as the fallback, so both paths are measured: a preset that is fast on one and
+        // slow on the other is exactly what this profile has to expose.
+        foreach (var useSkia in new[] { false, true })
         {
-            var low = Measure(preset, LowWidth, LowHeight);
-            var high = Measure(preset, HighWidth, HighHeight);
-            _output.WriteLine(Format(preset.Name, LowWidth, LowHeight, low));
-            _output.WriteLine(Format(preset.Name, HighWidth, HighHeight, high));
+            _output.WriteLine(useSkia ? "== Skia passes ==" : "== interpreter ==");
+            _output.WriteLine("preset                 size        total    warp    blur    post overlay   comp");
+            foreach (var preset in VisualizerPresets.BuiltIn)
+            {
+                var low = Measure(preset, LowWidth, LowHeight, useSkia);
+                var high = Measure(preset, HighWidth, HighHeight, useSkia);
+                _output.WriteLine(Format(preset.Name, LowWidth, LowHeight, low));
+                _output.WriteLine(Format(preset.Name, HighWidth, HighHeight, high));
 
-            Assert.True(low.Total > 0d);
-            Assert.True(low.Measured <= low.Total + 0.5d);
-            Assert.True(high.Measured <= high.Total + 0.5d);
-            Assert.True(high.Total > low.Total, $"{preset.Name}: {high.Total:F2} ms is not above {low.Total:F2} ms");
+                Assert.True(low.Total > 0d);
+                Assert.True(low.Measured <= low.Total + 0.5d);
+                Assert.True(high.Measured <= high.Total + 0.5d);
+                Assert.True(high.Total > low.Total, $"{preset.Name}: {high.Total:F2} ms is not above {low.Total:F2} ms");
+            }
         }
     }
 
@@ -48,10 +55,11 @@ public sealed class RenderTimingDiagnosticTests
     /// <param name="preset">Preset to measure.</param>
     /// <param name="width">Render width.</param>
     /// <param name="height">Render height.</param>
+    /// <param name="useSkia">Whether the Skia runtime-effect passes are enabled.</param>
     /// <returns>The averaged stage timings.</returns>
-    private static RenderTimings Measure(VisualizerPreset preset, int width, int height)
+    private static RenderTimings Measure(VisualizerPreset preset, int width, int height, bool useSkia)
     {
-        var renderer = new PresetRenderer(preset, width, height);
+        var renderer = new PresetRenderer(preset, width, height) { UseSkiaPasses = useSkia };
         var audio = new TimingAudio();
         renderer.RenderFrame(audio, 1d / 60d);
         renderer.ResetTimings();

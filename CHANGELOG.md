@@ -15,6 +15,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   the same audio state. `ORACLE_TONE`/`GLH_ORACLE_TONE` select the tone; without them the comparison
   keeps its previous constant level.
 
+### Fixed
+- The visualizer's per-pixel warp is now parallel for presets that keep their working value in a
+  temporary of their own, which is what the built-in **Plasma**, **Tunnel** and **Kaleidoscope**
+  presets do. Measured at 960 x 540, Plasma dropped from 85 ms to 29 ms per frame, Kaleidoscope from
+  82 ms to 31 ms, and Tunnel from 87 ms to 38 ms. A write to a standard Milkdrop variable such as
+  the shape alpha `a2` still keeps the warp sequential, because another stage may read it, so the
+  built-ins now use their own `spin`/`wedge`/`s` temporary.
+- A per-pixel warp program that the interpreter can split across cores no longer uses the Skia warp
+  pass, which rasterises on a single thread: **Zoom Pulse** dropped from 72 ms to 22 ms per frame at
+  960 x 540. `RenderTimingDiagnosticTests` now measures both the interpreter and the Skia path, so
+  this regression cannot return unnoticed.
+
 ### Changed
 - The visualizer's audio analysis now follows the reference more closely: every FFT input is damped
   with the reference's one-sample pre-emphasis, which suppresses high-frequency noise, and the window

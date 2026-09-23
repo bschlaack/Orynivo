@@ -18,9 +18,9 @@ internal static class VisualizerPresets
             blur_level=1
             wave_alpha=0.7
             per_frame_1=q1 = 0.4 + bass * 1.6;
-            per_pixel_1=a2 = ang + q1 * 0.6;
-            per_pixel_2=x = x + cos(a2) * 0.03 * (1 + bass);
-            per_pixel_3=y = y + sin(a2) * 0.03 * (1 + mid);
+            per_pixel_1=spin = ang + q1 * 0.6;
+            per_pixel_2=x = x + cos(spin) * 0.03 * (1 + bass);
+            per_pixel_3=y = y + sin(spin) * 0.03 * (1 + mid);
             """),
         VisualizerPreset.Parse("""
             name=Tunnel
@@ -89,9 +89,9 @@ internal static class VisualizerPresets
             blur_level=1
             wave_alpha=0.5
             per_frame_1=q1 = 3 + floor(bass * 4);
-            per_pixel_1=a2 = ang * q1;
-            per_pixel_2=x = cos(a2) * rad;
-            per_pixel_3=y = sin(a2) * rad;
+            per_pixel_1=wedge = ang * q1;
+            per_pixel_2=x = cos(wedge) * rad;
+            per_pixel_3=y = sin(wedge) * rad;
             """)
     ];
 

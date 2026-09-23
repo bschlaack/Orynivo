@@ -319,11 +319,35 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
         _hueOffsets[1] = ((hueSeed >> 8) % 53751u) * 0.01f;
         _hueOffsets[2] = ((hueSeed >> 16) % 42661u) * 0.01f;
         _hueOffsets[3] = ((hueSeed >> 24) % 31571u) * 0.01f;
-        // A per-pixel pass may only run in parallel when everything it writes is re-seeded for
-        // every pixel and no shader interpreter state is involved; otherwise one pixel could see
-        // what another pixel wrote and the picture would depend on the split.
+        // A per-pixel pass may run in parallel when nothing it writes can be seen by another pixel
+        // or by another stage of the preset. A value the engine re-seeds for every pixel is always
+        // safe; a pixel-local temporary is safe when the block assigns it before it reads it and no
+        // other stage reads it, because then it never leaves the pixel that wrote it. The engine's
+        // own motion values stay shared even when nothing else reads them, because the mesh does.
+        var shared = new HashSet<string>(MotionVariables, StringComparer.Ordinal);
+        AddReferencedVariables(shared, preset.PerFrameInit);
+        AddReferencedVariables(shared, preset.PerFrame);
+        AddReferencedVariables(shared, preset.PerPixelInit);
+        AddReferencedVariables(shared, preset.WavePerPoint);
+        foreach (var shape in preset.Shapes)
+        {
+            AddReferencedVariables(shared, shape.Init);
+            AddReferencedVariables(shared, shape.PerFrame);
+            AddReferencedVariables(shared, shape.PerPoint);
+        }
+
+        foreach (var wave in preset.Waves)
+        {
+            AddReferencedVariables(shared, wave.Init);
+            AddReferencedVariables(shared, wave.PerFrame);
+            AddReferencedVariables(shared, wave.PerPoint);
+        }
+
         _canParallelizeWarp = preset.WarpShaders.Count == 0 &&
-                              preset.PerPixel.WrittenVariables.All(IsSeededPerPixel);
+                              PresetExpressionTranspiler.CanRunInParallel(preset.PerPixel) &&
+                              preset.PerPixel.WrittenVariables.All(name =>
+                                  IsSeededPerPixel(name) ||
+                                  (!PresetVariableLayout.Standard.Contains(name) && !shared.Contains(name)));
         _perPixelGpuSafe = PresetExpressionTranspiler.CanRunInParallel(preset.PerPixel);
         var workers = ParallelRows.WorkerCount;
         _workerSlots = new float[workers][];
@@ -1094,7 +1118,12 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
                     }
                 }
             }
-            else if (UseSkiaPasses && TrySkiaWarpPass(
+            // The Skia warp pass rasterises a runtime effect on one thread, while the interpreter
+            // splits the rows across every core when nothing the program writes can leave its pixel.
+            // Measured at 960 x 540, a parallelizable per-pixel program costs about 18 ms through
+            // the interpreter against 65 ms through Skia, so the parallel interpreter wins whenever
+            // it is available; the Skia pass only pays off for a program that cannot be split.
+            else if (UseSkiaPasses && !_canParallelizeWarp && TrySkiaWarpPass(
                 zoom,
                 zoomExp,
                 rotation,
@@ -3699,6 +3728,17 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
     /// <param name="name">Variable name.</param>
     /// <returns><see langword="true"/> when the warp stage writes the variable before each pixel.</returns>
     private static bool IsSeededPerPixel(string name) => name is "x" or "y" or "rad" or "ang";
+
+    /// <summary>Adds every variable a program reads to a set.</summary>
+    /// <param name="target">Set to add to.</param>
+    /// <param name="program">Program to inspect; a missing program contributes nothing.</param>
+    private static void AddReferencedVariables(HashSet<string> target, PresetProgram? program)
+    {
+        if (program is null)
+            return;
+        foreach (var name in program.ReferencedVariables)
+            target.Add(name);
+    }
 }
 
 

@@ -55,6 +55,23 @@ public sealed class ParallelWarpTests
         Assert.False(Create("per_pixel_1=bass = 1;").WarpParallelismAvailable);
     }
 
+    /// <summary>
+    /// A pixel-local temporary is parallel-safe: the block assigns it before it reads it and no
+    /// other stage reads it, so it never leaves the pixel that wrote it.
+    /// </summary>
+    [Fact]
+    public void WarpParallelism_AllowsAPixelLocalTemporary()
+    {
+        Assert.True(Create("per_pixel_1=spin = ang + 0.1; x = x + cos(spin) * 0.01;").WarpParallelismAvailable);
+
+        // A standard variable belongs to the renderer or to another stage, not to the pixel.
+        Assert.False(Create("per_pixel_1=a2 = ang + 0.1; x = x + cos(a2) * 0.01;").WarpParallelismAvailable);
+
+        // A temporary another stage reads has to stay shared as well.
+        Assert.False(Create("per_pixel_1=spin = ang + 0.1; x = x + cos(spin) * 0.01;\nper_frame_1=zoom = 1 + spin * 0.001;").WarpParallelismAvailable);
+    }
+
+
     /// <summary>A preset with a warp shader stays sequential, because the interpreter keeps state.</summary>
     [Fact]
     public void WarpParallelism_IsDisabledByWarpShaders()

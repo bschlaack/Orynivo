@@ -22,6 +22,32 @@ public sealed class PresetVariableLayout
     public int IndexOf(string name) =>
         name is not null && _slots.TryGetValue(name, out var slot) ? slot : -1;
 
+    /// <summary>The fixed part of the standard Milkdrop variable set.</summary>
+    private static readonly string[] StandardNames =
+    [
+        "time", "fps", "frame", "monitor",
+        "r", "g", "b", "a", "r2", "g2", "b2", "a2", "sides", "additive",
+        "border_r", "border_g", "border_b", "border_a", "thickoutline", "thick",
+        "textured", "tex_zoom", "tex_ang", "instance", "num_inst",
+        "samples", "sep", "scaling", "smoothing", "sample", "value1", "value2",
+        "fWarpAnimSpeed", "fWarpScale", "bTexWrap",
+        "bass", "mid", "treb", "vol", "bass_att", "mid_att", "treb_att",
+        "aspectx", "aspecty", "pixelsx", "pixelsy",
+        "decay", "fDecay", "fGammaAdj", "fWarpAmount", "fWaveAlpha", "fWaveScale",
+        "zoom", "zoomexp", "rot", "cx", "cy", "dx", "dy", "warp", "sx", "sy",
+        "blur1", "blur2", "blur3", "darken_center",
+        "blur1_min", "blur1_max", "blur1_edge_darken",
+        "blur2_min", "blur2_max", "blur2_edge_darken",
+        "blur3_min", "blur3_max", "blur3_edge_darken",
+        "wave_mode", "wave_r", "wave_g", "wave_b", "wave_a", "wave_x", "wave_y",
+        "wave_mystery", "wave_dots", "wave_thick", "wave_additive", "wave_brighten",
+        "ob_r", "ob_g", "ob_b", "ob_a", "ib_r", "ib_g", "ib_b", "ib_a",
+        "mv_x", "mv_y", "mv_dx", "mv_dy", "mv_l", "mv_enabled",
+        "echo_zoom", "echo_alpha", "echo_orient",
+        "fVideoEchoZoom", "fVideoEchoAlpha", "nVideoEchoOrientation",
+        "x", "y", "rad", "ang", "progress", "meshx", "meshy", "rand_frame"
+    ];
+
     /// <summary>
     /// Registers the standard Milkdrop variable set up front, so the renderer can always write
     /// every variable a preset may read and user variables such as <c>q1</c> keep their value
@@ -32,31 +58,7 @@ public sealed class PresetVariableLayout
     public static PresetVariableLayout RegisterStandardVariables(PresetVariableLayout layout)
     {
         ArgumentNullException.ThrowIfNull(layout);
-        string[] names =
-        [
-            "time", "fps", "frame", "monitor",
-            "r", "g", "b", "a", "r2", "g2", "b2", "a2", "sides", "additive",
-            "border_r", "border_g", "border_b", "border_a", "thickoutline", "thick",
-            "textured", "tex_zoom", "tex_ang", "instance", "num_inst",
-            "samples", "sep", "scaling", "smoothing", "sample", "value1", "value2",
-            "fWarpAnimSpeed", "fWarpScale", "bTexWrap",
-            "bass", "mid", "treb", "vol", "bass_att", "mid_att", "treb_att",
-            "aspectx", "aspecty", "pixelsx", "pixelsy",
-            "decay", "fDecay", "fGammaAdj", "fWarpAmount", "fWaveAlpha", "fWaveScale",
-            "zoom", "zoomexp", "rot", "cx", "cy", "dx", "dy", "warp", "sx", "sy",
-            "blur1", "blur2", "blur3", "darken_center",
-            "blur1_min", "blur1_max", "blur1_edge_darken",
-            "blur2_min", "blur2_max", "blur2_edge_darken",
-            "blur3_min", "blur3_max", "blur3_edge_darken",
-            "wave_mode", "wave_r", "wave_g", "wave_b", "wave_a", "wave_x", "wave_y",
-            "wave_mystery", "wave_dots", "wave_thick", "wave_additive", "wave_brighten",
-            "ob_r", "ob_g", "ob_b", "ob_a", "ib_r", "ib_g", "ib_b", "ib_a",
-            "mv_x", "mv_y", "mv_dx", "mv_dy", "mv_l", "mv_enabled",
-            "echo_zoom", "echo_alpha", "echo_orient",
-            "fVideoEchoZoom", "fVideoEchoAlpha", "nVideoEchoOrientation",
-            "x", "y", "rad", "ang", "progress", "meshx", "meshy", "rand_frame"
-        ];
-        foreach (var name in names)
+        foreach (var name in StandardNames)
             layout.GetOrAdd(name);
 
         for (var index = 1; index <= 32; index++)
@@ -68,6 +70,27 @@ public sealed class PresetVariableLayout
             layout.GetOrAdd("t" + index.ToString(System.Globalization.CultureInfo.InvariantCulture));
 
         return layout;
+    }
+
+    /// <summary>
+    /// Gets the names the engine provides, so a stage can tell a preset's own variable from one
+    /// another stage or the renderer itself reads. A per-pixel block may only treat a written name
+    /// as its own local value when it is not one of these.
+    /// </summary>
+    public static IReadOnlySet<string> Standard { get; } = BuildStandardSet();
+
+    /// <summary>Builds the standard-name set, including the numbered general-purpose variables.</summary>
+    /// <returns>The standard variable names.</returns>
+    private static HashSet<string> BuildStandardSet()
+    {
+        var names = new HashSet<string>(StandardNames, StringComparer.Ordinal);
+        for (var index = 1; index <= 32; index++)
+            names.Add("q" + index.ToString(System.Globalization.CultureInfo.InvariantCulture));
+        for (var index = 1; index <= 8; index++)
+            names.Add("b" + index.ToString(System.Globalization.CultureInfo.InvariantCulture));
+        for (var index = 1; index <= 8; index++)
+            names.Add("t" + index.ToString(System.Globalization.CultureInfo.InvariantCulture));
+        return names;
     }
 
     /// <summary>Returns the slot of a variable, allocating one on first use.</summary>

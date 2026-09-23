@@ -285,9 +285,12 @@ This file applies to `Orynivo.Core/` and supplements `../AGENTS.md`.
   `PresetRenderer.DarkenEdges` applies the blur chain's `blurN_edge_darken` after the blur passes; its
   falloff is our own documented approximation, because a preset does not store the shape, so the
   centre stays untouched and the border is multiplied towards `1 - amount`. The warp
-  is parallel only when the per-pixel program
-  writes nothing but the values the engine re-seeds per pixel (`x`, `y`, `rad`, `ang`), because a
-  value written by one pixel and read by another would make the picture depend on the split; a
+  is parallel when the per-pixel program cannot leak a value out of its pixel: everything it
+  writes is either re-seeded per pixel (`x`, `y`, `rad`, `ang`), or a pixel-local temporary the
+  block assigns before it reads and no other stage reads. `PresetVariableLayout.Standard` is what
+  makes that decision precise, so a write to a standard name such as the shape alpha `a2` stays
+  sequential even when nothing else seems to read it; a preset's own temporary such as `spin`
+  does not. `PresetExpressionTranspiler.CanRunInParallel` covers the assign-before-read half. A
   warp shader or an active motion grid keeps it sequential for the same reason. Never give two
   workers the same slot array, and never claim a speed-up without the identical-frame test in
   `ParallelWarpTests`.
