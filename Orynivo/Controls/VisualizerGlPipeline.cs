@@ -122,8 +122,8 @@ internal sealed class VisualizerGlPipeline
 
             // The reference warp vertex shader's arithmetic: scale by the aspect, divide by the
             // radial zoom, stretch, rotate, translate, and scale back by the inverse aspect.
-            float aspectX = uFrameWidth / max(uFrameHeight, 1.0);
-            float aspectY = 1.0;
+            float aspectX = uFrameHeight > uFrameWidth ? uFrameWidth / uFrameHeight : 1.0;
+            float aspectY = uFrameWidth > uFrameHeight ? uFrameHeight / uFrameWidth : 1.0;
             float radius = uNeedsRadius > 0.5 ? length(normalized * vec2(aspectX, aspectY)) : 0.0;
             float radialZoom = (uNeedsRadius > 0.5 && zoomExp != 1.0)
                 ? pow(zoom, pow(zoomExp, radius * 2.0 - 1.0))

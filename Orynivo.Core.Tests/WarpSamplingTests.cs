@@ -87,4 +87,17 @@ public sealed class WarpSamplingTests
     {
         Assert.Equal(0.01f, WarpSampling.MinimumZoom);
     }
+
+    /// <summary>The reference keeps both aspect factors at or below one, scaling the smaller ratio.</summary>
+    [Fact]
+    public void GetAspect_ScalesTheSmallerRatio()
+    {
+        WarpSampling.GetAspect(320f, 180f, out var landscapeX, out var landscapeY);
+        Assert.Equal(1f, landscapeX, 5);
+        Assert.Equal(180f / 320f, landscapeY, 5);
+
+        WarpSampling.GetAspect(180f, 320f, out var portraitX, out var portraitY);
+        Assert.Equal(180f / 320f, portraitX, 5);
+        Assert.Equal(1f, portraitY, 5);
+    }
 }

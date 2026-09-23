@@ -990,8 +990,7 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
                 stretchYNow = Read(slots, _slotSy, stretchY);
             }
 
-            var aspectX = Read("aspectx", 1f);
-            var aspectY = Read("aspecty", 1f);
+            WarpSampling.GetAspect(width, height, out var aspectX, out var aspectY);
             WarpSampling.SamplePosition(
                 normalizedX,
                 normalizedY,
@@ -1009,7 +1008,6 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
                 needsRadius,
                 out var warpedX,
                 out var warpedY);
-
             if (needsRadius || needsAngle)
             {
                 var radius = MathF.Sqrt(
@@ -1145,6 +1143,7 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
         {
             var target = _warped.RawPixels;
             var sample = worker < 0 ? _sample : _workerSample[worker];
+            WarpSampling.GetAspect(width, height, out var aspectX, out var aspectY);
             for (var y = from; y < to; y++)
             {
                 var normalizedY = height > 1 ? (y / (float)(height - 1) * 2f) - 1f : 0f;
@@ -1176,8 +1175,8 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
                         offsetYNow,
                         stretchXNow,
                         stretchYNow,
-                        Read("aspectx", 1f),
-                        Read("aspecty", 1f),
+                        aspectX,
+                        aspectY,
                         needsRadius,
                         out var sampleX,
                         out var sampleY);

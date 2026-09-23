@@ -250,10 +250,10 @@ This file applies to `Orynivo.Core/` and supplements `../AGENTS.md`.
   duplicate that formula. It follows the reference warp vertex shader's coordinate contract — scale
   by the aspect, divide by the radial zoom, stretch, rotate, translate, and scale back by the inverse
   aspect — and its result is in the engine's minus-one-to-one space, which the frame sampler expects.
-  The aspect is passed in explicitly (`aspectx`/`aspecty`, the frame's width-to-height ratio and one
-  in the reference's landscape convention) and `rad`/`ang` are the aspect-scaled distance and angle
-  the reference derives from the position. `WarpSamplingTests` is the reference the translation is
-  checked against.
+  The aspect is passed in explicitly via `WarpSampling.GetAspect` (the reference keeps both factors at
+  or below one — a landscape frame is `(1, height/width)`, a portrait frame `(width/height, 1)`) and
+  `rad`/`ang` are the aspect-scaled distance and angle the reference derives from the position.
+  `WarpSamplingTests` is the reference the translation is checked against.
   A shader's blur levels each keep their own buffer (`_blurLevels`) and build on one another, and a
   level asked for first builds the ones below it. Do not collapse them back into one cached level: a
   comp shader that samples `GetBlur1` and `GetBlur3` in the same pixel otherwise invalidates the

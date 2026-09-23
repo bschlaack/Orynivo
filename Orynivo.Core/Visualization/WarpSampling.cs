@@ -17,6 +17,21 @@ public static class WarpSampling
     public const float MinimumZoom = 0.01f;
 
     /// <summary>
+    /// Computes the warp's aspect factors for a frame size. The reference keeps both factors at or
+    /// below one, so a landscape frame is <c>(1, height/width)</c> and a portrait frame is
+    /// <c>(width/height, 1)</c>; the smaller ratio is always the one that is scaled.
+    /// </summary>
+    /// <param name="width">Frame width in pixels.</param>
+    /// <param name="height">Frame height in pixels.</param>
+    /// <param name="aspectX">Receives the horizontal aspect factor.</param>
+    /// <param name="aspectY">Receives the vertical aspect factor.</param>
+    public static void GetAspect(float width, float height, out float aspectX, out float aspectY)
+    {
+        aspectX = height > width ? width / height : 1f;
+        aspectY = width > height ? height / width : 1f;
+    }
+
+    /// <summary>
     /// Computes where the warp reads the frame for one position. The position is in
     /// minus-one-to-one space, which is the engine's own convention for both the frame position and
     /// the result.

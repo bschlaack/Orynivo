@@ -726,8 +726,8 @@ public static class ShaderTranspiler
         EmitEntryHeader(builder);
         builder.Append("    float2 _orynivo_uv_orig = (fragCoord - 0.5) / (_orynivo_size - 1.0);\n");
         builder.Append("    float2 _orynivo_normalized = (_orynivo_uv_orig * 2.0) - 1.0;\n");
-        builder.Append("    float _orynivo_aspectX = texsize.x / max(texsize.y, 1.0);\n");
-        builder.Append("    float _orynivo_aspectY = 1.0;\n");
+        builder.Append("    float _orynivo_aspectX = texsize.y > texsize.x ? texsize.x / texsize.y : 1.0;\n");
+        builder.Append("    float _orynivo_aspectY = texsize.x > texsize.y ? texsize.y / texsize.x : 1.0;\n");
         builder.Append("    float _orynivo_radius = length(_orynivo_normalized * float2(_orynivo_aspectX, _orynivo_aspectY));\n");
         builder.Append("    float _orynivo_radialZoom = (_orynivo_zoomExp != 1.0) ? pow(_orynivo_zoom, pow(_orynivo_zoomExp, _orynivo_radius * 2.0 - 1.0)) : _orynivo_zoom;\n");
         builder.Append("    float _orynivo_inverseZoom = 1.0 / max(0.01, _orynivo_radialZoom);\n");

@@ -220,8 +220,7 @@ public sealed class SkiaWarpPassTests
         var slotAng = layout.IndexOf("ang");
         var width = target.Width;
         var height = target.Height;
-        var aspectX = width / (float)height;
-        const float aspectY = 1f;
+        WarpSampling.GetAspect(width, height, out var aspectX, out var aspectY);
         var sample = new float[4];
         for (var y = 0; y < height; y++)
         {
