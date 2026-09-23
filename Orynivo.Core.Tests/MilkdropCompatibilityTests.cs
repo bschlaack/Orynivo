@@ -135,6 +135,16 @@ public sealed class MilkdropCompatibilityTests
         Assert.True(Mean(darker) < Mean(plain));
     }
 
+    /// <summary>The decay is applied by the warp, so a lower decay dims the frame it carries.</summary>
+    [Fact]
+    public void RenderFrame_DecayDimsTheWarpedFrame()
+    {
+        var full = RenderFeedback(string.Empty);
+        var faded = RenderFeedback("decay = 0.5;");
+
+        Assert.True(Mean(faded) < Mean(full));
+    }
+
     /// <summary>Darken centre pulls the middle of the frame down more than its corner.</summary>
     [Fact]
     public void RenderFrame_DarkenCenterTargetsTheMiddle()
