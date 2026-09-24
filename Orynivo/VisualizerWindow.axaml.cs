@@ -206,7 +206,8 @@ public partial class VisualizerWindow : Window
     private volatile bool _renderRunning;
     private volatile bool _closed;
     private volatile int _presetIndex;
-    private int _renderedPresetIndex = -1;
+    private volatile int _renderedPresetIndex = -1;
+    private int _labeledPresetIndex = -1;
     private volatile bool _resetRequested;
     private int _presentPending;
     private string? _renderError;
@@ -614,6 +615,11 @@ public partial class VisualizerWindow : Window
                 if (_closed)
                     return;
 
+                // The render thread applies a queued switch on its next frame, so this is where a
+                // label that still names the selected preset catches up with the rendered one.
+                if (_labeledPresetIndex != _renderedPresetIndex)
+                    UpdatePresetLabel();
+
                 Present();
                 UpdatePlayPauseIcon();
                 UpdateOverlayVisibility();
@@ -972,13 +978,22 @@ public partial class VisualizerWindow : Window
 
     private void UpdatePresetLabel()
     {
+        // The label follows the selection, not the renderer: the render thread applies a switch on
+        // its next frame, so reading the rendered preset named the previously shown preset until
+        // then. Once the switch has been applied the rendered name wins, because it is the truth
+        // when a preset falls back to a built-in or declares its own name.
+        var selected = _presetIndex;
+        var applied = _renderedPresetIndex == selected;
+        var name = applied ? _renderer.Preset.Name : _library.NameAt(selected);
+        _labeledPresetIndex = applied ? selected : -1;
         var label = string.Format(
             CultureInfo.CurrentCulture,
             LocalizationManager.Current.VisualizerPresetLabel,
-            _renderer.Preset.Name);
+            name);
         if (_library.RejectedFiles.Count > 0)
-            label = $"{label}  ·  {_library.RejectedFiles.Count} x {LocalizationManager.Current.VisualizerPresetRejected}";
-        PresetTextBlock.Text = label;
+            label = $"{label}  �  {_library.RejectedFiles.Count} x {LocalizationManager.Current.VisualizerPresetRejected}";
+        if (PresetTextBlock.Text != label)
+            PresetTextBlock.Text = label;
     }
 }
 

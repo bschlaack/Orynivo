@@ -203,4 +203,38 @@ public sealed class VisualizerPresetLibraryTests : IDisposable
         Assert.Equal(VisualizerPresets.BuiltIn[0].Name, library.At(count).Name);
         Assert.Equal("Mine", library.At(-1).Name);
     }
+
+    /// <summary>
+    /// The name of an index is available before the preset has been parsed, which is what lets the
+    /// window label follow the selection immediately instead of naming the previously rendered
+    /// preset. Once a preset has been shown, its parsed name wins.
+    /// </summary>
+    [Fact]
+    public void NameAt_NamesAPresetBeforeItIsParsed()
+    {
+        File.WriteAllText(Path.Combine(_directory, "typo.oryvis"), "name=Inner");
+        var library = new VisualizerPresetLibrary();
+        library.Reload(_directory);
+
+        // Nothing has read the file yet, so the display name comes from its path.
+        Assert.Equal("typo", library.NameAt(BuiltInCount));
+
+        Assert.Equal("Inner", library.At(BuiltInCount).Name);
+        Assert.Equal("Inner", library.NameAt(BuiltInCount));
+    }
+
+    /// <summary>The label lookup wraps around like the preset lookup and names the built-ins.</summary>
+    [Fact]
+    public void NameAt_WrapsAndNamesBuiltIns()
+    {
+        File.WriteAllText(Path.Combine(_directory, "mine.oryvis"), "name=Mine");
+        var library = new VisualizerPresetLibrary();
+        library.Reload(_directory);
+
+        var count = library.Count;
+        Assert.Equal(VisualizerPresets.BuiltIn[0].Name, library.NameAt(0));
+        Assert.Equal(VisualizerPresets.BuiltIn[0].Name, library.NameAt(count));
+        Assert.Equal("mine", library.NameAt(-1));
+        Assert.Equal(string.Empty, new VisualizerPresetLibrary().NameAt(0));
+    }
 }

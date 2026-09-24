@@ -163,9 +163,7 @@ internal sealed class VisualizerPresetLibrary
             pending = _pending[wrapped - _builtIn.Count];
         }
 
-        var fallbackName = pending.SectionCount > 1
-            ? $"{Path.GetFileNameWithoutExtension(pending.Path)} ({pending.SectionIndex + 1})"
-            : Path.GetFileNameWithoutExtension(pending.Path);
+        var fallbackName = DisplayName(pending);
         lock (_gate)
         {
             if (_failed.Contains(wrapped))
@@ -208,10 +206,50 @@ internal sealed class VisualizerPresetLibrary
         }
     }
 
+    /// <summary>
+    /// Returns the display name of the preset at an index, wrapping around, without parsing it.
+    /// The visualizer's label uses this so the name follows the selection immediately: reading the
+    /// rendered preset instead reported the previously shown preset until the render thread had
+    /// applied the switch. That made the name disagree with the picture for exactly the switch the
+    /// user had just made, which is most visible at the end of a short user list, where the next
+    /// index wraps into the built-ins and the label still named the last user preset.
+    /// </summary>
+    /// <param name="index">Preset index.</param>
+    /// <returns>The display name, or an empty string when no preset is available.</returns>
+    public string NameAt(int index)
+    {
+        lock (_gate)
+        {
+            var count = _builtIn.Count + _pending.Count;
+            if (count == 0)
+                return string.Empty;
+
+            var wrapped = ((index % count) + count) % count;
+            if (wrapped < _builtIn.Count)
+                return _builtIn[wrapped].Name;
+            if (_loaded.TryGetValue(wrapped, out var cached))
+                return cached.Name;
+
+            return DisplayName(_pending[wrapped - _builtIn.Count]);
+        }
+    }
+
     /// <summary>Returns the preset used when a user preset cannot be parsed.</summary>
     /// <returns>The first built-in, or an empty preset when none is available.</returns>
     private VisualizerPreset Fallback() =>
         _builtIn.Count > 0 ? _builtIn[0] : VisualizerPreset.Create("Empty", null, null);
+
+    /// <summary>
+    /// Derives the name of an unparsed preset file from its path. A multi-preset file numbers its
+    /// sections so each one stays distinguishable.
+    /// </summary>
+    /// <param name="pending">Discovered preset that has not been read yet.</param>
+    /// <returns>The display name.</returns>
+    private static string DisplayName(PendingPreset pending) =>
+        pending.SectionCount > 1
+            ? $"{Path.GetFileNameWithoutExtension(pending.Path)} ({pending.SectionIndex + 1})"
+            : Path.GetFileNameWithoutExtension(pending.Path);
+
 
     private static bool IsPresetFile(string path)
     {
