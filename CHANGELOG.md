@@ -7,6 +7,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Added
+- Added a Windows-only Winamp MilkDrop capture harness that runs the supplied `vis_milk2.dll`
+  inside an isolated copy of Winamp, plays the comparison tone, records Direct3D frames with
+  playback timestamps, and produces a side-by-side Orynivo comparison. A 300-frame Royal Mashup
+  run now provides a direct Winamp reference instead of relying on projectM as a proxy.
 - Added matched-music comparison for the visualizer: `scripts/projectm-oracle/run-oracle.ps1 -Audio
   <file>` converts a track that FFmpeg can read into one raw 16-bit stereo PCM file both renderers
   consume, so a comparison runs on the same music instead of a synthetic signal. The converted WAV
@@ -31,6 +35,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   keeps its previous constant level.
 
 ### Fixed
+- The visualizer's preset label no longer names a different preset than the one that is
+  rendered. It was read from the current renderer, which still held the previously shown preset
+  until the render thread applied the switch, so the name and the picture disagreed for exactly
+  the switch the user had just made. That was most visible with a short user preset list, where
+  the next preset wraps into the built-ins and the label still named the last user preset. The
+  label now follows the selection immediately through `VisualizerPresetLibrary.NameAt`, which
+  derives a preset's display name without parsing it, and switches to the rendered preset's own
+  name once the render thread has applied the change.
 - The preset audio bands `bass`, `mid`, and `treble` are alive again. The reference's guard against
   dividing an empty band by its long-term average is `0.001`, but it is written in the reference's own
   magnitude units — projectM scales every sample by 128 and leaves its FFT unnormalized, while
@@ -211,6 +223,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   echo rather than the blur.
 
 ### Fixed
+- Corrected textured MilkDrop shapes on the GPU to multiply sampled RGB by the shape colour and use the shape's interpolated alpha. The CPU fallback now applies the same colour modulation. The Winamp comparison harness also initializes its visualization window at the requested size, so MilkDrop allocates a matching-aspect render texture before capture.
+- Custom MilkDrop waves now apply the original inverse-aspect coordinate transform and draw
+  `bDrawThick` lines at all four full-opacity offsets. This corrects the geometry and feedback
+  contribution of presets such as Royal Mashup on non-square visualizer surfaces.
+- Corrected MilkDrop shader `GetPixel(uv)` to sample normalized coordinates, broadcast scalar
+  swizzles across colour channels in the CPU interpreter, and bind the comp main and blur samplers
+  to the preceding feedback frame (VS[0]), as the MilkDrop source actually does. The GPU and CPU
+  agree on the first frame of the Royal Mashup
+  preset. Off-screen custom-wave segments are clipped instead of painted onto the frame border.
+  The comparison harness also feeds its reference tone through the real audio analyzer.
 - Corrected additional MilkDrop integration defects: real `shapecode_*` parameters and compact
   equation keys, isolated custom-wave/shape state, once-per-frame wave execution, 512-point stereo
   PCM scaling, live warp speed/scale, independent OpenGL sampler filtering/wrapping, blur range

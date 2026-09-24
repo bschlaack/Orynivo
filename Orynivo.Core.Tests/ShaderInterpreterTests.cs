@@ -126,6 +126,30 @@ public sealed class ShaderInterpreterTests
         Assert.Equal(0.5f, result.X);
     }
 
+    /// <summary>GetPixel uses normalised UVs, as the MilkDrop shader macro does.</summary>
+    [Fact]
+    public void Run_GetPixelSamplesTheFrameAtNormalisedUv()
+    {
+        var sampler = new FixedSampler();
+        var interpreter = new ShaderInterpreter(ShaderParser.Parse("return GetPixel(uv);"), sampler);
+        interpreter.SetVariable("uv", ShaderValue.Vector(0.25f, 0.75f, 0f, 0f, 2));
+
+        Assert.Equal(0.5f, interpreter.Run().X);
+        Assert.Equal("sampler_main", sampler.LastSampler);
+        Assert.Equal(0.25f, sampler.LastU);
+        Assert.Equal(0.75f, sampler.LastV);
+    }
+
+    /// <summary>A swizzled scalar broadcasts across all vector channels in shader arithmetic.</summary>
+    [Fact]
+    public void Run_BroadcastsSwizzledScalarAcrossColour()
+    {
+        var value = Run("float2 uv = float2(0.25, 0.75); return (1-uv.y)*float3(0.2,0.4,0.6);");
+        Assert.Equal(0.05f, value.X, 5);
+        Assert.Equal(0.1f, value.Y, 5);
+        Assert.Equal(0.15f, value.Z, 5);
+    }
+
     /// <summary>Division by zero yields zero instead of an infinity.</summary>
     [Fact]
     public void Run_TreatsDivisionByZeroAsZero()

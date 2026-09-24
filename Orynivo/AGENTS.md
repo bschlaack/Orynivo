@@ -72,7 +72,8 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
 - Legacy gamma/echo use a separate display target and must never enter feedback.
   Gamma is a linear brightness gain. The overlay's alpha is coverage, not forced
   opacity; non-additive elements cover feedback. The shader blur chain is retained
-  for warp, updated after warp from the previous feedback, then read by comp.
+  for warp, updated after warp from the previous feedback (VS[0]), then read by comp. The comp
+  main samplers also bind VS[0], not the current warp-and-overlay target VS[1].
   Apply progressive range compression, GetBlur decoding and first-level edge darkening.
   Run both `verify-feedback.ps1` and `verify-fidelity.ps1` in `scripts/gl-harness`.
 
@@ -550,6 +551,8 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
   with the alpha channel masked for an additive fill), which is the same "over" `PaintPixel` applies.
   The fan repeats its first rim vertex because `GL_TRIANGLE_FAN` does not wrap, its position is
   y-flipped into OpenGL's space, and a textured fill samples the blurred frame with a flipped v.
+  The fixed-function MilkDrop texture stage modulates sampled RGB by the interpolated shape RGB
+  and selects the shape's diffuse alpha; do not use the sampled frame's alpha as fill opacity.
   A Milkdrop shape's own space is Direct3D's y-up space, so `BuildVertices` negates a
   `MilkdropCoordinates` shape's y as it leaves the preset's expression space, and the fan centre is
   converted the same way; the overlay rasterizer itself is y-down, which is why the waveform paths
@@ -654,7 +657,13 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
   keep `PostPresent` coalescing to one queued present so a busy UI thread cannot build a backlog.
   Preset switching (`_presetIndex`), the reset key (`_resetRequested`), and shutdown
   (`_renderRunning`, `_closed`) travel as flags that the render thread applies, so UI event
-  handlers must never touch the renderer directly. Frame pacing lives in the pure, tested
+  handlers must never touch the renderer directly. The preset label must follow the selection:
+  `UpdatePresetLabel` reads `VisualizerPresetLibrary.NameAt` (which never parses a file) while
+  the switch is still pending and the rendered preset's name once `_renderedPresetIndex` has
+  caught up, refreshed from `PostPresent`. Sourcing it from the renderer alone named the
+  previously shown preset for one switch, which made the name disagree with the picture - most
+  visibly at the end of a short user list, where the next index wraps into the built-ins.
+  Frame pacing lives in the pure, tested
   `Orynivo.Visualization.FramePacing`.
   `VisualizerPresetLibrary` loads the built-in presets plus `.oryvis` and `.milk` files from
   `AppSettings.VisualizerPresetDirectory` (default: a `visualizer-presets` folder below the

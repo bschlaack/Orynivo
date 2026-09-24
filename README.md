@@ -1688,10 +1688,16 @@ archive in place.
 Milkdrop compatibility is currently partial: loading or compiling a `.milk` preset
 does not guarantee the original appearance. The OpenGL path now honors sampler
 filter/wrap modes, custom-wave state, real shape keys, warp speed/scale, blur ranges,
-and display-only gamma/echo. Textured shapes, default-wave geometry, exact audio
+and display-only gamma/echo. The comp shader now samples `GetPixel(uv)` in normalized
+coordinates; the comp main and blur samplers read the preceding feedback frame as in the
+MilkDrop 2.25c source. Textured shapes, default-wave geometry, exact audio
 analysis, legacy hue shading and CPU fallback behavior still differ. See the
 [current verification report](VISUALIZER-FIDELITY-RECHECK.md) for fixes, tests and
-remaining limits; a direct Winamp MilkDrop comparison is still required. The analyzer
+remaining limits. The Windows-only `scripts/winamp-milkdrop-harness/compare-winamp.ps1` now
+runs the installed Winamp host with the supplied `vis_milk2.dll` in an isolated profile and
+captures its Direct3D window alongside Orynivo, with playback-time stamps and a side-by-side
+image; see its [harness notes](scripts/winamp-milkdrop-harness/README.md). The Royal Mashup
+comparison still shows a substantial colour and feedback mismatch. The analyzer
 uses the reference's one-sample pre-emphasis, raised-sine window period and
 multi-octave waveform alignment.
 `scripts/visualizer-compare/render-compare.ps1` renders Orynivo and the reference

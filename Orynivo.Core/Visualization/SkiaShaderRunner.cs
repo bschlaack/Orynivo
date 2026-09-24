@@ -76,7 +76,7 @@ public static class SkiaShaderRunner
 
     /// <summary>
     /// Renders a shader as a Skia runtime effect. Each sampler may read its own frame, so a comp pass
-    /// can hand the shader the composited frame, its blur levels, and the noise and volume textures the
+    /// can hand the shader the preceding feedback, its blur levels, and the noise and volume textures the
     /// interpreter would read, which is what keeps the two paths on the same picture.
     /// </summary>
     /// <param name="program">Root node returned by <see cref="ShaderParser.Parse"/>.</param>
@@ -937,8 +937,7 @@ public static class SkiaShaderRunner
     /// <summary>
     /// A compiled comp shader that runs as a Skia runtime effect over the renderer's frames. The
     /// runtime effect and the static noise and volume child shaders are built once; each draw binds
-    /// the composited frame, its blur levels, and the previous frame, which is what the interpreter's
-    /// sampler reads for a comp pass.
+    /// the previous feedback as its main and blur source, matching the interpreter's comp sampler.
     /// </summary>
     public sealed class CompPass : IDisposable
     {
@@ -999,7 +998,7 @@ public static class SkiaShaderRunner
 
         /// <summary>
         /// Gets or sets a value indicating whether the blur levels are built on the GPU as a chain of
-        /// box-blur passes over the composited frame instead of being supplied as pre-blurred frames.
+        /// box-blur passes over sampler_main instead of being supplied as pre-blurred frames.
         /// </summary>
         public bool GpuBlur { get; set; }
 
@@ -1077,7 +1076,8 @@ public static class SkiaShaderRunner
                 using var sourceBitmap = CreateBitmap(output.Pixels, width, height);
                 using var sourceShader = sourceBitmap.ToShader(SKShaderTileMode.Clamp, SKShaderTileMode.Clamp, LinearSampling);
 
-                // The blur levels are blurred copies of the composited frame, which is sampler_main.
+                // MilkDrop's BlurPasses starts from VS[0], the previous feedback. The comp main
+                // sampler reads that same frame, so its shader is also the blur source here.
                 var mainShader = sourceShader;
                 SKBitmap? mainBitmap = null;
                 if (samplerSources.TryGetValue("sampler_main", out var mainSource))

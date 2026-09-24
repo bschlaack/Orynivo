@@ -79,8 +79,9 @@ This file applies to `Orynivo.Core/` and supplements `../AGENTS.md`.
   left and right waveform and spectrum separate for the custom waveforms, and the
   desktop hub measures the frame time its smoothing rates need. The analysis geometry follows the
   reference too: a 1024-point transform (`AudioSpectrumAnalyzer`'s default FFT size) over the most
-  recent `ReferenceAnalysisSamples` (480) samples of each channel, windowed with a raised sine over
-  that 480-sample window, and the loudness bands read `_bandMagnitudes`, the average of the two
+  recent 576-sample analysis buffer: its first `ReferenceAnalysisSamples` (480) samples are
+  windowed with a raised sine, while the newest 96 samples are excluded from that frame's FFT.
+  The loudness bands read `_bandMagnitudes`, the average of the two
   equalized channel magnitudes, never the transform of their mix - the reference averages the channels'
   spectra, so a phase-inverted stereo pair must not cancel. Orynivo's own `WaveformPoints` (512) and
   `SpectrumPoints` (256) contracts keep their lengths. Never clamp the
@@ -99,12 +100,19 @@ This file applies to `Orynivo.Core/` and supplements `../AGENTS.md`.
   darkening, the shapes and waves (which are added to the warped frame before the
   centre darkening and the border, so those later passes cover them), the centre darkening, the
   border, and finally the reference's final composite — either the custom comp shader or the legacy
-  video echo and gamma adjustment, never both. The legacy path also multiplies the finished frame by
+  video echo and gamma adjustment, never both. The custom-wave rasterizer clips line segments
+  against the frame before converting endpoints to pixels; clamping endpoints creates spurious
+  bright border lines. Custom-wave points first use MilkDrop's inverse aspect factors about the
+  frame centre; thick lines use four full-opacity offsets in a 2x2 pixel footprint. The CPU
+  textured-shape fallback multiplies the sampled frame RGB by the interpolated shape RGB and
+  blends using interpolated shape alpha, matching MilkDrop's fixed-function texture stage. The legacy
+  path also multiplies the finished frame by
   the reference's animated hue shade, a four-corner colour whose three channels are animated sines
   normalised so their maximum is one; the per-preset offsets are seeded from the preset name so the
-  look is reproducible, and the OpenGL display pass applies the same shade. The shader blur chain is
-  built once per frame from the
-  frame being warped, so the warp shader and the comp shader read the same blurred input.
+  look is reproducible, and the OpenGL display pass applies the same shade. The warp shader reads
+  the retained blur chain; after warp, MilkDrop refreshes blur from VS[0], the previous feedback,
+  despite a contradictory comment in its source. Its comp shader also binds VS[0] to every main
+  sampler; VS[1], the current warp plus overlays, only becomes feedback after presentation.
   `Composite` adds the overlay frame into the warped
   frame and `Publish` copies the finished frame into the display buffer, so a post effect never runs
   after the publish. The per-pixel block sees the warped
@@ -253,8 +261,8 @@ This file applies to `Orynivo.Core/` and supplements `../AGENTS.md`.
   child shader for every sampler `Transpile` reports, and the CPU/GPU comparison tests must keep
   passing. Its `CompPass` runs a comp shader, with its own per-pixel block emitted into the same
   effect, as a runtime effect over the
-  renderer's frames; it binds the composited frame, its blur levels, and the previous frame per
-  sampler and scales each sampler by its own `texsize_*`, and `PresetRenderer.UseSkiaPasses` gates
+  renderer's frames; it binds the previous feedback to every main sampler, builds blur from it,
+  and scales each sampler by its own `texsize_*`. `PresetRenderer.UseSkiaPasses` gates
   it because the eight-bit Skia surface differs from the float interpreter by up to one level. The
   visualizer enables it by default and the interpreter stays the fallback, so a preset or pass the
   Skia path cannot handle still renders. `UseSkiaPasses` covers the per-pixel shader passes (the

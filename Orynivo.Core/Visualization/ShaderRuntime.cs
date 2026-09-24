@@ -433,11 +433,14 @@ internal static class ShaderRuntime
         Func<float, float, float> combine)
     {
         var count = Math.Max(left.Count, right.Count);
+        // A scalar produced by a swizzle stores its value only in X. HLSL broadcasts that value
+        // for every vector component; reading its unused Y/Z/W fields instead corrupts expressions
+        // such as (1 - uv.y) * hue_shader.
         return new ShaderValue(
             combine(left.Get(0), right.Get(0)),
-            combine(left.Get(1), right.Get(1)),
-            combine(left.Get(2), right.Get(2)),
-            combine(left.Get(3), right.Get(3)),
+            combine(left.Count == 1 ? left.X : left.Get(1), right.Count == 1 ? right.X : right.Get(1)),
+            combine(left.Count == 1 ? left.X : left.Get(2), right.Count == 1 ? right.X : right.Get(2)),
+            combine(left.Count == 1 ? left.X : left.Get(3), right.Count == 1 ? right.X : right.Get(3)),
             count);
     }
 
@@ -747,12 +750,14 @@ internal static class ShaderRuntime
         if (sampler is null || count < 1)
             throw new PresetExpressionException("The shader sampled a texture without a sampler.", position);
 
-        // Milkdrop spells this both ways: GetPixel(x, y) and GetPixel(float2(x, y)). Requiring two
-        // scalars made every preset that used the float2 form fail, and a failed comp shader is
-        // silently disabled, which costs that preset its picture.
+        // The shader header defines GetPixel(uv) as tex2D(sampler_main, uv). Its one-vector
+        // form therefore uses normalised UVs, not integer texel coordinates.
+        if (count == 1)
+            return sampler.Sample("sampler_main", a.X, a.Y);
+
+        // Keep the earlier two-scalar extension for presets that use integer pixel coordinates.
         var x = a.X;
-        var y = count >= 2 ? b.X : a.Y;
-        return sampler.SamplePixel((int)x, (int)y);
+        return sampler.SamplePixel((int)x, (int)b.X);
     }
 
     /// <summary>Builds a vector from a constructor call.</summary>

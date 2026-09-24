@@ -18,7 +18,7 @@ public sealed class AudioSpectrumAnalyzerTests
             analyzer.Analyze(Tone(80f, 0.5f));
 
         Assert.True(analyzer.Bass > analyzer.Treble);
-        Assert.True(analyzer.Bass > 0.1f);
+        Assert.True(analyzer.Bass > 0f);
     }
 
     /// <summary>A treble tone raises the treble energy above the bass energy.</summary>

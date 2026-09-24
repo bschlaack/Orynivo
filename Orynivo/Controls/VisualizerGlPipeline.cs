@@ -96,8 +96,11 @@ internal sealed class VisualizerGlPipeline
         uniform float uTextured;
         void main()
         {
-            vec4 colour = uTextured != 0.0 ? texture(uFrame, vec2(vUv.x, 1.0 - vUv.y)) : vColor;
-            fragColor = vec4(colour.rgb * colour.a, colour.a);
+            vec3 rgb = uTextured != 0.0
+                ? texture(uFrame, vec2(vUv.x, 1.0 - vUv.y)).rgb * vColor.rgb
+                : vColor.rgb;
+            // MilkDrop selects diffuse (shape) alpha even for a textured fan.
+            fragColor = vec4(rgb * vColor.a, vColor.a);
         }
         """;
 
@@ -565,11 +568,11 @@ internal sealed class VisualizerGlPipeline
     private int _compTexture;
     private int _compFramebuffer;
 
-    /// <summary>The previous frame's pre-comp composite, for the comp shader's <c>sampler_pc_main</c>.</summary>
+    /// <summary>The previous feedback, bound to every main sampler in the comp shader.</summary>
     private int _previousTexture;
     private int _previousFramebuffer;
 
-    /// <summary>Blurred copies of the comp input, for the comp shader's <c>sampler_blur1</c>-<c>3</c>.</summary>
+    /// <summary>Blurred copies of previous feedback for <c>sampler_blur1</c>-<c>3</c>.</summary>
     private readonly int[] _shaderBlurTexture = new int[3];
     private readonly int[] _shaderBlurFramebuffer = new int[3];
 
@@ -907,7 +910,7 @@ internal sealed class VisualizerGlPipeline
                 gl.BindFramebuffer(GlFramebuffer, _pingFramebuffer[0]);
                 gl.Viewport(0, 0, frameWidth, frameHeight);
                 gl.UseProgram(_warpShaderProgram);
-                BindShaderSamplers(gl, _warpShaderProgram, _warpShaderUniforms, _feedbackTexture, _previousTexture);
+                BindShaderSamplers(gl, _warpShaderProgram, _warpShaderUniforms, _feedbackTexture);
                 SetShaderUniforms(gl, _warpShaderProgram, _warpShaderUniforms, uniforms);
                 // The vertex stage owns the transform, so it needs the same motion parameters the
                 // fixed warp passes.
@@ -947,8 +950,9 @@ internal sealed class VisualizerGlPipeline
             }
 
             ClearSamplerBindings();
-            // Milkdrop updates blur after warp from the previous feedback. The warp reads the
-            // retained chain; the comp sees the updated chain, before overlays enter feedback.
+            // MilkDrop's BlurPasses binds VS[0], the previous feedback, even though its comment
+            // calls this the current post-warp frame. The warp sees the retained chain; comp sees
+            // the newly blurred previous frame.
             if (_warpShaderProgram != 0 || _compShaderProgram != 0)
                 BuildShaderBlurLevels(gl, _feedbackTexture, frameWidth, frameHeight, uniforms);
 
@@ -1024,8 +1028,8 @@ internal sealed class VisualizerGlPipeline
             Set(gl, _postUniforms, "uSmaller", Math.Min(frameWidth, frameHeight));
             DrawQuad(gl);
 
-            // The comp shader is a display pass: it reads the composited frame and writes the display,
-            // while the feedback stays the pre-comp frame the next warp samples.
+            // The comp shader is a display pass. MilkDrop binds the old VS[0] to sampler_main;
+            // the freshly composited VS[1] becomes feedback only after presentation.
             var output = _feedbackTexture;
             if (_compShaderProgram != 0 && RunCompShader(gl, frameWidth, frameHeight, uniforms))
                 output = _compTexture;
@@ -1362,7 +1366,7 @@ internal sealed class VisualizerGlPipeline
         }
     }
 
-    /// <summary>Runs the comp shader over the composited frame into its own display target.</summary>
+    /// <summary>Runs the comp shader with the previous feedback as its main sampler.</summary>
     /// <param name="gl">GL interface.</param>
     /// <param name="width">Frame width.</param>
     /// <param name="height">Frame height.</param>
@@ -1370,14 +1374,15 @@ internal sealed class VisualizerGlPipeline
     /// <returns><see langword="true"/> when the pass was drawn.</returns>
     private bool RunCompShader(GlInterface gl, int width, int height, IReadOnlyDictionary<string, ShaderValue>? uniforms)
     {
-        // The blur chain was updated from the previous feedback before the overlay composite.
+        // VS[0] is snapshotted before the post pass overwrites feedback. MilkDrop binds it to
+        // every main sampler in the comp shader, including qualified sampler names.
 
         gl.BindFramebuffer(GlFramebuffer, _compFramebuffer);
         gl.Viewport(0, 0, width, height);
         gl.ClearColor(0f, 0f, 0f, 1f);
         gl.Clear(GlColorBufferBit);
         gl.UseProgram(_compShaderProgram);
-        BindShaderSamplers(gl, _compShaderProgram, _compShaderUniforms, _feedbackTexture, _previousTexture);
+        BindShaderSamplers(gl, _compShaderProgram, _compShaderUniforms, _previousTexture);
         SetShaderUniforms(gl, _compShaderProgram, _compShaderUniforms, uniforms);
         DrawQuad(gl);
         ClearSamplerBindings();
@@ -1469,22 +1474,19 @@ internal sealed class VisualizerGlPipeline
     }
 
     /// <summary>
-    /// Binds the frame textures to the emitted shader's samplers. The main and filtered samplers read
-    /// the composited frame, the previous-composite sampler reads the stored previous frame, the blur
-    /// levels read their own textures, and every other sampler falls back to the main frame so it is
-    /// never left unbound.
+    /// Binds the frame textures to the emitted shader's samplers. Every qualified main sampler reads
+    /// the stage's main texture; blur levels use their own textures, and unknown samplers fall back
+    /// to that main texture.
     /// </summary>
     /// <param name="gl">GL interface.</param>
     /// <param name="locations">Uniform locations of the program.</param>
-    /// <param name="main">The composited frame.</param>
-    /// <param name="previous">Retained previous-frame handle, reserved for legacy callers.</param>
+    /// <param name="main">The stage's main frame texture.</param>
     /// <param name="program">The program whose active samplers are bound.</param>
     private void BindShaderSamplers(
         GlInterface gl,
         int program,
         Dictionary<string, int> locations,
-        int main,
-        int previous)
+        int main)
     {
         var nextUnit = 0;
         foreach (var name in program == _warpShaderProgram ? _warpSamplerNames : _compSamplerNames)

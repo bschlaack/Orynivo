@@ -1939,11 +1939,14 @@ public static class ShaderTranspiler
                 return $"{volumeHelper}({arguments[1]})";
             case "getpixel":
                 {
-                    // The interpreter reads the texel at the truncated integer coordinate, so the pixel
-                    // centre is the coordinate plus half; GLSL samples that pixel centre normalised.
-                    var pixel = arguments.Count >= 2
-                        ? $"float2(float(int({arguments[0]})), float(int({arguments[1]})))"
-                        : $"float2(float(int({arguments[0]}.x)), float(int({arguments[0]}.y)))";
+                    // Milkdrop's GetPixel(uv) macro is tex2D(sampler_main, uv). Only the legacy
+                    // two-scalar extension uses integer texel coordinates.
+                    if (arguments.Count == 1)
+                        return $"float4({SampleExpr(MainSampler, SamplerCoordinate(MainSampler, Coordinate(call, arguments[0], 0)))}).rgb";
+
+                    if (arguments.Count < 2)
+                        throw new PresetExpressionException("GetPixel needs a coordinate.", call.Position);
+                    var pixel = $"float2(float(int({arguments[0]})), float(int({arguments[1]})))";
                     return $"float4({SampleExpr(MainSampler, PixelCoordinate(pixel))}).rgb";
                 }
             case "getblur1":

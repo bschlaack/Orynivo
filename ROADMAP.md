@@ -17,6 +17,7 @@ execution, isolated element state, real shape keys and compact equation spelling
 PCM waveform scaling, independent GL sampler modes, warp speed/scale, blur ranges,
 overlay alpha and display-only gamma/echo. Managed and GPU contract tests cover
 these changes. The oracle now uses explicit time and matching PCM input.
+The direct Winamp harness now starts MilkDrop at the target aspect ratio; a controlled Royal Mashup probe exposed and corrected textured-shape colour/alpha modulation. Dynamic preset playback is still not frame-synchronized, so its single-frame pixel error is diagnostic only.
 
 See [the current verification report](VISUALIZER-FIDELITY-RECHECK.md) for evidence
 and remaining work: the reference's logarithmic frequency equalization, fallback-path

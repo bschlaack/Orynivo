@@ -9,6 +9,37 @@ public sealed class MilkdropFidelityRegressionTests
 {
     private const string Wave = "wave_a=0\nwavecode_0_enabled=1\nwavecode_0_samples=2\nwavecode_0_g=0\nwavecode_0_b=0\nwave_0_per_point_1=x=0.25+sample*0.5;y=0.5;\n";
 
+    /// <summary>Off-screen custom-wave lines are clipped instead of pinned to the frame edge.</summary>
+    [Fact]
+    public void OffscreenCustomWaveDoesNotPaintTheBorder()
+    {
+        var renderer = Create(Wave.Replace("y=0.5", "y=2"));
+        renderer.RenderFrame(new Audio(), 1d / 60d);
+        Assert.Equal(0f, renderer.OverlayFrame.MeanBrightness());
+    }
+
+    /// <summary>Custom-wave points expand along the short axis before rasterization.</summary>
+    [Fact]
+    public void CustomWaveUsesReferenceAspectCoordinates()
+    {
+        var renderer = Create(Wave.Replace("y=0.5", "y=0.75"), 96, 64);
+        renderer.RenderFrame(new Audio(), 1d / 60d);
+        var rows = Enumerable.Range(0, 64).Where(y => Enumerable.Range(0, 96).Any(x => renderer.OverlayFrame.GetPixel(x, y, 0) > 0f)).ToArray();
+        Assert.Contains(7, rows);
+        Assert.DoesNotContain(16, rows);
+    }
+
+    /// <summary>Thick custom lines use four opaque pixel offsets, as in both references.</summary>
+    [Fact]
+    public void ThickCustomWaveCoversFourOffsets()
+    {
+        var renderer = Create(Wave.Replace("wavecode_0_g=0", "wavecode_0_g=0\nwavecode_0_bDrawThick=1"));
+        renderer.RenderFrame(new Audio(), 1d / 60d);
+        var rows = Enumerable.Range(0, 64).Where(y => Enumerable.Range(0, 64).Any(x => renderer.OverlayFrame.GetPixel(x, y, 0) > 0f)).ToArray();
+        Assert.Contains(30, rows);
+        Assert.Contains(31, rows);
+    }
+
     /// <summary>Each frame increments private user state once, while T values restart at init.</summary>
     [Fact]
     public void WaveFrameStateRunsOnceAndRestoresInitT()
@@ -148,7 +179,8 @@ public sealed class MilkdropFidelityRegressionTests
     }
 
 
-    private static PresetRenderer Create(string text) => new(VisualizerPreset.Parse(text), 64, 64) { ExpressionsOnly = true, MeshRequested = true };
+    private static PresetRenderer Create(string text, int width = 64, int height = 64) =>
+        new(VisualizerPreset.Parse(text), width, height) { ExpressionsOnly = true, MeshRequested = true };
 
     /// <summary>A constant stereo PCM input, independent of frame time.</summary>
     private sealed class Audio : IVisualizerAudioSource

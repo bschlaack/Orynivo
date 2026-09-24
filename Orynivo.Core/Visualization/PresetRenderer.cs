@@ -135,7 +135,6 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
 
     /// <summary>The four roam vectors for the current frame: cos, sin, slow cos, slow sin.</summary>
     private readonly ShaderValue[] _roam = new ShaderValue[4];
-    private bool _samplerMainIsWarped;
     private PixelBuffer? _shaderOutput;
     private SkiaShaderRunner.CompPass? _skiaComp;
     private bool _skiaCompTried;
@@ -1898,7 +1897,6 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
     /// <param name="originalV">Row of the pixel itself.</param>
     private void RunWarpShadersCore(float u, float v, float originalU, float originalV)
     {
-        _samplerMainIsWarped = false;
         for (var index = 0; index < _warpShaders.Count; index++)
         {
             var (interpreter, shader) = _warpShaders[index];
@@ -2074,8 +2072,8 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
         var height = _fresh.Height;
         _frameCopy.CopyFrom(_fresh);
         _compStageRan = true;
-        _samplerMainIsWarped = true;
-        // The comp pass blurs a different source than the warp, so its blur levels are rebuilt.
+        // MilkDrop reruns BlurPasses after warp, but its first source is still VS[0]: previous
+        // feedback. Rebuilding here follows that stage's cache lifetime.
         Array.Clear(_blurLevelReady);
 
         // A comp shader whose per-pixel block is empty is a pure post-process, so it can run as a
@@ -2188,8 +2186,8 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
         {
             var sources = new Dictionary<string, SkiaShaderRunner.SamplerSource>(StringComparer.Ordinal)
             {
-                ["sampler_main"] = new(_frameCopy.RawPixels, width, height),
-                ["sampler_fc_main"] = new(_warped.RawPixels, width, height),
+                ["sampler_main"] = new(_previous.RawPixels, width, height),
+                ["sampler_fc_main"] = new(_previous.RawPixels, width, height),
                 ["sampler_pc_main"] = new(_previous.RawPixels, width, height)
             };
 
@@ -2570,9 +2568,9 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
             return ShaderValue.Vector(_sample[0], _sample[1], _sample[2], _sample[3], 4);
         }
 
-        // Everything else is the stage's main frame: the previous frame during the warp and the
-        // composited picture during the comp pass.
-        var source = _samplerMainIsWarped ? _frameCopy : _previous;
+        // MilkDrop binds VS[0] to main samplers in both stages. VS[1], the current warp and
+        // overlay, only becomes the next frame's VS[0] after presentation.
+        var source = _previous;
         source.SampleShader(u, v, parsed.Wrap, parsed.Nearest, _sample);
         return ShaderValue.Vector(_sample[0], _sample[1], _sample[2], _sample[3], 4);
     }
@@ -2589,13 +2587,8 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
         var buffer = _blurLevels[level - 1];
         if (!_blurLevelReady[level - 1])
         {
-            // The reference builds its blur textures once per frame from the frame being warped, so
-            // both the warp shader and the comp shader read the same blurred input; the comp stage
-            // must not rebuild the chain from the composite it just produced. The GPU warp and comp
-            // passes bind the same levels, so the two execution paths agree. The cache is invalidated
-            // once per stage, because the buffer's contents change every frame while the object stays
-            // the same. A level asked for first builds the ones below it, so level 3 is three passes
-            // whether or not level 1 was read before it.
+            // MilkDrop refreshes the chain after warp but binds VS[0], the previous feedback, as
+            // its source. Clear the cache between stages to follow that lifecycle.
             for (var build = 1; build <= level; build++)
             {
                 if (_blurLevelReady[build - 1])
@@ -2636,10 +2629,8 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
     /// <inheritdoc/>
     public ShaderValue SamplePixel(int x, int y)
     {
-        // GetPixel reads the same frame sampler_main refers to, matching the GPU's translation and
-        // Milkdrop; reading the warped frame here made a comp shader's GetPixel differ from its
-        // tex2D(sampler_main, ...).
-        var source = _samplerMainIsWarped ? _frameCopy : _previous;
+        // GetPixel reads the same VS[0] that sampler_main reads in both shader stages.
+        var source = _previous;
         var column = Math.Clamp(x, 0, source.Width - 1);
         var row = Math.Clamp(y, 0, source.Height - 1);
         var offset = (((row * source.Width) + column) * 4);
@@ -3174,10 +3165,15 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
         if (count < 1 || width < 1 || height < 1)
             return;
 
+        var inverseAspectX = MathF.Max(1f, height / (float)width);
+        var inverseAspectY = MathF.Max(1f, width / (float)height);
+
         for (var index = 0; index < count; index++)
         {
-            var x = (int)Math.Clamp(_waveOutX[index] * (width - 1), 0f, width - 1);
-            var y = (int)Math.Clamp((1f - _waveOutY[index]) * (height - 1), 0f, height - 1);
+            // MilkDrop stores custom-wave points in aspect-corrected clip space.
+            // Its inverse aspect expands the short screen axis about the centre.
+            var x = (0.5f + (_waveOutX[index] - 0.5f) * inverseAspectX) * (width - 1);
+            var y = (0.5f - (_waveOutY[index] - 0.5f) * inverseAspectY) * (height - 1);
             var red = _waveOutRed[index];
             var green = _waveOutGreen[index];
             var blue = _waveOutBlue[index];
@@ -3185,17 +3181,69 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
 
             if (wave.UseDots)
             {
-                PaintPixel(x, y, red, green, blue, alpha, wave.Additive);
+                if (float.IsFinite(x) && float.IsFinite(y) && x >= 0f && x < width && y >= 0f && y < height)
+                    PaintPixel((int)x, (int)y, red, green, blue, alpha, wave.Additive);
                 continue;
             }
 
             if (index == 0)
                 continue;
 
-            var previousX = (int)Math.Clamp(_waveOutX[index - 1] * (width - 1), 0f, width - 1);
-            var previousY = (int)Math.Clamp((1f - _waveOutY[index - 1]) * (height - 1), 0f, height - 1);
-            DrawWaveSegment(previousX, previousY, x, y, red, green, blue, alpha, wave.Additive, wave.DrawThick);
+            var previousX = (0.5f + (_waveOutX[index - 1] - 0.5f) * inverseAspectX) * (width - 1);
+            var previousY = (0.5f - (_waveOutY[index - 1] - 0.5f) * inverseAspectY) * (height - 1);
+            if (ClipWaveSegment(ref previousX, ref previousY, ref x, ref y, width, height))
+                DrawWaveSegment((int)previousX, (int)previousY,
+                    (int)x, (int)y, red, green, blue, alpha,
+                    wave.Additive, wave.DrawThick);
         }
+    }
+
+    /// <summary>Clips a waveform segment to the frame, as the original graphics API does.</summary>
+    /// <param name="x0">First endpoint column, updated to the clipped position.</param>
+    /// <param name="y0">First endpoint row, updated to the clipped position.</param>
+    /// <param name="x1">Second endpoint column, updated to the clipped position.</param>
+    /// <param name="y1">Second endpoint row, updated to the clipped position.</param>
+    /// <param name="width">Frame width in pixels.</param>
+    /// <param name="height">Frame height in pixels.</param>
+    /// <returns>Whether any part of the segment intersects the frame.</returns>
+    private static bool ClipWaveSegment(ref float x0, ref float y0, ref float x1, ref float y1, int width, int height)
+    {
+        if (!float.IsFinite(x0) || !float.IsFinite(y0) || !float.IsFinite(x1) || !float.IsFinite(y1))
+            return false;
+
+        var dx = x1 - x0;
+        var dy = y1 - y0;
+        var enter = 0f;
+        var leave = 1f;
+        if (!ClipWaveEdge(-dx, x0, ref enter, ref leave) ||
+            !ClipWaveEdge(dx, (width - 1) - x0, ref enter, ref leave) ||
+            !ClipWaveEdge(-dy, y0, ref enter, ref leave) ||
+            !ClipWaveEdge(dy, (height - 1) - y0, ref enter, ref leave))
+            return false;
+
+        x1 = x0 + leave * dx;
+        y1 = y0 + leave * dy;
+        x0 += enter * dx;
+        y0 += enter * dy;
+        return true;
+    }
+
+    /// <summary>Restricts the visible portion of a waveform segment against one frame edge.</summary>
+    /// <param name="p">Signed direction perpendicular to the edge.</param>
+    /// <param name="q">Distance from the first endpoint to the edge.</param>
+    /// <param name="enter">Entering fraction, updated in place.</param>
+    /// <param name="leave">Leaving fraction, updated in place.</param>
+    /// <returns>Whether a visible segment remains.</returns>
+    private static bool ClipWaveEdge(float p, float q, ref float enter, ref float leave)
+    {
+        if (p == 0f)
+            return q >= 0f;
+        var fraction = q / p;
+        if (p < 0f)
+            enter = MathF.Max(enter, fraction);
+        else
+            leave = MathF.Min(leave, fraction);
+        return enter <= leave;
     }
 
     /// <summary>Draws one anti-aliased-free line segment of a custom waveform.</summary>
@@ -3208,7 +3256,7 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
     /// <param name="blue">Blue, zero to one.</param>
     /// <param name="alpha">Opacity, zero to one.</param>
     /// <param name="additive">Whether the colour is added instead of alpha-blended.</param>
-    /// <param name="thick">Whether the segment is drawn two pixels thick.</param>
+    /// <param name="thick">Whether the segment uses MilkDrop's four full-opacity offsets.</param>
     private void DrawWaveSegment(
         int x0, int y0, int x1, int y1, float red, float green, float blue, float alpha, bool additive, bool thick)
     {
@@ -3218,16 +3266,26 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
         if (steps == 0)
         {
             PaintPixel(x0, y0, red, green, blue, alpha, additive);
+            if (thick)
+            {
+                PaintPixel(x0 + 1, y0, red, green, blue, alpha, additive);
+                PaintPixel(x0 + 1, y0 - 1, red, green, blue, alpha, additive);
+                PaintPixel(x0, y0 - 1, red, green, blue, alpha, additive);
+            }
             return;
         }
 
-        var thickness = thick ? 2 : 1;
         for (var step = 0; step <= steps; step++)
         {
             var x = x0 + (int)MathF.Round(dx * step / (float)steps);
             var y = y0 + (int)MathF.Round(dy * step / (float)steps);
-            for (var offset = 0; offset < thickness; offset++)
-                PaintPixel(x, y + offset, red, green, blue, alpha * (offset == 0 ? 1f : 0.5f), additive);
+            PaintPixel(x, y, red, green, blue, alpha, additive);
+            if (thick)
+            {
+                PaintPixel(x + 1, y, red, green, blue, alpha, additive);
+                PaintPixel(x + 1, y - 1, red, green, blue, alpha, additive);
+                PaintPixel(x, y - 1, red, green, blue, alpha, additive);
+            }
         }
     }
 
@@ -3574,7 +3632,11 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
                     var u = (0.5f * w0) + (_shapeUvX[i] * w1) + (_shapeUvX[next] * w2);
                     var v = (0.5f * w0) + (_shapeUvY[i] * w1) + (_shapeUvY[next] * w2);
                     _warped.SampleShader(u, v, VisualizerTextureWrap.Repeat, nearest: false, _shapeSample);
-                    PaintPixel(x, y, _shapeSample[0], _shapeSample[1], _shapeSample[2], pixelAlpha, additive);
+                    var pixelRed = red2 + (red - red2) * w0;
+                    var pixelGreen = green2 + (green - green2) * w0;
+                    var pixelBlue = blue2 + (blue - blue2) * w0;
+                    PaintPixel(x, y, _shapeSample[0] * pixelRed, _shapeSample[1] * pixelGreen,
+                        _shapeSample[2] * pixelBlue, pixelAlpha, additive);
                     continue;
                 }
 

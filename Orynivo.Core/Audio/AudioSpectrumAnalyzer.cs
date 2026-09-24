@@ -85,11 +85,10 @@ public sealed class AudioSpectrumAnalyzer : IVisualizerAudioSource
         _sampleRate = sampleRate;
         _fftSize = fftSize;
         _window = new float[fftSize];
-        // The reference windows the 480 samples it analyses with a raised sine over that window, so the
-        // ramp spans 480 samples and not the transform length; the samples before it stay unwindowed
-        // because the transform's front is zero anyway.
+        // The reference keeps a 576-sample analysis buffer, then transforms its first 480 samples.
+        // The newest 96 samples are the alignment margin, not part of this frame's FFT.
         var windowed = Math.Min(ReferenceAnalysisSamples, fftSize);
-        var windowStart = fftSize - windowed;
+        var windowStart = Math.Max(0, fftSize - Math.Min(AlignBufferPoints, fftSize));
         for (var index = 0; index < windowed; index++)
             _window[windowStart + index] = 0.5f - (0.5f * MathF.Cos(2f * MathF.PI * index / windowed));
 
