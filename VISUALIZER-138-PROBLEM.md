@@ -26,7 +26,7 @@ beide direkt vergleichbar sind.
 **Referenzen, die zur Verfügung stehen:**
 
 - **projectM**-Quelltext (lokaler Checkout) und ein daraus gebauter
-  Referenz-Renderer („Oracle", `scripts/projectm-oracle/oracle.cpp`), der ein
+  Referenz-Renderer („Oracle", `the reference oracle`), der ein
   Preset headless rendert und `pm-NNN.bmp` schreibt.
 - **Original MilkDrop 2.25c**-Quelltext (BSD-artige Nullsoft-Lizenz) unter
   `%TEMP%\opencode\milkdrop-src\milkdrop_225c_src\vis_milk2` — **nur als
@@ -68,19 +68,9 @@ Ein **440-Hz-Ton** wird als identische Audiodaten an beide Engines gegeben und �
 (`0.299R + 0.587G + 0.114B`, alle Pixel) jedes gespeicherten Frames berechnet —
 also dieselbe Metrik für alle drei Renderer.
 
-Reproduktion (PowerShell, im Repositorium):
-
-```powershell
-$preset = 'X:\projects\presets-cream-of-the-crop\Dancer\Glowsticks\$$$ Royal - Mashup (138).milk'
-
-# Referenz (projectM):
-$env:ORACLE_TONE='1'
-& "$env:TEMP\opencode\oracle-build\Release\orynivo_pm_oracle.exe" $preset "$env:TEMP\opencode\orig138\pm" 320 180 300
-
-# Orynivo (schreibt cpu-NNN.bmp und gl-NNN.bmp):
-$env:GLH_ORACLE_TONE='1'
-dotnet run --project scripts/gl-harness/GlHarness.csproj -c Debug -- $preset "$env:TEMP\opencode\orig138\ory" 300 320 180
-```
+Reproduziert wurde mit den lokalen, **nicht versionierten** Entwicklungs-Harnessen: einem
+Referenz-Renderer, der `pm-NNN.bmp`-Frames schreibt, und einem Orynivo-Harness, das dieselben
+Audiodaten liest und `cpu-NNN.bmp`/`gl-NNN.bmp` schreibt.
 
 ## 4. Messergebnis (Original-Preset, gleiche Metrik, gleicher Ton)
 
@@ -401,7 +391,7 @@ Pfaden bei Frame 0 vergleichen. Bei einem Pass-Through-Comp ist das identisch
 **Skia-Runtime-Effect** laufen (`TryApplySkiaCompShader`, Zeile 2083). Wenn die
 Referenzmessung der CPU diesen Pfad genommen hat, könnte die Differenz
 CPU↔GL in Wahrheit der Unterschied Skia↔Interpreter sein, nicht CPU↔GPU.
-*Experiment:* `GLH_SKIA_PASSES` setzen/weglassen und die CPU-Mittelwerte
+*Experiment:* im lokalen Harness den Skia-Comp-Pfad an- und abschalten und die CPU-Mittelwerte
 vergleichen; zusätzlich prüfen, ob der Interpreter- und der Skia-Pfad dasselbe
 liefern.
 
@@ -469,36 +459,22 @@ Abweichung später in der Kette (Comp/Hue/Gamma/Feedback-Invariante) liegen.
   Referenz lesen, die Ursache finden, dann korrigieren.
 - **Nach jeder Änderung:** `scripts/verify-all.ps1` (Build mit `--warnaserror`,
   Non-Windows-Desktop-Kompilierung, drei Testprojekte, drei Parity-Skripte) muss
-  grün sein, und vier GPU-Regressionen müssen bestehen:
-  `verify-fidelity.ps1`, `verify-feedback.ps1`, `verify-pixel-warp.ps1`,
-  `verify-warp-target.ps1` (aus `scripts/gl-harness/`).
-  `verify-fidelity.ps1` pinnt u. a. `GetBlur1`/`GetBlur2`-Werte sowie einen
-  `hue_shader`-Probe und eine Shape-Probe.
+  grün sein, und die vier lokalen GPU-Regressionen (Feedback, Fidelity, Pixel-Warp,
+  Warp-Target) müssen bestehen. Die Fidelity-Regression pinnt u. a.
+  `GetBlur1`/`GetBlur2`-Werte sowie eine `hue_shader`-Probe und eine Shape-Probe.
 - **Reproduzierbarkeit:** Diagnosen müssen auf gespeicherten Frames und derselben
-  Metrik beruhen; neue Diagnostik lieber als Harness-Schalter (Präfix `GLH_` bzw.
-  `ORACLE_`) statt als ad-hoc-Code.
+  Metrik beruhen; neue Diagnostik lieber als Schalter der lokalen Harnesse statt als
+  ad-hoc-Code.
 - **Keine Regressionen an anderen Presets.** Frühere Messungen nennen
   `$$$ Royal - Mashup (138)` mit 85–109 mittlerer Helligkeit gegen projectMs ~32.
 - **Secrets:** In Logs/Diagnostik dürfen keine Credentials oder authentifizierten
   URLs auftauchen (betrifft hier nur generelle Projektregeln, nicht dieses Preset).
 
-## 11. Hilfreiche Diagnose-Schalter
+## 11. Lokale Diagnose-Werkzeuge
 
-Harness (`scripts/gl-harness/Program.cs`, gestartet über
-`dotnet run --project scripts/gl-harness/GlHarness.csproj -- <preset> <outdir> <frames> <w> <h>`):
-
-- `GLH_ORACLE_TONE=1` — derselbe 440-Hz-Ton wie das Oracle
-- `GLH_ORACLE_PCM` / `GLH_ORACLE_AUDIO=<raw s16le stereo PCM>` — identische Audiodaten
-- `GLH_SILENT=1` — Stille
-- `GLH_STAGES=1` — mittlere Helligkeit der Puffer **jeder Render-Stufe** für einige
-  Frames (die Sonde `blur` zeigt den *Warp-Ausgang*, nicht den Blur)
-- `GLH_SKIA_PASSES=1`, `GLH_FORCE_HALF_FLOAT`, `GLH_TIGHT_BUDGET`, `GLH_HUE_DEBUG`,
-  `GLH_AUDIO_DEBUG`, `GLH_TIMINGS`, `GLH_NO_COMP`, `GLH_NO_WARP`,
-  `GLH_NO_SHAPE_FILLS`, `GLH_PIXEL_WARP`
-
-Oracle (`scripts/projectm-oracle/oracle.cpp`):
-
-- `ORACLE_TONE=1`, `ORACLE_AUDIO=<…>`, `ORACLE_SILENT=1`
+Die Harnesse liegen bewusst außerhalb der Versionskontrolle (siehe `.gitignore`). Sie lesen
+dieselben Audiodaten wie der Referenz-Renderer, schreiben BMP-Frames je Renderstufe und erlauben,
+einzelne Stufen (Warp, Blur, Overlay, Comp) gezielt an- und abzuschalten.
 
 Umgebungsvariablen der App: `ORYNIVO_VISUALIZER_OPENGL=0` erzwingt Bitmap-Präsentation
 (GL ist Standard), `ORYNIVO_VISUALIZER_PIXELWARP=0` erzwingt den CPU-Warp.

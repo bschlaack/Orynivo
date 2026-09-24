@@ -198,15 +198,6 @@ failure; CI still runs these steps itself. The non-Windows compile matters becau
 the desktop swaps in `Compatibility/Linux` implementations for several Windows
 types, so a Windows-only local build cannot see a broken Linux or macOS call site.
 Use it before declaring work complete.
-The Windows-only `scripts/winamp-milkdrop-harness/compare-winamp.ps1` is a manual visualizer
-diagnostic: it runs the actual 32-bit MilkDrop DLL inside a temporary copy of the installed
-Winamp host and pairs visible Direct3D captures with the Orynivo GL harness. It needs an
-interactive desktop, so it is not part of CI. Keep its temporary profile separate from the
-user's Winamp profile and remove the isolated host after capture; use `capture.csv` playback
-timestamps when comparing because Winamp's render cadence is variable.
-Set both MilkDrop's main window bounds and the visualization host's `avs_ww`/`avs_wh` in
-the isolated profile before launch. Resizing only after the plugin starts can leave its
-internal render texture at another aspect ratio and invalidate shape/wave comparisons.
 Every test that changes the process-wide playback profile through
 `AudioDatabase.SetActiveProfile` must save `AudioDatabase.ActiveProfileId` first and
 restore it in a `finally`. `ActiveProfileId` is process-wide `AsyncLocal` state, so

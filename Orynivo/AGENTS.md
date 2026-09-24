@@ -43,14 +43,14 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
   resolved. Resolve the mesh vertex uniforms for custom warp programs when linking
   them as well as the fixed warp's decay/time/scale inputs. The fixed warp samples
   bottom-up feedback without an extra Y flip. Decay is applied by the fixed warp
-  only; custom warp shaders own their fade. Run `scripts/gl-harness/verify-feedback.ps1`
-  after changing these contracts. Remaining compatibility defects are recorded in
+  only; custom warp shaders own their fade. Re-check these contracts with a constant-output
+  shader after changing them. Remaining compatibility defects are recorded in
   `VISUALIZER-FIDELITY-RECHECK.md`; previous "corrected" notes are not fidelity proof.
 
 - Blur generation changes the active GL framebuffer and viewport. The custom warp
   pass must rebind its full-resolution ping target after `BuildShaderBlurLevels`
-  and before drawing. `scripts/gl-harness/verify-warp-target.ps1` checks the real
-  GPU pipeline with a constant-output shader at two sizes. See
+  and before drawing. A constant-output shader at two sizes checks that the real GPU
+  pipeline fills its target. See
   `VISUALIZER-FIDELITY-AUDIT.md` for outstanding Milkdrop compatibility issues.
 - The fixed GL warp transforms the texture coordinate in its vertex shader and
   interpolates the resulting coordinate, so `WarpVertexSource` computes the
@@ -75,7 +75,6 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
   for warp, updated after warp from the previous feedback (VS[0]), then read by comp. The comp
   main samplers also bind VS[0], not the current warp-and-overlay target VS[1].
   Apply progressive range compression, GetBlur decoding and first-level edge darkening.
-  Run both `verify-feedback.ps1` and `verify-fidelity.ps1` in `scripts/gl-harness`.
 
 - Dashboard and its Show all pages share DashboardScrollViewer. Album artwork
   assignment must update the bound ContentRow in place, never call
@@ -565,9 +564,8 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
   `_orynivo_*` motion uniforms seeded from the mesh's first vertex, and the decay moved to the post
   pass); `ORYNIVO_VISUALIZER_PIXELWARP=0` forces the CPU warp. `ShaderTranspiler` must not fail the
   mesh path over such a block: the mesh runs it and the shader never emits it, so only its uniforms
-  are lost, while the comp and Skia paths keep failing. It is verified by
-  `scripts/gl-harness/verify-pixel-warp.ps1` is its check: a whole-frame CPU comparison cannot see the
-  warp, so that probe draws the overlay only for the first frames and follows the brightness centroid
+  are lost, while the comp and Skia paths keep failing. A whole-frame CPU comparison cannot see the
+  warp, so its check draws the overlay only for the first frames and follows the brightness centroid
   of the remaining warped feedback, with a control preset without the block as the negative control.
   When the preset has no
   shaders, `Orynivo.Controls.VisualizerGlPipeline` owns the whole frame: the warp as a mesh draw whose

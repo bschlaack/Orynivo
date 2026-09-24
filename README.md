@@ -1693,16 +1693,10 @@ coordinates; the comp main and blur samplers read the preceding feedback frame a
 MilkDrop 2.25c source. Textured shapes, default-wave geometry, exact audio
 analysis, legacy hue shading and CPU fallback behavior still differ. See the
 [current verification report](VISUALIZER-FIDELITY-RECHECK.md) for fixes, tests and
-remaining limits. The Windows-only `scripts/winamp-milkdrop-harness/compare-winamp.ps1` now
-runs the installed Winamp host with the supplied `vis_milk2.dll` in an isolated profile and
-captures its Direct3D window alongside Orynivo, with playback-time stamps and a side-by-side
-image; see its [harness notes](scripts/winamp-milkdrop-harness/README.md). The Royal Mashup
-comparison still shows a substantial colour and feedback mismatch. The analyzer
+remaining limits. The Royal Mashup comparison against Winamp still shows a substantial colour
+and feedback mismatch. The analyzer
 uses the reference's one-sample pre-emphasis, raised-sine window period and
 multi-octave waveform alignment.
-`scripts/visualizer-compare/render-compare.ps1` renders Orynivo and the reference
-implementation under identical resolution, frame time and audio and writes a matching
-test tone, so a capture from a reference player can be compared with the renders.
 
 **Visualisierung** in the sidebar opens a fullscreen music visualizer. It renders the playing
 audio through a Milkdrop-style preset engine at 640 x 360 and scales the frame up. Escape

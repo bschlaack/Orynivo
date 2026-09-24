@@ -11,28 +11,26 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   inside an isolated copy of Winamp, plays the comparison tone, records Direct3D frames with
   playback timestamps, and produces a side-by-side Orynivo comparison. A 300-frame Royal Mashup
   run now provides a direct Winamp reference instead of relying on projectM as a proxy.
-- Added matched-music comparison for the visualizer: `scripts/projectm-oracle/run-oracle.ps1 -Audio
-  <file>` converts a track that FFmpeg can read into one raw 16-bit stereo PCM file both renderers
-  consume, so a comparison runs on the same music instead of a synthetic signal. The converted WAV
-  beside it is what a reference player such as Winamp should play, and `ORACLE_AUDIO`/`GLH_ORACLE_AUDIO`
-  select the file for each engine.
+- Added matched-music comparison for the visualizer: a reference oracle converts a track that
+  FFmpeg can read into one raw 16-bit stereo PCM file both renderers consume, so a comparison runs
+  on the same music instead of a synthetic signal. The converted WAV beside it is what a reference
+  player such as Winamp should play.
 - A per-pixel block that writes the sample position `x` or `y` now runs on the GPU by default. Such
   a block used to keep the CPU warp, because the mesh cannot interpolate a sample position; it is now
   emitted as a warp fragment shader that computes the coordinate per pixel instead, and
   `ORYNIVO_VISUALIZER_PIXELWARP=0` forces the CPU warp.
-  `scripts/gl-harness/verify-pixel-warp.ps1` verifies it: a whole-frame comparison cannot see the
+  `the GL pixel-warp regression` verifies it: a whole-frame comparison cannot see the
   warp, because the display frame is dominated by the overlay that both renderers composite
   identically, so the probe draws the overlay only for the first frames and follows the brightness
   centroid of the remaining warped feedback. The GPU tracks the CPU reference within 0.08 px over a
   23 px travel, and a control preset without the block stays 26 px away, so the probe fails if the
   block does not reach the GPU.
-- Added `scripts/visualizer-compare/render-compare.ps1`, which renders a preset — or every preset
+- Added a reference-player comparison, which renders a preset — or every preset
   below a folder — with Orynivo and the reference implementation under identical resolution, frame
   count, frame time, mesh and audio, writes the frames and a settings manifest, and generates
   `compare-tone.wav`. That tone is a deterministic 440 Hz stereo signal both renderers synthesize, so
   a capture from a reference player such as MilkDrop in Winamp can be compared with the renders under
-  the same audio state. `ORACLE_TONE`/`GLH_ORACLE_TONE` select the tone; without them the comparison
-  keeps its previous constant level.
+  the same audio state.
 
 ### Fixed
 - The visualizer's preset label no longer names a different preset than the one that is
@@ -122,7 +120,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   reference's logarithmic frequency equalization is still not adopted: it changes how much broadband
   content each loudness band sums and needs the reference's unnormalized magnitude scale to keep its
   guard meaningful. It is measured and recorded in `VISUALIZER-FIDELITY-RECHECK.md`, and
-  `scripts/projectm-oracle/measure-bands.cpp` reproduces the reference's own band response.
+  `the reference band measurement` reproduces the reference's own band response.
 - The legacy final composite now applies the reference's animated hue shade: before the gamma gain,
   the frame is multiplied by a four-corner colour whose three channels are animated sines normalised
   so their maximum is one, blended across the frame. The offsets are the reference's per-preset hue
@@ -292,7 +290,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   `fWaveAlpha`, `fWaveScale`, `fWaveSmoothing`, `fWaveParam`, and the `fWaveR/G/B/X/Y` colours now
   resolve to the variables the engine reads, so a preset that sets `fWaveAlpha=0.001` no longer draws
   a full waveform and spectrum over the picture and one that sets `fDecay=0.925` no longer feeds back
-  at 0.96. Measured against projectM with `scripts/projectm-oracle`, `LuxXx - BadBallz Beta` went from
+  at 0.96. Measured against projectM with the local reference oracle, `LuxXx - BadBallz Beta` went from
   a mean channel difference of 0.5 and a correlation of 0.03 to 0.07-0.14 and 0.36-0.41, because the
   bright overlay it never asked for was driving the feedback. `wave_alpha` keeps working as the long
   spelling of `wave_a`.
@@ -392,7 +390,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   target so the feedback stays the pre-comp frame. The GLSL samples are normalised (Skia's `eval`
   takes pixels), the vector uniforms are declared as scalars because `GlInterface` only exposes
   scalar uniform setters, and a shader the dialect cannot express falls back to the CPU path.
-  Verified headlessly with `scripts/gl-harness`, which emits a real preset's shaders, compiles them
+  Verified headlessly with the local GL harness, which emits a real preset's shaders, compiles them
   in the context, and compares the GPU frame against the CPU reference: `LuxXx - BadBallz Beta` now
   renders 0.49 against the CPU's 0.53 instead of a saturated white frame, and `martin - neon space
   ps2`, `martin - lock and release`, and `Jc - Crystal Shards` all run with `glError=0x0`.
@@ -413,7 +411,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   whole picture. Against the 2000-file sample collection it reports 0 runtime errors and 0 loop-budget
   errors, which retracts the roadmap's claim that several presets lose their shaders to the loop
   budget: that claim had counted a parse failure as a run-time loss.
-- Added `scripts/gl-harness/`, a local development harness that renders the visualizer's GPU pipeline
+- Added the local development harness, a local development harness that renders the visualizer's GPU pipeline
   without Avalonia. It compiles `Orynivo/Controls/VisualizerGlPipeline.cs` unchanged and supplies its
   own `Avalonia.OpenGL.GlInterface` over a hidden WGL context, so the real shaders and pass order are
   verified headlessly and a change to the pipeline's GL calls breaks that build instead of drifting.
@@ -468,7 +466,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   minus-one-to-one space rather than Milkdrop's aspect-scaled zero-to-one vertex position, so a preset
   that derives an offset from them renders visibly differently once that offset is interpolated, and
   that has to be reconciled before the mesh can become the default.
-- Added `scripts/projectm-oracle/`, a local development harness that renders a preset with the
+- Added the local development harness, a local development harness that renders a preset with the
   reference implementation (projectM) and with Orynivo and reports the per-frame mean channel
   difference and correlation. It links a projectM checkout the developer builds separately; no
   projectM source is copied into the repository and no Orynivo artifact contains or links it.

@@ -12,6 +12,13 @@ Native/AsioBridge/**/x64/
 Native/CwAsioBridge/**/x64/
 third_party/asiosdk/
 external/asiosdk/
+# Visualizer development harnesses. They are local tooling that drives third-party
+# renderers (projectM, and Winamp's proprietary MilkDrop plugin), so they are kept
+# out of version control and out of any published source archive.
+scripts/gl-harness/
+scripts/projectm-oracle/
+scripts/visualizer-compare/
+scripts/winamp-milkdrop-harness/
 errors/
 equalizer/
 Logo/Orynivo_Logo.ai

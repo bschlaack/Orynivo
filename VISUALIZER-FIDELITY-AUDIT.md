@@ -26,7 +26,7 @@ Reproduction on the real WGL/NVIDIA GPU pipeline: a constant RGB
 `(0.25, 0.5, 0.75)` warp with no overlay produced RGB `(0, 0, 0)` before the
 fix and `(64, 127, 191)` in 8-bit readback afterward. Both runs reported GL error
 zero, so the existing error diagnostic alone did not detect the fault.
-`scripts/gl-harness/verify-warp-target.ps1` checks every pixel at 64×48 and 97×61
+`the GL warp-target regression` checks every pixel at 64×48 and 97×61
 over two frames. This verifies the shared pipeline, not Avalonia/ANGLE integration.
 
 ### P1: Mesh motion accumulated across vertices
@@ -197,6 +197,6 @@ the two fixes remove confirmed faults but do not complete that work.
 - `scripts/verify-all.ps1` in Debug and Release: all managed builds, the non-Windows
   desktop compile, all three test projects, localization/MCP parity and action pins passed.
 - All 13 mesh tests passed; the added regression was observed failing before correction.
-- `scripts/gl-harness/verify-warp-target.ps1` passed on the real GPU at both sizes.
+- `the GL warp-target regression` passed on the real GPU at both sizes.
 - `git diff --check` passed. No end-to-end Avalonia/ANGLE visual comparison or
   collection-wide projectM image comparison was performed in this review.

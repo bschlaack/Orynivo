@@ -69,9 +69,8 @@ This file applies to `Orynivo.Core/` and supplements `../AGENTS.md`.
   multi-octave cross-correlation (`WaveformAligner`), keeping the reference's 96-sample
   margin after the window. The reference's logarithmic frequency equalization is not
   adopted, because it needs the reference's unnormalized magnitude scale to keep its
-  loudness guard meaningful. Measure the reference itself with
-  `scripts/projectm-oracle/measure-bands.cpp` before changing this
-  (`VISUALIZER-FIDELITY-RECHECK.md`). The analyzer serves two contracts: the normalized
+  loudness guard meaningful. Measure the reference's own band response against this one
+  before changing it (`VISUALIZER-FIDELITY-RECHECK.md`). The analyzer serves two contracts: the normalized
   `Bands`/`Bass`/`Mid`/`Treble`/`Volume` values other consumers use, and Milkdrop's
   own relative loudness (`BassRelative` and friends), where each band's sum over one
   sixth of the linear spectrum is divided by its long-term average so a value above
@@ -344,7 +343,7 @@ This file applies to `Orynivo.Core/` and supplements `../AGENTS.md`.
   motion vectors, or feeds a warp shader keeps the per-pixel path, because an interpolated sample
   position has no meaning. `BuildMesh` writes the per-vertex `x`/`y`/`rad`/`ang` with the reference
   aspect (`WarpSampling.GetAspect`), matching the reference's aspect-scaled zero-to-one vertex
-  position, and `scripts/projectm-oracle` is how that is measured.
+  position, and a measurement against the reference is how that is checked.
   `MeshGridX`, `MeshGridY`, and `MeshValues` are public because a GPU warp reads the mesh as vertex
   attributes, and the value order is part of that contract: zoom, zoomexp, rot, cx, cy, dx, dy, sx,
   sy, warp. `MeshRequested` builds the mesh while the CPU keeps evaluating per pixel, which is the

@@ -105,12 +105,12 @@ contracts are now implemented and covered by targeted tests:
 
 ## Validation
 
-- `scripts/gl-harness/verify-feedback.ps1`: identity feedback, decay, landscape
+- `the GL feedback regression`: identity feedback, decay, landscape
   and portrait custom radius, shader-owned fade.
-- `scripts/gl-harness/verify-fidelity.ps1`: simultaneous point/linear and
+- `the GL fidelity regression`: simultaneous point/linear and
   clamp/repeat reads, compressed and decoded blur ranges, multi-frame legacy
   gamma without feedback accumulation, asymmetric shape orientation and alpha.
-- `scripts/gl-harness/verify-warp-target.ps1`: full-size custom warp target.
+- `the GL warp-target regression`: full-size custom warp target.
 - `MilkdropFidelityRegressionTests`: real key spellings, enabled/sparse shapes,
   isolated wave state, once-per-frame execution, init T restoration, PCM scaling,
   contiguous sample windows, warp parameters and stable FPS.
@@ -190,7 +190,7 @@ These corrections do **not** establish complete Winamp MilkDrop fidelity:
   adopted:
   - The reference multiplies each magnitude by `-0.02 * ln((half - i) / half)`, a
     logarithmic frequency equalization. Measuring the reference itself
-    (`scripts/projectm-oracle/measure-bands.cpp`) shows this does **not** suppress
+    (`the reference band measurement`) shows this does **not** suppress
     the bass: a 60 Hz onset drives projectM's bass band to 125 (peak 249), a 6 kHz
     onset drives its mid band to 125, and a 12 kHz onset drives its treble band to
     83.5. It does change how much broadband content each band sums. Adopting it
@@ -208,7 +208,7 @@ These corrections do **not** establish complete Winamp MilkDrop fidelity:
   named-preset comparisons. These tests do not prove every expression/shader dialect.
 - GPU checks use a hidden WGL context. Avalonia/ANGLE composition and a direct
   Winamp capture with identical music, preset and settings were not exercised.
-  `scripts/visualizer-compare/render-compare.ps1` now renders both engines under
+  the local reference-player comparison now renders both engines under
   identical resolution, frame time and audio and writes a matching test tone, so a
   reference-player capture can be produced and compared.
 
@@ -261,13 +261,13 @@ print the per-frame feedback variables (`zoom`, `zoomexp`, `rot`, `cx`, `cy`, `d
 same frames, and compare them directly. The GL path's early darkness should be
 diagnosed separately from the CPU tail-brightness issue.
 
-## Harness and oracle diagnostics added
+## Local verification tooling
 
-`GLH_STAGES=1` prints the mean brightness of the buffer each render stage reads, for a
-few frames. `GLH_ORACLE_AUDIO` and `ORACLE_AUDIO` feed both engines the same raw signed
-16-bit stereo PCM so a preset can be compared on real music rather than a tone. The
-oracle writes `pm-NNN.bmp` and the harness writes `cpu-NNN.bmp`/`gl-NNN.bmp`, so the
-three outputs can be compared with one identical measure.
+Every measurement in this report comes from local, unversioned development harnesses: a reference
+renderer that writes `pm-NNN.bmp` frames, and Orynivo harnesses that write `cpu-NNN.bmp`/`gl-NNN.bmp`
+and can feed both engines the same raw signed 16-bit stereo PCM, so a preset is compared on real
+music rather than a tone. A stage-brightness probe prints the mean brightness of the buffer each
+render stage reads. They are development tooling and are deliberately not part of the repository.
 
 ## Open: the OpenGL presenter's comp shader is too dark for 138
 

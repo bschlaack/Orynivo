@@ -38,9 +38,9 @@ kein belastbarer Sollwert für den Comp-Shader dieses Presets ist.
   Linien haben jetzt die vier vollen Offsets. Die drei Royal-Mashup-Custom-Waves nutzen diesen
   Modus; ein Regressionstest prüft die zusätzliche Pixelreihe.
 
-Der Vergleichsharness schaltet bei `GLH_ORACLE_TONE=1` jetzt tatsächlich auf den
+Der lokale Vergleichsharness schaltet im Ton-Modus jetzt tatsächlich auf den
 `AudioSpectrumAnalyzer` um. Zuvor erhielt projectM einen 440-Hz-Ton, Orynivo aber synthetische
-`HarnessAudio`-Werte. Der Ton wird mit einer Phase in `double` berechnet, wie im Oracle;
+Audiodaten. Der Ton wird mit einer Phase in `double` berechnet, wie im Referenz-Renderer;
 eine `float`-Phase erzeugte bei langen Läufen zusätzliche Frequenzfehler. Der FFT-Eingang
 nutzt die ersten 480 Werte des 576-Werte-Analysefensters; die letzten 96 sind der
 zeitliche Rand wie in der Referenz.
@@ -56,7 +56,7 @@ ursprüngliche UV getrennt an den Pixelshader gehen.
 Bei einem kontrollierten Austausch von `comp_1` im selben Preset lieferte projectM mit einem
 konstant roten Comp-Shader und mit einem Pass-Through-Comp fast dasselbe Bild: Bei Frame 5
 lagen die mittleren RGB-Werte bei etwa 0,22421 bzw. 0,22418. Der Original-Comp lieferte
-etwa 0,20076. Daraus folgt mindestens, dass der projectM-Oracle-Pfad die Comp-Varianten
+etwa 0,20076. Daraus folgt mindestens, dass der projectM-Referenzpfad die Comp-Varianten
 nicht so unterscheidet, wie ihr Shader-Code erwarten lässt. Seine absolute Helligkeit ist
 deshalb kein Nachweis für das Aussehen in Winamp. Der Original-MilkDrop-Code definiert
 `uv_orig` zudem als originale Vertex-UV; projectM setzt sie auf die aktuelle UV. Den
@@ -94,8 +94,8 @@ nicht.
 
 ## Direkter Winamp-Mitschnitt (24. September 2026)
 
-Mit `scripts/winamp-milkdrop-harness/compare-winamp.ps1` läuft nun die vom Nutzer bereitgestellte
-`vis_milk2.dll` in einer isolierten Kopie des installierten Winamp. Der Harness kopiert genau das
+Mit dem lokalen Winamp-Mitschnitt läuft die bereitgestellte
+`vis_milk2.dll` in einer isolierten Kopie des installierten Winamp. Das Werkzeug kopiert genau das
 Royal-Mashup-Preset in dessen Presetverzeichnis, spielt einen 440-Hz-Stereoton mit 44,1 kHz ab,
 setzt dessen Wiedergabezeit vor dem Capture auf null und erfasst 300 Bilder der Direct3D-Clientfläche
 bei 320x180. Winamp meldete für Bild 299 eine Wiedergabezeit von 4.990 ms. Die einfache mittlere

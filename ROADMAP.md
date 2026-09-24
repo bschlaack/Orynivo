@@ -23,7 +23,7 @@ See [the current verification report](VISUALIZER-FIDELITY-RECHECK.md) for eviden
 and remaining work: the reference's logarithmic frequency equalization, fallback-path
 differences and matched Winamp/ANGLE captures. The analyzer now uses the reference's
 one-sample pre-emphasis, raised-sine window period and multi-octave waveform
-alignment; `scripts/visualizer-compare/render-compare.ps1` renders both
+alignment; the local reference-player comparison renders both
 engines under identical resolution, frame time and audio and writes a matching test
 tone, so a reference-player capture can be compared with the renders. The default
 waveform now uses the reference's per-mode geometry (`MilkdropWaveform`), textured
@@ -884,8 +884,8 @@ affordable. This is a project of its own and must keep the CPU path as the fallb
   the frame motion seeded as `_orynivo_*` uniforms and the decay moved to the post pass);
   `ORYNIVO_VISUALIZER_PIXELWARP=0` forces the CPU warp. A block the dialect cannot express no longer
   costs the preset its shaders in the mesh path, which is what sent `$$$ Royal - Mashup (397)` to the
-  CPU entirely. `scripts/gl-harness` renders it with `GLH_PIXEL_WARP=1`, and
-  `scripts/gl-harness/verify-pixel-warp.ps1` verifies it. A whole-frame CPU-vs-GPU comparison is
+  CPU entirely. Its regression renders it with the per-pixel GPU warp forced and verifies the result.
+  A whole-frame CPU-vs-GPU comparison is
   **not** a valid gate: the display frame is dominated by the overlay, which both renderers composite
   identically after the warp, so the frames agree to about 1/255 whether the GPU runs the per-pixel
   warp or the fixed one. The probe therefore draws the overlay only for the first frames and follows
@@ -894,8 +894,8 @@ affordable. This is a project of its own and must keep the CPU path as the fallb
 
   **A matched-music comparison now exists.** Most presets drive their shapes, zoom, and colours from
   the audio, so a tone could not show whether they behave like the reference.
-  `scripts/projectm-oracle/run-oracle.ps1 -Audio <track>` converts a track FFmpeg can read into one raw
-  PCM file both engines consume, and `scripts/gl-harness` reads the same file with `GLH_ORACLE_AUDIO`.
+  A reference oracle runner converts a track FFmpeg can read into one raw
+  PCM file both engines consume, and the Orynivo harness reads the same file.
   It found a real defect straight away: the loudness guard stood at the reference's literal `0.001`,
   which is written for projectM's unnormalized magnitudes, so `mid` and `treble` reported a constant
   one for real music and every preset that reacts to them was dead. The guard is scaled to Orynivo's
@@ -939,7 +939,7 @@ affordable. This is a project of its own and must keep the CPU path as the fallb
   scalar uniform setters; and the uniforms come from `PresetRenderer.WriteShaderUniforms`, which
   seeds the same values the interpreter binds. A shader the dialect cannot express leaves that stage
   on the fixed pipeline, and a preset whose shaders do not emit keeps the CPU frame path.
-  The `gl-harness` emits a real preset's shaders, compiles them in the context, and compares the GPU
+  The local GL harness emits a real preset's shaders, compiles them in the context, and compares the GPU
   frame against the CPU reference: `LuxXx - BadBallz Beta` now renders 0.49 against the CPU's 0.53
   instead of a saturated white frame, a shader-free preset matches to 0.0002, and three further
   shader presets run with `glError=0x0`. The residual difference is the GL frame-pass approximation,
@@ -1183,7 +1183,7 @@ affordable. This is a project of its own and must keep the CPU path as the fallb
   to the per-pixel path, that a position-varying motion is interpolated, and that a position-writing
   program ignores the setting.
   A comparison harness now exists for the fidelity work that remains:
-  `scripts/projectm-oracle/` builds projectM as the reference, renders a preset with it and with
+  the local development harness builds projectM as the reference, renders a preset with it and with
   Orynivo, and reports the mean channel difference and the correlation per frame. It is a local
   development tool, links a projectM checkout the developer builds, and is not part of any build,
   test run, or release artifact. Against a few presets the correlation is weak but positive where
@@ -1210,8 +1210,8 @@ affordable. This is a project of its own and must keep the CPU path as the fallb
   **random** hue (the video echo's `shade` and `ApplyHueShaderColors`), which cannot be reproduced and
   makes an exact colour match impossible; the comp shader's `sampler_main` is the warped frame in
   projectM and the composited frame here; and the video echo and overlay modulation still differ. The
-  oracle's audio input is not equivalent to projectM's own analysis unless both sides run silent
-  (`ORACLE_SILENT` and `GLH_SILENT`), so a comparison must use that mode before the numbers mean
+  oracle's audio input is not equivalent to projectM's own analysis unless both sides run silent,
+  so a comparison must use that mode before the numbers mean
   anything, and the Orynivo side must be the GL pipeline because the CPU pass budget abandons a heavy
   comp shader the GPU runs.
 **Tests**: each phase adds its own; 39a is the prerequisite for claiming any speed-up.
