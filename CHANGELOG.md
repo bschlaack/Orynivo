@@ -53,10 +53,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   collection found the banks used by about 600 presets and `vol_att` by 206.
 
 ### Changed
-- Refreshed the built-in visualizer presets with richer motion, colour cycling, shapes, and a
-  spectrum wave: **Plasma**, **Nebula**, **Tunnel**, **Spectrum Bars**, **Bloom**, **Orbit**,
-  **Mandala**, and **Starfield**. **Spectrum Bars** draws a bright additive spectrum wave along the
-  bottom as an equalizer, and every built-in is verified to light up by
+- Refreshed the built-in visualizer presets with richer motion, colour cycling, and shapes:
+  **Plasma**, **Nebula**, **Tunnel**, **Spectrum Bars**, **Bloom**, **Orbit**, **Mandala**, and
+  **Starfield**. The plasma, nebula, tunnel, bloom, and starfield presets draw the bright full-width
+  PCM   waveform with a swirling warp (a spectrum-mode wave there only left a thin line at the
+  bottom), **Spectrum Bars** keeps the bright additive spectrum wave along the bottom as an
+  equalizer, and **Orbit** uses custom shapes. Every built-in is verified to light up by
   `VisualizerBrightnessDiagnosticTests`.
 
 ### Added
