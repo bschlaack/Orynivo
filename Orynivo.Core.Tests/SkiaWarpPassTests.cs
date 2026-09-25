@@ -213,7 +213,7 @@ public sealed class SkiaWarpPassTests
         PresetProgram perPixel)
     {
         var layout = perPixel.Layout;
-        var slots = new float[layout.Count];
+        var slots = new double[layout.Count];
         var slotX = layout.IndexOf("x");
         var slotY = layout.IndexOf("y");
         var slotRad = layout.IndexOf("rad");
@@ -256,8 +256,8 @@ public sealed class SkiaWarpPassTests
                 slots[slotX] = sampleX;
                 slots[slotY] = sampleY;
                 perPixel.Execute(slots);
-                sampleX = slots[slotX];
-                sampleY = slots[slotY];
+                sampleX = (float)slots[slotX];
+                sampleY = (float)slots[slotY];
 
                 previous.SampleBilinear((sampleX * 0.5f) + 0.5f, (sampleY * 0.5f) + 0.5f, sample);
                 var offset = (((y * width) + x) * 4);

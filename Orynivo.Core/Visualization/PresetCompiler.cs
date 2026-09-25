@@ -88,7 +88,7 @@ public static class PresetCompiler
             body.Add(CompileStatement(state, statement));
 
         var block = Expression.Block(body);
-        var lambda = Expression.Lambda<Action<float[]>>(block, state.Slots);
+        var lambda = Expression.Lambda<Action<double[]>>(block, state.Slots);
         return new PresetProgram(state.Layout, lambda.Compile(), state.ReferencedNames, state.WrittenNames, syntax);
     }
 
@@ -277,7 +277,7 @@ public static class PresetCompiler
         if (current.Kind != PresetTokenKind.OpenParenthesis)
         {
             if (string.Equals(name, "pi", StringComparison.OrdinalIgnoreCase))
-                return new PresetLiteralNode(MathF.PI, position);
+                return new PresetLiteralNode(Math.PI, position);
             return new PresetVariableNode(name, position);
         }
 
@@ -511,7 +511,7 @@ public static class PresetCompiler
                     Expression.Constant(loop.Position)))));
         body.Add(Expression.PostIncrementAssign(index));
         return Expression.Block(
-            typeof(float),
+            typeof(double),
             [index, limit],
             Expression.Assign(limit, clamped),
             Expression.Assign(index, Expression.Constant(0)),
@@ -521,7 +521,7 @@ public static class PresetCompiler
                     Expression.Block(body),
                     Expression.Break(done)),
                 done),
-            Expression.Constant(0f));
+            Expression.Constant(0.0));
     }
 
     /// <summary>Compiles Milkdrop's bounded <c>while</c> construct.</summary>
@@ -548,14 +548,14 @@ public static class PresetCompiler
                     Expression.Constant("The preset looped too often."),
                     Expression.Constant(loop.Position)))));
         return Expression.Block(
-            typeof(float),
+            typeof(double),
             Expression.Loop(
                 Expression.IfThenElse(
                     condition,
                     Expression.Block(body),
                     Expression.Break(done)),
                 done),
-            Expression.Constant(0f));
+            Expression.Constant(0.0));
     }
 
     /// <summary>Compiles one parsed expression into the LINQ tree the interpreter runs.</summary>
@@ -593,7 +593,7 @@ public static class PresetCompiler
     {
         PresetTokenKind.Minus => Expression.Negate(CompileExpression(state, unary.Operand)),
         PresetTokenKind.Plus => CompileExpression(state, unary.Operand),
-        PresetTokenKind.Not => ToNumber(Expression.Equal(CompileExpression(state, unary.Operand), Expression.Constant(0f))),
+        PresetTokenKind.Not => ToNumber(Expression.Equal(CompileExpression(state, unary.Operand), Expression.Constant(0.0))),
         _ => throw new PresetExpressionException($"Unsupported unary operator '{unary.Operator}'", unary.Position)
     };
 
@@ -647,10 +647,10 @@ public static class PresetCompiler
             if (arguments.Count == 0)
                 throw new PresetExpressionException("'sigmoid' expects 1 argument", position);
             return Expression.Divide(
-                Expression.Constant(1f),
+                Expression.Constant(1.0),
                 Expression.Add(
-                    Expression.Constant(1f),
-                    MathCall(nameof(MathF.Exp), Expression.Negate(arguments[0]))));
+                    Expression.Constant(1.0),
+                    MathCall(nameof(Math.Exp), Expression.Negate(arguments[0]))));
         }
 
         // Milkdrop's exec2/exec3/exec4 evaluate their arguments in order and yield the last one,
@@ -664,26 +664,26 @@ public static class PresetCompiler
 
         return name switch
         {
-            "sin" => Unary(value => MathCall(nameof(MathF.Sin), value)),
-            "cos" => Unary(value => MathCall(nameof(MathF.Cos), value)),
-            "tan" => Unary(value => MathCall(nameof(MathF.Tan), value)),
-            "asin" => Unary(value => MathCall(nameof(MathF.Asin), value)),
-            "acos" => Unary(value => MathCall(nameof(MathF.Acos), value)),
-            "atan" => Unary(value => MathCall(nameof(MathF.Atan), value)),
-            "sqrt" => Unary(value => MathCall(nameof(MathF.Sqrt), value)),
-            "abs" => Unary(value => MathCall(nameof(MathF.Abs), value)),
-            "exp" => Unary(value => MathCall(nameof(MathF.Exp), value)),
-            "log" => Unary(value => MathCall(nameof(MathF.Log), value)),
-            "log10" => Unary(value => MathCall(nameof(MathF.Log10), value)),
-            "floor" => Unary(value => MathCall(nameof(MathF.Floor), value)),
-            "ceil" => Unary(value => MathCall(nameof(MathF.Ceiling), value)),
-            "int" => Unary(value => MathCall(nameof(MathF.Truncate), value)),
+            "sin" => Unary(value => MathCall(nameof(Math.Sin), value)),
+            "cos" => Unary(value => MathCall(nameof(Math.Cos), value)),
+            "tan" => Unary(value => MathCall(nameof(Math.Tan), value)),
+            "asin" => Unary(value => MathCall(nameof(Math.Asin), value)),
+            "acos" => Unary(value => MathCall(nameof(Math.Acos), value)),
+            "atan" => Unary(value => MathCall(nameof(Math.Atan), value)),
+            "sqrt" => Unary(value => MathCall(nameof(Math.Sqrt), value)),
+            "abs" => Unary(value => MathCall(nameof(Math.Abs), value)),
+            "exp" => Unary(value => MathCall(nameof(Math.Exp), value)),
+            "log" => Unary(value => MathCall(nameof(Math.Log), value)),
+            "log10" => Unary(value => MathCall(nameof(Math.Log10), value)),
+            "floor" => Unary(value => MathCall(nameof(Math.Floor), value)),
+            "ceil" => Unary(value => MathCall(nameof(Math.Ceiling), value)),
+            "int" => Unary(value => MathCall(nameof(Math.Truncate), value)),
             "sign" => Unary(value => Expression.Call(SignMethod, value)),
             "rand" => Unary(value => Expression.Multiply(Expression.Call(RandomMethod), value), 1),
-            "min" => Binary(arguments, name, position, nameof(MathF.Min)),
-            "max" => Binary(arguments, name, position, nameof(MathF.Max)),
-            "pow" => Binary(arguments, name, position, nameof(MathF.Pow)),
-            "atan2" => Binary(arguments, name, position, nameof(MathF.Atan2)),
+            "min" => Binary(arguments, name, position, nameof(Math.Min)),
+            "max" => Binary(arguments, name, position, nameof(Math.Max)),
+            "pow" => Binary(arguments, name, position, nameof(Math.Pow)),
+            "atan2" => Binary(arguments, name, position, nameof(Math.Atan2)),
             "fmod" => Binary(arguments, name, position, null),
             "sqr" => Unary(value => Expression.Multiply(value, value)),
             // Milkdrop's shared memory buffers. They are global state, so the accesses are
@@ -719,8 +719,8 @@ public static class PresetCompiler
         Require(arguments, 2, name, position);
         return Expression.Condition(
             Expression.MakeBinary(comparison, arguments[0], arguments[1]),
-            Expression.Constant(1f),
-            Expression.Constant(0f));
+            Expression.Constant(1.0),
+            Expression.Constant(0.0));
     }
 
     /// <summary>Builds a bitwise operation on the integer view of its arguments.</summary>
@@ -741,7 +741,7 @@ public static class PresetCompiler
         Expression result = unary
             ? Expression.Not(value)
             : Expression.MakeBinary(operation, value, Expression.Convert(arguments[1], typeof(int)));
-        return Expression.Convert(result, typeof(float));
+        return Expression.Convert(result, typeof(double));
     }
 
     private static Expression Binary(
@@ -754,7 +754,7 @@ public static class PresetCompiler
         if (methodName is null)
             return Expression.Call(FmodMethod, arguments[0], arguments[1]);
 
-        var method = typeof(MathF).GetMethod(methodName, [typeof(float), typeof(float)])
+        var method = typeof(Math).GetMethod(methodName, [typeof(double), typeof(double)])
             ?? throw new PresetExpressionException($"Unknown function '{name}'", position);
         return Expression.Call(method, arguments[0], arguments[1]);
     }
@@ -768,7 +768,7 @@ public static class PresetCompiler
 
     private static Expression MathCall(string name, Expression value)
     {
-        var method = typeof(MathF).GetMethod(name, [typeof(float)])
+        var method = typeof(Math).GetMethod(name, [typeof(double)])
             ?? throw new PresetExpressionException($"Unknown function '{name}'", 0);
         return Expression.Call(method, value);
     }
@@ -809,15 +809,15 @@ public static class PresetCompiler
         Func<Expression, Expression, BinaryExpression> comparison,
         Expression left,
         Expression right) =>
-        Expression.Condition(comparison(left, right), Expression.Constant(1f), Expression.Constant(0f));
+        Expression.Condition(comparison(left, right), Expression.Constant(1.0), Expression.Constant(0.0));
 
     /// <summary>Converts a value to the boolean a condition needs, where non-zero is true.</summary>
     private static Expression IsTrue(Expression value) =>
-        Expression.NotEqual(value, Expression.Constant(0f));
+        Expression.NotEqual(value, Expression.Constant(0.0));
 
     /// <summary>Converts a condition back into the one-or-zero a preset variable holds.</summary>
     private static Expression ToNumber(Expression condition) =>
-        Expression.Condition(condition, Expression.Constant(1f), Expression.Constant(0f));
+        Expression.Condition(condition, Expression.Constant(1.0), Expression.Constant(0.0));
 
     private static int PrecedenceOf(PresetTokenKind kind) => kind switch
     {
@@ -834,16 +834,16 @@ public static class PresetCompiler
     /// <param name="left">Dividend.</param>
     /// <param name="right">Divisor.</param>
     /// <returns>The remainder, or zero when the divisor is zero.</returns>
-    private static float Fmod(float left, float right) =>
-        right == 0f ? 0f : left - (right * MathF.Truncate(left / right));
+    private static double Fmod(double left, double right) =>
+        right == 0.0 ? 0.0 : left - (right * Math.Truncate(left / right));
 
     /// <summary>Returns -1 for negative values and 1 otherwise, matching the preset convention.</summary>
     /// <param name="value">Input value.</param>
     /// <returns>The sign as -1 or 1.</returns>
-    private static float Sign(float value) => value < 0f ? -1f : 1f;
+    private static double Sign(double value) => value < 0.0 ? -1.0 : 1.0;
 
     /// <summary>The shared Milkdrop memory buffer, one entry per slot a preset can address.</summary>
-    private static readonly float[] MegaBuffer = new float[1 << 20];
+    private static readonly double[] MegaBuffer = new double[1 << 20];
 
     /// <summary>Guards the shared memory buffer, which presets can read and write.</summary>
     private static readonly object MegaGate = new();
@@ -851,11 +851,11 @@ public static class PresetCompiler
     /// <summary>Reads one entry of the shared Milkdrop memory buffer.</summary>
     /// <param name="index">Entry index.</param>
     /// <returns>The stored value, or zero outside the buffer.</returns>
-    private static float ReadMegaBuffer(float index)
+    private static double ReadMegaBuffer(double index)
     {
         var slot = (int)index;
         if (slot < 0 || slot >= MegaBuffer.Length)
-            return 0f;
+            return 0.0;
         lock (MegaGate)
             return MegaBuffer[slot];
     }
@@ -864,7 +864,7 @@ public static class PresetCompiler
     /// <param name="index">Entry index.</param>
     /// <param name="value">Value to store.</param>
     /// <returns>The stored value.</returns>
-    private static float WriteMegaBufferValue(float index, float value)
+    private static double WriteMegaBufferValue(double index, double value)
     {
         var slot = (int)index;
         if (slot < 0 || slot >= MegaBuffer.Length)
@@ -900,7 +900,7 @@ public static class PresetCompiler
 
     /// <summary>Draws the next pseudo-random value in the range zero to one.</summary>
     /// <returns>A value in the range zero to one.</returns>
-    private static float NextRandom() => Random.Shared.NextSingle();
+    private static double NextRandom() => Random.Shared.NextDouble();
 
     /// <summary>Collects the slot layout while compiling.</summary>
     private sealed class CompileState
@@ -910,7 +910,7 @@ public static class PresetCompiler
         public CompileState(PresetVariableLayout? layout) => Layout = layout ?? new PresetVariableLayout();
 
         /// <summary>Gets the slot array parameter shared by every compiled statement.</summary>
-        public ParameterExpression Slots { get; } = Expression.Parameter(typeof(float[]), "slots");
+        public ParameterExpression Slots { get; } = Expression.Parameter(typeof(double[]), "slots");
 
         /// <summary>Gets the slot layout this program compiles against.</summary>
         public PresetVariableLayout Layout { get; }

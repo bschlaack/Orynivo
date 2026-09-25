@@ -8,7 +8,7 @@ namespace Orynivo.Visualization;
 /// </summary>
 public sealed class PresetProgram
 {
-    private readonly Action<float[]>? _execute;
+    private readonly Action<double[]>? _execute;
     private readonly HashSet<string> _referenced;
     private readonly HashSet<string> _written;
 
@@ -20,7 +20,7 @@ public sealed class PresetProgram
     /// <param name="syntax">Parsed statement tree, or <see langword="null"/> when empty.</param>
     internal PresetProgram(
         PresetVariableLayout layout,
-        Action<float[]>? execute,
+        Action<double[]>? execute,
         IReadOnlyCollection<string>? referenced = null,
         IReadOnlyCollection<string>? written = null,
         PresetBlockNode? syntax = null)
@@ -90,7 +90,7 @@ public sealed class PresetProgram
     /// </summary>
     /// <param name="slots">Mutable slot storage.</param>
     /// <exception cref="ArgumentException">The slot array is too short.</exception>
-    public void Execute(float[] slots)
+    public void Execute(double[] slots)
     {
         ArgumentNullException.ThrowIfNull(slots);
         if (_execute is null)

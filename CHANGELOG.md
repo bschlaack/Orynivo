@@ -20,6 +20,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   `dot(x, float3(0.32, 0.49, 0.29))`, instead of the conventional Rec. 601 luma the
   interpreter and both emitters used. A composite shader that derives its blur gradient
   through `lum` (for example Royal Mashup (13)) sampled the wrong value.
+- Separated the MilkDrop per-frame and per-pixel variable storage. A preset's per-pixel block
+  now writes to its own slot array, seeded from the per-frame state each frame, instead of the
+  per-frame array, matching the reference's separate `m_pf_eel`/`m_pv_eel` variable universes.
+  In Royal Mashup (13) the per-pixel vortex points `x1`/`y1`/`x2`/`y2` previously overwrote the
+  per-frame spring state, so the spring (`q4`/`q5`/`q8`) diverged from Winamp.
+- Corrected the comp shader's `rad`/`ang` on the CPU interpreter path to MilkDrop's
+  `UvToMathSpace` (aspect scaled, `rad` one at the screen corners, `ang` wrapped to `0..2π`).
+  The interpreter previously disagreed with the GPU emitter, so a comp shader such as Royal
+  Mashup (13) that derives its picture from them rendered differently on the two paths.
+  `CompShaderPolarTests` pins the interpreter convention.
+- Preset expression variables now use `double` like ns-eel2's `EEL_F`, so long-running feedback
+  keeps the reference's numeric precision instead of accumulating `float` rounding.
 
 ### Added
 - Added a Windows-only Winamp MilkDrop capture harness that runs the supplied `vis_milk2.dll`

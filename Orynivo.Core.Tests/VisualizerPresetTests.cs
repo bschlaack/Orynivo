@@ -54,7 +54,7 @@ public sealed class VisualizerPresetTests
     {
         var preset = VisualizerPreset.Parse("per_frame_1=q1 = 0.25;\nper_pixel_1=x = q1;");
 
-        var slots = new float[preset.Layout.Count];
+        var slots = new double[preset.Layout.Count];
         preset.PerFrame.Execute(slots);
         preset.PerPixel.Execute(slots);
 

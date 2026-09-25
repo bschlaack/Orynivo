@@ -121,8 +121,10 @@ public sealed class MilkdropCompatibilityTests
 
         Assert.Equal(80f, renderer.ReadVariable("pixelsx"));
         Assert.Equal(40f, renderer.ReadVariable("pixelsy"));
+        // Milkdrop binds aspectx/aspecty to the *inverse* factors (milkdropfs.cpp:
+        // var_pf_aspectx = m_fInvAspectX), so a landscape 80x40 frame reports (1, 2), not (1, 0.5).
         Assert.Equal(1f, renderer.ReadVariable("aspectx"));
-        Assert.Equal(0.5f, renderer.ReadVariable("aspecty"));
+        Assert.Equal(2f, renderer.ReadVariable("aspecty"));
     }
 
     /// <summary>Rotation, zoom, and stretch each change the sampled feedback.</summary>

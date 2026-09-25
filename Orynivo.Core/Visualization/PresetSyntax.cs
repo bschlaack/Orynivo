@@ -12,7 +12,7 @@ internal abstract record PresetSyntaxNode(int Position);
 /// <summary>A numeric literal.</summary>
 /// <param name="Value">The literal value.</param>
 /// <param name="Position">Source position.</param>
-internal sealed record PresetLiteralNode(float Value, int Position) : PresetSyntaxNode(Position);
+internal sealed record PresetLiteralNode(double Value, int Position) : PresetSyntaxNode(Position);
 
 /// <summary>A variable reference, which the layout maps to a slot.</summary>
 /// <param name="Name">Variable name.</param>

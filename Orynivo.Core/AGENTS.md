@@ -64,8 +64,14 @@ This file applies to `Orynivo.Core/` and supplements `../AGENTS.md`.
   path instead of a fullscreen fragment warp that drops dx/dy.
   Composite shader `rad` divides the aspect-scaled position's length by the
   aspect-scaled corner radius, and `ang` is in 0..2π as in MilkDrop's
-  `UvToMathSpace`. The four hue-shader indices are bottom-right, bottom-left,
-  top-right, top-left in a top-down image.
+  `UvToMathSpace`. The CPU interpreter (`PresetRenderer.BindShaderVariables` /
+  `SeedPolar` with `mathSpacePolar`) and the GPU emitter
+  (`ShaderTranspiler.EmitCompMain`) must both use that convention; a comp shader
+  such as Mashup (13) that derives its whole picture from `rad`/`ang` otherwise
+  renders differently on the two paths. The warp shader keeps its own per-vertex
+  polar pair, which is not aspect-normalised. `CompShaderPolarTests` pins the
+  interpreter convention. The four hue-shader indices are bottom-right,
+  bottom-left, top-right, top-left in a top-down image.
 
 - Manual cover searches fetch only bounded CAA `front-250` previews, with three
   concurrent workers, a 35-second search budget and one retry for transient
@@ -93,8 +99,14 @@ This file applies to `Orynivo.Core/` and supplements `../AGENTS.md`.
   stereo waveform stays aligned by `WaveformAligner`, and the normalized display
   bands remain a separate contract. Never evaluate preset expressions or render
   frames on the audio thread. `PresetVariableLayout.RegisterStandardVariables` is the single place
-  that declares the Milkdrop variable set, so every expression block of a preset shares one
-  slot layout and `q1`-`q32` keep their value between the per-frame and per-pixel stages. The
+  that declares the Milkdrop variable set, so every expression block of a preset shares one slot
+  layout. The layout is the only shared thing: the per-frame and per-pixel blocks run on separate
+  slot arrays (`PresetRenderer._slots` and `_pixelSlots`, with the per-pixel array seeded from the
+  per-frame state each frame), because Milkdrop keeps per-frame (`m_pf_eel`) and per-vertex
+  (`m_pv_eel`) as separate variable universes. A shared array lets a per-pixel write such as `x1`
+  clobber the per-frame spring state, which is what made Mashup (13) render wrong; never reintroduce
+  it. `q1`-`q32` reach the per-pixel stage because the per-frame state is copied in, not because the
+  arrays are shared. Slot values are `double`, matching ns-eel2's `EEL_F`. The
   renderer runs the stages in Milkdrop order: the init blocks once, the preset per-frame block, the motion warp (`zoom`, `zoomexp`, `rot`, `cx`/`cy`,
   `dx`/`dy`, `sx`/`sy`) with the per-pixel block on top, the decay fade (the reference's warp
   fragment shader applies it to the sampled colour), the blur passes and the blur chain's edge

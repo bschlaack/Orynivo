@@ -370,7 +370,7 @@ public static class PresetExpressionTranspiler
     /// <returns>The expression text.</returns>
     private static string EmitExpression(PresetSyntaxNode expression, EmitState state) => expression switch
     {
-        PresetLiteralNode literal => SkSL.Literal(literal.Value),
+        PresetLiteralNode literal => SkSL.Literal((float)literal.Value),
         PresetVariableNode variable => Variable(variable.Name, state),
         PresetUnaryNode unary => EmitUnary(unary, state),
         PresetBinaryNode binary => EmitBinary(binary, state),

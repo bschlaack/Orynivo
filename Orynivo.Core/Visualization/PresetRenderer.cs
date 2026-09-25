@@ -150,13 +150,18 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
     /// amplifies inside the comp shader diverge to white.
     /// </summary>
     private bool _compStageRan;
-    private float[] _slots;
+    private double[] _slots;
+    // The per-pixel stage runs against its own copy of the slots, so the user variables its block
+    // writes (a preset may reuse a name such as x2 as a spring state in per-frame and a vortex point
+    // in per-pixel) cannot overwrite the per-frame state. Milkdrop keeps the two stages separate;
+    // only q1-q8 carry from per-frame to per-pixel.
+    private double[] _pixelSlots;
     private double _frameDelta = 1d / 60d;
     private static readonly string[] QNames = Enumerable.Range(1, 32).Select(i => "q" + i).ToArray();
     private static readonly string[] TNames = Enumerable.Range(1, 8).Select(i => "t" + i).ToArray();
-    private readonly Dictionary<object, float[]> _elementFrames = [];
-    private readonly Dictionary<object, float[]> _elementPoints = [];
-    private readonly Dictionary<object, float[]> _elementInitT = [];
+    private readonly Dictionary<object, double[]> _elementFrames = [];
+    private readonly Dictionary<object, double[]> _elementPoints = [];
+    private readonly Dictionary<object, double[]> _elementInitT = [];
     private static readonly string[] ElementInputs = ["time", "fps", "frame", "progress", "bass", "mid", "treb", "bass_att", "mid_att", "treb_att"];
 
     // Resolved once so the per-pixel loop never looks a name up in the layout again.
@@ -185,7 +190,8 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
     private readonly int _slotSx;
     private readonly int _slotSy;
     private readonly int _slotWarp;
-    private readonly float[][] _workerSlots;
+    private readonly double[][] _workerSlots;
+    private readonly double[][] _workerPixelSlots;
     private readonly float[][] _workerSample;
     private readonly bool _canParallelizeWarp;
     // Resolved once: whether the per-pixel program may run on the GPU, which evaluates every pixel
@@ -284,7 +290,8 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
             new PixelBuffer(Math.Max(16, width / 8), Math.Max(16, height / 8)),
             new PixelBuffer(Math.Max(16, width / 16), Math.Max(16, height / 16))
         ];
-        _slots = new float[preset.Layout.Count];
+        _slots = new double[preset.Layout.Count];
+        _pixelSlots = new double[preset.Layout.Count];
         _slotX = preset.Layout.IndexOf("x");
         _slotY = preset.Layout.IndexOf("y");
         _slotRad = preset.Layout.IndexOf("rad");
@@ -349,11 +356,13 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
                                   (!PresetVariableLayout.Standard.Contains(name) && !shared.Contains(name)));
         _perPixelGpuSafe = PresetExpressionTranspiler.CanRunInParallel(preset.PerPixel);
         var workers = ParallelRows.WorkerCount;
-        _workerSlots = new float[workers][];
+        _workerSlots = new double[workers][];
+        _workerPixelSlots = new double[workers][];
         _workerSample = new float[workers][];
         for (var worker = 0; worker < workers; worker++)
         {
-            _workerSlots[worker] = new float[preset.Layout.Count];
+            _workerSlots[worker] = new double[preset.Layout.Count];
+            _workerPixelSlots[worker] = new double[preset.Layout.Count];
             _workerSample[worker] = new float[4];
         }
 
@@ -575,6 +584,8 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
         if (!_perPixelWritesMotion && !MeshRequested)
             return;
 
+        // The per-pixel stage starts from the per-frame state but writes to its own slots.
+        Array.Copy(_slots, _pixelSlots, _slots.Length);
         BuildMesh(
             Math.Max(0.01f, Read("zoom", Preset.Zoom)),
             Read("zoomexp", 1f),
@@ -677,6 +688,7 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
         {
             WarpScale = Read("fWarpScale", 1f),
             TextureWrap = Read("bTexWrap", 0f) != 0f,
+            ShaderAmount = Math.Clamp(Read("shader", 1f), 0f, 1f),
             HueTime = (float)_elapsed * 30f,
             HueOffsets = (_hueOffsets[0], _hueOffsets[1], _hueOffsets[2], _hueOffsets[3]),
         };
@@ -1195,6 +1207,12 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
 
         var perPixelMotion = _perPixelWritesMotion && !recordMotion;
 
+        // The per-pixel stage starts from the per-frame state but writes to its own slots, so its
+        // user variables cannot leak back into the spring or any other per-frame variable.
+        Array.Copy(_slots, _pixelSlots, _slots.Length);
+        for (var worker = 0; worker < _workerPixelSlots.Length; worker++)
+            Array.Copy(_slots, _workerPixelSlots[worker], _slots.Length);
+
         // Measured from here, not from the frame start: the ceiling guards a runaway per-pixel
         // program, and it must not trip on the one-off JIT cost of the earlier stages.
         _warpClock.Restart();
@@ -1219,7 +1237,7 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
         // changes one of these inside per_pixel sees the change here, on the next point, the way
         // Milkdrop does it. Both the per-pixel fill and the shader grid go through this, so the
         // two paths cannot drift apart.
-        void ComputeSample(float[] slots, float normalizedX, float normalizedY, out float sampleX, out float sampleY)
+        void ComputeSample(double[] slots, float normalizedX, float normalizedY, out float sampleX, out float sampleY)
         {
             var zoomNow = zoom;
             var zoomExpNow = zoomExp;
@@ -1295,7 +1313,7 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
             var target = _warped.RawPixels;
             // A parallel worker gets its own slots and its own sample scratch, because the shared
             // ones would let two pixels race on the value a per-pixel program just wrote.
-            var slots = worker < 0 ? _slots : _workerSlots[worker];
+            var slots = worker < 0 ? _pixelSlots : _workerPixelSlots[worker];
             var sample = worker < 0 ? _sample : _workerSample[worker];
             for (var y = from; y < to; y++)
             {
@@ -1364,8 +1382,8 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
         {
             // Each worker starts from the per-frame values, so a per-pixel program sees the same
             // frame variables it would on a single thread.
-            for (var worker = 0; worker < _workerSlots.Length; worker++)
-                Array.Copy(_slots, _workerSlots[worker], _slots.Length);
+            for (var worker = 0; worker < _workerPixelSlots.Length; worker++)
+                Array.Copy(_pixelSlots, _workerPixelSlots[worker], _slots.Length);
             ParallelRows.For(height, WarpRows);
         }
         else
@@ -1506,16 +1524,16 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
 
                 // Motion outputs are local to a vertex. In particular, zoom *= ... must
                 // not multiply the preceding vertex's result across the entire mesh.
-                Write(_slots, _slotZoom, frameZoom);
-                Write(_slots, _slotZoomExp, frameZoomExp);
-                Write(_slots, _slotRot, frameRotation);
-                Write(_slots, _slotCx, frameCentreX);
-                Write(_slots, _slotCy, frameCentreY);
-                Write(_slots, _slotDx, frameOffsetX);
-                Write(_slots, _slotDy, frameOffsetY);
-                Write(_slots, _slotSx, frameStretchX);
-                Write(_slots, _slotSy, frameStretchY);
-                Write("warp", frameWarp);
+                Write(_pixelSlots, _slotZoom, frameZoom);
+                Write(_pixelSlots, _slotZoomExp, frameZoomExp);
+                Write(_pixelSlots, _slotRot, frameRotation);
+                Write(_pixelSlots, _slotCx, frameCentreX);
+                Write(_pixelSlots, _slotCy, frameCentreY);
+                Write(_pixelSlots, _slotDx, frameOffsetX);
+                Write(_pixelSlots, _slotDy, frameOffsetY);
+                Write(_pixelSlots, _slotSx, frameStretchX);
+                Write(_pixelSlots, _slotSy, frameStretchY);
+                Write(_pixelSlots, _slotWarp, frameWarp);
 
                 var normalizedX = (gridX / (float)MeshGridX * 2f) - 1f;
                 // Milkdrop hands the program the vertex position and the aspect-scaled polar pair.
@@ -1523,23 +1541,23 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
                 var aspectVertexY = normalizedY * aspectY;
                 // Milkdrop's per-vertex x/y are the aspect-scaled position in zero-to-one space,
                 // which is the space a preset computes an offset like x - ox in.
-                Write(_slots, _slotX, (normalizedX * 0.5f * aspectX) + 0.5f);
-                Write(_slots, _slotY, (normalizedY * 0.5f * aspectY) + 0.5f);
-                Write(_slots, _slotRad, MathF.Sqrt((aspectVertexX * aspectVertexX) + (aspectVertexY * aspectVertexY)));
-                Write(_slots, _slotAng, -MathF.Atan2(aspectVertexY, aspectVertexX));
-                Preset.PerPixel.Execute(_slots);
+                Write(_pixelSlots, _slotX, (normalizedX * 0.5f * aspectX) + 0.5f);
+                Write(_pixelSlots, _slotY, (normalizedY * 0.5f * aspectY) + 0.5f);
+                Write(_pixelSlots, _slotRad, MathF.Sqrt((aspectVertexX * aspectVertexX) + (aspectVertexY * aspectVertexY)));
+                Write(_pixelSlots, _slotAng, -MathF.Atan2(aspectVertexY, aspectVertexX));
+                Preset.PerPixel.Execute(_pixelSlots);
 
                 var index = (((gridY * (MeshGridX + 1)) + gridX) * MeshValues);
-                _meshMotion[index] = Math.Max(0.01f, Read(_slots, _slotZoom, zoom));
-                _meshMotion[index + 1] = Read(_slots, _slotZoomExp, zoomExp);
-                _meshMotion[index + 2] = Read(_slots, _slotRot, rotation);
-                _meshMotion[index + 3] = Read(_slots, _slotCx, centreX);
-                _meshMotion[index + 4] = Read(_slots, _slotCy, centreY);
-                _meshMotion[index + 5] = Read(_slots, _slotDx, offsetX);
-                _meshMotion[index + 6] = Read(_slots, _slotDy, offsetY);
-                _meshMotion[index + 7] = Read(_slots, _slotSx, stretchX);
-                _meshMotion[index + 8] = Read(_slots, _slotSy, stretchY);
-                _meshMotion[index + 9] = Read(_slots, _slotWarp, warp);
+                _meshMotion[index] = Math.Max(0.01f, Read(_pixelSlots, _slotZoom, zoom));
+                _meshMotion[index + 1] = Read(_pixelSlots, _slotZoomExp, zoomExp);
+                _meshMotion[index + 2] = Read(_pixelSlots, _slotRot, rotation);
+                _meshMotion[index + 3] = Read(_pixelSlots, _slotCx, centreX);
+                _meshMotion[index + 4] = Read(_pixelSlots, _slotCy, centreY);
+                _meshMotion[index + 5] = Read(_pixelSlots, _slotDx, offsetX);
+                _meshMotion[index + 6] = Read(_pixelSlots, _slotDy, offsetY);
+                _meshMotion[index + 7] = Read(_pixelSlots, _slotSx, stretchX);
+                _meshMotion[index + 8] = Read(_pixelSlots, _slotSy, stretchY);
+                _meshMotion[index + 9] = Read(_pixelSlots, _slotWarp, warp);
             }
         }
 
@@ -1722,7 +1740,7 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
             for (var gridX = 0; gridX < gridWidth; gridX++)
             {
                 var normalizedX = gridWidth > 1 ? (gridX / (float)(gridWidth - 1) * 2f) - 1f : 0f;
-                computeSample(_slots, normalizedX, normalizedY, out var sampleX, out var sampleY);
+                computeSample(_pixelSlots, normalizedX, normalizedY, out var sampleX, out var sampleY);
                 RunWarpShaders(
                     (sampleX * 0.5f) + 0.5f,
                     (sampleY * 0.5f) + 0.5f,
@@ -1779,7 +1797,7 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
     /// <param name="normalizedY">Vertical position in the range minus one to one.</param>
     /// <param name="sampleX">Resulting horizontal sampling position.</param>
     /// <param name="sampleY">Resulting vertical sampling position.</param>
-    private delegate void SamplePosition(float[] slots, float normalizedX, float normalizedY, out float sampleX, out float sampleY);
+    private delegate void SamplePosition(double[] slots, float normalizedX, float normalizedY, out float sampleX, out float sampleY);
 
     /// <summary>
     /// Computes the grid a shader pass runs on. A frame larger than the current pixel target is
@@ -1925,12 +1943,12 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
             {
                 compiled.SetAt(compiled.UvIndex, ShaderValue.Vector(u, v, 0f, 0f, 2));
                 compiled.SetAt(compiled.UvOrigIndex, ShaderValue.Vector(originalU, originalV, 0f, 0f, 2));
-                SeedPolar(compiled, u, v);
+                SeedPolar(compiled, u, v, 1f, 1f, false);
                 colour = compiled.Run(this);
             }
             else
             {
-                BindShaderVariables(interpreter, u, v, originalU, originalV);
+                BindShaderVariables(interpreter, u, v, originalU, originalV, false);
                 colour = interpreter.Run();
                 if (!interpreter.ReturnedValue && interpreter.Variables.TryGetValue("ret", out var written))
                     colour = written;
@@ -1950,10 +1968,29 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
     /// <param name="compiled">Compiled shader about to run.</param>
     /// <param name="u">Sampling coordinate in the range zero to one.</param>
     /// <param name="v">Sampling row in the range zero to one.</param>
-    private static void SeedPolar(CompiledShader compiled, float u, float v)
+    /// <param name="aspectX">Horizontal aspect factor (one on a landscape frame).</param>
+    /// <param name="aspectY">Vertical aspect factor (at most one).</param>
+    /// <param name="mathSpacePolar">
+    /// Whether <c>rad</c>/<c>ang</c> use the reference's <c>UvToMathSpace</c> convention, matching
+    /// the GPU emitter's comp entry point; the warp shader keeps its own polar pair.
+    /// </param>
+    private static void SeedPolar(CompiledShader compiled, float u, float v, float aspectX, float aspectY, bool mathSpacePolar)
     {
         if (compiled.RadIndex < 0 && compiled.AngIndex < 0)
             return;
+
+        if (mathSpacePolar)
+        {
+            var px = ((u * 2f) - 1f) * aspectX;
+            var py = ((v * 2f) - 1f) * aspectY;
+            var corner = MathF.Sqrt((aspectX * aspectX) + (aspectY * aspectY));
+            var angle = MathF.Atan2(py, px);
+            if (angle < 0f)
+                angle += 2f * MathF.PI;
+            compiled.SetAt(compiled.RadIndex, ShaderValue.Scalar(MathF.Sqrt((px * px) + (py * py)) / corner));
+            compiled.SetAt(compiled.AngIndex, ShaderValue.Scalar(angle));
+            return;
+        }
 
         var x = (u * 2f) - 1f;
         var y = (v * 2f) - 1f;
@@ -2025,6 +2062,9 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
     /// <param name="shaderHeight">Shader grid height.</param>
     private bool RunCompShaders(PixelBuffer output, int shaderWidth, int shaderHeight)
     {
+        // The comp shader's rad/ang use MilkDrop's UvToMathSpace convention, which is aspect scaled.
+        var compAspectX = 1f / Math.Max(0.0001f, Read("aspectx", 1f));
+        var compAspectY = 1f / Math.Max(0.0001f, Read("aspecty", 1f));
         for (var y = 0; y < shaderHeight; y++)
         {
             if (_shaderClock.Elapsed.TotalMilliseconds > ShaderPassBudgetMilliseconds)
@@ -2055,12 +2095,12 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
                     {
                         compiled.SetAt(compiled.UvIndex, ShaderValue.Vector(u, v, 0f, 0f, 2));
                         compiled.SetAt(compiled.UvOrigIndex, ShaderValue.Vector(u, v, 0f, 0f, 2));
-                        SeedPolar(compiled, u, v);
+                        SeedPolar(compiled, u, v, compAspectX, compAspectY, true);
                         colour = compiled.Run(this);
                     }
                     else
                     {
-                        BindShaderVariables(interpreter, u, v, u, v);
+                        BindShaderVariables(interpreter, u, v, u, v, true);
                         colour = interpreter.Run();
                         if (!interpreter.ReturnedValue && interpreter.Variables.TryGetValue("ret", out var written))
                             colour = written;
@@ -2263,7 +2303,7 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
 
             var slot = layout.IndexOf(name);
             if (slot >= 0 && slot < _slots.Length)
-                scalars[name] = _slots[slot];
+                scalars[name] = (float)_slots[slot];
         }
 
         if (perPixelVariables is not null)
@@ -2272,7 +2312,7 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
             {
                 var slot = layout.IndexOf(name);
                 scalars[PresetExpressionTranspiler.UniformName(name)] =
-                    slot >= 0 && slot < _slots.Length ? _slots[slot] : 0f;
+                    slot >= 0 && slot < _slots.Length ? (float)_slots[slot] : 0f;
             }
         }
 
@@ -2395,7 +2435,7 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
         {
             var slot = layout.IndexOf(name);
             destination[PresetExpressionTranspiler.UniformName(name)] =
-                ShaderValue.Scalar(slot >= 0 && slot < _slots.Length ? _slots[slot] : 0f);
+                ShaderValue.Scalar(slot >= 0 && slot < _slots.Length ? (float)_slots[slot] : 0f);
         }
     }
 
@@ -2433,7 +2473,12 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
     /// <param name="v">Sampling row in the range zero to one.</param>
     /// <param name="originalU">Coordinate of the pixel itself.</param>
     /// <param name="originalV">Row of the pixel itself.</param>
-    private void BindShaderVariables(ShaderInterpreter interpreter, float u, float v, float originalU, float originalV)
+    /// <param name="mathSpacePolar">
+    /// Whether <c>rad</c>/<c>ang</c> use the reference's <c>UvToMathSpace</c> convention (aspect
+    /// scaled, <c>rad</c> one at the screen corners, <c>ang</c> wrapped to zero through two pi). The
+    /// comp shader needs that convention; the warp shader keeps its own per-vertex polar pair.
+    /// </param>
+    private void BindShaderVariables(ShaderInterpreter interpreter, float u, float v, float originalU, float originalV, bool mathSpacePolar)
     {
         var width = _previous.Width;
         var height = _previous.Height;
@@ -2478,10 +2523,29 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
         interpreter.SetVariable("roam_sin", _roam[1]);
         interpreter.SetVariable("slow_roam_cos", _roam[2]);
         interpreter.SetVariable("slow_roam_sin", _roam[3]);
-        var x = (u * 2f) - 1f;
-        var y = (v * 2f) - 1f;
-        interpreter.SetVariable("rad", MathF.Sqrt((x * x) + (y * y)));
-        interpreter.SetVariable("ang", MathF.Atan2(y, x));
+        if (mathSpacePolar)
+        {
+            // MilkDrop's UvToMathSpace (milkdropfs.cpp): the position is scaled by the aspect, rad is
+            // one at the screen corners, and ang runs zero through two pi. The comp shader's
+            // GetBlur/frac(rs) presets depend on this exact convention.
+            var aspectX = 1f / Math.Max(0.0001f, inverseAspectX);
+            var aspectY = 1f / Math.Max(0.0001f, inverseAspectY);
+            var px = ((u * 2f) - 1f) * aspectX;
+            var py = ((v * 2f) - 1f) * aspectY;
+            var corner = MathF.Sqrt((aspectX * aspectX) + (aspectY * aspectY));
+            var angle = MathF.Atan2(py, px);
+            if (angle < 0f)
+                angle += 2f * MathF.PI;
+            interpreter.SetVariable("rad", MathF.Sqrt((px * px) + (py * py)) / corner);
+            interpreter.SetVariable("ang", angle);
+        }
+        else
+        {
+            var x = (u * 2f) - 1f;
+            var y = (v * 2f) - 1f;
+            interpreter.SetVariable("rad", MathF.Sqrt((x * x) + (y * y)));
+            interpreter.SetVariable("ang", MathF.Atan2(y, x));
+        }
     }
 
     /// <summary>
@@ -2670,16 +2734,26 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
         var width = _warped.Width;
         var height = _warped.Height;
         var pixels = _warped.RawPixels;
+        // Milkdrop's bDarkenCenter is a small black diamond fan (milkdropfs.cpp, DrawSprites):
+        // half size 0.05 in clip space, peak alpha 3/32 at the centre and zero at the rim, blended
+        // towards black. It is not a full-frame radial fade.
+        WarpSampling.GetAspect(width, height, out _, out var aspectY);
+        var halfX = 0.05f * aspectY;
+        const float HalfY = 0.05f;
+        const float PeakAlpha = 3f / 32f;
         ParallelRows.For(ParallelismEnabled, height, (worker, from, to) =>
         {
             for (var y = from; y < to; y++)
             {
-                var normalizedY = height > 1 ? (y / (float)(height - 1) * 2f) - 1f : 0f;
+                var clipY = height > 1 ? (y / (float)(height - 1) * 2f) - 1f : 0f;
                 for (var x = 0; x < width; x++)
                 {
-                    var normalizedX = width > 1 ? (x / (float)(width - 1) * 2f) - 1f : 0f;
-                    var distance = MathF.Sqrt((normalizedX * normalizedX) + (normalizedY * normalizedY));
-                    var factor = 1f - (amount * Math.Clamp(1f - distance, 0f, 1f));
+                    var clipX = width > 1 ? (x / (float)(width - 1) * 2f) - 1f : 0f;
+                    var diamond = (MathF.Abs(clipX) / halfX) + (MathF.Abs(clipY) / HalfY);
+                    if (diamond >= 1f)
+                        continue;
+
+                    var factor = 1f - (PeakAlpha * (1f - diamond) * amount);
                     var offset = (((y * width) + x) * 4);
                     pixels[offset] *= factor;
                     pixels[offset + 1] *= factor;
@@ -2749,6 +2823,10 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
     private void ApplyHueShadeAndGamma()
     {
         var gamma = Math.Clamp(Read("fGammaAdj", 1f), 0.1f, 10f);
+        // The legacy composite mixes the animated hue shade with white by the shader amount, so a
+        // zero value leaves the frame untinted (milkdropfs.cpp, ShowToUser_NoShaders). The preset key
+        // is fShader, which the parser aliases onto the shader variable.
+        var shaderAmount = Math.Clamp(Read("shader", 1f), 0f, 1f);
         var width = _warped.Width;
         var height = _warped.Height;
         ComputeHueShades();
@@ -2771,6 +2849,9 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
                     var redShade = Lerp(Lerp(shadeR[0], shadeR[1], u), Lerp(shadeR[2], shadeR[3], u), v);
                     var greenShade = Lerp(Lerp(shadeG[0], shadeG[1], u), Lerp(shadeG[2], shadeG[3], u), v);
                     var blueShade = Lerp(Lerp(shadeB[0], shadeB[1], u), Lerp(shadeB[2], shadeB[3], u), v);
+                    redShade = (redShade * shaderAmount) + (1f - shaderAmount);
+                    greenShade = (greenShade * shaderAmount) + (1f - shaderAmount);
+                    blueShade = (blueShade * shaderAmount) + (1f - shaderAmount);
                     var index = rowStart + (x * 4);
                     pixels[index] = Math.Clamp(pixels[index] * redShade * gamma, 0f, 1f);
                     pixels[index + 1] = Math.Clamp(pixels[index + 1] * greenShade * gamma, 0f, 1f);
@@ -2937,7 +3018,7 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
             }
 
             if (index > 0)
-                DrawWaveSegment(previousX, previousY, x, y, red, green, blue, alpha, additive, thick);
+                DrawWaveSegment(previousX, previousY, x, y, red, green, blue, alpha, red, green, blue, alpha, additive, thick);
             previousX = x;
             previousY = y;
         }
@@ -2946,7 +3027,7 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
         {
             var firstX = (int)Math.Clamp((xs[0] * 0.5f + 0.5f) * (width - 1), 0f, width - 1);
             var firstY = (int)Math.Clamp((0.5f - (ys[0] * 0.5f)) * (height - 1), 0f, height - 1);
-            DrawWaveSegment(previousX, previousY, firstX, firstY, red, green, blue, alpha, additive, thick);
+            DrawWaveSegment(previousX, previousY, firstX, firstY, red, green, blue, alpha, red, green, blue, alpha, additive, thick);
         }
     }
 
@@ -3012,7 +3093,7 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
             _slots = _elementPoints[wave];
             CopyElementInputs(frameSlots, _slots);
             for (var t = 1; t <= 8; t++)
-                Write(TNames[t - 1], frameSlots[Preset.Layout.IndexOf(TNames[t - 1])]);
+                Write(TNames[t - 1], (float)frameSlots[Preset.Layout.IndexOf(TNames[t - 1])]);
             var step = samples > 1 ? 1f / (samples - 1) : 0f;
             for (var sample = 0; sample < samples; sample++)
             {
@@ -3048,9 +3129,9 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
     private void InitializeElement(object element, PresetProgram init)
     {
         var parent = _slots;
-        var context = new float[parent.Length];
+        var context = new double[parent.Length];
         _elementFrames[element] = context;
-        _elementPoints[element] = new float[parent.Length];
+        _elementPoints[element] = new double[parent.Length];
         _slots = context;
         try
         {
@@ -3058,7 +3139,7 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
             if (element is VisualizerWave wave) SeedWave(wave);
             if (element is VisualizerShape shape) SeedShape(shape);
             init.Execute(context);
-            var initialT = new float[8];
+            var initialT = new double[8];
             for (var t = 0; t < 8; t++) initialT[t] = Read(TNames[t], 0f);
             _elementInitT[element] = initialT;
         }
@@ -3066,7 +3147,7 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
     }
 
     /// <summary>Transfers read-only frame inputs and Q values, never another context's user variables.</summary>
-    private void CopyElementInputs(float[] source, float[] target)
+    private void CopyElementInputs(double[] source, double[] target)
     {
         foreach (var name in ElementInputs)
         {
@@ -3084,7 +3165,7 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
     private void RestoreElementT(object element)
     {
         var initial = _elementInitT[element];
-        for (var t = 0; t < 8; t++) Write(TNames[t], initial[t]);
+        for (var t = 0; t < 8; t++) Write(TNames[t], (float)initial[t]);
     }
 
     /// <summary>Seeds a custom wave's saved parameters before init or per-frame evaluation.</summary>
@@ -3200,7 +3281,17 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
             if (wave.UseDots)
             {
                 if (float.IsFinite(x) && float.IsFinite(y) && x >= 0f && x < width && y >= 0f && y < height)
-                    PaintPixel((int)x, (int)y, red, green, blue, alpha, wave.Additive);
+                {
+                    // Milkdrop's point size is two at normal texture sizes and one larger with
+                    // bDrawThick, so a thick dot covers a two-by-two square (milkdropfs.cpp,
+                    // DrawCustomWaves). Dots are not the four-offset line path.
+                    var pointSize = (width >= 1024 ? 2 : 1) + (wave.DrawThick ? 1 : 0);
+                    var pixelX = (int)x;
+                    var pixelY = (int)y;
+                    for (var offsetY = 0; offsetY < pointSize; offsetY++)
+                        for (var offsetX = 0; offsetX < pointSize; offsetX++)
+                            PaintPixel(pixelX + offsetX, pixelY + offsetY, red, green, blue, alpha, wave.Additive);
+                }
                 continue;
             }
 
@@ -3210,8 +3301,11 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
             var previousX = (0.5f + (_waveOutX[index - 1] - 0.5f) * inverseAspectX) * (width - 1);
             var previousY = (0.5f - (_waveOutY[index - 1] - 0.5f) * inverseAspectY) * (height - 1);
             if (ClipWaveSegment(ref previousX, ref previousY, ref x, ref y, width, height))
-                DrawWaveSegment((int)previousX, (int)previousY,
-                    (int)x, (int)y, red, green, blue, alpha,
+                DrawWaveSegment(
+                    (int)previousX, (int)previousY,
+                    (int)x, (int)y,
+                    _waveOutRed[index - 1], _waveOutGreen[index - 1], _waveOutBlue[index - 1], _waveOutAlpha[index - 1],
+                    red, green, blue, alpha,
                     wave.Additive, wave.DrawThick);
         }
     }
@@ -3269,32 +3363,46 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
     /// <param name="y0">Start row.</param>
     /// <param name="x1">End column.</param>
     /// <param name="y1">End row.</param>
-    /// <param name="red">Red, zero to one.</param>
-    /// <param name="green">Green, zero to one.</param>
-    /// <param name="blue">Blue, zero to one.</param>
-    /// <param name="alpha">Opacity, zero to one.</param>
+    /// <param name="startRed">Red at the start, zero to one.</param>
+    /// <param name="startGreen">Green at the start, zero to one.</param>
+    /// <param name="startBlue">Blue at the start, zero to one.</param>
+    /// <param name="startAlpha">Opacity at the start, zero to one.</param>
+    /// <param name="endRed">Red at the end, zero to one.</param>
+    /// <param name="endGreen">Green at the end, zero to one.</param>
+    /// <param name="endBlue">Blue at the end, zero to one.</param>
+    /// <param name="endAlpha">Opacity at the end, zero to one.</param>
     /// <param name="additive">Whether the colour is added instead of alpha-blended.</param>
     /// <param name="thick">Whether the segment uses MilkDrop's four full-opacity offsets.</param>
     private void DrawWaveSegment(
-        int x0, int y0, int x1, int y1, float red, float green, float blue, float alpha, bool additive, bool thick)
+        int x0, int y0, int x1, int y1,
+        float startRed, float startGreen, float startBlue, float startAlpha,
+        float endRed, float endGreen, float endBlue, float endAlpha,
+        bool additive, bool thick)
     {
         var dx = x1 - x0;
         var dy = y1 - y0;
         var steps = Math.Max(Math.Abs(dx), Math.Abs(dy));
         if (steps == 0)
         {
-            PaintPixel(x0, y0, red, green, blue, alpha, additive);
+            PaintPixel(x0, y0, endRed, endGreen, endBlue, endAlpha, additive);
             if (thick)
             {
-                PaintPixel(x0 + 1, y0, red, green, blue, alpha, additive);
-                PaintPixel(x0 + 1, y0 - 1, red, green, blue, alpha, additive);
-                PaintPixel(x0, y0 - 1, red, green, blue, alpha, additive);
+                PaintPixel(x0 + 1, y0, endRed, endGreen, endBlue, endAlpha, additive);
+                PaintPixel(x0 + 1, y0 - 1, endRed, endGreen, endBlue, endAlpha, additive);
+                PaintPixel(x0, y0 - 1, endRed, endGreen, endBlue, endAlpha, additive);
             }
             return;
         }
 
         for (var step = 0; step <= steps; step++)
         {
+            // Milkdrop draws the line strip with per-vertex diffuse, so the colour runs from the
+            // start vertex to the end vertex instead of using one colour for the whole segment.
+            var fraction = step / (float)steps;
+            var red = Lerp(startRed, endRed, fraction);
+            var green = Lerp(startGreen, endGreen, fraction);
+            var blue = Lerp(startBlue, endBlue, fraction);
+            var alpha = Lerp(startAlpha, endAlpha, fraction);
             var x = x0 + (int)MathF.Round(dx * step / (float)steps);
             var y = y0 + (int)MathF.Round(dy * step / (float)steps);
             PaintPixel(x, y, red, green, blue, alpha, additive);
@@ -3912,7 +4020,7 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
     private float Read(string name, float fallback)
     {
         var slot = Preset.Layout.IndexOf(name);
-        return slot < 0 ? fallback : _slots[slot];
+        return slot < 0 ? fallback : (float)_slots[slot];
     }
 
     private void Write(string name, float value)
@@ -3931,7 +4039,7 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
     /// <param name="slots">Slot array to write to.</param>
     /// <param name="slot">Slot index, or a negative value when the layout lacks the variable.</param>
     /// <param name="value">Value to store.</param>
-    private static void Write(float[] slots, int slot, float value)
+    private static void Write(double[] slots, int slot, float value)
     {
         if (slot >= 0)
             slots[slot] = value;
@@ -3948,7 +4056,7 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
     /// <param name="slot">Slot index, or a negative value when the layout lacks the variable.</param>
     /// <param name="fallback">Value used when the layout lacks the variable.</param>
     /// <returns>The stored value.</returns>
-    private static float Read(float[] slots, int slot, float fallback) => slot < 0 ? fallback : slots[slot];
+    private static float Read(double[] slots, int slot, float fallback) => slot < 0 ? fallback : (float)slots[slot];
 
     /// <summary>Reports whether the engine re-seeds a variable for every pixel.</summary>
     /// <param name="name">Variable name.</param>
