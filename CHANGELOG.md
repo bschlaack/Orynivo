@@ -33,14 +33,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   the same audio state.
 
 ### Fixed
-- The visualizer's preset label no longer names a different preset than the one that is
-  rendered. It was read from the current renderer, which still held the previously shown preset
-  until the render thread applied the switch, so the name and the picture disagreed for exactly
-  the switch the user had just made. That was most visible with a short user preset list, where
-  the next preset wraps into the built-ins and the label still named the last user preset. The
-  label now follows the selection immediately through `VisualizerPresetLibrary.NameAt`, which
-  derives a preset's display name without parsing it, and switches to the rendered preset's own
-  name once the render thread has applied the change.
+- The visualizer's label now follows the frame OpenGL actually drew. Previously the new
+  selection could be labeled while the presenter still consumed the old frame; its shader fields
+  could even be paired with the next preset's overlay. Each published frame now carries its own
+  index, name, and shader sources, and switching presets clears the previous preset's GPU feedback.
+  This also keeps keyboard and mouse navigation in step with the displayed picture.
 - The preset audio bands `bass`, `mid`, and `treble` are alive again. The reference's guard against
   dividing an empty band by its long-term average is `0.001`, but it is written in the reference's own
   magnitude units — projectM scales every sample by 128 and leaves its FFT unnormalized, while
@@ -221,6 +218,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   echo rather than the blur.
 
 ### Fixed
+- Preset diagnostics now record the exact external preset section given to the parser/compiler,
+  its SHA-256 digest, the first frame's wave mode and GPU/CPU presentation path, and the shader
+  digests the GL callback actually drew. The OpenGL
+  presenter also snapshots overlay, mesh, and shape data when a frame is published, so the next
+  render cannot overwrite data still being consumed by Avalonia's GL callback.
+- Mouse navigation now accepts only the first left-button press of a click sequence and excludes
+  clicks whose source is itself a transport button, preventing a double-click or button press from
+  skipping a preset. Mouse and key navigation events are logged with their current indices.
+- Kept the visualizer's relative audio analysis continuous across preset changes and started a new analysis at neutral relative loudness. This prevents the first frame of `$$$ Royal - Mashup (129)` from calculating an extreme warp and erasing its feedback, including when switching between byte-identical copies of the preset.
+- Preserved MilkDrop `fWaveScale` values above one instead of clamping them to one. This corrects the oversized visible waveform in presets such as `$$$ Royal - Mashup (129)`; further shader fidelity work is still needed to reproduce its full Winamp image.
+- Fixed `GL_INVALID_OPERATION` when the Avalonia/ANGLE visualizer allocates `RGBA16F` frame textures: the upload type is now `GL_HALF_FLOAT` instead of `GL_UNSIGNED_BYTE`. Presets such as `$$$ Royal - Mashup (129)` can use the sixteen-bit path without leaving a GL error and falling back to eight-bit frames.
 - Corrected textured MilkDrop shapes on the GPU to multiply sampled RGB by the shape colour and use the shape's interpolated alpha. The CPU fallback now applies the same colour modulation. The Winamp comparison harness also initializes its visualization window at the requested size, so MilkDrop allocates a matching-aspect render texture before capture.
 - Custom MilkDrop waves now apply the original inverse-aspect coordinate transform and draw
   `bDrawThick` lines at all four full-opacity offsets. This corrects the geometry and feedback

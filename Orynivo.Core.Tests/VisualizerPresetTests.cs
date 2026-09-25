@@ -39,6 +39,15 @@ public sealed class VisualizerPresetTests
         Assert.False(preset.PerPixel.IsEmpty);
     }
 
+    /// <summary>MilkDrop wave scales above one retain their full value.</summary>
+    [Fact]
+    public void Parse_PreservesLargeMilkdropWaveScale()
+    {
+        var preset = VisualizerPreset.Parse("fWaveScale=28.599");
+
+        Assert.Equal(28.599f, preset.WaveScale, 3);
+    }
+
     /// <summary>Every expression block shares one layout, so q1 carries across stages.</summary>
     [Fact]
     public void Parse_SharesTheLayoutBetweenStages()

@@ -587,11 +587,22 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
   buffered, so a refresh that draws nothing swaps to the buffer two presentations old and the picture
   appears to jump backwards. The render loop publishes at the configured frame rate while the control
   refreshes at the display rate, so an undrawn refresh is the normal case. **Every** pass clamps its
-  output to zero-to-one, exactly like the eight-bit texture it replaces: the clamp is what gives a
+  colour output to zero-to-one. When publishing a GPU frame, snapshot the overlay, mesh, shape fills,
+  and uniforms together: the render thread reuses its buffers immediately, while Avalonia's GL
+  callback consumes the published frame later. `VisualizerPresetLibrary.At` logs the exact selected
+  external section and SHA-256 digest on first parse; the window logs the first frame's wave mode
+  and whether the GPU pipeline or CPU frame was actually handed to the presenter.
+  The GL callback also logs the applied preset index, linked shader stages, and GLSL digests;
+  inspect this event when the selected label and displayed picture disagree. Mouse navigation
+  advances only on the first primary-button press and must exclude the transport button itself
+  as well as its descendants.
+  The clamp is what gives a
   preset that amplifies its own feedback a stable fixed point, so a float format without it diverges
   exponentially, becomes an infinity and then a NaN, and paints the frame white. The float format
-  buys precision, not range. A preset with shaders now uses the GL pipeline too when its comp and
-  warp shaders emit GLSL: `ShaderTranspiler`'s GLSL dialect (`TranspileGlsl`, `TranspileGlslComp`,
+  buys precision, not range. For `RGBA16F` render textures, `TexImage2D` must use `GL_HALF_FLOAT`
+  as its data type even with null initial data; ANGLE rejects `GL_UNSIGNED_BYTE` with 0x502 and
+  forces the pipeline's eight-bit fallback. A preset with shaders now uses the GL pipeline too when
+  its comp and warp shaders emit GLSL: `ShaderTranspiler`'s GLSL dialect (`TranspileGlsl`, `TranspileGlslComp`,
   `TranspileGlslWarp`) produces a `void main()` writing `orynivoColor`, `VisualizerGlPipeline` runs
   the warp shader in place of the fixed mesh warp and the comp shader after the post pass into its
   own display target, and the feedback stays the pre-comp frame. The GLSL samples with normalised
@@ -603,7 +614,9 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
   `VisualizerWindow`
   owns `VisualizerAudioHub.IsActive`: while it is false the players skip the tap entirely, so
   a closed visualizer costs nothing. Never render, analyse, or evaluate preset expressions on
-  the audio thread, and keep the window's `ReduceMotion` path on
+  the audio thread. A preset switch must retain the audio analyzer's long-term loudness history;
+  clearing it on every selection can produce an extreme first-frame warp in MilkDrop presets.
+  Keep the window's `ReduceMotion` path on
   `PresetRenderer.RenderOverlayOnly` so the reduce-motion preference is honoured. The window
   renders with a silent audio source when nothing is playing, so it never stays black, and
   `PixelBuffer.SampleBilinear` returns transparent black outside the frame: clamping to the
@@ -655,12 +668,11 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
   keep `PostPresent` coalescing to one queued present so a busy UI thread cannot build a backlog.
   Preset switching (`_presetIndex`), the reset key (`_resetRequested`), and shutdown
   (`_renderRunning`, `_closed`) travel as flags that the render thread applies, so UI event
-  handlers must never touch the renderer directly. The preset label must follow the selection:
-  `UpdatePresetLabel` reads `VisualizerPresetLibrary.NameAt` (which never parses a file) while
-  the switch is still pending and the rendered preset's name once `_renderedPresetIndex` has
-  caught up, refreshed from `PostPresent`. Sourcing it from the renderer alone named the
-  previously shown preset for one switch, which made the name disagree with the picture - most
-  visibly at the end of a short user list, where the next index wraps into the built-ins.
+  handlers must never touch the renderer directly. A completed presentation snapshot carries the
+  preset index, name, shader sources, mesh, overlay, and uniforms together. The label follows
+  `GlPresenter.DrawnPresetIndex` on the GPU path, or the copied frame index on the bitmap path;
+  never advance it from `_presetIndex` or `_renderedPresetIndex` before the frame reaches the
+  presenter. A new preset also clears GPU feedback, matching the new CPU renderer's empty state.
   Frame pacing lives in the pure, tested
   `Orynivo.Visualization.FramePacing`.
   `VisualizerPresetLibrary` loads the built-in presets plus `.oryvis` and `.milk` files from

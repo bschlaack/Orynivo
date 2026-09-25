@@ -26,6 +26,7 @@ internal sealed class VisualizerGlPipeline
     private const int GlFloat = 0x1406;
     private const int GlUnsignedShort = 0x1403;
     private const int GlUnsignedByte = 0x1401;
+    private const int GlHalfFloat = 0x140B;
     private const int GlTriangles = 0x0004;
     private const int GlTriangleStrip = 0x0005;
     private const int GlTexture2D = 0x0DE1;
@@ -642,10 +643,42 @@ internal sealed class VisualizerGlPipeline
         }
     }
 
+    /// <summary>Clears feedback from the previous preset before rendering a newly selected one.</summary>
+    /// <param name="gl">Current OpenGL context.</param>
+    /// <param name="width">Frame width.</param>
+    /// <param name="height">Frame height.</param>
+    public void ResetFeedback(GlInterface gl, int width, int height)
+    {
+        if (!_ready || width <= 0 || height <= 0)
+            return;
+
+        EnsureSize(gl, width, height);
+        gl.ClearColor(0f, 0f, 0f, 1f);
+        foreach (var framebuffer in new[] { _feedbackFramebuffer, _previousFramebuffer, _compFramebuffer,
+                     _pingFramebuffer[0], _pingFramebuffer[1] })
+        {
+            gl.BindFramebuffer(GlFramebuffer, framebuffer);
+            gl.Viewport(0, 0, width, height);
+            gl.Clear(GlColorBufferBit);
+        }
+
+        for (var index = 0; index < _shaderBlurFramebuffer.Length; index++)
+        {
+            var (blurWidth, blurHeight) = ShaderBlurSize(width, height, index);
+            gl.BindFramebuffer(GlFramebuffer, _shaderBlurFramebuffer[index]);
+            gl.Viewport(0, 0, blurWidth, blurHeight);
+            gl.Clear(GlColorBufferBit);
+        }
+
+        _outputTexture = 0;
+        _frame = 0;
+    }
+
     /// <summary>Whether the published warp shader computes the coordinate per pixel.</summary>
     private bool _perPixelWarp;
 
     private bool _shadersDirty;
+
 
     /// <summary>Gets why the pipeline could not be built or last failed, or <see langword="null"/>.</summary>
     public string? Error { get; private set; }
@@ -661,6 +694,12 @@ internal sealed class VisualizerGlPipeline
 
     /// <summary>Gets the texture holding the last finished frame, for presentation.</summary>
     public int OutputTexture => _outputTexture != 0 ? _outputTexture : _feedbackTexture;
+
+    /// <summary>Whether the current preset's warp GLSL program was linked and used.</summary>
+    internal bool WarpShaderActive => _warpShaderProgram != 0;
+
+    /// <summary>Whether the current preset's composite GLSL program was linked and used.</summary>
+    internal bool CompShaderActive => _compShaderProgram != 0;
 
     /// <summary>The texture last presented: the comp output when a comp shader ran, else the feedback.</summary>
     private int _outputTexture;
@@ -1630,7 +1669,8 @@ internal sealed class VisualizerGlPipeline
         gl.TexParameteri(GlTexture2D, GlTextureMagFilter, GlLinear);
         gl.TexParameteri(GlTexture2D, GlTextureWrapS, GlClampToEdge);
         gl.TexParameteri(GlTexture2D, GlTextureWrapT, GlClampToEdge);
-        gl.TexImage2D(GlTexture2D, 0, _halfFloat ? GlRgba16f : GlRgba8, width, height, 0, GlRgba, GlUnsignedByte, IntPtr.Zero);
+        gl.TexImage2D(GlTexture2D, 0, _halfFloat ? GlRgba16f : GlRgba8, width, height, 0, GlRgba,
+            _halfFloat ? GlHalfFloat : GlUnsignedByte, IntPtr.Zero);
 
         gl.BindFramebuffer(GlFramebuffer, framebuffer);
         gl.FramebufferTexture2D(GlFramebuffer, GlColorAttachment0, GlTexture2D, texture, 0);

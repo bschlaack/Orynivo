@@ -43,6 +43,11 @@ public partial class VisualizerWindow : Window
     private byte[] _glOverlayBytes = [];
     private string? _glWarpShader;
     private string? _glCompShader;
+    private string? _presentWarpShader;
+    private string? _presentCompShader;
+    private bool _presentPixelWarp;
+    private int _framePresetIndex = -1;
+    private string? _framePresetName;
     private IReadOnlyList<string>? _glPerPixelUniforms;
 
     /// <summary>Whether <see cref="_glWarpShader"/> computes the warp coordinate per pixel.</summary>
@@ -84,22 +89,42 @@ public partial class VisualizerWindow : Window
         _glCompShader = null;
         _glPerPixelUniforms = null;
         _glPixelWarp = false;
-        if (!renderer.HasShaders)
+
+        // A per-pixel block that writes the sample position cannot be interpolated over the mesh, so
+        // it is emitted as a warp fragment shader that computes the coordinate itself. That applies
+        // whenever the preset has no warp shader, whether or not it also has a comp shader: without
+        // the emitted block no mesh is built, and the preset then falls back to the CPU frame even
+        // though its shaders are representable.
+        if (renderer.Preset.WarpShaders.Count == 0 &&
+            _pixelWarpEnabled &&
+            TryEmitPixelWarp(renderer, out var pixelWarp, out var pixelUniforms))
         {
-            // A per-pixel block that writes the sample position keeps the CPU warp in the mesh
-            // pipeline, because an interpolated sample position has no meaning. Emitting it as a warp
-            // fragment shader that computes the coordinate itself puts that work on the GPU, which is
-            // exactly what the CPU per-pixel path does today.
-            if (_pixelWarpEnabled && TryEmitPixelWarp(renderer, out var pixelWarp, out var pixelUniforms))
+            var names = new SortedSet<string>(pixelUniforms ?? [], StringComparer.Ordinal);
+            string? pixelWarpComp = null;
+            IReadOnlyList<string>? pixelWarpCompUniforms = null;
+            if (renderer.Preset.CompShaders.Count > 0 &&
+                !TryEmitGlsl(renderer, out _, out pixelWarpComp, out pixelWarpCompUniforms))
             {
-                renderer.ExpressionsOnly = true;
-                renderer.MeshForPixelWarp = true;
-                _glWarpShader = pixelWarp;
-                _glPerPixelUniforms = pixelUniforms;
-                _glPixelWarp = true;
+                // The comp shader is not representable, so the CPU frame has to keep it.
                 return;
             }
 
+            if (pixelWarpCompUniforms is not null)
+                names.UnionWith(pixelWarpCompUniforms);
+            renderer.ExpressionsOnly = true;
+            renderer.MeshForPixelWarp = true;
+            _glWarpShader = pixelWarp;
+            _glCompShader = pixelWarpComp;
+            _glPerPixelUniforms = [.. names];
+            _glPixelWarp = true;
+            return;
+        }
+
+        if (!renderer.HasShaders)
+        {
+            // The pixel warp was already attempted above; it either does not apply (the block does
+            // not write the sample position) or the GLSL dialect cannot express it, so the CPU keeps
+            // the overlay and the mesh.
             renderer.ExpressionsOnly = true;
             return;
         }
@@ -207,6 +232,8 @@ public partial class VisualizerWindow : Window
     private volatile bool _closed;
     private volatile int _presetIndex;
     private volatile int _renderedPresetIndex = -1;
+    private int _presentedPresetIndex = -1;
+    private string? _presentedPresetName;
     private int _labeledPresetIndex = -1;
     private volatile bool _resetRequested;
     private int _presentPending;
@@ -310,9 +337,15 @@ public partial class VisualizerWindow : Window
         }
         PointerPressed += (_, e) =>
         {
-            // A click on one of the overlay buttons must not also switch the preset.
-            if (e.Source is Visual source && source.GetVisualAncestors().OfType<Button>().Any())
+            var primary = e.GetCurrentPoint(this).Properties.IsLeftButtonPressed;
+            if (primary)
+                SeekDiagnostics.Log("visualizer-preset", $"input=mouse-press clickCount={e.ClickCount} currentIndex={_presetIndex}");
+            // Only the first primary-button press advances the preset. A double-click's second
+            // press and clicks on the transport overlay must not silently skip an entry.
+            if (!primary || e.ClickCount != 1 ||
+                e.Source is Visual source && (source is Button || source.GetVisualAncestors().OfType<Button>().Any()))
                 return;
+            SeekDiagnostics.Log("visualizer-preset", $"input=mouse currentIndex={_presetIndex} nextIndex={(_presetIndex + 1) % _library.Count}");
             SelectPreset(_presetIndex + 1);
             ShowOverlay();
         };
@@ -358,8 +391,11 @@ public partial class VisualizerWindow : Window
             return;
 
         _presetIndex = ((index % count) + count) % count;
-        VisualizerAudioHub.Shared.Clear();
-        UpdatePresetLabel();
+        // Keep the analyzer's long-term loudness history across preset changes. Resetting it here
+        // makes the first relative bass value spike, and presets such as Mashup (129) amplify that
+        // spike into an extreme warp that destroys their existing feedback.
+        // The label changes when a completed frame for this index is handed to the presenter.
+        // Updating it here would name the new selection while GL still shows the old frame.
     }
 
     private void OnKeyDown(object? sender, KeyEventArgs e)
@@ -370,9 +406,11 @@ public partial class VisualizerWindow : Window
                 Close();
                 break;
             case Key.N or Key.Right or Key.Down or Key.Space:
+                SeekDiagnostics.Log("visualizer-preset", $"input=key-next key={e.Key} currentIndex={_presetIndex}");
                 SelectPreset(_presetIndex + 1);
                 break;
             case Key.P or Key.Left or Key.Up:
+                SeekDiagnostics.Log("visualizer-preset", $"input=key-previous key={e.Key} currentIndex={_presetIndex}");
                 SelectPreset(_presetIndex - 1);
                 break;
             case Key.R:
@@ -531,6 +569,16 @@ public partial class VisualizerWindow : Window
             _renderer.RenderFrame(audio, deltaSeconds);
         frameClock.Stop();
 
+        if (_renderer.FrameCount == 1)
+        {
+            SeekDiagnostics.Log(
+                "visualizer-preset",
+                $"first-frame index={_renderedPresetIndex} name={_renderer.Preset.Name} " +
+                $"wave_mode={_renderer.ReadVariable("wave_mode")} wave_scale={_renderer.Preset.WaveScale} " +
+                $"expressionsOnly={_renderer.ExpressionsOnly} glWarp={_glWarpShader is not null} " +
+                $"glComp={_glCompShader is not null} shaderError={GlPresenter.ShaderError ?? "none"}");
+        }
+
         // A frame that takes far too long is the visible freeze, and the last line the log holds is
         // then the preset it happened in. Only slow frames are logged, so this cannot flood.
         if (frameClock.ElapsedMilliseconds >= 250)
@@ -590,6 +638,22 @@ public partial class VisualizerWindow : Window
                 _glPipelineActive = false;
                 _presentBuffer.CopyFrom(_renderer.Output);
             }
+            // Publish the identity and shaders with the pixels. The UI thread may present this
+            // snapshot while the render thread is already constructing the next preset.
+            _framePresetIndex = _renderedPresetIndex;
+            _framePresetName = _renderer.Preset.Name;
+            _presentWarpShader = _glWarpShader;
+            _presentCompShader = _glCompShader;
+            _presentPixelWarp = _glPixelWarp;
+        }
+
+        if (_renderer.FrameCount == 1)
+        {
+            SeekDiagnostics.Log(
+                "visualizer-preset",
+                $"first-presentation index={_renderedPresetIndex} name={_renderer.Preset.Name} " +
+                $"path={(_glPipelineActive ? "gpu-pipeline" : "cpu-frame")} " +
+                $"glPipelineFailed={GlPresenter.PipelineFailed} glError={GlPresenter.GlError ?? "none"}");
         }
 
         PostPresent(BuildDiagnostics());
@@ -615,12 +679,13 @@ public partial class VisualizerWindow : Window
                 if (_closed)
                     return;
 
-                // The render thread applies a queued switch on its next frame, so this is where a
-                // label that still names the selected preset catches up with the rendered one.
-                if (_labeledPresetIndex != _renderedPresetIndex)
-                    UpdatePresetLabel();
-
                 Present();
+                // PresentCore records which finished frame it handed to the control. Update the
+                // label only after that identity is known, never from the next requested index.
+                // It runs on every present, because the GL callback draws the published frame
+                // asynchronously: the identity read here is the one drawn before this present, so
+                // the label catches up on the following present instead of sticking a preset back.
+                UpdatePresetLabel();
                 UpdatePlayPauseIcon();
                 UpdateOverlayVisibility();
                 if (_transport is { } transport)
@@ -772,6 +837,8 @@ public partial class VisualizerWindow : Window
             lock (_presentLock)
             {
                 pipeline = _glPipelineActive;
+                _presentedPresetIndex = _framePresetIndex;
+                _presentedPresetName = _framePresetName;
                 if (!pipeline)
                 {
                     var size = _renderWidth * _renderHeight * 4;
@@ -798,11 +865,13 @@ public partial class VisualizerWindow : Window
                         _glMeshX,
                         _glMeshY,
                         _glParameters,
-                        _glWarpShader,
-                        _glCompShader,
+                        _presentWarpShader,
+                        _presentCompShader,
                         _glUniforms,
-                        _glPixelWarp,
-                        _glShapeFills);
+                        _presentPixelWarp,
+                        _glShapeFills,
+                        _framePresetIndex,
+                        _framePresetName);
                 }
             }
 
@@ -810,6 +879,11 @@ public partial class VisualizerWindow : Window
                 GlPresenter.SetFrame(_glBytes, _renderWidth, _renderHeight);
 
             GlPresenter.RequestNextFrameRendering();
+            if (pipeline)
+            {
+                _presentedPresetIndex = GlPresenter.DrawnPresetIndex;
+                _presentedPresetName = GlPresenter.DrawnPresetName;
+            }
             if (!_glInfoLogged && GlPresenter.Frames > 0)
             {
                 _glInfoLogged = true;
@@ -837,6 +911,8 @@ public partial class VisualizerWindow : Window
         // presentation copy. The lock is held for the copy only, never for a whole frame.
         lock (_presentLock)
         {
+            _presentedPresetIndex = _framePresetIndex;
+            _presentedPresetName = _framePresetName;
             // Sample the render thread's finished frame before the copy and the destination bytes
             // after it, so a copy or bitmap fault shows up as the two numbers disagreeing.
             _presentSourceBrightness = _presentBuffer.MeanBrightness();
@@ -978,14 +1054,13 @@ public partial class VisualizerWindow : Window
 
     private void UpdatePresetLabel()
     {
-        // The label follows the selection, not the renderer: the render thread applies a switch on
-        // its next frame, so reading the rendered preset named the previously shown preset until
-        // then. Once the switch has been applied the rendered name wins, because it is the truth
-        // when a preset falls back to a built-in or declares its own name.
-        var selected = _presetIndex;
-        var applied = _renderedPresetIndex == selected;
-        var name = applied ? _renderer.Preset.Name : _library.NameAt(selected);
-        _labeledPresetIndex = applied ? selected : -1;
+        // The name follows the frame handed to the presenter. The selected index can already have
+        // advanced while an older frame is still being drawn by the asynchronous GL callback.
+        var shownIndex = _presentedPresetIndex;
+        var name = shownIndex >= 0
+            ? _presentedPresetName ?? _library.NameAt(shownIndex)
+            : _library.NameAt(_presetIndex);
+        _labeledPresetIndex = shownIndex;
         var label = string.Format(
             CultureInfo.CurrentCulture,
             LocalizationManager.Current.VisualizerPresetLabel,

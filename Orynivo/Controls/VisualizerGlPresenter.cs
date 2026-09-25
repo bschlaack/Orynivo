@@ -1,7 +1,10 @@
 ﻿using System.Runtime.InteropServices;
+using System.Security.Cryptography;
+using System.Text;
 using Avalonia.Controls;
 using Avalonia.OpenGL;
 using Avalonia.OpenGL.Controls;
+using Orynivo.Audio;
 using Orynivo.Visualization;
 
 namespace Orynivo.Controls;
@@ -86,6 +89,9 @@ public sealed class VisualizerGlPresenter : OpenGlControlBase
     private int _textureUniform = -1;
     /// <summary>The texture last drawn, re-presented on a refresh that published no frame.</summary>
     private int _lastPresented;
+    private int _lastLoggedPresetIndex = -1;
+    private int _drawnPresetIndex = -1;
+    private string? _drawnPresetName;
     private bool _glReady;
 
     /// <summary>Gets the negotiated GL version, once the context is up.</summary>
@@ -149,6 +155,8 @@ public sealed class VisualizerGlPresenter : OpenGlControlBase
     private IReadOnlyDictionary<string, ShaderValue>? _pipelineUniforms;
     private bool _pipelinePending;
     private bool _pipelinePixelWarp;
+    private int _pipelinePresetIndex;
+    private string? _pipelinePresetName;
     private IReadOnlyList<ShapeFill>? _pipelineShapeFills;
     private bool _pipelineFailed;
     private readonly VisualizerGlPipeline _pipeline = new();
@@ -168,6 +176,12 @@ public sealed class VisualizerGlPresenter : OpenGlControlBase
 
     /// <summary>Gets the pipeline's one-shot first-frame description, or <see langword="null"/>.</summary>
     public string? PipelineDiagnostics => _pipeline.Diagnostics;
+
+    /// <summary>Gets the index of the most recent preset frame OpenGL actually drew.</summary>
+    public int DrawnPresetIndex => Volatile.Read(ref _drawnPresetIndex);
+
+    /// <summary>Gets the name of the most recent preset frame OpenGL actually drew.</summary>
+    public string? DrawnPresetName => Volatile.Read(ref _drawnPresetName);
 
     /// <summary>Gets why an emitted shader failed to build, or <see langword="null"/>.</summary>
     public string? ShaderError => _pipeline.ShaderError;
@@ -192,6 +206,8 @@ public sealed class VisualizerGlPresenter : OpenGlControlBase
     /// it over a full-screen quad with the frame motion as uniforms.
     /// </param>
     /// <param name="shapeFills">Overlay shape fills the GPU draws itself, or <see langword="null"/>.</param>
+    /// <param name="presetIndex">Index of the preset that produced this frame.</param>
+    /// <param name="presetName">Name of the preset that produced this frame.</param>
     public void SetPipeline(
         byte[] overlayBgra,
         int frameWidth,
@@ -204,21 +220,28 @@ public sealed class VisualizerGlPresenter : OpenGlControlBase
         string? compShader = null,
         IReadOnlyDictionary<string, ShaderValue>? uniforms = null,
         bool perPixelWarp = false,
-        IReadOnlyList<ShapeFill>? shapeFills = null)
+        IReadOnlyList<ShapeFill>? shapeFills = null,
+        int presetIndex = -1,
+        string? presetName = null)
     {
         lock (_frameLock)
         {
-            _pipelineOverlay = overlayBgra;
+            // The render thread reuses its overlay and mesh on the next frame. Keep this published
+            // frame immutable until the GL callback consumes it; otherwise a preset switch can
+            // pair the previous preset's uniforms/shaders with the next preset's geometry.
+            _pipelineOverlay = (byte[])overlayBgra.Clone();
             _pipelineFrameWidth = frameWidth;
             _pipelineFrameHeight = frameHeight;
-            _pipelineMesh = mesh;
+            _pipelineMesh = (float[])mesh.Clone();
             _pipelineMeshX = meshX;
             _pipelineMeshY = meshY;
             _pipelineParameters = parameters;
             _pipelineWarpShader = warpShader;
             _pipelineCompShader = compShader;
             _pipelinePixelWarp = perPixelWarp;
-            _pipelineShapeFills = shapeFills;
+            _pipelinePresetIndex = presetIndex;
+            _pipelinePresetName = presetName;
+            _pipelineShapeFills = shapeFills?.ToArray();
             // The render thread owns the caller's dictionary and writes it under its own lock, so the
             // presenter takes its own copy here rather than reading a Dictionary the render thread may
             // be mutating: a concurrent read of a Dictionary is undefined and can loop forever.
@@ -334,6 +357,8 @@ public sealed class VisualizerGlPresenter : OpenGlControlBase
             string? pipelineWarpShader = null, pipelineCompShader = null;
             IReadOnlyDictionary<string, ShaderValue>? pipelineUniforms = null;
             var pipelinePixelWarp = false;
+            var pipelinePresetIndex = -1;
+            string? pipelinePresetName = null;
             IReadOnlyList<ShapeFill>? pipelineShapeFills = null;
             byte[]? frame = null;
             int frameWidth = 0, frameHeight = 0;
@@ -352,6 +377,8 @@ public sealed class VisualizerGlPresenter : OpenGlControlBase
                     pipelineCompShader = _pipelineCompShader;
                     pipelineUniforms = _pipelineUniforms;
                     pipelinePixelWarp = _pipelinePixelWarp;
+                    pipelinePresetIndex = _pipelinePresetIndex;
+                    pipelinePresetName = _pipelinePresetName;
                     pipelineShapeFills = _pipelineShapeFills;
                     _pipelinePending = false;
                 }
@@ -368,6 +395,8 @@ public sealed class VisualizerGlPresenter : OpenGlControlBase
             {
                 var pipelineViewport = FramebufferSize();
                 _pipeline.SetShaders(pipelineWarpShader, pipelineCompShader, pipelinePixelWarp);
+                if (pipelinePresetIndex != _drawnPresetIndex)
+                    _pipeline.ResetFeedback(gl, pipelineWidth, pipelineHeight);
                 if (_pipeline.Render(
                     gl,
                     fb,
@@ -385,7 +414,18 @@ public sealed class VisualizerGlPresenter : OpenGlControlBase
                     pipelineShapeFills))
                 {
                     _lastPresented = _pipeline.OutputTexture;
+                    Volatile.Write(ref _drawnPresetName, pipelinePresetName);
+                    Volatile.Write(ref _drawnPresetIndex, pipelinePresetIndex);
                     Frames++;
+                    if (_lastLoggedPresetIndex != pipelinePresetIndex)
+                    {
+                        _lastLoggedPresetIndex = pipelinePresetIndex;
+                        SeekDiagnostics.Log(
+                            "visualizer-preset",
+                            $"gpu-drawn index={pipelinePresetIndex} warpActive={_pipeline.WarpShaderActive} " +
+                            $"compActive={_pipeline.CompShaderActive} warpSha256={ShaderHash(pipelineWarpShader)} " +
+                            $"compSha256={ShaderHash(pipelineCompShader)} shaderError={_pipeline.ShaderError ?? "none"}");
+                    }
                 }
                 else
                 {
@@ -450,6 +490,13 @@ public sealed class VisualizerGlPresenter : OpenGlControlBase
             handle.Free();
         }
     }
+    /// <summary>Identifies the exact GLSL source handed to OpenGL without logging its full text.</summary>
+    /// <param name="source">Shader source, or <see langword="null"/> for the fixed pass.</param>
+    /// <returns>SHA-256 digest, or <c>fixed</c> when there is no custom source.</returns>
+    private static string ShaderHash(string? source) => source is null
+        ? "fixed"
+        : Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(source)));
+
     /// <summary>Compiles and links the presentation shaders.</summary>
     /// <param name="gl">GL interface.</param>
     /// <returns>The linked program.</returns>

@@ -253,7 +253,7 @@ public sealed class VisualizerPreset
             ReadFloat(values, "warp", 1f),
             (int)Math.Clamp(ReadFloat(values, "blur_level", 0f), 0f, 4f),
             Math.Clamp(ReadFloat(values, "wave_a", 0.8f), 0f, 1f),
-            Math.Clamp(ReadFloat(values, "wave_scale", 1f), 0f, 1f),
+            Math.Max(0f, ReadFloat(values, "wave_scale", 1f)),
             CompileBlock(values, layout, "per_point", failed),
             ParseShapes(values, layout, failed),
             ParseWaves(values, layout, failed),

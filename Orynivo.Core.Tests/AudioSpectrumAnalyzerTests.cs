@@ -21,6 +21,24 @@ public sealed class AudioSpectrumAnalyzerTests
         Assert.True(analyzer.Bass > 0f);
     }
 
+    /// <summary>A new analysis history starts at neutral relative loudness instead of a transient spike.</summary>
+    [Fact]
+    public void Analyze_FirstFrameStartsWithNeutralRelativeLoudness()
+    {
+        var analyzer = new AudioSpectrumAnalyzer(SampleRate);
+        var tone = Tone(440f, 0.5f);
+
+        analyzer.Analyze(tone);
+        Assert.Equal(1f, analyzer.BassRelative);
+        Assert.Equal(1f, analyzer.MidRelative);
+        Assert.Equal(1f, analyzer.TrebleRelative);
+
+        analyzer.Reset();
+        analyzer.Analyze(new float[tone.Length]);
+        analyzer.Analyze(tone);
+        Assert.Equal(1f, analyzer.BassRelative);
+    }
+
     /// <summary>A treble tone raises the treble energy above the bass energy.</summary>
     [Fact]
     public void Analyze_SeparatesTrebleFromBass()

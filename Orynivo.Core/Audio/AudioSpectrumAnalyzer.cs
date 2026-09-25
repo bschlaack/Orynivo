@@ -159,7 +159,9 @@ public sealed class AudioSpectrumAnalyzer : IVisualizerAudioSource
 
     /// <summary>
     /// One Milkdrop loudness band: the current and attenuated band sums divided by the band's
-    /// long-term average, with the reference's frame-rate-adjusted smoothing rates.
+    /// long-term average, with the reference's frame-rate-adjusted smoothing rates. The first
+    /// non-silent observation seeds that average so a freshly opened visualizer begins at relative
+    /// loudness one.
     /// </summary>
     private sealed class Loudness
     {
@@ -175,6 +177,7 @@ public sealed class AudioSpectrumAnalyzer : IVisualizerAudioSource
         private float _average;
         private float _longAverage;
         private float _current;
+        private bool _historyInitialized;
 
         /// <summary>Gets the current band sum divided by the long-term average.</summary>
         public float CurrentRelative { get; private set; } = 1f;
@@ -189,6 +192,15 @@ public sealed class AudioSpectrumAnalyzer : IVisualizerAudioSource
         public void Update(float current, double secondsSinceLastFrame, long frame)
         {
             _current = current;
+            if (!_historyInitialized)
+            {
+                if (MathF.Abs(current) < EmptyBandThreshold)
+                    return;
+                _average = _longAverage = current;
+                CurrentRelative = AverageRelative = 1f;
+                _historyInitialized = true;
+                return;
+            }
             var rate = AdjustRateToFps(current > _average ? 0.2f : 0.5f, secondsSinceLastFrame);
             _average = (_average * rate) + (current * (1f - rate));
 
@@ -205,6 +217,7 @@ public sealed class AudioSpectrumAnalyzer : IVisualizerAudioSource
             _average = 0f;
             _longAverage = 0f;
             _current = 0f;
+            _historyInitialized = false;
             CurrentRelative = 1f;
             AverageRelative = 1f;
         }

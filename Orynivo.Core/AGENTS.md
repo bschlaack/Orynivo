@@ -75,6 +75,8 @@ This file applies to `Orynivo.Core/` and supplements `../AGENTS.md`.
   own relative loudness (`BassRelative` and friends), where each band's sum over one
   sixth of the linear spectrum is divided by its long-term average so a value above
   one means "louder than usual" and `above(bass, 1.2)` can fire. It also keeps the
+  first analyzed frame at a neutral relative value of one; dividing by a newly started
+  zero long-term average made high-power preset equations produce destructive spikes.
   left and right waveform and spectrum separate for the custom waveforms, and the
   desktop hub measures the frame time its smoothing rates need. The analysis geometry follows the
   reference too: a 1024-point transform (`AudioSpectrumAnalyzer`'s default FFT size) over the most
@@ -127,7 +129,8 @@ This file applies to `Orynivo.Core/` and supplements `../AGENTS.md`.
   only them takes its blur amount from their `blurN_max` sum when Orynivo's own `blur_level` key is
   absent. Keep new aliases in that one table. The default wave mode is the single line, which is six
   in the reference's `nWaveMode` numbering (its idle preset uses six), and the default `wave_scale`
-  is one. `MilkdropWaveform` owns the default wave's per-mode geometry — ring, spiral, centred
+  is one. Preset wave scales may exceed one (for example Mashup (129) uses 28.599); never
+  clamp MilkDrop's `fWaveScale` to the zero-to-one range. `MilkdropWaveform` owns the default wave's per-mode geometry — ring, spiral, centred
   spirograph, derivative line, explosive hash, line, double line and spectrum line — with the
   reference's edge clipping, closed-loop modes and four-tap polyline smoothing; `DrawDefaultWave`
   only prepares the PCM, applies the legacy global `per_point` block, and draws the result. Never

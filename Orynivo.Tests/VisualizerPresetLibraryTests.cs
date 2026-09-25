@@ -204,6 +204,26 @@ public sealed class VisualizerPresetLibraryTests : IDisposable
         Assert.Equal("Mine", library.At(-1).Name);
     }
 
+    /// <summary>Two copies keep their own last and penultimate indices and identical preset data.</summary>
+    [Fact]
+    public void At_LoadsTheLastDuplicateInsteadOfWrappingToTheFirstBuiltIn()
+    {
+        const string content = "[preset00]\nfWaveScale=28.599\nper_frame_1=q1=42;\n";
+        File.WriteAllText(Path.Combine(_directory, "Mashup (129) - Copy.milk"), content);
+        File.WriteAllText(Path.Combine(_directory, "Mashup (129).milk"), content);
+        var library = new VisualizerPresetLibrary();
+        library.Reload(_directory);
+
+        var copy = library.At(BuiltInCount);
+        var last = library.At(library.Count - 1);
+
+        Assert.Equal(28.599f, copy.WaveScale, 3);
+        Assert.Equal(copy.WaveScale, last.WaveScale);
+        Assert.Equal(copy.PerFrame.IsEmpty, last.PerFrame.IsEmpty);
+        Assert.NotEqual(VisualizerPresets.BuiltIn[0].Name, last.Name);
+        Assert.Contains("Mashup (129)", last.Name, StringComparison.Ordinal);
+    }
+
     /// <summary>
     /// The name of an index is available before the preset has been parsed, which is what lets the
     /// window label follow the selection immediately instead of naming the previously rendered

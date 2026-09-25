@@ -1,4 +1,7 @@
 using System.Diagnostics;
+using System.Security.Cryptography;
+using System.Text;
+using Orynivo.Audio;
 using Orynivo.Visualization;
 
 namespace Orynivo.Visualization;
@@ -25,6 +28,7 @@ internal sealed class VisualizerPresetLibrary
     private readonly List<VisualizerPreset> _builtIn = [];
     private readonly List<PendingPreset> _pending = [];
     private readonly Dictionary<int, VisualizerPreset> _loaded = [];
+    private readonly Dictionary<int, string> _sourceHashes = [];
     private readonly HashSet<int> _failed = [];
     private readonly List<string> _rejected = [];
     private readonly List<string> _rejectedReasons = [];
@@ -117,6 +121,7 @@ internal sealed class VisualizerPresetLibrary
             _pending.Clear();
             _pending.AddRange(discovered);
             _loaded.Clear();
+            _sourceHashes.Clear();
             _failed.Clear();
         }
 
@@ -158,7 +163,10 @@ internal sealed class VisualizerPresetLibrary
                 return _builtIn[wrapped];
 
             if (_loaded.TryGetValue(wrapped, out var cached))
+            {
+                SeekDiagnostics.Log("visualizer-preset", $"index={wrapped} cache-hit name={cached.Name} sha256={_sourceHashes.GetValueOrDefault(wrapped, "unknown")}");
                 return cached;
+            }
 
             pending = _pending[wrapped - _builtIn.Count];
         }
@@ -174,10 +182,16 @@ internal sealed class VisualizerPresetLibrary
         {
             var sections = VisualizerPreset.ParseSections(File.ReadAllText(pending.Path));
             var text = pending.SectionIndex < sections.Count ? sections[pending.SectionIndex] : string.Empty;
+            var sha256 = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(text)));
+            SeekDiagnostics.Log(
+                "visualizer-preset",
+                $"compiler-input index={wrapped} file={Path.GetFileName(pending.Path)} section={pending.SectionIndex} " +
+                $"sha256={sha256} length={text.Length}\n--- BEGIN PRESET SOURCE ---\n{text}\n--- END PRESET SOURCE ---");
             var preset = VisualizerPreset.Parse(text, fallbackName);
             lock (_gate)
             {
                 _loaded[wrapped] = preset;
+                _sourceHashes[wrapped] = sha256;
                 // A file with several sections exposes the rest the first time one of them is
                 // shown, so a multi-preset file is complete without reading it during discovery.
                 if (pending.SectionIndex == 0 && sections.Count > 1)
