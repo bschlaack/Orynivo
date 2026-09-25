@@ -16,6 +16,7 @@ public sealed class FrameParametersTests
         var preset = VisualizerPreset.Parse(
             "decay=0.9\nblur_level=2\ndarken_center=0.25\nfGammaAdj=1.5\nfShader=0.3\n" +
             "echo_zoom=1.2\necho_alpha=0.4\necho_orient=2\n" +
+            "ob_size=0.05\nib_size=0.03\n" +
             "ob_r=0.1\nob_g=0.2\nob_b=0.3\nob_a=0.5\nib_a=0.25");
         var renderer = new PresetRenderer(preset, 40, 40);
         renderer.RenderFrame(new FakeAudio(), 1d / 60d);
@@ -32,8 +33,11 @@ public sealed class FrameParametersTests
         Assert.Equal(2, parameters.EchoOrientation);
         Assert.Equal(0.1f, parameters.OuterBorder.Red, 5);
         Assert.Equal(0.5f, parameters.OuterBorder.Alpha, 5);
-        Assert.Equal(0.02f, parameters.OuterBorder.Thickness, 5);
-        Assert.Equal(0.06f, parameters.InnerBorder.Inset, 5);
+        // The outer ring is [1 - ob_size, 1] and the inner one [1 - ob_size - ib_size, 1 - ob_size].
+        Assert.Equal(0.95f, parameters.OuterBorder.Inset, 5);
+        Assert.Equal(0.05f, parameters.OuterBorder.Thickness, 5);
+        Assert.Equal(0.92f, parameters.InnerBorder.Inset, 5);
+        Assert.Equal(0.03f, parameters.InnerBorder.Thickness, 5);
         Assert.Equal(0.25f, parameters.InnerBorder.Alpha, 5);
     }
 

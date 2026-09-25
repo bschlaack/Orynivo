@@ -377,15 +377,15 @@ internal sealed class VisualizerGlPipeline
                 colour.rgb *= 1.0 - uDarken * (3.0 / 32.0) * coverage;
             }
 
-            // The border bands are rings measured from the frame's edge; the geometry is symmetric in
-            // both axes, so the bottom-up coordinate gives the same ring as the CPU's top-down one.
-            vec2 pixels = vUv * vec2(uFrameWidth, uFrameHeight);
+            // The border bands are clip-space Chebyshev rings, [inset, inset + thickness), symmetric
+            // in both axes, so the bottom-up coordinate gives the same ring as the CPU's top-down one.
             vec4 outer = vec4(uOuterR, uOuterG, uOuterB, uOuterA);
             vec4 inner = vec4(uInnerR, uInnerG, uInnerB, uInnerA);
-            float edge = min(min(pixels.x, pixels.y), min(uFrameWidth - pixels.x, uFrameHeight - pixels.y));
-            if (outer.a > 0.0 && edge < uSmaller * (uOuterInset + uOuterThickness) && edge >= uSmaller * uOuterInset)
+            vec2 clip = abs(vUv * 2.0 - 1.0);
+            float chebyshev = max(clip.x, clip.y);
+            if (outer.a > 0.0 && uOuterThickness > 0.0 && chebyshev >= uOuterInset && chebyshev <= uOuterInset + uOuterThickness)
                 colour = mix(colour, vec4(outer.rgb, colour.a), outer.a);
-            if (inner.a > 0.0 && edge < uSmaller * (uInnerInset + uInnerThickness) && edge >= uSmaller * uInnerInset)
+            if (inner.a > 0.0 && uInnerThickness > 0.0 && chebyshev >= uInnerInset && chebyshev <= uInnerInset + uInnerThickness)
                 colour = mix(colour, vec4(inner.rgb, colour.a), inner.a);
 
             }

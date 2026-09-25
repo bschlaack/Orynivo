@@ -483,8 +483,8 @@ public static class SkiaShaderRunner
         """;
 
     /// <summary>One rectangular border band of the Milkdrop border pass.</summary>
-    /// <param name="Inset">Inset as a fraction of the smaller dimension.</param>
-    /// <param name="Thickness">Band thickness as a fraction of the smaller dimension.</param>
+    /// <param name="Inset">Inner ring radius in clip space, where one is the frame edge.</param>
+    /// <param name="Thickness">Band width in clip space, the outer radius minus the inner radius.</param>
     /// <param name="Red">Red component.</param>
     /// <param name="Green">Green component.</param>
     /// <param name="Blue">Blue component.</param>
@@ -545,13 +545,12 @@ public static class SkiaShaderRunner
         uniform float2 innerShape;
         uniform float4 innerColor;
         float4 applyBorder(float4 c, float2 coord, float2 shape, float4 colour) {
-            float smallest = min(size.x, size.y);
-            float margin = floor(smallest * shape.x);
-            float band = max(1.0, floor(smallest * shape.y));
-            float x = floor(coord.x);
-            float y = floor(coord.y);
-            float ring = min(min(x - margin, y - margin), min((size.x - 1.0 - margin) - x, (size.y - 1.0 - margin) - y));
-            float painted = ((ring >= 0.0) && (ring < band)) ? 1.0 : 0.0;
+            // Milkdrop's ring is the Chebyshev distance in clip space, [shape.x, shape.x + shape.y).
+            float2 pixel = floor(coord);
+            float2 denom = max(size - 1.0, float2(1.0, 1.0));
+            float2 clip = abs((pixel / denom) * 2.0 - 1.0);
+            float chebyshev = max(clip.x, clip.y);
+            float painted = ((chebyshev >= shape.x) && (chebyshev <= shape.x + shape.y)) ? 1.0 : 0.0;
             return float4(mix(c.rgb, colour.rgb, painted * colour.a), c.a);
         }
         half4 main(float2 coord) {

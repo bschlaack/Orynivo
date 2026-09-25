@@ -163,8 +163,8 @@ public sealed class SkiaCompPassTests
     public void Borders_MatchesTheCpuBorders()
     {
         var source = CreatePattern();
-        var outer = new SkiaShaderRunner.BorderBand(0f, 0.06f, 1f, 0.5f, 0f, 0.7f);
-        var inner = new SkiaShaderRunner.BorderBand(0.1f, 0.05f, 0f, 0.2f, 1f, 0.4f);
+        var outer = new SkiaShaderRunner.BorderBand(0.9f, 0.1f, 1f, 0.5f, 0f, 0.7f);
+        var inner = new SkiaShaderRunner.BorderBand(0.8f, 0.1f, 0f, 0.2f, 1f, 0.4f);
 
         var gpu = new PixelBuffer(source.Width, source.Height);
         gpu.CopyFrom(source);
@@ -184,34 +184,22 @@ public sealed class SkiaCompPassTests
     /// <param name="band">Band to draw.</param>
     private static void CpuBorderBand(PixelBuffer frame, SkiaShaderRunner.BorderBand band)
     {
-        if (band.Alpha <= 0f)
+        if (band.Alpha <= 0f || band.Thickness <= 0f)
             return;
 
         var width = frame.Width;
         var height = frame.Height;
-        var smallest = Math.Min(width, height);
-        var thickness = Math.Max(1, (int)(smallest * band.Thickness));
-        var margin = (int)(smallest * band.Inset);
+        var outerRadius = band.Inset + band.Thickness;
         var pixels = frame.Pixels;
-        for (var offset = 0; offset < thickness; offset++)
+        for (var y = 0; y < height; y++)
         {
-            var left = margin + offset;
-            var top = margin + offset;
-            var right = width - 1 - margin - offset;
-            var bottom = height - 1 - margin - offset;
-            if (left > right || top > bottom)
-                break;
-
-            for (var x = left; x <= right; x++)
+            var clipY = height > 1 ? (y / (float)(height - 1) * 2f) - 1f : 0f;
+            for (var x = 0; x < width; x++)
             {
-                Paint(pixels, width, x, top, band);
-                Paint(pixels, width, x, bottom, band);
-            }
-
-            for (var y = top; y <= bottom; y++)
-            {
-                Paint(pixels, width, left, y, band);
-                Paint(pixels, width, right, y, band);
+                var clipX = width > 1 ? (x / (float)(width - 1) * 2f) - 1f : 0f;
+                var chebyshev = MathF.Max(MathF.Abs(clipX), MathF.Abs(clipY));
+                if (chebyshev >= band.Inset && chebyshev <= outerRadius)
+                    Paint(pixels, width, x, y, band);
             }
         }
     }

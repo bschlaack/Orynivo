@@ -457,7 +457,7 @@ public sealed class MilkdropCompatibilityTests
     public void RenderFrame_OuterBorderPaintsTheEdge()
     {
         var plain = RenderFeedback(string.Empty);
-        var bordered = RenderFeedback("ob_a=1\nob_r=1\nob_g=0\nob_b=0");
+        var bordered = RenderFeedback("ob_a=1\nob_size=0.1\nob_r=1\nob_g=0\nob_b=0");
 
         Assert.True(MeanDifference(plain, bordered) > 0.001f);
     }
@@ -466,15 +466,18 @@ public sealed class MilkdropCompatibilityTests
     [Fact]
     public void RenderFrame_InnerBorderIsInset()
     {
+        // The inner band is [1 - ob_size - ib_size, 1 - ob_size]; leaving the outer band empty keeps
+        // the very corner (Chebyshev distance one) outside it.
         var preset = VisualizerPreset.Parse(
-            "decay = 1;\nper_frame_1=wave_a = 0; ib_a = 1; ib_g = 1; ib_r = 0; ib_b = 0;");
+            "decay = 1;\nob_size=0.1\nib_size=0.1\n" +
+            "per_frame_1=wave_a = 0; ib_a = 1; ib_g = 1; ib_r = 0; ib_b = 0;");
         var renderer = new PresetRenderer(preset, 40, 40);
         renderer.RenderFrame(new FakeAudio(), 1d / 60d);
         renderer.RenderFrame(new FakeAudio(), 1d / 60d);
 
         var pixels = renderer.Output.Pixels;
         var corner = Luminance(pixels, (0 * 40) + 0);
-        var inset = Luminance(pixels, (2 * 40) + 2);
+        var inset = Luminance(pixels, (3 * 40) + 3);
         Assert.True(corner < inset);
     }
 

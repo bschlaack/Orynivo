@@ -32,6 +32,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   `CompShaderPolarTests` pins the interpreter convention.
 - Preset expression variables now use `double` like ns-eel2's `EEL_F`, so long-running feedback
   keeps the reference's numeric precision instead of accumulating `float` rounding.
+- Corrected MilkDrop's border bands. The outer and inner rings now use the preset's `ob_size` and
+  `ib_size` (default 0.01) as clip-space Chebyshev rings, `[1 - ob_size, 1]` and
+  `[1 - ob_size - ib_size, 1 - ob_size]`, consistently on the CPU, Skia, and OpenGL paths. Both
+  rings previously used fixed values (0.02 thick at insets 0 and 0.06) and ignored the preset keys,
+  so a preset whose border feeds the feedback (for example Royal Mashup (13)) rendered too dark.
 
 ### Added
 - Added a Windows-only Winamp MilkDrop capture harness that runs the supplied `vis_milk2.dll`

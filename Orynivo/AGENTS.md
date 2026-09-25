@@ -589,7 +589,10 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
   shaders, `Orynivo.Controls.VisualizerGlPipeline` owns the whole frame: the warp as a mesh draw whose
   fragment shader is a translation of `WarpSampling.SamplePosition`, the blur as the same nine-tap
   clamped box filter with ping-pong targets, and decay, video echo, centre darkening, both border
-  bands, gamma, and the additive overlay composite in one post pass. `PresetRenderer.ExpressionsOnly`
+  bands, gamma, and the additive overlay composite in one post pass. The post pass draws the border
+  bands as the same clip-space Chebyshev rings the CPU uses, reading
+  `VisualizerFrameParameters.OuterBorder`/`InnerBorder` (Inset is the inner clip radius and
+  Thickness the clip width); it must not fall back to a min-dimension inset. `PresetRenderer.ExpressionsOnly`
   is the CPU half: the per-frame block, the mesh, and the overlay, with no pixel pass. Keep the
   bitmap path as the fallback for a platform whose GL context never arrives: the window confirms the
   presenter once it has drawn a frame and otherwise switches back within

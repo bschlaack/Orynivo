@@ -298,7 +298,11 @@ This file applies to `Orynivo.Core/` and supplements `../AGENTS.md`.
   `SkiaShaderRunner.VideoEcho` is the GPU video-echo pass and must keep the CPU pass's zoom, flip,
   alpha blend, and leave-untouched rule.   `SkiaShaderRunner.Composite` is the GPU additive composite
   and must keep the CPU pass's clamp.   `SkiaShaderRunner.Borders` is the GPU border pass and must
-  keep the CPU ring geometry and blend. `SkiaShaderRunner.Warp` is the GPU geometric warp and must
+  keep the CPU ring geometry and blend: MilkDrop draws two clip-space Chebyshev rings sized by the
+  preset's `ob_size`/`ib_size` (default 0.01), `[1 - ob_size, 1]` and
+  `[1 - ob_size - ib_size, 1 - ob_size]`, blended with `SRCALPHA`/`INVSRCALPHA`. Never reintroduce
+  fixed band values; a wrong border changes the feedback of a preset whose only content is its
+  border, such as Royal Mashup (13). `SkiaShaderRunner.Warp` is the GPU geometric warp and must
   keep the CPU motion transform and the black-outside-the-frame rule. `PresetExpressionTranspiler`
   emits the preset's per-pixel expression language as SkSL from the same `PresetSyntaxNode` tree the
   interpreter compiles, so the GPU and the CPU cannot disagree about a block; it reports the uniforms

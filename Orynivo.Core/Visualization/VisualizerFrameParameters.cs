@@ -1,8 +1,8 @@
 namespace Orynivo.Visualization;
 
 /// <summary>One of Milkdrop's two border bands: where it sits, how thick it is, and its colour.</summary>
-/// <param name="Inset">Inset as a fraction of the smaller frame dimension.</param>
-/// <param name="Thickness">Band thickness as a fraction of the smaller frame dimension.</param>
+/// <param name="Inset">Inner ring radius in clip space, where one is the frame edge.</param>
+/// <param name="Thickness">Band width in clip space, the outer radius minus the inner radius.</param>
 /// <param name="Red">Red, zero to one.</param>
 /// <param name="Green">Green, zero to one.</param>
 /// <param name="Blue">Blue, zero to one.</param>

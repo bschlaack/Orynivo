@@ -674,17 +674,23 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
     /// has run, which is the case once <see cref="RenderFrame"/> has returned.
     /// </summary>
     /// <returns>The frame's pass parameters.</returns>
-    public VisualizerFrameParameters ReadFrameParameters() => new(
-        Math.Clamp(Read("decay", Preset.Decay), 0f, 1f),
-        BlurPasses(),
-        Math.Clamp(Read("darken_center", 0f), 0f, 1f),
-        Math.Clamp(Read("fGammaAdj", 1f), 0.1f, 10f),
-        Math.Clamp(Read("echo_zoom", Read("fVideoEchoZoom", 1f)), 0.1f, 4f),
-        Math.Clamp(Read("echo_alpha", Read("fVideoEchoAlpha", 0f)), 0f, 1f),
-        (int)Math.Clamp(Read("echo_orient", Read("nVideoEchoOrientation", 0f)), 0f, 3f),
-        ToPublicBand(ReadBand("ob_", 0f, 0.02f)),
-        ToPublicBand(ReadBand("ib_", 0.06f, 0.02f)),
-        (float)_elapsed * Read("fWarpAnimSpeed", 1f))
+    public VisualizerFrameParameters ReadFrameParameters()
+    {
+        // The band Inset is the inner ring radius in clip space and the Thickness its width, matching
+        // the reference's [1 - ob_size, 1] and [1 - ob_size - ib_size, 1 - ob_size] rings.
+        var outerSize = Math.Clamp(Read("ob_size", 0.01f), 0f, 2f);
+        var innerSize = Math.Clamp(Read("ib_size", 0.01f), 0f, 2f);
+        return new(
+            Math.Clamp(Read("decay", Preset.Decay), 0f, 1f),
+            BlurPasses(),
+            Math.Clamp(Read("darken_center", 0f), 0f, 1f),
+            Math.Clamp(Read("fGammaAdj", 1f), 0.1f, 10f),
+            Math.Clamp(Read("echo_zoom", Read("fVideoEchoZoom", 1f)), 0.1f, 4f),
+            Math.Clamp(Read("echo_alpha", Read("fVideoEchoAlpha", 0f)), 0f, 1f),
+            (int)Math.Clamp(Read("echo_orient", Read("nVideoEchoOrientation", 0f)), 0f, 3f),
+            ToPublicBand(ReadBand("ob_", 1f - outerSize, outerSize)),
+            ToPublicBand(ReadBand("ib_", 1f - outerSize - innerSize, innerSize)),
+            (float)_elapsed * Read("fWarpAnimSpeed", 1f))
         {
             WarpScale = Read("fWarpScale", 1f),
             TextureWrap = Read("bTexWrap", 0f) != 0f,
@@ -692,6 +698,7 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
             HueTime = (float)_elapsed * 30f,
             HueOffsets = (_hueOffsets[0], _hueOffsets[1], _hueOffsets[2], _hueOffsets[3]),
         };
+    }
 
     /// <summary>Publishes one border band with the public frame-parameter type.</summary>
     /// <param name="band">Band read from the preset's keys.</param>
@@ -3471,11 +3478,20 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
     /// <summary>Draws the outer and inner Milkdrop borders over the warped frame.</summary>
     private void DrawBorders()
     {
+        // Milkdrop draws two square rings in clip space (milkdropfs.cpp, DrawSprites): the outer band
+        // spans [1 - ob_size, 1] and the inner band [1 - ob_size - ib_size, 1 - ob_size]. The distance
+        // is the Chebyshev distance from the frame centre, and the band is measured in clip space, so
+        // it is wider in pixels on the wider axis. The band keys, not fixed values, drive the size.
+        var outerSize = Math.Clamp(Read("ob_size", 0.01f), 0f, 2f);
+        var innerSize = Math.Clamp(Read("ib_size", 0.01f), 0f, 2f);
         if (UseSkiaFramePasses)
         {
             try
             {
-                SkiaShaderRunner.Borders(_warped, ReadBand("ob_", 0f, 0.02f), ReadBand("ib_", 0.06f, 0.02f));
+                SkiaShaderRunner.Borders(
+                    _warped,
+                    ReadBand("ob_", 1f - outerSize, outerSize),
+                    ReadBand("ib_", 1f - outerSize - innerSize, innerSize));
                 return;
             }
             catch (Exception exception)
@@ -3484,8 +3500,8 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
             }
         }
 
-        DrawBorderFrame(0f, 0.02f);
-        DrawBorderFrame(0.06f, 0.02f);
+        DrawBorderRing(1f - outerSize, outerSize, "ob_");
+        DrawBorderRing(1f - outerSize - innerSize, innerSize, "ib_");
     }
 
     /// <summary>Reads one border band's colour keys.</summary>
@@ -3502,44 +3518,36 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
             Math.Clamp(Read(prefix + "b", 1f), 0f, 1f),
             Math.Clamp(Read(prefix + "a", 0f), 0f, 1f));
 
-    /// <summary>Draws one border frame with its own colour keys.</summary>
-    /// <param name="inset">Inset as a fraction of the smaller dimension.</param>
-    /// <param name="thickness">Frame thickness as a fraction of the smaller dimension.</param>
-    private void DrawBorderFrame(float inset, float thickness)
+    /// <summary>Draws one border band as Milkdrop's clip-space ring.</summary>
+    /// <param name="innerRadius">Inner ring radius in clip space, where one is the frame edge.</param>
+    /// <param name="thickness">Band width in clip space.</param>
+    /// <param name="prefix">Key prefix, <c>ob_</c> or <c>ib_</c>.</param>
+    private void DrawBorderRing(float innerRadius, float thickness, string prefix)
     {
-        var prefix = inset > 0f ? "ib_" : "ob_";
         var alpha = Math.Clamp(Read(prefix + "a", 0f), 0f, 1f);
-        if (alpha <= 0f)
+        if (alpha <= 0f || thickness <= 0f)
             return;
 
         var red = Math.Clamp(Read(prefix + "r", 1f), 0f, 1f);
         var green = Math.Clamp(Read(prefix + "g", 1f), 0f, 1f);
         var blue = Math.Clamp(Read(prefix + "b", 1f), 0f, 1f);
+        var outerRadius = innerRadius + thickness;
         var width = _warped.Width;
         var height = _warped.Height;
-        var band = Math.Max(1, (int)(Math.Min(width, height) * thickness));
-        var margin = (int)(Math.Min(width, height) * inset);
-        for (var offset = 0; offset < band; offset++)
+        ParallelRows.For(ParallelismEnabled, height, (worker, from, to) =>
         {
-            var left = margin + offset;
-            var top = margin + offset;
-            var right = width - 1 - margin - offset;
-            var bottom = height - 1 - margin - offset;
-            if (left > right || top > bottom)
-                break;
-
-            for (var x = left; x <= right; x++)
+            for (var y = from; y < to; y++)
             {
-                PaintWarped(x, top, red, green, blue, alpha);
-                PaintWarped(x, bottom, red, green, blue, alpha);
+                var clipY = height > 1 ? (y / (float)(height - 1) * 2f) - 1f : 0f;
+                for (var x = 0; x < width; x++)
+                {
+                    var clipX = width > 1 ? (x / (float)(width - 1) * 2f) - 1f : 0f;
+                    var chebyshev = MathF.Max(MathF.Abs(clipX), MathF.Abs(clipY));
+                    if (chebyshev >= innerRadius && chebyshev <= outerRadius)
+                        PaintWarped(x, y, red, green, blue, alpha);
+                }
             }
-
-            for (var y = top; y <= bottom; y++)
-            {
-                PaintWarped(left, y, red, green, blue, alpha);
-                PaintWarped(right, y, red, green, blue, alpha);
-            }
-        }
+        });
     }
 
     /// <summary>Blends one pixel into the warped frame.</summary>
