@@ -31,7 +31,7 @@ public sealed class PresetVariableLayout
         "textured", "tex_zoom", "tex_ang", "instance", "num_inst",
         "samples", "sep", "scaling", "smoothing", "sample", "value1", "value2",
         "fWarpAnimSpeed", "fWarpScale", "bTexWrap",
-        "bass", "mid", "treb", "vol", "bass_att", "mid_att", "treb_att",
+        "bass", "mid", "treb", "vol", "bass_att", "mid_att", "treb_att", "vol_att",
         "aspectx", "aspecty", "pixelsx", "pixelsy",
         "decay", "fDecay", "fGammaAdj", "shader", "fWarpAmount", "fWaveAlpha", "fWaveScale",
         "zoom", "zoomexp", "rot", "cx", "cy", "dx", "dy", "warp", "sx", "sy",

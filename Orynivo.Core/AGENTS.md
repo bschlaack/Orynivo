@@ -283,7 +283,13 @@ This file applies to `Orynivo.Core/` and supplements `../AGENTS.md`.
   universe for the expression blocks and the shader, so `q1`-`q32` and `t1`-`t8` are seeded from the
   preset slots on both CPU paths (`BindShaderVariables` per pixel and `SeedCompiledShaderFrame` once
   per frame) and on the GPU; keep the two sides seeding the same set, because a shader that reads a
-  variable the interpreter leaves at zero renders a different picture on the two paths.
+  variable the interpreter leaves at zero renders a different picture on the two paths. That universe
+  also carries MilkDrop's `include.fx` extras that real presets use: the `float4` q banks `_qa`-`_qh`
+  (q1-q4 through q29-q32) and `vol_att`. `_qa`-`_qh` are macros in the GLSL prelude and `float4`
+  uniforms in the SkSL prelude, the type table marks them `float4` so `float2x2(_qb)` spreads its
+  components, and `WriteShaderUniforms` seeds them from the preset slots; a bank read as an unknown
+  scalar (a zero) broke Royal Mashup (151) with a divide by zero. Do not drop these: a scan of a
+  10,353-preset collection uses the banks in about 600 presets and `vol_att` in 206.
  `SkiaShaderRunner` must bind a
   child shader for every sampler `Transpile` reports, and the CPU/GPU comparison tests must keep
   passing. Its `CompPass` runs a comp shader, with its own per-pixel block emitted into the same

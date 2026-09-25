@@ -45,6 +45,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   shape fills use. The CPU overlay for such a preset drops to a few milliseconds and no longer scales
   with the render resolution; a preset whose overlay program is unavailable still rasterizes on the
   CPU.
+- Added MilkDrop's `_qa`..`_qh` q-variable banks and `vol_att`. `include.fx` packs `q1`..`q32` into
+  the `float4` banks `_qa`..`_qh`; a shader that uses a bank as a vector (for example
+  `float2x2(_qb)` in Royal Mashup (151)) rendered white because the unknown name became a zero
+  scalar, so `mus = 0.01/(sqrt(0) + 0.001)` exploded. The banks now reach the GLSL, SkSL, and
+  interpreter paths, and `vol_att` is bound as the attenuated overall level. A scan of a 10,353-preset
+  collection found the banks used by about 600 presets and `vol_att` by 206.
 
 ### Added
 - Added a Windows-only Winamp MilkDrop capture harness that runs the supplied `vis_milk2.dll`

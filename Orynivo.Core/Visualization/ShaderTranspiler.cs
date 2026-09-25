@@ -31,7 +31,7 @@ public static class ShaderTranspiler
     private static readonly HashSet<string> LiteralUniforms = new(StringComparer.Ordinal)
     {
         "texsize", "time", "frame", "fps", "bass", "mid", "treb", "vol",
-        "bass_att", "mid_att", "treb_att", "aspect", "rand_frame", "rand_preset",
+        "bass_att", "mid_att", "treb_att", "vol_att", "aspect", "rand_frame", "rand_preset",
         "roam_cos", "roam_sin", "slow_roam_cos", "slow_roam_sin"
     };
 
@@ -241,6 +241,7 @@ public static class ShaderTranspiler
         uniform float mid;
         uniform float treb;
         uniform float vol;
+        uniform float vol_att;
         uniform float bass_att;
         uniform float mid_att;
         uniform float treb_att;
@@ -251,6 +252,14 @@ public static class ShaderTranspiler
         uniform float4 roam_sin;
         uniform float4 slow_roam_cos;
         uniform float4 slow_roam_sin;
+        uniform float4 _qa;
+        uniform float4 _qb;
+        uniform float4 _qc;
+        uniform float4 _qd;
+        uniform float4 _qe;
+        uniform float4 _qf;
+        uniform float4 _qg;
+        uniform float4 _qh;
         uniform shader sampler_main;
         uniform shader sampler_blur1;
         uniform shader sampler_blur2;
@@ -310,6 +319,7 @@ public static class ShaderTranspiler
         uniform float mid;
         uniform float treb;
         uniform float vol;
+        uniform float vol_att;
         uniform float bass_att;
         uniform float mid_att;
         uniform float treb_att;
@@ -348,6 +358,14 @@ public static class ShaderTranspiler
         uniform float slow_roam_sin_z;
         uniform float slow_roam_sin_w;
         #define slow_roam_sin float4(slow_roam_sin_x, slow_roam_sin_y, slow_roam_sin_z, slow_roam_sin_w)
+        #define _qa float4(q1, q2, q3, q4)
+        #define _qb float4(q5, q6, q7, q8)
+        #define _qc float4(q9, q10, q11, q12)
+        #define _qd float4(q13, q14, q15, q16)
+        #define _qe float4(q17, q18, q19, q20)
+        #define _qf float4(q21, q22, q23, q24)
+        #define _qg float4(q25, q26, q27, q28)
+        #define _qh float4(q29, q30, q31, q32)
         uniform sampler2D sampler_main;
         uniform sampler2D sampler_blur1;
         uniform sampler2D sampler_blur2;
@@ -636,6 +654,10 @@ public static class ShaderTranspiler
         };
         foreach (var (uniform, count) in UniformComponents)
             _types[uniform] = count switch { 1 => "float", 2 => "float2", 4 => "float4", _ => "float" };
+        // Milkdrop's include.fx packs q1..q32 into the float4 banks _qa.._qh; a shader uses them as a
+        // vector (for example float2x2(_qb)), so their type must be known for a matrix constructor.
+        for (var bank = 0; bank < 8; bank++)
+            _types["_q" + (char)('a' + bank)] = "float4";
 
         _mutableUniforms = new HashSet<string>(StringComparer.Ordinal);
         _helperReturns = new Dictionary<string, string>(StringComparer.Ordinal);

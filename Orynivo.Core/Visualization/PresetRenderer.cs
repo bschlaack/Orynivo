@@ -798,6 +798,9 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
     /// <summary>Gets the attenuated treble level relative to its long-term average.</summary>
     public float TrebleAttRelative { get; private set; } = 1f;
 
+    /// <summary>Gets the attenuated overall level relative to its long-term average.</summary>
+    public float VolumeAtt => (BassAttRelative + MidAttRelative + TrebleAttRelative) * 0.333f;
+
     /// <summary>Gets the left channel's waveform of the last rendered frame.</summary>
     public ReadOnlySpan<float> WaveformLeft => _audio is null ? default : _audio.WaveformLeft;
 
@@ -1041,6 +1044,7 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
         Write("mid", MidRelative);
         Write("treb", TrebleRelative);
         Write("vol", (BassRelative + MidRelative + TrebleRelative) * 0.333f);
+        Write("vol_att", (BassAttRelative + MidAttRelative + TrebleAttRelative) * 0.333f);
         Write("bass_att", BassAttRelative);
         Write("mid_att", MidAttRelative);
         Write("treb_att", TrebleAttRelative);
@@ -2055,6 +2059,7 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
             1f / Math.Max(0.0001f, aspectX),
             1f / Math.Max(0.0001f, aspectY),
             4);
+        values[15] = ShaderValue.Scalar(VolumeAtt);
         foreach (var compiled in _compiledWarp)
             SeedCompiledShader(compiled, values);
 
@@ -2389,6 +2394,7 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
         destination["mid"] = ShaderValue.Scalar(MidRelative);
         destination["treb"] = ShaderValue.Scalar(TrebleRelative);
         destination["vol"] = ShaderValue.Scalar(Volume);
+        destination["vol_att"] = ShaderValue.Scalar(VolumeAtt);
         var previousMin = 0f; var previousMax = 1f;
         for (var level = 1; level <= 3; level++)
         {
@@ -2409,6 +2415,15 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
         destination["treb_att"] = ShaderValue.Scalar(Read("treb_att", 0f));
         for (var index = 1; index <= 32; index++)
             destination["q" + index] = ShaderValue.Scalar(Read("q" + index, 0f));
+        // Milkdrop's include.fx packs q1..q32 into the float4 banks _qa.._qh. A shader may use a bank
+        // as a vector, for example float2x2(_qb), so the banks travel to the shader as well.
+        for (var bank = 0; bank < 8; bank++)
+        {
+            var first = bank * 4;
+            destination["_q" + (char)('a' + bank)] = ShaderValue.Vector(
+                Read("q" + (first + 1), 0f), Read("q" + (first + 2), 0f),
+                Read("q" + (first + 3), 0f), Read("q" + (first + 4), 0f), 4);
+        }
         for (var index = 1; index <= 8; index++)
             destination["t" + index] = ShaderValue.Scalar(Read("t" + index, 0f));
 
@@ -2516,6 +2531,7 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
         interpreter.SetVariable("mid", Mid);
         interpreter.SetVariable("treb", Treble);
         interpreter.SetVariable("vol", Volume);
+        interpreter.SetVariable("vol_att", Read("vol_att", 0f));
         interpreter.SetVariable("bass_att", Read("bass_att", 0f));
         interpreter.SetVariable("mid_att", Read("mid_att", 0f));
         interpreter.SetVariable("treb_att", Read("treb_att", 0f));
@@ -2582,7 +2598,8 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
         public static readonly string[] FrameVariables =
         [
             "time", "frame", "fps", "bass", "mid", "treb", "vol",
-            "bass_att", "mid_att", "treb_att", "aspectx", "aspecty", "texsize", "rand_frame", "aspect"
+            "bass_att", "mid_att", "treb_att", "aspectx", "aspecty", "texsize", "rand_frame", "aspect",
+            "vol_att"
         ];
 
         /// <summary>
