@@ -556,7 +556,12 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
     public void PrepareMeshForGpu()
     {
         _meshBuiltThisFrame = false;
-        if (_perPixelWritesPosition || Read("mv_enabled", 0f) >= 0.5f)
+        // A per-pixel block that writes the sample position cannot be interpolated over a mesh, so
+        // the mesh is skipped for it. MeshForPixelWarp is the exception: the GPU evaluates that
+        // block per pixel in a fragment shader and reads only the mesh's motion values, so the
+        // mesh is still built as the source of those values and the CPU can stop evaluating the
+        // block itself.
+        if ((_perPixelWritesPosition && !MeshForPixelWarp) || Read("mv_enabled", 0f) >= 0.5f)
             return;
         if (!_perPixelWritesMotion && !MeshRequested)
             return;
@@ -3631,7 +3636,9 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
                     // radius is 0.5 / tex_zoom.
                     var u = (0.5f * w0) + (_shapeUvX[i] * w1) + (_shapeUvX[next] * w2);
                     var v = (0.5f * w0) + (_shapeUvY[i] * w1) + (_shapeUvY[next] * w2);
-                    _warped.SampleShader(u, v, VisualizerTextureWrap.Repeat, nearest: false, _shapeSample);
+                    // MilkDrop binds VS[0], the previous feedback, as the textured shape's
+                    // source while drawing the shape into the newly warped VS[1].
+                    _previous.SampleShader(u, v, VisualizerTextureWrap.Repeat, nearest: false, _shapeSample);
                     var pixelRed = red2 + (red - red2) * w0;
                     var pixelGreen = green2 + (green - green2) * w0;
                     var pixelBlue = blue2 + (blue - blue2) * w0;

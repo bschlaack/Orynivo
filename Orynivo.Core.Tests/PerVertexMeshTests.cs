@@ -189,6 +189,39 @@ public sealed class PerVertexMeshTests
         Assert.True(any, "the overlay should be drawn in expressions-only mode");
     }
 
+    /// <summary>
+    /// A per-pixel block that writes the sample position still gets a mesh when the GPU evaluates
+    /// that block in its warp fragment shader: the mesh is the source of the motion values the
+    /// fragment shader seeds from, so the CPU can stop evaluating the block itself. Without that
+    /// flag the same preset exposes no mesh, which is what sends it to the CPU frame path.
+    /// </summary>
+    [Fact]
+    public void RenderFrame_PixelWarpBuildsTheMeshWhileThePlainExpressionPathDoesNot()
+    {
+        var preset = VisualizerPreset.Parse("decay = 1;\nzoom=1.25\nwave_alpha=1;\nper_pixel_1=x = x + 0.1;");
+        var mesh = new float[(PresetRenderer.MeshGridX + 1) * (PresetRenderer.MeshGridY + 1) * PresetRenderer.MeshValues];
+
+        var pixelWarp = new PresetRenderer(preset, 40, 40)
+        {
+            ExpressionsOnly = true,
+            MeshRequested = true,
+            MeshForPixelWarp = true,
+        };
+        pixelWarp.RenderFrame(new FakeAudio(), 1d / 60d);
+        Assert.True(pixelWarp.TryCopyMeshMotion(mesh, out _, out _));
+        // Every vertex carries the frame's zoom, so the pixel-warp uniforms have a source.
+        for (var vertex = 0; vertex < mesh.Length; vertex += PresetRenderer.MeshValues)
+            Assert.Equal(1.25f, mesh[vertex], 4);
+
+        var plain = new PresetRenderer(preset, 40, 40)
+        {
+            ExpressionsOnly = true,
+            MeshRequested = true,
+        };
+        plain.RenderFrame(new FakeAudio(), 1d / 60d);
+        Assert.False(plain.TryCopyMeshMotion(mesh, out _, out _));
+    }
+
     /// <summary>Renders a preset with a visible overlay so the feedback carries a picture.</summary>
 
     /// <param name="perPixel">Per-pixel program text.</param>

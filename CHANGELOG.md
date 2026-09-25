@@ -33,6 +33,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   the same audio state.
 
 ### Fixed
+- A preset whose per-pixel block writes the sample position now runs its warp on the GPU without
+  also costing the CPU the full warp and comp passes. `PrepareMeshForGpu` refused to build a mesh
+  for such a block, so the expressions-only renderer never took its early return and computed the
+  complete frame while the presenter drew the GPU pipeline as well - the same work twice. It now
+  builds the mesh for `MeshForPixelWarp`, whose fragment shader needs only the mesh's motion
+  values, so the CPU stops at the overlay. Measured on `$$$ Royal - Mashup (13)`: about 500 ms per
+  frame before, with `warpMs` 310 and `compShaderMs` 159 on the CPU.
 - The visualizer's label now follows the frame OpenGL actually drew. Previously the new
   selection could be labeled while the presenter still consumed the old frame; its shader fields
   could even be paired with the next preset's overlay. Each published frame now carries its own
@@ -218,6 +225,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   echo rather than the blur.
 
 ### Fixed
+- Textured MilkDrop shapes now sample the previous feedback frame in both CPU and OpenGL paths, matching Winamp's `VS[0]` binding. The OpenGL shape sampler also uses repeat wrapping.
 - Preset diagnostics now record the exact external preset section given to the parser/compiler,
   its SHA-256 digest, the first frame's wave mode and GPU/CPU presentation path, and the shader
   digests the GL callback actually drew. The OpenGL

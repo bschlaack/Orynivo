@@ -21,7 +21,7 @@ This file applies to `Orynivo.Core/` and supplements `../AGENTS.md`.
   Draw shapes before custom/default waves. The overlay stores premultiplied colour
   plus accumulated non-additive coverage; composite as `feedback*(1-coverage)+RGB`.
   Preserve alpha when exporting the GL overlay, but keep ordinary bitmap output opaque.
-  A shape whose `shapecode_N_textured` is set must sample the frame instead of the
+  A shape whose `shapecode_N_textured` is set must sample the previous feedback frame (`VS[0]`) instead of the
   gradient: interpolate the reference's fan texture coordinates (centre at the
   texture centre, rim on a circle of radius `0.5 / tex_zoom` rotated by `tex_ang`)
   and read the frame with repeat.
@@ -352,8 +352,12 @@ This file applies to `Orynivo.Core/` and supplements `../AGENTS.md`.
   sy, warp. `MeshRequested` builds the mesh while the CPU keeps evaluating per pixel, which is the
   transitional double work a GPU warp needs before it replaces the CPU warp; `TryCopyMeshMotion`
   copies the values and `MeshSource` exposes the frame the mesh samples. Requesting the mesh must
-  leave the CPU frame byte-identical, which `PerVertexMeshTests` asserts.
-  `ReadFrameParameters` publishes the clamped per-frame pass values and `RenderOverlayFrame` the`n  overlay-only frame, so a GPU pipeline reads them instead of duplicating the key lookups and`n  clamps; `RenderOverlayFrame` seeds the live variables first, because the overlay reads them.`n    `ReadFrameParameters` publishes the clamped per-frame pass values and `RenderOverlayFrame` the
+  leave the CPU frame byte-identical, which `PerVertexMeshTests` asserts. A per-pixel block that
+  writes the sample position exposes no mesh, except when `MeshForPixelWarp` is set: the emitted
+  warp fragment shader computes that coordinate itself and reads only the mesh's motion values, so
+  the mesh is still built for it and `ExpressionsOnly` stops the CPU at the overlay instead of
+  running the complete frame while the presenter also draws the GPU pipeline.
+  `ReadFrameParameters` publishes the clamped per-frame pass values and `RenderOverlayFrame` the
   overlay-only frame, so a GPU pipeline reads them instead of duplicating the key lookups and clamps;
   `RenderOverlayFrame` seeds the live variables first, because the overlay reads them.
   `WarpSampling.SamplePosition` is the single definition
