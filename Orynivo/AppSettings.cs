@@ -91,6 +91,12 @@ public sealed class AppSettings
 
     /// <summary>Gets or sets the visualizer target frame rate.</summary>
     public int VisualizerFrameRate { get; set; } = 60;
+
+    /// <summary>Gets or sets a value indicating whether the visualizer advances to the next preset automatically.</summary>
+    public bool VisualizerAutoAdvanceEnabled { get; set; }
+
+    /// <summary>Gets or sets how many seconds the visualizer shows one preset before advancing.</summary>
+    public int VisualizerAutoAdvanceSeconds { get; set; } = 15;
     public bool PcmOutputBoostEnabled { get; set; }
     /// <summary>Gets or sets the fade duration used when advancing non-gapless queues, in seconds.</summary>
     public double NonGaplessCrossfadeSeconds { get; set; }

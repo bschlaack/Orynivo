@@ -17,13 +17,17 @@ namespace Orynivo.Visualization;
 /// <param name="PresetDirectory">
 /// Folder to load user presets from, or <see langword="null"/> for the default folder.
 /// </param>
+/// <param name="AutoAdvanceEnabled">Whether the window advances to the next preset automatically.</param>
+/// <param name="AutoAdvanceSeconds">Seconds to show one preset before advancing.</param>
 public sealed record VisualizerRenderOptions(
     int Width,
     int Height,
     int FrameRate,
     bool ReduceMotion,
     bool AlwaysShowOverlay,
-    string? PresetDirectory);
+    string? PresetDirectory,
+    bool AutoAdvanceEnabled = false,
+    int AutoAdvanceSeconds = 15);
 
 /// <summary>A selectable visualizer frame size.</summary>
 /// <param name="Width">Frame width in pixels.</param>

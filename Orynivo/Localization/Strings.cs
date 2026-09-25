@@ -1446,6 +1446,9 @@ public sealed record LocalizedStrings(
     public string VisualizerResolutionHint { get; init; } = "";
     public string VisualizerFrameRate { get; init; } = "";
     public string VisualizerFrameRateHint { get; init; } = "";
+    public string VisualizerAutoAdvance { get; init; } = "";
+    public string VisualizerAutoAdvanceHint { get; init; } = "";
+    public string VisualizerAutoAdvanceSeconds { get; init; } = "";
     public string MaxOutputSampleRate { get; init; } = "";
     public string MaxOutputSampleRateHint { get; init; } = "";
     public string MaxOutputSampleRateAutomatic { get; init; } = "";

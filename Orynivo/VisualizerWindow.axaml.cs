@@ -250,6 +250,9 @@ public partial class VisualizerWindow : Window
     private volatile bool _closed;
     private volatile int _presetIndex;
     private volatile int _renderedPresetIndex = -1;
+    private readonly bool _autoAdvanceEnabled;
+    private readonly double _autoAdvanceSeconds;
+    private double _presetSeconds;
     private int _presentedPresetIndex = -1;
     private string? _presentedPresetName;
     private int _labeledPresetIndex = -1;
@@ -295,6 +298,8 @@ public partial class VisualizerWindow : Window
             _renderHeight = Math.Clamp(options.Height, 90, 4320);
 
         _frameInterval = TimeSpan.FromMilliseconds(1000.0 / Math.Clamp(options.FrameRate, 5, 240));
+        _autoAdvanceEnabled = options.AutoAdvanceEnabled;
+        _autoAdvanceSeconds = Math.Clamp(options.AutoAdvanceSeconds, 1, 600);
         // Only the built-ins are available here. Enumerating a real preset collection is a disk
         // walk over thousands of files and must never run while the window is being constructed,
         // because that would block the interface for as long as it takes.
@@ -565,12 +570,26 @@ public partial class VisualizerWindow : Window
                 $"shaders=warp{preset.WarpShaders.Count}/comp{preset.CompShaders.Count} " +
                 $"failedBlocks={preset.FailedBlocks.Count}");
             _resetRequested = false;
+            _presetSeconds = 0;
         }
 
         if (_resetRequested)
         {
             _resetRequested = false;
             _renderer.Reset();
+            _presetSeconds = 0;
+        }
+
+        // Advance to the next preset after the configured dwell time. The switch is applied by the
+        // block above on the next frame, so this only sets the index.
+        if (_autoAdvanceEnabled)
+        {
+            _presetSeconds += deltaSeconds;
+            if (_presetSeconds >= _autoAdvanceSeconds)
+            {
+                _presetSeconds = 0;
+                SelectPreset(_presetIndex + 1);
+            }
         }
 
         // Render even when nothing is playing, so the window never stays black.

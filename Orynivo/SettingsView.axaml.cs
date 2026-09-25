@@ -213,6 +213,11 @@ internal partial class SettingsView : UserControl
         _visualizerPresetDirectory = settings.VisualizerPresetDirectory ?? string.Empty;
         UpdateVisualizerPresetFolder();
         VisualizerAlwaysShowOverlayCheckBox.IsChecked = settings.VisualizerAlwaysShowOverlay;
+        VisualizerAutoAdvanceCheckBox.IsChecked = settings.VisualizerAutoAdvanceEnabled;
+        VisualizerAutoAdvanceSecondsNumericUpDown.Value = (decimal)Math.Clamp(
+            settings.VisualizerAutoAdvanceSeconds,
+            1,
+            600);
         var visualizerResolutionChoices = new[]
         {
             new SettingChoice<VisualizerResolution>(new VisualizerResolution(3840, 2160), "3840 × 2160"),
@@ -606,6 +611,13 @@ internal partial class SettingsView : UserControl
     /// <summary>Gets the configured visualizer target frame rate.</summary>
     public int VisualizerFrameRateValue =>
         VisualizerFrameRateComboBox.SelectedItem is SettingChoice<int> choice ? choice.Value : 60;
+
+    /// <summary>Gets a value indicating whether the visualizer advances to the next preset automatically.</summary>
+    public bool VisualizerAutoAdvanceEnabled => VisualizerAutoAdvanceCheckBox.IsChecked == true;
+
+    /// <summary>Gets the seconds the visualizer shows one preset before advancing.</summary>
+    public int VisualizerAutoAdvanceSeconds =>
+        (int)Math.Clamp(VisualizerAutoAdvanceSecondsNumericUpDown.Value ?? 15m, 1m, 600m);
 
     /// <summary>Gets the configured maximum PCM output sample rate in hertz, or zero for automatic.</summary>
     public int MaxOutputSampleRateHz =>

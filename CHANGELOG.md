@@ -53,6 +53,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   collection found the banks used by about 600 presets and `vol_att` by 206.
 
 ### Added
+- Added automatic preset advancement to the visualizer. Settings > Visualisierung gains an enable
+  toggle and a per-preset dwell time in seconds; when enabled the window advances to the next preset
+  after that time. It is off by default and defaults to 15 seconds.
+
 - Added a Windows-only Winamp MilkDrop capture harness that runs the supplied `vis_milk2.dll`
   inside an isolated copy of Winamp, plays the comparison tone, records Direct3D frames with
   playback timestamps, and produces a side-by-side Orynivo comparison. A 300-frame Royal Mashup

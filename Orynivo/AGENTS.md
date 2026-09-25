@@ -664,7 +664,10 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
   edits all three, and the window clamps them to a sane range (160-7680 wide, 5-240 fps). The
   resolution choices run from 320 x 180 up to 3840 x 2160; keep the list ordered from the largest
   down, and resolve a missing selection through a named default rather than an index, because an
-  index silently changes meaning when an entry is added. The
+  index silently changes meaning when an entry is added. `VisualizerAutoAdvanceEnabled` and
+  `VisualizerAutoAdvanceSeconds` (default 15) let the render loop advance to the next preset after
+  the dwell time; the window only sets `_presetIndex` and lets the next frame apply the switch, so
+  the change stays a render-thread request like the key and mouse navigation. The
   defaults are 640 x 360 at 60 frames per second, which the parallel frame passes made affordable
   (the built-in presets cost 21 ms per frame on average there against 39 ms at 480 x 270 before).
   `VisualizerAlwaysShowOverlay` decides whether the overlay is permanent or appears on pointer
