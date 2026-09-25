@@ -632,6 +632,23 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
     private readonly List<ShapeFill> _shapeFills = [];
 
     /// <summary>
+    /// Gets or sets a value indicating whether the renderer publishes the custom waveforms as GPU
+    /// geometry instead of rasterizing their thick lines and dots into <see cref="OverlayFrame"/>. A
+    /// CPU overlay rasterizes every line segment per pixel, which is prohibitively slow at a high
+    /// render resolution; a GPU overlay draws <see cref="WaveGeometry"/> instead. The rasterized wave
+    /// is skipped while this is set, so a caller that publishes the geometry must draw it.
+    /// </summary>
+    public bool CollectWaveGeometry { get; set; }
+
+    /// <summary>
+    /// Gets the custom-wave geometry collected for the last frame, in draw order. The list is empty
+    /// unless <see cref="CollectWaveGeometry"/> is set.
+    /// </summary>
+    public IReadOnlyList<WaveGeometry> WaveGeometry => _waveGeometry;
+
+    private readonly List<WaveGeometry> _waveGeometry = [];
+
+    /// <summary>
     /// Draws only the waveform and spectrum overlay, without touching the feedback buffers, and
     /// leaves it in <see cref="OverlayFrame"/>. It is the overlay half of the frame for a GPU
     /// pipeline, which owns the warp and the frame passes itself.
@@ -2879,6 +2896,7 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
     private void DrawOverlay()
     {
         _fresh.Clear();
+        _waveGeometry.Clear();
         DrawMotionVectors();
         DrawShapes();
         DrawWaves();
@@ -3101,29 +3119,40 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
             CopyElementInputs(frameSlots, _slots);
             for (var t = 1; t <= 8; t++)
                 Write(TNames[t - 1], (float)frameSlots[Preset.Layout.IndexOf(TNames[t - 1])]);
+            // The per-point block runs once per sample (up to 512), so resolve the sample variables
+            // once instead of a layout lookup per sample.
+            var slotSample = Preset.Layout.IndexOf("sample");
+            var slotValue1 = Preset.Layout.IndexOf("value1");
+            var slotValue2 = Preset.Layout.IndexOf("value2");
+            var slotX = Preset.Layout.IndexOf("x");
+            var slotY = Preset.Layout.IndexOf("y");
+            var slotR = Preset.Layout.IndexOf("r");
+            var slotG = Preset.Layout.IndexOf("g");
+            var slotB = Preset.Layout.IndexOf("b");
+            var slotA = Preset.Layout.IndexOf("a");
             var step = samples > 1 ? 1f / (samples - 1) : 0f;
             for (var sample = 0; sample < samples; sample++)
             {
                 // Milkdrop keeps the two channels separate: value1 is the left trace, value2 the right.
                 var value1 = _waveSamples[sample];
                 var value2 = _waveSamplesRight[sample];
-                Write("sample", sample * step);
-                Write("value1", value1);
-                Write("value2", value2);
-                Write("x", 0.5f + value1);
-                Write("y", 0.5f + value2);
-                Write("r", baseRed);
-                Write("g", baseGreen);
-                Write("b", baseBlue);
-                Write("a", baseAlpha);
+                Write(slotSample, sample * step);
+                Write(slotValue1, value1);
+                Write(slotValue2, value2);
+                Write(slotX, 0.5f + value1);
+                Write(slotY, 0.5f + value2);
+                Write(slotR, baseRed);
+                Write(slotG, baseGreen);
+                Write(slotB, baseBlue);
+                Write(slotA, baseAlpha);
                 wave.PerPoint.Execute(_slots);
 
-                _wavePointX[sample] = Read("x", 0.5f);
-                _wavePointY[sample] = Read("y", 0.5f);
-                _waveRed[sample] = Math.Clamp(Read("r", baseRed), 0f, 1f);
-                _waveGreen[sample] = Math.Clamp(Read("g", baseGreen), 0f, 1f);
-                _waveBlue[sample] = Math.Clamp(Read("b", baseBlue), 0f, 1f);
-                _waveAlpha[sample] = Math.Clamp(Read("a", baseAlpha), 0f, 1f);
+                _wavePointX[sample] = Read(slotX, 0.5f);
+                _wavePointY[sample] = Read(slotY, 0.5f);
+                _waveRed[sample] = Math.Clamp(Read(slotR, baseRed), 0f, 1f);
+                _waveGreen[sample] = Math.Clamp(Read(slotG, baseGreen), 0f, 1f);
+                _waveBlue[sample] = Math.Clamp(Read(slotB, baseBlue), 0f, 1f);
+                _waveAlpha[sample] = Math.Clamp(Read(slotA, baseAlpha), 0f, 1f);
             }
 
             var count = SmoothWavePoints(samples);
@@ -3271,6 +3300,12 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
         if (count < 1 || width < 1 || height < 1)
             return;
 
+        if (CollectWaveGeometry)
+        {
+            CollectWaveGeometryFor(wave, count, width, height);
+            return;
+        }
+
         var inverseAspectX = MathF.Max(1f, height / (float)width);
         var inverseAspectY = MathF.Max(1f, width / (float)height);
 
@@ -3315,6 +3350,104 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
                     red, green, blue, alpha,
                     wave.Additive, wave.DrawThick);
         }
+    }
+
+    /// <summary>
+    /// Expands a smoothed custom waveform into triangles for a GPU overlay instead of rasterizing
+    /// them. Thick lines become quads and dots become small squares; the pipeline draws the list with
+    /// the same "over" or additive blend the CPU <see cref="PaintPixel"/> applies.
+    /// </summary>
+    /// <param name="wave">Waveform state, for the dot, thickness, and blend modes.</param>
+    /// <param name="count">Number of polyline points.</param>
+    /// <param name="width">Overlay width in pixels.</param>
+    /// <param name="height">Overlay height in pixels.</param>
+    private void CollectWaveGeometryFor(VisualizerWave wave, int count, int width, int height)
+    {
+        var inverseAspectX = MathF.Max(1f, height / (float)width);
+        var inverseAspectY = MathF.Max(1f, width / (float)height);
+        var denominatorX = Math.Max(1, width - 1);
+        var denominatorY = Math.Max(1, height - 1);
+        var vertices = new List<WaveVertex>(Math.Max(6, count * 6));
+
+        WaveVertex Vertex(float x, float y, float red, float green, float blue, float alpha) =>
+            new(
+                (x / denominatorX * 2f) - 1f,
+                (y / denominatorY * 2f) - 1f,
+                Math.Clamp(red, 0f, 1f),
+                Math.Clamp(green, 0f, 1f),
+                Math.Clamp(blue, 0f, 1f),
+                Math.Clamp(alpha, 0f, 1f));
+
+        (float X, float Y) Screen(int index) => (
+            (0.5f + (_waveOutX[index] - 0.5f) * inverseAspectX) * (width - 1),
+            (0.5f - (_waveOutY[index] - 0.5f) * inverseAspectY) * (height - 1));
+
+        if (wave.UseDots)
+        {
+            var half = wave.DrawThick ? 1f : 0.5f;
+            for (var index = 0; index < count; index++)
+            {
+                var (x, y) = Screen(index);
+                if (!float.IsFinite(x) || !float.IsFinite(y))
+                    continue;
+
+                var red = _waveOutRed[index];
+                var green = _waveOutGreen[index];
+                var blue = _waveOutBlue[index];
+                var alpha = _waveOutAlpha[index];
+                var a = Vertex(x - half, y - half, red, green, blue, alpha);
+                var b = Vertex(x + half, y - half, red, green, blue, alpha);
+                var c = Vertex(x + half, y + half, red, green, blue, alpha);
+                var d = Vertex(x - half, y + half, red, green, blue, alpha);
+                vertices.Add(a);
+                vertices.Add(b);
+                vertices.Add(c);
+                vertices.Add(a);
+                vertices.Add(c);
+                vertices.Add(d);
+            }
+        }
+        else
+        {
+            var halfThickness = wave.DrawThick ? 1f : 0.5f;
+            for (var index = 1; index < count; index++)
+            {
+                var (x0, y0) = Screen(index - 1);
+                var (x1, y1) = Screen(index);
+                if (!float.IsFinite(x0) || !float.IsFinite(y0) || !float.IsFinite(x1) || !float.IsFinite(y1))
+                    continue;
+
+                var dx = x1 - x0;
+                var dy = y1 - y0;
+                var length = MathF.Sqrt((dx * dx) + (dy * dy));
+                if (length < 0.0001f)
+                    continue;
+
+                var nx = -dy / length * halfThickness;
+                var ny = dx / length * halfThickness;
+                var red0 = _waveOutRed[index - 1];
+                var green0 = _waveOutGreen[index - 1];
+                var blue0 = _waveOutBlue[index - 1];
+                var alpha0 = _waveOutAlpha[index - 1];
+                var red1 = _waveOutRed[index];
+                var green1 = _waveOutGreen[index];
+                var blue1 = _waveOutBlue[index];
+                var alpha1 = _waveOutAlpha[index];
+                var a = Vertex(x0 + nx, y0 + ny, red0, green0, blue0, alpha0);
+                var b = Vertex(x1 + nx, y1 + ny, red1, green1, blue1, alpha1);
+                var c = Vertex(x1 - nx, y1 - ny, red1, green1, blue1, alpha1);
+                var d = Vertex(x0 - nx, y0 - ny, red0, green0, blue0, alpha0);
+                vertices.Add(a);
+                vertices.Add(b);
+                vertices.Add(c);
+                vertices.Add(a);
+                vertices.Add(c);
+                vertices.Add(d);
+            }
+        }
+
+        if (vertices.Count >= 3)
+            _waveGeometry.Add(new WaveGeometry(vertices, wave.Additive));
     }
 
     /// <summary>Clips a waveform segment to the frame, as the original graphics API does.</summary>

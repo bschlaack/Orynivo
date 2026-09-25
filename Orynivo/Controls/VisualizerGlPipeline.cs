@@ -621,6 +621,14 @@ internal sealed class VisualizerGlPipeline
     public bool ShapeFillsSupported => _shapeProgram != 0;
 
     /// <summary>
+    /// Gets a value indicating whether the pipeline can draw the custom-wave geometry. A caller that
+    /// sets <c>PresetRenderer.CollectWaveGeometry</c> must only do so while this is
+    /// <see langword="true"/>, because the renderer then skips its own CPU line rasterization, which
+    /// is prohibitively slow at a high render resolution.
+    /// </summary>
+    public bool WaveGeometrySupported => _shapeProgram != 0;
+
+    /// <summary>
     /// Publishes the emitted GLSL for the current preset. The sources are compiled on the next frame,
     /// because the GL context is only current inside the render callback. A source that fails to build
     /// leaves that stage on the fixed pipeline instead of losing the frame.
@@ -930,7 +938,8 @@ internal sealed class VisualizerGlPipeline
         bool needsRadius,
         VisualizerFrameParameters parameters,
         IReadOnlyDictionary<string, ShaderValue>? uniforms = null,
-        IReadOnlyList<ShapeFill>? shapeFills = null)
+        IReadOnlyList<ShapeFill>? shapeFills = null,
+        IReadOnlyList<WaveGeometry>? waveGeometry = null)
     {
         if (!_ready || frameWidth <= 0 || frameHeight <= 0)
             return false;
@@ -1024,12 +1033,15 @@ internal sealed class VisualizerGlPipeline
             // into the post's source with the same "over" that PaintPixel applies. A textured fill
             // samples the previous feedback (VS[0]), so the draw targets the other ping and the
             // post reads it back.
-            if (shapeFills is { Count: > 0 } && _shapeProgram != 0)
+            if ((shapeFills is { Count: > 0 } || waveGeometry is { Count: > 0 }) && _shapeProgram != 0)
             {
-                var shapeTarget = 1 - current;
-                Blit(gl, _pingTexture[current], _pingFramebuffer[shapeTarget], frameWidth, frameHeight);
-                DrawShapeFills(gl, shapeFills, _feedbackTexture, frameWidth, frameHeight, shapeTarget);
-                current = shapeTarget;
+                var overlayTarget = 1 - current;
+                Blit(gl, _pingTexture[current], _pingFramebuffer[overlayTarget], frameWidth, frameHeight);
+                if (shapeFills is { Count: > 0 })
+                    DrawShapeFills(gl, shapeFills, _feedbackTexture, frameWidth, frameHeight, overlayTarget);
+                if (waveGeometry is { Count: > 0 })
+                    DrawWaveGeometry(gl, waveGeometry, frameWidth, frameHeight, overlayTarget);
+                current = overlayTarget;
             }
 
             // Post-processing and the overlay composite, into the next feedback.
@@ -1272,6 +1284,78 @@ internal sealed class VisualizerGlPipeline
             _shapeVertices[target + 5] = vertex.Alpha;
             _shapeVertices[target + 6] = vertex.U;
             _shapeVertices[target + 7] = vertex.V;
+            target += FloatsPerShapeVertex;
+        }
+
+        var handle = GCHandle.Alloc(_shapeVertices, GCHandleType.Pinned);
+        try
+        {
+            gl.BufferData(GlArrayBuffer, (IntPtr)(required * sizeof(float)), handle.AddrOfPinnedObject(), GlDynamicDraw);
+        }
+        finally
+        {
+            handle.Free();
+        }
+    }
+
+    /// <summary>
+    /// Draws the custom-wave triangle lists into the frame. It reuses the shape program untextured,
+    /// so the premultiplied colour and the "over"/additive blend match the CPU rasterizer.
+    /// </summary>
+    /// <param name="gl">GL interface.</param>
+    /// <param name="geometry">Wave geometry, in draw order.</param>
+    /// <param name="width">Frame width.</param>
+    /// <param name="height">Frame height.</param>
+    /// <param name="target">Ping target the geometry is drawn into.</param>
+    private void DrawWaveGeometry(
+        GlInterface gl,
+        IReadOnlyList<WaveGeometry> geometry,
+        int width,
+        int height,
+        int target)
+    {
+        gl.BindFramebuffer(GlFramebuffer, _pingFramebuffer[target]);
+        gl.Viewport(0, 0, width, height);
+        gl.UseProgram(_shapeProgram);
+        Set(gl, _shapeUniforms, "uTextured", 0f);
+        gl.BindVertexArray(_shapeVertexArray);
+        gl.BindBuffer(GlArrayBuffer, _shapeVertexBuffer);
+        _enableCapability?.Invoke(GlBlend);
+        foreach (var wave in geometry)
+        {
+            if (wave.Vertices.Count < 3)
+                continue;
+
+            PackWaveGeometry(gl, wave);
+            _blendFunc?.Invoke(GlOne, wave.Additive ? GlOne : GlOneMinusSrcAlpha);
+            _colorMask?.Invoke(1, 1, 1, wave.Additive ? (byte)0 : (byte)1);
+            gl.DrawArrays(GlTriangles, 0, wave.Vertices.Count);
+        }
+
+        _colorMask?.Invoke(1, 1, 1, 1);
+        _disableCapability?.Invoke(GlBlend);
+    }
+
+    /// <summary>Uploads one wave's triangles into the shape vertex buffer.</summary>
+    /// <param name="gl">GL interface.</param>
+    /// <param name="wave">Wave geometry to upload.</param>
+    private void PackWaveGeometry(GlInterface gl, WaveGeometry wave)
+    {
+        var required = wave.Vertices.Count * FloatsPerShapeVertex;
+        if (_shapeVertices.Length < required)
+            _shapeVertices = new float[required];
+
+        var target = 0;
+        foreach (var vertex in wave.Vertices)
+        {
+            _shapeVertices[target] = vertex.X;
+            _shapeVertices[target + 1] = vertex.Y;
+            _shapeVertices[target + 2] = vertex.Red;
+            _shapeVertices[target + 3] = vertex.Green;
+            _shapeVertices[target + 4] = vertex.Blue;
+            _shapeVertices[target + 5] = vertex.Alpha;
+            _shapeVertices[target + 6] = 0.5f;
+            _shapeVertices[target + 7] = 0.5f;
             target += FloatsPerShapeVertex;
         }
 

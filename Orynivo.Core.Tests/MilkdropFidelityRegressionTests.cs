@@ -64,6 +64,19 @@ public sealed class MilkdropFidelityRegressionTests
         Assert.True(renderer.OverlayFrame.GetPixel(32, 32, 0) > 0f);
     }
 
+    /// <summary>Publishing the wave geometry skips the CPU rasterizer and leaves the overlay empty.</summary>
+    [Fact]
+    public void CollectWaveGeometry_PublishesTrianglesInsteadOfRasterizing()
+    {
+        var renderer = Create(Wave + "wavecode_0_bDrawThick=1");
+        renderer.CollectWaveGeometry = true;
+        renderer.RenderFrame(new Audio(), 1d / 60d);
+
+        Assert.NotEmpty(renderer.WaveGeometry);
+        Assert.All(renderer.WaveGeometry, geometry => Assert.True(geometry.Vertices.Count >= 6));
+        Assert.Equal(0f, renderer.OverlayFrame.MeanBrightness());
+    }
+
     /// <summary>Centre darkening only affects the reference's small low-opacity fan.</summary>
     [Fact]
     public void DarkenCenterDoesNotDimTheWholeFrame()

@@ -576,7 +576,13 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
   flip explicitly instead. Keep those two conventions apart: the reference measures `shape_y` from the
   top but `wave_y` from the bottom.
   `CollectShapeFills` must only be set while `VisualizerGlPresenter.ShapeFillsSupported` is true,
-  because the renderer then skips its own fill; the borders and waves stay on the CPU. Such a block is emitted by default as a
+  because the renderer then skips its own fill. The custom waveforms are drawn on the GPU the same
+  way: `PresetRenderer.CollectWaveGeometry` publishes `WaveGeometry` triangle lists and
+  `VisualizerGlPipeline.DrawWaveGeometry` draws them with the shape program untextured and the same
+  blend, so the CPU overlay no longer rasterizes the thick lines per pixel (that cost about 250 ms
+  per frame for a 512-sample wave at 1920x1080). `CollectWaveGeometry` must only be set while
+  `VisualizerGlPresenter.WaveGeometrySupported` is true, because the renderer then skips its own
+  draw. The borders and the default waveform stay on the CPU. Such a block is emitted by default as a
   warp fragment shader that computes the coordinate per pixel
   (`ShaderTranspiler.TranspileGlslWarp` with a null body, drawn over a full-screen quad with the
   `_orynivo_*` motion uniforms seeded from the mesh's first vertex, and the decay moved to the post

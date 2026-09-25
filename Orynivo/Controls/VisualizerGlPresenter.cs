@@ -158,6 +158,7 @@ public sealed class VisualizerGlPresenter : OpenGlControlBase
     private int _pipelinePresetIndex;
     private string? _pipelinePresetName;
     private IReadOnlyList<ShapeFill>? _pipelineShapeFills;
+    private IReadOnlyList<WaveGeometry>? _pipelineWaveGeometry;
     private bool _pipelineFailed;
     private readonly VisualizerGlPipeline _pipeline = new();
 
@@ -173,6 +174,13 @@ public sealed class VisualizerGlPresenter : OpenGlControlBase
     /// renderer then skips its own rasterized fill.
     /// </summary>
     public bool ShapeFillsSupported => _pipeline.ShapeFillsSupported;
+
+    /// <summary>
+    /// Gets a value indicating whether the pipeline can draw the custom-wave geometry. A caller must
+    /// only set <c>PresetRenderer.CollectWaveGeometry</c> while this is <see langword="true"/>,
+    /// because the renderer then skips its own CPU line rasterization.
+    /// </summary>
+    public bool WaveGeometrySupported => _pipeline.WaveGeometrySupported;
 
     /// <summary>Gets the pipeline's one-shot first-frame description, or <see langword="null"/>.</summary>
     public string? PipelineDiagnostics => _pipeline.Diagnostics;
@@ -206,6 +214,7 @@ public sealed class VisualizerGlPresenter : OpenGlControlBase
     /// it over a full-screen quad with the frame motion as uniforms.
     /// </param>
     /// <param name="shapeFills">Overlay shape fills the GPU draws itself, or <see langword="null"/>.</param>
+    /// <param name="waveGeometry">Custom-wave geometry the GPU draws itself, or <see langword="null"/>.</param>
     /// <param name="presetIndex">Index of the preset that produced this frame.</param>
     /// <param name="presetName">Name of the preset that produced this frame.</param>
     public void SetPipeline(
@@ -221,6 +230,7 @@ public sealed class VisualizerGlPresenter : OpenGlControlBase
         IReadOnlyDictionary<string, ShaderValue>? uniforms = null,
         bool perPixelWarp = false,
         IReadOnlyList<ShapeFill>? shapeFills = null,
+        IReadOnlyList<WaveGeometry>? waveGeometry = null,
         int presetIndex = -1,
         string? presetName = null)
     {
@@ -242,6 +252,7 @@ public sealed class VisualizerGlPresenter : OpenGlControlBase
             _pipelinePresetIndex = presetIndex;
             _pipelinePresetName = presetName;
             _pipelineShapeFills = shapeFills?.ToArray();
+            _pipelineWaveGeometry = waveGeometry?.ToArray();
             // The render thread owns the caller's dictionary and writes it under its own lock, so the
             // presenter takes its own copy here rather than reading a Dictionary the render thread may
             // be mutating: a concurrent read of a Dictionary is undefined and can loop forever.
@@ -360,6 +371,7 @@ public sealed class VisualizerGlPresenter : OpenGlControlBase
             var pipelinePresetIndex = -1;
             string? pipelinePresetName = null;
             IReadOnlyList<ShapeFill>? pipelineShapeFills = null;
+            IReadOnlyList<WaveGeometry>? pipelineWaveGeometry = null;
             byte[]? frame = null;
             int frameWidth = 0, frameHeight = 0;
             lock (_frameLock)
@@ -380,6 +392,7 @@ public sealed class VisualizerGlPresenter : OpenGlControlBase
                     pipelinePresetIndex = _pipelinePresetIndex;
                     pipelinePresetName = _pipelinePresetName;
                     pipelineShapeFills = _pipelineShapeFills;
+                    pipelineWaveGeometry = _pipelineWaveGeometry;
                     _pipelinePending = false;
                 }
                 else if (_hasFrame)
@@ -411,7 +424,8 @@ public sealed class VisualizerGlPresenter : OpenGlControlBase
                     true,
                     pipelineParameters,
                     pipelineUniforms,
-                    pipelineShapeFills))
+                    pipelineShapeFills,
+                    pipelineWaveGeometry))
                 {
                     _lastPresented = _pipeline.OutputTexture;
                     Volatile.Write(ref _drawnPresetName, pipelinePresetName);

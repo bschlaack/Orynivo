@@ -55,6 +55,7 @@ public partial class VisualizerWindow : Window
 
     /// <summary>Overlay shape fills the GPU draws itself, copied under the presentation lock.</summary>
     private readonly List<ShapeFill> _glShapeFills = [];
+    private readonly List<WaveGeometry> _glWaveGeometry = [];
 
     /// <summary>
     /// Whether a per-pixel block that writes the sample position may run on the GPU. It is the
@@ -580,6 +581,9 @@ public partial class VisualizerWindow : Window
         // The GPU overlay draws the shape fills itself once its program is ready; until then the CPU
         // keeps rasterizing them, which is also the path the bitmap presentation uses.
         _renderer.CollectShapeFills = _useGlPresenter && GlPresenter.ShapeFillsSupported;
+        // The custom-wave line rasterizer is the expensive part at a high render resolution, so the
+        // GPU draws the wave geometry when its overlay program is ready.
+        _renderer.CollectWaveGeometry = _useGlPresenter && GlPresenter.WaveGeometrySupported;
         if (ReduceMotion)
             _renderer.RenderOverlayOnly(audio);
         else
@@ -643,6 +647,8 @@ public partial class VisualizerWindow : Window
                 // them on the next frame.
                 _glShapeFills.Clear();
                 _glShapeFills.AddRange(_renderer.ShapeFills);
+                _glWaveGeometry.Clear();
+                _glWaveGeometry.AddRange(_renderer.WaveGeometry);
                 // The uniforms are filled under the same lock the presenter reads them under, so the
                 // GPU pipeline seeds the frame the CPU just computed.
                 _renderer.WriteShaderUniforms(_glUniforms, _glPerPixelUniforms);
@@ -889,6 +895,7 @@ public partial class VisualizerWindow : Window
                         _glUniforms,
                         _presentPixelWarp,
                         _glShapeFills,
+                        _glWaveGeometry,
                         _framePresetIndex,
                         _framePresetName);
                 }

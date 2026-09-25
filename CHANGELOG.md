@@ -37,6 +37,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   `[1 - ob_size - ib_size, 1 - ob_size]`, consistently on the CPU, Skia, and OpenGL paths. Both
   rings previously used fixed values (0.02 thick at insets 0 and 0.06) and ignored the preset keys,
   so a preset whose border feeds the feedback (for example Royal Mashup (13)) rendered too dark.
+- Moved the custom MilkDrop waveforms onto the GPU. The CPU rasterized every line segment and thick
+  offset per pixel, which cost roughly 250 ms per frame for a 512-sample wave at 1920x1080 — a few
+  frames per second for a preset such as Royal Mashup (180). `PresetRenderer` now expands the
+  smoothed polyline into triangles (`WaveGeometry`) instead of drawing it, and
+  `VisualizerGlPipeline` draws those triangles with the same premultiplied "over"/additive blend the
+  shape fills use. The CPU overlay for such a preset drops to a few milliseconds and no longer scales
+  with the render resolution; a preset whose overlay program is unavailable still rasterizes on the
+  CPU.
 
 ### Added
 - Added a Windows-only Winamp MilkDrop capture harness that runs the supplied `vis_milk2.dll`

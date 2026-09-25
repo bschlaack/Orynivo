@@ -155,6 +155,14 @@ This file applies to `Orynivo.Core/` and supplements `../AGENTS.md`.
   smooths and scales it, and gives the per-point block the reference's `sample`/`value1`/`value2`
   contract; the polyline is smoothed with the reference's four taps. Never draw spectrum bars
   unconditionally, and keep the waveform scratch buffers reused so an overlay stays allocation-free.
+  A GPU overlay draws the custom waveforms instead of the CPU: `PresetRenderer.CollectWaveGeometry`
+  makes `DrawWavePoints` expand the smoothed polyline into a triangle list (`WaveGeometry`) and skip
+  the per-pixel line rasterizer, whose 4-offset thick lines otherwise cost hundreds of milliseconds
+  at a high render resolution. The geometry is in the engine's minus-one-to-one top-down overlay
+  space, the same space `ShapeFillVertex` uses, and the pipeline draws it with the shape program
+  untextured and the same "over"/additive blend `PaintPixel` applies. Keep the CPU rasterizer as the
+  fallback for a caller that does not collect the geometry; `CollectWaveGeometry` must only be set
+  while the pipeline reports it can draw the geometry, because the renderer then skips its own draw.
   `VisualizerTextureBank` generates the Milkdrop noise and random textures from fixed seeds
   instead of bundling third party images: keep generation deterministic and lazy, and keep the
   sizes (32, 256, 512) so shader sampling stays comparable. It also generates the two 32³ volume
