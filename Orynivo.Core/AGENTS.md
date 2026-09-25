@@ -219,7 +219,9 @@ This file applies to `Orynivo.Core/` and supplements `../AGENTS.md`.
   same values; `ShaderCompilerTests` asserts exactly that and must keep passing. Keep its function
   set aligned with `ShaderTranspiler`'s vocabulary: a function the emitter can translate but the
   runtime does not know makes the CPU silently disable a shader the GPU renders, and `lum` alone
-  appears in a third of a real collection. The matrix types are part of that set now: `float2x2`,
+  appears in a third of a real collection. `lum` must use MilkDrop's `include.fx` weights
+  (`dot(x, float3(0.32, 0.49, 0.29))`), not the conventional Rec. 601 luma, because the interpreter
+  and both emitters have to agree and a comp shader derives its blur gradient through it. The matrix types are part of that set now: `float2x2`,
   `float3x3`, and `float4x4` were unknown and disabled 788 presets' shaders. A matrix lives in a
   per-pixel pool in `ShaderRuntime` (`StoreMatrix`/`ResetMatrixPool`), and `ShaderValue` carries only
   its index and dimension; do not move the nine or sixteen components into the value, because an

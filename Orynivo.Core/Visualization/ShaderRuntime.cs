@@ -644,8 +644,8 @@ internal static class ShaderRuntime
         return total;
     }
 
-    /// <summary>The Rec. 601 luminance weights Milkdrop's <c>lum</c> uses.</summary>
-    private static readonly ShaderValue LumWeights = ShaderValue.Vector(0.299f, 0.587f, 0.114f, 0f, 3);
+    /// <summary>The per-channel weights Milkdrop's <c>lum(x) = dot(x, float3(0.32, 0.49, 0.29))</c> uses.</summary>
+    private static readonly ShaderValue LumWeights = ShaderValue.Vector(0.32f, 0.49f, 0.29f, 0f, 3);
 
     /// <summary>
     /// Widens a value to a <c>float3</c> the way the SkSL emitter does: a scalar broadcasts, a

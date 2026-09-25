@@ -16,6 +16,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   thick custom-wave dots cover the reference's 2×2 pixels at normal texture sizes.
   The GL comparison harness can also save the raw overlay with
   `GLH_DUMP_OVERLAY=1` to separate waveform drawing from feedback and composite differences.
+- Corrected MilkDrop's `lum` helper to the reference's `include.fx` weights,
+  `dot(x, float3(0.32, 0.49, 0.29))`, instead of the conventional Rec. 601 luma the
+  interpreter and both emitters used. A composite shader that derives its blur gradient
+  through `lum` (for example Royal Mashup (13)) sampled the wrong value.
 
 ### Added
 - Added a Windows-only Winamp MilkDrop capture harness that runs the supplied `vis_milk2.dll`

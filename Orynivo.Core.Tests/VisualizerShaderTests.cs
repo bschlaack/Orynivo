@@ -119,6 +119,21 @@ public sealed class VisualizerShaderTests
         Assert.InRange(renderer.Output.GetPixel(63, 16, 0), 0.83f, 0.94f);
     }
 
+    /// <summary><c>lum</c> uses MilkDrop's include.fx weights, not the conventional Rec. 601 ones.</summary>
+    [Fact]
+    public void RenderFrame_LumUsesMilkdropWeights()
+    {
+        var preset = VisualizerPreset.Parse(
+            "wave_a=0\ncomp_1=float4 main(float2 uv : TEXCOORD0) : COLOR { return float4(lum(float3(1,0,0)), lum(float3(0,1,0)), lum(float3(0,0,1)), 1); }");
+        using var renderer = new PresetRenderer(preset, 8, 8);
+        renderer.RenderFrame(new SilentAudio(), 1d / 60d);
+
+        // include.fx: #define lum(x) (dot(x,float3(0.32,0.49,0.29)))
+        Assert.Equal(0.32f, renderer.Output.Pixels[0], 3);
+        Assert.Equal(0.49f, renderer.Output.Pixels[1], 3);
+        Assert.Equal(0.29f, renderer.Output.Pixels[2], 3);
+    }
+
     /// <summary>sampler_main gives the warp shader the frame it is sampling.</summary>
     [Fact]
     public void RenderFrame_BindsSamplerMain()

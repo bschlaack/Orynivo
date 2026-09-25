@@ -1978,10 +1978,10 @@ public static class ShaderTranspiler
             case "mul":
                 return arguments.Count >= 2 ? $"({arguments[0]} * {arguments[1]})" : arguments[0];
             case "lum":
-                // Milkdrop's luminance helper; the weights are the conventional Rec. 601 ones. The
-                // implicit float3 weight vector is a second operand, so the value is converted to
-                // float3 here rather than by the argument loop above.
-                return $"dot({SkSL.Convert(arguments[0], call.Items.Count > 0 ? TypeOf(call.Items[0]) : null, "float3")}, float3(0.299, 0.587, 0.114))";
+                // Milkdrop's luminance helper is `dot(x, float3(0.32, 0.49, 0.29))` (include.fx), not the
+                // conventional Rec. 601 weights. The implicit float3 weight vector is a second operand,
+                // so the value is converted to float3 here rather than by the argument loop above.
+                return $"dot({SkSL.Convert(arguments[0], call.Items.Count > 0 ? TypeOf(call.Items[0]) : null, "float3")}, float3(0.32, 0.49, 0.29))";
         }
 
         // A call to a function the shader defines itself keeps its name. The file-scope variables the
