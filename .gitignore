@@ -19,6 +19,9 @@ scripts/gl-harness/
 scripts/projectm-oracle/
 scripts/visualizer-compare/
 scripts/winamp-milkdrop-harness/
+# Local working note with the measured visualizer findings, kept for a cross-check that needs
+# the unversioned harnesses above.
+VISUALIZER-PRESET-CHECK.md
 errors/
 equalizer/
 Logo/Orynivo_Logo.ai
