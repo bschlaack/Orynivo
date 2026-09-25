@@ -91,6 +91,8 @@ public sealed class VisualizerGlPresenter : OpenGlControlBase
     private int _lastPresented;
     private int _lastLoggedPresetIndex = -1;
     private int _drawnPresetIndex = -1;
+    private int _pipelineRenderedWidth;
+    private int _pipelineRenderedHeight;
     private string? _drawnPresetName;
     private bool _glReady;
 
@@ -408,8 +410,16 @@ public sealed class VisualizerGlPresenter : OpenGlControlBase
             {
                 var pipelineViewport = FramebufferSize();
                 _pipeline.SetShaders(pipelineWarpShader, pipelineCompShader, pipelinePixelWarp);
-                if (pipelinePresetIndex != _drawnPresetIndex)
+                // The feedback is cleared only when its size changes (a freshly allocated texture holds
+                // undefined content), never on a preset switch: Milkdrop continues from the last frame
+                // of the previous preset, so the new one warps the existing feedback instead of
+                // restarting from black.
+                if (pipelineWidth != _pipelineRenderedWidth || pipelineHeight != _pipelineRenderedHeight)
+                {
                     _pipeline.ResetFeedback(gl, pipelineWidth, pipelineHeight);
+                    _pipelineRenderedWidth = pipelineWidth;
+                    _pipelineRenderedHeight = pipelineHeight;
+                }
                 if (_pipeline.Render(
                     gl,
                     fb,

@@ -702,7 +702,10 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
   preset index, name, shader sources, mesh, overlay, and uniforms together. The label follows
   `GlPresenter.DrawnPresetIndex` on the GPU path, or the copied frame index on the bitmap path;
   never advance it from `_presetIndex` or `_renderedPresetIndex` before the frame reaches the
-  presenter. A new preset also clears GPU feedback, matching the new CPU renderer's empty state.
+  presenter. A preset switch must **not** clear the feedback: like Milkdrop, the new preset continues
+  from the last frame of the previous one, so `VisualizerGlPresenter` clears the feedback only when
+  its size changes (a freshly allocated texture holds undefined content), and the CPU path seeds the
+  new renderer with the previous `MeshSource` through `PresetRenderer.SeedFeedback`.
   Frame pacing lives in the pure, tested
   `Orynivo.Visualization.FramePacing`.
   `VisualizerPresetLibrary` loads the built-in presets plus `.oryvis` and `.milk` files from

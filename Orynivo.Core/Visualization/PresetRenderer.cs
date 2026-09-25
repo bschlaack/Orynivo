@@ -608,6 +608,19 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
     public PixelBuffer MeshSource => _previous;
 
     /// <summary>
+    /// Seeds the feedback with a frame from a previous preset so a preset switch continues the
+    /// picture instead of restarting from black, matching Milkdrop's blend across presets.
+    /// </summary>
+    /// <param name="source">Frame to continue from, or <see langword="null"/> to leave the feedback empty.</param>
+    public void SeedFeedback(PixelBuffer? source)
+    {
+        if (source is null || source.Width != _previous.Width || source.Height != _previous.Height)
+            return;
+
+        _previous.CopyFrom(source);
+    }
+
+    /// <summary>
     /// Gets the overlay-only frame the last <see cref="RenderOverlayFrame"/> drew: the waveform,
     /// spectrum, motion vectors, and shapes without the feedback warp. A GPU pipeline composites it
     /// over its own warped frame, so the overlay stays the CPU's vector drawing.

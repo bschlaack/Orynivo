@@ -551,8 +551,12 @@ public partial class VisualizerWindow : Window
             _renderedPresetIndex = _presetIndex;
             var preset = _library.At(_presetIndex);
             var loadMs = switchClock.ElapsedMilliseconds;
+            // Continue from the previous preset's last frame instead of restarting from black.
+            var previousFeedback = _renderer.MeshSource;
+            var newRenderer = new PresetRenderer(preset, _renderWidth, _renderHeight);
+            newRenderer.SeedFeedback(previousFeedback);
             _renderer.Dispose();
-            _renderer = new PresetRenderer(preset, _renderWidth, _renderHeight);
+            _renderer = newRenderer;
             ConfigureRenderer(_renderer);
             // The first frames are traced stage by stage so a frozen frame names its own stage, and
             // every frame reports the brightness as it enters each stage. The renderer probes the

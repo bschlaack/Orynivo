@@ -56,6 +56,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Added automatic preset advancement to the visualizer. Settings > Visualisierung gains an enable
   toggle and a per-preset dwell time in seconds; when enabled the window advances to the next preset
   after that time. It is off by default and defaults to 15 seconds.
+- Preset switches in the visualizer no longer reset the frame. Like Milkdrop, the new preset
+  continues from the last frame of the previous one: the OpenGL feedback is kept across a switch
+  (cleared only when its size changes), and the CPU path seeds the new renderer with the previous
+  feedback through `PresetRenderer.SeedFeedback`.
 
 - Added a Windows-only Winamp MilkDrop capture harness that runs the supplied `vis_milk2.dll`
   inside an isolated copy of Winamp, plays the comparison tone, records Direct3D frames with
