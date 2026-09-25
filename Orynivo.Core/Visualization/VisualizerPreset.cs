@@ -647,6 +647,7 @@ public sealed class VisualizerPreset
         // preset that set fWaveAlpha to 0.001 still drew a full overlay and one that set fDecay to
         // 0.925 fed back at 0.96.
         ["fDecay"] = "decay",
+        ["fShader"] = "shader",
         ["wave_alpha"] = "wave_a",
         ["fWaveAlpha"] = "wave_a",
         ["fWaveScale"] = "wave_scale",

@@ -372,6 +372,48 @@ public sealed class MilkdropCompatibilityTests
         Assert.Equal(0f, Mean(textured), 5);
     }
 
+    /// <summary>A textured shape samples the previous feedback, not the current warp output.</summary>
+    [Fact]
+    public void RenderFrame_TexturedShapeSamplesPreviousFeedback()
+    {
+        var preset = VisualizerPreset.Parse(
+            """
+            [preset00]
+            fDecay=1
+            fWaveAlpha=0
+            shapecode_0_enabled=1
+            shapecode_0_sides=4
+            shapecode_0_x=0.5
+            shapecode_0_y=0.5
+            shapecode_0_rad=1
+            shapecode_0_textured=1
+            shapecode_0_a=1
+            shapecode_0_a2=1
+            shapecode_0_r=1
+            shapecode_0_g=1
+            shapecode_0_b=1
+            shapecode_0_r2=1
+            shapecode_0_g2=1
+            shapecode_0_b2=1
+            warp_1=float4 main(float2 uv : TEXCOORD0) : COLOR { return float4(0, 0, 1, 1); }
+            """);
+        using var renderer = new PresetRenderer(preset, 64, 64);
+        var previous = renderer.MeshSource.Pixels;
+        for (var y = 0; y < 64; y++)
+        for (var x = 0; x < 64; x++)
+        {
+            var offset = ((y * 64) + x) * 4;
+            previous[offset] = 0.5f;
+            previous[offset + 3] = 1f;
+        }
+
+        renderer.RenderFrame(new FakeAudio(), 1d / 60d);
+
+        var centre = ((32 * 64) + 32) * 4;
+        Assert.True(renderer.MeshSource.Pixels[centre] > 0.3f);
+        Assert.True(renderer.MeshSource.Pixels[centre + 2] < 0.1f);
+    }
+
     /// <summary>
     /// The legacy final composite multiplies the frame by its animated hue shade, whose per-channel
     /// value stays between a half and one; a comp shader replaces that path entirely.
@@ -380,7 +422,7 @@ public sealed class MilkdropCompatibilityTests
     public void RenderFrame_LegacyCompositeAppliesTheHueShade()
     {
         var preset = VisualizerPreset.Parse(
-            "decay=1\nwave_a=0\nwarp_1=float4 main(float2 uv : TEXCOORD0) : COLOR { return float4(1, 1, 1, 1); }");
+            "decay=1\nwave_a=0\nfShader=1\nwarp_1=float4 main(float2 uv : TEXCOORD0) : COLOR { return float4(1, 1, 1, 1); }");
         var renderer = new PresetRenderer(preset, 32, 32);
         renderer.RenderFrame(new FakeAudio(), 1d / 60d);
 
@@ -393,6 +435,19 @@ public sealed class MilkdropCompatibilityTests
         }
 
         Assert.True(Mean(pixels) < 1f);
+    }
+
+    /// <summary>A zero shader amount leaves the legacy composite white as in MilkDrop.</summary>
+    [Fact]
+    public void RenderFrame_ZeroShaderAmountDoesNotTint()
+    {
+        var preset = VisualizerPreset.Parse(
+            "decay=1\nwave_a=0\nfShader=0\nwarp_1=float4 main(float2 uv : TEXCOORD0) : COLOR { return float4(1, 1, 1, 1); }");
+        var renderer = new PresetRenderer(preset, 32, 32);
+        renderer.RenderFrame(new FakeAudio(), 1d / 60d);
+        Assert.True(renderer.Output.GetPixel(16, 16, 0) > 0.99f);
+        Assert.True(renderer.Output.GetPixel(16, 16, 1) > 0.99f);
+        Assert.True(renderer.Output.GetPixel(16, 16, 2) > 0.99f);
     }
 
     /// <summary>The outer border paints the frame edges.</summary>

@@ -21,22 +21,49 @@ public sealed class AudioSpectrumAnalyzerTests
         Assert.True(analyzer.Bass > 0f);
     }
 
-    /// <summary>A new analysis history starts at neutral relative loudness instead of a transient spike.</summary>
+    /// <summary>MilkDrop starts its custom-sound history at zero, so a first tone can exceed one.</summary>
     [Fact]
-    public void Analyze_FirstFrameStartsWithNeutralRelativeLoudness()
+    public void Analyze_FirstToneUsesReferenceStartupHistory()
     {
         var analyzer = new AudioSpectrumAnalyzer(SampleRate);
         var tone = Tone(440f, 0.5f);
 
         analyzer.Analyze(tone);
-        Assert.Equal(1f, analyzer.BassRelative);
-        Assert.Equal(1f, analyzer.MidRelative);
-        Assert.Equal(1f, analyzer.TrebleRelative);
+        Assert.True(analyzer.BassRelative > 1f);
+        Assert.True(analyzer.MidRelative > 1f);
+        Assert.True(analyzer.TrebleRelative > 1f);
 
         analyzer.Reset();
         analyzer.Analyze(new float[tone.Length]);
-        analyzer.Analyze(tone);
         Assert.Equal(1f, analyzer.BassRelative);
+        analyzer.Analyze(tone);
+        Assert.True(analyzer.BassRelative > 1f);
+    }
+
+    /// <summary>The preset bands retain MilkDrop's eight-bit FFT noise floor on a steady tone.</summary>
+    [Fact]
+    public void Analyze_CustomSoundBandsFollowMilkdropToneReference()
+    {
+        const int sampleRate = 44_100;
+        const int samplesPerFrame = sampleRate / 60;
+        var analyzer = new AudioSpectrumAnalyzer(sampleRate);
+        var block = new float[samplesPerFrame * 2];
+
+        for (var frame = 0; frame < 60; frame++)
+        {
+            for (var sample = 0; sample < samplesPerFrame; sample++)
+            {
+                var index = frame * samplesPerFrame + sample;
+                var value = 0.5f * MathF.Sin(2f * MathF.PI * 440f * index / sampleRate);
+                block[2 * sample] = value;
+                block[2 * sample + 1] = value;
+            }
+            analyzer.Analyze(block, 1d / 60d);
+        }
+
+        Assert.InRange(analyzer.BassRelative, 1.0f, 1.5f);
+        Assert.InRange(analyzer.MidRelative, 2.0f, 3.2f);
+        Assert.InRange(analyzer.TrebleRelative, 1.3f, 2.2f);
     }
 
     /// <summary>A treble tone raises the treble energy above the bass energy.</summary>

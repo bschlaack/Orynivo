@@ -90,6 +90,23 @@ public partial class VisualizerWindow : Window
         _glPerPixelUniforms = null;
         _glPixelWarp = false;
 
+        // MilkDrop evaluates motion writes at mesh vertices. A fullscreen pixel-warp quad
+        // discards the resulting dx/dy (and rotation/zoom) attributes, freezing presets
+        // such as Royal Mashup (13). Its x/y assignments are inputs to the motion equations.
+        if (renderer.Preset.WarpShaders.Count == 0 &&
+            renderer.PerPixelWritesMotion &&
+            (renderer.Preset.PerPixel.Writes("x") || renderer.Preset.PerPixel.Writes("y")))
+        {
+            if (!TryEmitGlsl(renderer, out _, out var meshComp, out var meshUniforms))
+                return;
+
+            renderer.ExpressionsOnly = true;
+            renderer.MeshForPixelWarp = true;
+            _glCompShader = meshComp;
+            _glPerPixelUniforms = meshUniforms;
+            return;
+        }
+
         // A per-pixel block that writes the sample position cannot be interpolated over the mesh, so
         // it is emitted as a warp fragment shader that computes the coordinate itself. That applies
         // whenever the preset has no warp shader, whether or not it also has a comp shader: without
@@ -755,6 +772,8 @@ public partial class VisualizerWindow : Window
         var timings = _renderer.AverageTimings;
         var message =
             $"frames={_renderer.FrameCount} audioFrames={VisualizerAudioHub.Shared.AnalyzedFrames} "
+            + $"audio=bass:{_renderer.BassRelative:F3}/mid:{_renderer.MidRelative:F3}/treb:{_renderer.TrebleRelative:F3} "
+            + $"motion=q15:{_renderer.ReadVariable("q15"):F3}/q16:{_renderer.ReadVariable("q16"):F3}/q18:{_renderer.ReadVariable("q18"):F3} "
             + $"reduceMotion={ReduceMotion} brightness={brightness:F4} "
             + $"saturated={saturated:P1} "
             + $"presentBrightness=source:{_presentSourceBrightness:F4}/destination:{_presentDestinationBrightness:F4} "

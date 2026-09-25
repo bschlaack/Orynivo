@@ -40,6 +40,48 @@ public sealed class MilkdropFidelityRegressionTests
         Assert.Contains(31, rows);
     }
 
+    /// <summary>MilkDrop line strips interpolate per-vertex colour instead of using the end colour for each segment.</summary>
+    [Fact]
+    public void CustomWaveInterpolatesVertexColour()
+    {
+        var renderer = Create(Wave + "wave_0_per_point_2=r=sample;");
+        renderer.RenderFrame(new Audio(), 1d / 60d);
+        var midpoint = renderer.OverlayFrame.GetPixel(40, 31, 0);
+        Assert.InRange(midpoint, 0.3f, 0.9f);
+    }
+
+    /// <summary>Thick custom-wave points cover a two-by-two square at normal texture sizes.</summary>
+    [Fact]
+    public void ThickCustomWaveDotsCoverFourPixels()
+    {
+        var renderer = Create("wave_a=0\nwavecode_0_enabled=1\nwavecode_0_samples=1\n" +
+            "wavecode_0_bUseDots=1\nwavecode_0_bDrawThick=1\nwavecode_0_g=0\nwavecode_0_b=0\n" +
+            "wave_0_per_point_1=x=0.5;y=0.5;", 64, 64);
+        renderer.RenderFrame(new Audio(), 1d / 60d);
+        Assert.True(renderer.OverlayFrame.GetPixel(31, 31, 0) > 0f);
+        Assert.True(renderer.OverlayFrame.GetPixel(32, 31, 0) > 0f);
+        Assert.True(renderer.OverlayFrame.GetPixel(31, 32, 0) > 0f);
+        Assert.True(renderer.OverlayFrame.GetPixel(32, 32, 0) > 0f);
+    }
+
+    /// <summary>Centre darkening only affects the reference's small low-opacity fan.</summary>
+    [Fact]
+    public void DarkenCenterDoesNotDimTheWholeFrame()
+    {
+        const string dots = "fDecay=0\nfGammaAdj=1\nfShader=0\nwave_a=0\n" +
+            "wavecode_0_enabled=1\nwavecode_0_samples=1\nwavecode_0_bUseDots=1\n" +
+            "wave_0_per_point_1=x=0.25;y=0.5;r=1;g=1;b=1;a=1;\n" +
+            "wavecode_1_enabled=1\nwavecode_1_samples=1\nwavecode_1_bUseDots=1\n" +
+            "wave_1_per_point_1=x=0.5;y=0.5;r=1;g=1;b=1;a=1;\n";
+        var plain = new PresetRenderer(VisualizerPreset.Parse(dots), 200, 200);
+        var darkened = new PresetRenderer(VisualizerPreset.Parse(dots + "bDarkenCenter=1\n"), 200, 200);
+        plain.RenderFrame(new Audio(), 1d / 60d);
+        darkened.RenderFrame(new Audio(), 1d / 60d);
+        Assert.Equal(plain.Output.GetPixel(49, 99, 0), darkened.Output.GetPixel(49, 99, 0));
+        Assert.True(darkened.Output.GetPixel(99, 99, 0) < plain.Output.GetPixel(99, 99, 0));
+        Assert.True(darkened.Output.GetPixel(99, 99, 0) > 0.9f);
+    }
+
     /// <summary>Each frame increments private user state once, while T values restart at init.</summary>
     [Fact]
     public void WaveFrameStateRunsOnceAndRestoresInitT()

@@ -6,6 +6,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Fixed
+- Corrected the MilkDrop preset variables `aspectx`/`aspecty`: the reference binds them to the *inverse* aspect factors (`var_pf_aspectx = m_fInvAspectX`, so a landscape frame is `(1, width/height)`), while Orynivo bound the non-inverse pair. Per-pixel code that multiplies its position delta by `aspecty` (for example Royal Mashup (13)) therefore applied the aspect correction twice. The shader `aspect` float4 keeps the reference layout `(aspectX, aspectY, 1/aspectX, 1/aspectY)`.
+- Corrected MilkDrop `bDarkenCenter`: Winamp draws only a small, faint centre fan, while
+  Orynivo previously darkened almost the entire frame. Royal Mashup (10)'s isolated
+  wave brightness now closely matches the Winamp capture. Legacy hue shading also
+  respects `fShader`, so a zero value leaves colours untinted.
+- Custom MilkDrop wave lines now interpolate colour and opacity between vertices, and
+  thick custom-wave dots cover the reference's 2×2 pixels at normal texture sizes.
+  The GL comparison harness can also save the raw overlay with
+  `GLH_DUMP_OVERLAY=1` to separate waveform drawing from feedback and composite differences.
+
 ### Added
 - Added a Windows-only Winamp MilkDrop capture harness that runs the supplied `vis_milk2.dll`
   inside an isolated copy of Winamp, plays the comparison tone, records Direct3D frames with
@@ -225,6 +236,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   echo rather than the blur.
 
 ### Fixed
+- MilkDrop preset equations now receive bass, mid and treble from the reference's separate
+  eight-bit, 576-sample custom-sound FFT instead of the display spectrum. A matched 440 Hz
+  capture showed Orynivo's middle and treble inputs staying near one while Winamp's rose
+  substantially; the corrected three-band response now closely matches Winamp's diagnostic
+  preset. Royal Mashup (10) and (121) render visible structures again, though their colour
+  and feedback still diverge from Winamp.
+- MilkDrop presets that write both `x`/`y` and mesh motion in their per-pixel block now use the vertex mesh on OpenGL. The fullscreen pixel-warp path discarded their `dx`/`dy` output, freezing motion in Royal Mashup (13).
+- Visualizer diagnostics now report the live relative audio bands and the motion variables used by Royal Mashup (13), making a missing PCM feed distinguishable from a shader mapping error.
+- Composite shaders now receive MilkDrop's aspect-corrected, corner-normalized radius and 0–2π angle. The four animated hue colors use MilkDrop's actual composite-vertex order; Royal Mashup (13) uses both contracts for its colored whirl.
+- The visualizer now keeps a rolling audio-analysis window across render ticks and reuses the last spectrum briefly between player writes. Short PCM blocks no longer zero-pad most of the FFT input, and a render tick between writes no longer substitutes silence.
 - Textured MilkDrop shapes now sample the previous feedback frame in both CPU and OpenGL paths, matching Winamp's `VS[0]` binding. The OpenGL shape sampler also uses repeat wrapping.
 - Preset diagnostics now record the exact external preset section given to the parser/compiler,
   its SHA-256 digest, the first frame's wave mode and GPU/CPU presentation path, and the shader

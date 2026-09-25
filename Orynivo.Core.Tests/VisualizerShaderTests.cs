@@ -106,6 +106,19 @@ public sealed class VisualizerShaderTests
         Assert.Equal(1f, renderer.Output.Pixels[1], 3);
     }
 
+    /// <summary>The composite radius uses MilkDrop's aspect-scaled corner normalisation.</summary>
+    [Fact]
+    public void RenderFrame_CompRadiusIsNormalisedAtLandscapeEdge()
+    {
+        var preset = VisualizerPreset.Parse("wave_a=0\ncomp_1=float4 main(float2 uv : TEXCOORD0) : COLOR { return float4(rad, rad, rad, 1); }");
+        using var renderer = new PresetRenderer(preset, 64, 32);
+        renderer.RenderFrame(new SilentAudio(), 1d / 60d);
+
+        // At the horizontal midpoint of a 2:1 frame, MilkDrop's radius is
+        // 1 / hypot(1, 0.5) ≈ 0.894 rather than the unscaled value 1.
+        Assert.InRange(renderer.Output.GetPixel(63, 16, 0), 0.83f, 0.94f);
+    }
+
     /// <summary>sampler_main gives the warp shader the frame it is sampling.</summary>
     [Fact]
     public void RenderFrame_BindsSamplerMain()

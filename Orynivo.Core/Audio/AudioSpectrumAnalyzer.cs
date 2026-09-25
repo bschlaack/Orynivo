@@ -5,8 +5,8 @@ namespace Orynivo.Audio;
 /// <summary>
 /// Turns the PCM stream a player is about to output into the compact spectrum a
 /// visualization preset reacts to. It owns the windowing, the FFT, the logarithmic band
-/// grouping, and the attack/decay smoothing, so a preset only ever sees stable values in
-/// the range zero to one.
+/// grouping, and the attack/decay smoothing. Display bands are normalized to zero to one;
+/// preset-facing MilkDrop loudness values are relative and may exceed one.
 /// </summary>
 public sealed class AudioSpectrumAnalyzer : IVisualizerAudioSource
 {
@@ -52,6 +52,8 @@ public sealed class AudioSpectrumAnalyzer : IVisualizerAudioSource
     private readonly float[] _rightSamples;
     private readonly float[] _leftMagnitudes;
     private readonly float[] _rightMagnitudes;
+    private readonly float[] _milkdropSamples;
+    private readonly float[] _milkdropMagnitudes;
     private readonly float[] _waveformLeft = new float[WaveformPoints];
     private readonly float[] _waveformRight = new float[WaveformPoints];
     private readonly float[] _alignLeft = new float[AlignBufferPoints];
@@ -66,11 +68,9 @@ public sealed class AudioSpectrumAnalyzer : IVisualizerAudioSource
     private long _analysisFrame;
 
     /// <summary>
-    /// Samples the reference analyses per channel: its FFT takes 480 samples from a 576-sample buffer
-    /// into a 1024-point transform. Orynivo's waveform and spectrum contracts keep their own lengths;
-    /// this is what the loudness bands are computed from.
+    /// Samples the reference's custom sound analysis transforms from its 576-sample waveform.
     /// </summary>
-    public const int ReferenceAnalysisSamples = 480;
+    public const int ReferenceAnalysisSamples = 576;
 
     /// <summary>Creates an analyzer for one output sample rate.</summary>
     /// <param name="sampleRate">Output sample rate in hertz.</param>
@@ -85,8 +85,8 @@ public sealed class AudioSpectrumAnalyzer : IVisualizerAudioSource
         _sampleRate = sampleRate;
         _fftSize = fftSize;
         _window = new float[fftSize];
-        // The reference keeps a 576-sample analysis buffer, then transforms its first 480 samples.
-        // The newest 96 samples are the alignment margin, not part of this frame's FFT.
+        // The reference transforms 576 waveform samples. The additional 96 samples in the
+        // aligner give it room to choose the best overlapping window.
         var windowed = Math.Min(ReferenceAnalysisSamples, fftSize);
         var windowStart = Math.Max(0, fftSize - Math.Min(AlignBufferPoints, fftSize));
         for (var index = 0; index < windowed; index++)
@@ -106,6 +106,8 @@ public sealed class AudioSpectrumAnalyzer : IVisualizerAudioSource
         _rightSamples = new float[fftSize];
         _leftMagnitudes = new float[fftSize / 2];
         _rightMagnitudes = new float[fftSize / 2];
+        _milkdropSamples = new float[fftSize];
+        _milkdropMagnitudes = new float[fftSize / 2];
     }
 
     /// <summary>Gets the sample rate this analyzer was created for.</summary>
@@ -158,26 +160,19 @@ public sealed class AudioSpectrumAnalyzer : IVisualizerAudioSource
     public float TrebleAttRelative => _treble.AverageRelative;
 
     /// <summary>
-    /// One Milkdrop loudness band: the current and attenuated band sums divided by the band's
-    /// long-term average, with the reference's frame-rate-adjusted smoothing rates. The first
-    /// non-silent observation seeds that average so a freshly opened visualizer begins at relative
-    /// loudness one.
+    /// One MilkDrop custom-sound band. Its running averages start at zero and use the distinct
+    /// thirty-frame-per-second rates in <c>CPlugin::DoCustomSoundAnalysis</c>.
     /// </summary>
     private sealed class Loudness
     {
         /// <summary>
-        /// The reference's guard against dividing by an empty band, scaled to these magnitudes. The
-        /// reference's own value is <c>0.001</c>, but it is written in the reference's magnitude units:
-        /// projectM scales every sample by 128 and leaves its FFT unnormalized, while these magnitudes
-        /// are normalized by the transform length. At the literal value the quiet middle and treble
-        /// bands of real music stayed at one, so the bands a preset reacts to were dead.
+    /// The reference's guard against dividing by an empty long-term band average, in its
+    /// unnormalized FFT magnitude units.
         /// </summary>
-        private const float EmptyBandThreshold = 0.001f / (128f * 1024f);
+        private const float EmptyBandThreshold = 0.001f;
 
         private float _average;
         private float _longAverage;
-        private float _current;
-        private bool _historyInitialized;
 
         /// <summary>Gets the current band sum divided by the long-term average.</summary>
         public float CurrentRelative { get; private set; } = 1f;
@@ -188,19 +183,9 @@ public sealed class AudioSpectrumAnalyzer : IVisualizerAudioSource
         /// <summary>Updates the band with this frame's sum.</summary>
         /// <param name="current">Band sum for this frame.</param>
         /// <param name="secondsSinceLastFrame">Time since the previous frame.</param>
-        /// <param name="frame">Frame counter, so the long-term average starts faster.</param>
+        /// <param name="frame">Analysis frame count for the reference's first-fifty-frame rate.</param>
         public void Update(float current, double secondsSinceLastFrame, long frame)
         {
-            _current = current;
-            if (!_historyInitialized)
-            {
-                if (MathF.Abs(current) < EmptyBandThreshold)
-                    return;
-                _average = _longAverage = current;
-                CurrentRelative = AverageRelative = 1f;
-                _historyInitialized = true;
-                return;
-            }
             var rate = AdjustRateToFps(current > _average ? 0.2f : 0.5f, secondsSinceLastFrame);
             _average = (_average * rate) + (current * (1f - rate));
 
@@ -216,13 +201,11 @@ public sealed class AudioSpectrumAnalyzer : IVisualizerAudioSource
         {
             _average = 0f;
             _longAverage = 0f;
-            _current = 0f;
-            _historyInitialized = false;
             CurrentRelative = 1f;
             AverageRelative = 1f;
         }
 
-        /// <summary>Scales a per-frame rate from thirty frames per second to the actual frame time.</summary>
+        /// <summary>Scales a per-frame rate from the reference's thirty frames per second.</summary>
         /// <param name="rate">Rate at thirty frames per second.</param>
         /// <param name="secondsSinceLastFrame">Time since the previous frame.</param>
         /// <returns>The adjusted rate.</returns>
@@ -363,23 +346,35 @@ public sealed class AudioSpectrumAnalyzer : IVisualizerAudioSource
     }
 
     /// <summary>
-    /// Updates Milkdrop's loudness bands. Each band sums one sixth of the linear spectrum and is
-    /// divided by its own long-term average, so a value above one means "louder than usual" and a
-    /// preset condition such as <c>above(bass, 1.2)</c> can fire.
+    /// Updates the preset-facing bands from MilkDrop's separate custom-sound FFT. Unlike the
+    /// display spectrum, this uses the left 576-sample eight-bit waveform and sums the first
+    /// three sixths of its equalized, unnormalized 1024-point FFT.
     /// </summary>
     /// <param name="secondsSinceLastFrame">Time since the previous analysis.</param>
     private void UpdateLoudness(double secondsSinceLastFrame)
     {
-        _bass.Update(SumSixth(_bandMagnitudes, 0), secondsSinceLastFrame, _analysisFrame);
-        _mid.Update(SumSixth(_bandMagnitudes, 1), secondsSinceLastFrame, _analysisFrame);
-        _treble.Update(SumSixth(_bandMagnitudes, 2), secondsSinceLastFrame, _analysisFrame);
+        Array.Clear(_milkdropSamples);
+        var count = Math.Min(ReferenceAnalysisSamples, Math.Min(_alignLeft.Length, _milkdropSamples.Length));
+        for (var index = 0; index < count; index++)
+        {
+            var quantized = Math.Clamp((int)MathF.Round(_alignLeft[index] * 128f), -128, 127);
+            var envelope = 0.5f - 0.5f * MathF.Cos(2f * MathF.PI * index / count);
+            _milkdropSamples[index] = quantized * envelope;
+        }
+        Fft.ComputeMagnitudes(_milkdropSamples, _milkdropMagnitudes, _scratch);
+        for (var index = 0; index < _milkdropMagnitudes.Length; index++)
+            _milkdropMagnitudes[index] *= _fftSize * _equalize[index];
+
+        _bass.Update(SumSixth(_milkdropMagnitudes, 0), secondsSinceLastFrame, _analysisFrame);
+        _mid.Update(SumSixth(_milkdropMagnitudes, 1), secondsSinceLastFrame, _analysisFrame);
+        _treble.Update(SumSixth(_milkdropMagnitudes, 2), secondsSinceLastFrame, _analysisFrame);
         _analysisFrame++;
     }
 
-    /// <summary>Sums one sixth of the linear spectrum, the band split the reference uses.</summary>
+    /// <summary>Sums one sixth of the linear spectrum, as MilkDrop's preset audio path does.</summary>
     /// <param name="magnitudes">Spectrum magnitudes.</param>
     /// <param name="band">Band index, zero being the bass.</param>
-    /// <returns>The band sum.</returns>
+    /// <returns>The unnormalized magnitude sum.</returns>
     private static float SumSixth(ReadOnlySpan<float> magnitudes, int band)
     {
         var start = magnitudes.Length * band / 6;

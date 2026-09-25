@@ -37,6 +37,13 @@ This file applies to `Orynivo.Core/` and supplements `../AGENTS.md`.
 - The stereo custom waveform has 512 contiguous normalized PCM samples, aligned to
   the previous frame. Convert by
   128 at the custom-wave rendering boundary before applying the reference 0.004 scale.
+  Custom-wave line segments interpolate vertex colour and alpha; using only the end
+  vertex colour changes the density and colour of overlapping MilkDrop line strips.
+  Thick custom-wave dots cover 2×2 pixels at normal texture sizes.
+  `bDarkenCenter` is a small diamond-shaped fan with 3/32 peak alpha and radius
+  0.025 times the smaller frame dimension in pixels, not a full-frame radial fade.
+  The legacy hue shade is mixed with white by `shader` (`fShader`); zero leaves
+  the image untinted while shader uniforms still receive the raw animated shade.
   This does not assert exact Winamp FFT compatibility. `fWarpAnimSpeed` and
   `fWarpScale` must reach every warp path; GLSL audio uniforms use relative bands.
   FPS reflects the supplied interval, and aspect factors remain at most one.
@@ -51,6 +58,14 @@ This file applies to `Orynivo.Core/` and supplements `../AGENTS.md`.
   across vertices. `PerVertexMeshTests.RenderFrame_MeshReseedsMotionForEveryVertex`
   covers this. See `VISUALIZER-FIDELITY-AUDIT.md` for remaining reference mismatches;
   agreement with the CPU renderer alone does not establish Milkdrop compatibility.
+  A per-pixel block that writes both x/y and motion still has to publish the
+  per-vertex motion mesh for the GL renderer; its x/y values feed the motion
+  equations at each vertex. `PerPixelWritesMotion` lets the desktop select that
+  path instead of a fullscreen fragment warp that drops dx/dy.
+  Composite shader `rad` divides the aspect-scaled position's length by the
+  aspect-scaled corner radius, and `ang` is in 0..2π as in MilkDrop's
+  `UvToMathSpace`. The four hue-shader indices are bottom-right, bottom-left,
+  top-right, top-left in a top-down image.
 
 - Manual cover searches fetch only bounded CAA `front-250` previews, with three
   concurrent workers, a 35-second search budget and one retry for transient
@@ -63,36 +78,21 @@ This file applies to `Orynivo.Core/` and supplements `../AGENTS.md`.
   `PcmVisualizationTap` is the lock-free hand-off from the audio pump and must
   never block or wait (drop the oldest samples instead), `AudioSpectrumAnalyzer`
   owns windowing, FFT, band grouping, and smoothing, and `Fft` stays a pure,
-  allocation-free transform. The FFT input is damped with the reference's one-sample
-  pre-emphasis and windowed with its raised-sine window over the complete transform
-  length; the stereo waveform is aligned to the previous frame with the reference's
-  multi-octave cross-correlation (`WaveformAligner`), keeping the reference's 96-sample
-  margin after the window. The reference's logarithmic frequency equalization is not
-  adopted, because it needs the reference's unnormalized magnitude scale to keep its
-  loudness guard meaningful. Measure the reference's own band response against this one
-  before changing it (`VISUALIZER-FIDELITY-RECHECK.md`). The analyzer serves two contracts: the normalized
-  `Bands`/`Bass`/`Mid`/`Treble`/`Volume` values other consumers use, and Milkdrop's
-  own relative loudness (`BassRelative` and friends), where each band's sum over one
-  sixth of the linear spectrum is divided by its long-term average so a value above
-  one means "louder than usual" and `above(bass, 1.2)` can fire. It also keeps the
-  first analyzed frame at a neutral relative value of one; dividing by a newly started
-  zero long-term average made high-power preset equations produce destructive spikes.
-  left and right waveform and spectrum separate for the custom waveforms, and the
-  desktop hub measures the frame time its smoothing rates need. The analysis geometry follows the
-  reference too: a 1024-point transform (`AudioSpectrumAnalyzer`'s default FFT size) over the most
-  recent 576-sample analysis buffer: its first `ReferenceAnalysisSamples` (480) samples are
-  windowed with a raised sine, while the newest 96 samples are excluded from that frame's FFT.
-  The loudness bands read `_bandMagnitudes`, the average of the two
-  equalized channel magnitudes, never the transform of their mix - the reference averages the channels'
-  spectra, so a phase-inverted stereo pair must not cancel. Orynivo's own `WaveformPoints` (512) and
-  `SpectrumPoints` (256) contracts keep their lengths. Never clamp the
-  relative values to one, and never evaluate preset expressions or render frames on
-  the audio thread. The guard that stands in for an empty band
-  (`Loudness.EmptyBandThreshold`) must stay scaled to Orynivo's magnitudes: the
-  reference's literal `0.001` assumes projectM's 128-times input scale and its
-  unnormalized FFT, and at that value the quiet middle and treble sums of real music
-  reported a constant one, which left `mid` and `treble` dead for every preset that
-  reacts to them. `PresetVariableLayout.RegisterStandardVariables` is the single place
+  allocation-free transform. The analyzer serves two contracts: normalized
+  `Bands`/`Bass`/`Mid`/`Treble`/`Volume` for other consumers, and preset-facing
+  `BassRelative`/`MidRelative`/`TrebleRelative` with their attenuated counterparts.
+  The latter must follow Winamp MilkDrop's `CPlugin::DoCustomSoundAnalysis`, not the
+  separate `CPluginShell` display analysis: quantize the aligned left PCM to signed
+  eight-bit samples, apply a raised-sine window to 576 samples, run an unnormalized
+  1024-point FFT with logarithmic equalization, sum the first three sixths, and use
+  the reference's 30-FPS-adjusted attack and long-average rates. The histories start
+  at zero; their near-zero guard is 0.001 in those unnormalized units. Do not seed a
+  first non-silent band to a relative value of one, since that erases the large
+  initial response and leaves constant-tone middle and treble values wrong. A matched
+  Winamp 440 Hz capture and `AudioSpectrumAnalyzerTests` pin this behavior. The
+  stereo waveform stays aligned by `WaveformAligner`, and the normalized display
+  bands remain a separate contract. Never evaluate preset expressions or render
+  frames on the audio thread. `PresetVariableLayout.RegisterStandardVariables` is the single place
   that declares the Milkdrop variable set, so every expression block of a preset shares one
   slot layout and `q1`-`q32` keep their value between the per-frame and per-pixel stages. The
   renderer runs the stages in Milkdrop order: the init blocks once, the preset per-frame block, the motion warp (`zoom`, `zoomexp`, `rot`, `cx`/`cy`,
@@ -190,8 +190,11 @@ This file applies to `Orynivo.Core/` and supplements `../AGENTS.md`.
   reason, and keep the three bindings real presets depend on: `ret` is the output variable when a
   body returns nothing (`ShaderInterpreter.ReturnedValue` says which case applies), `GetPixel`
   accepts both `GetPixel(x, y)` and `GetPixel(float2(x, y))`, and `aspect` is bound as the float4
-  `(aspectx, aspecty, 1/aspectx, 1/aspecty)` next to the `aspectx`/`aspecty` scalars, because presets
-  read `aspect.zw` and Milkdrop/projectM define it that way. `hue_shader` is bound too: the reference
+  `(aspectX, aspectY, 1/aspectX, 1/aspectY)`, because presets read `aspect.zw` and Milkdrop/projectM
+  define it that way. The preset *scalars* `aspectx`/`aspecty` are not the same pair: Milkdrop binds
+  them to the **inverse** factors (`var_pf_aspectx = m_fInvAspectX`, `milkdropfs.cpp`), so a
+  landscape frame is `(1, width/height)`. Keep the two apart, because per-pixel code that
+  multiplies its position delta by `aspecty` otherwise applies the aspect correction twice. `hue_shader` is bound too: the reference
   defines it as the final quad's vertex diffuse (`#define hue_shader _vDiffuse.xyz`) and always
   computes it, four corners of `0.5 + 0.5*normalised sine` ("since we don't know if shader uses it or
   not"), so a warp or comp shader may read it and a shader that reads zero paints the wrong picture -

@@ -328,6 +328,7 @@ internal sealed class VisualizerGlPipeline
         uniform float uEchoOrientation;
         uniform float uDarken;
         uniform float uGamma;
+        uniform float uShaderAmount;
         uniform float uOuterInset;
         uniform float uOuterThickness;
         uniform float uOuterR;
@@ -368,9 +369,12 @@ internal sealed class VisualizerGlPipeline
 
             if (uDarken > 0.0)
             {
-                vec2 normalized = (vUv * 2.0) - 1.0;
-                float distance = length(normalized);
-                colour.rgb *= 1.0 - (uDarken * clamp(1.0 - distance, 0.0, 1.0));
+                // MilkDrop draws a tiny six-vertex black fan, with 3/32 opacity at the
+                // centre and zero opacity at its diamond-shaped rim.
+                vec2 fromCentre = abs((vUv - 0.5) * vec2(uFrameWidth, uFrameHeight));
+                float radius = uSmaller * 0.025;
+                float coverage = max(0.0, 1.0 - (fromCentre.x + fromCentre.y) / max(radius, 0.0001));
+                colour.rgb *= 1.0 - uDarken * (3.0 / 32.0) * coverage;
             }
 
             // The border bands are rings measured from the frame's edge; the geometry is symmetric in
@@ -404,9 +408,9 @@ internal sealed class VisualizerGlPipeline
 
             if (uDisplayOnly > 0.5) {
                 // The legacy final composite tints the finished frame with its animated hue shade.
-                vec3 shade = mix(mix(hueShade(0.0), hueShade(1.0), vUv.x),
-                                 mix(hueShade(2.0), hueShade(3.0), vUv.x), 1.0 - vUv.y);
-                colour.rgb *= shade;
+                vec3 shade = mix(mix(hueShade(3.0), hueShade(2.0), vUv.x),
+                                 mix(hueShade(1.0), hueShade(0.0), vUv.x), 1.0 - vUv.y);
+                colour.rgb *= mix(vec3(1.0), shade, uShaderAmount);
             }
 
             if (uGamma != 1.0)
@@ -726,7 +730,7 @@ internal sealed class VisualizerGlPipeline
                 [
                     "uSource", "uOverlay", "uDecay", "uDisplayOnly", "uHueTime", "uHue0", "uHue1", "uHue2", "uHue3",
                     "uEchoZoom", "uEchoAlpha", "uEchoOrientation",
-                    "uDarken", "uGamma", "uOuterInset", "uOuterThickness", "uOuterR", "uOuterG",
+                    "uDarken", "uGamma", "uShaderAmount", "uOuterInset", "uOuterThickness", "uOuterR", "uOuterG",
                     "uOuterB", "uOuterA", "uInnerInset", "uInnerThickness", "uInnerR", "uInnerG",
                     "uInnerB", "uInnerA", "uFrameWidth", "uFrameHeight", "uSmaller"
                 ]);
@@ -1018,12 +1022,13 @@ internal sealed class VisualizerGlPipeline
 
             // The overlay's shape fills run on the GPU: the CPU publishes the fans, and they are drawn
             // into the post's source with the same "over" that PaintPixel applies. A textured fill
-            // samples the blurred frame, so the draw targets the other ping and the post reads it back.
+            // samples the previous feedback (VS[0]), so the draw targets the other ping and the
+            // post reads it back.
             if (shapeFills is { Count: > 0 } && _shapeProgram != 0)
             {
                 var shapeTarget = 1 - current;
                 Blit(gl, _pingTexture[current], _pingFramebuffer[shapeTarget], frameWidth, frameHeight);
-                DrawShapeFills(gl, shapeFills, _pingTexture[current], frameWidth, frameHeight, shapeTarget);
+                DrawShapeFills(gl, shapeFills, _feedbackTexture, frameWidth, frameHeight, shapeTarget);
                 current = shapeTarget;
             }
 
@@ -1082,6 +1087,7 @@ internal sealed class VisualizerGlPipeline
                 Set(gl, _postUniforms, "uDisplayOnly", 1f);
                 Set(gl, _postUniforms, "uEchoAlpha", parameters.EchoAlpha);
                 Set(gl, _postUniforms, "uGamma", parameters.Gamma);
+                Set(gl, _postUniforms, "uShaderAmount", parameters.ShaderAmount);
                 Set(gl, _postUniforms, "uHueTime", parameters.HueTime);
                 Set(gl, _postUniforms, "uHue0", parameters.HueOffsets.X);
                 Set(gl, _postUniforms, "uHue1", parameters.HueOffsets.Y);
@@ -1207,7 +1213,7 @@ internal sealed class VisualizerGlPipeline
     /// </summary>
     /// <param name="gl">GL interface.</param>
     /// <param name="fills">Fills to draw, in order.</param>
-    /// <param name="frameTexture">The blurred frame a textured fill samples.</param>
+    /// <param name="frameTexture">Previous feedback (MilkDrop VS[0]) sampled by a textured fill.</param>
     /// <param name="width">Frame width.</param>
     /// <param name="height">Frame height.</param>
     /// <param name="target">Ping target index to draw into.</param>
@@ -1224,6 +1230,7 @@ internal sealed class VisualizerGlPipeline
         gl.UseProgram(_shapeProgram);
         gl.ActiveTexture(GlTexture0);
         gl.BindTexture(GlTexture2D, frameTexture);
+        _bindSampler?.Invoke(0, _samplerStates[2]);
         SetSampler(gl, _shapeUniforms, "uFrame", 0);
         gl.BindVertexArray(_shapeVertexArray);
         gl.BindBuffer(GlArrayBuffer, _shapeVertexBuffer);
@@ -1242,6 +1249,7 @@ internal sealed class VisualizerGlPipeline
 
         _colorMask?.Invoke(1, 1, 1, 1);
         _disableCapability?.Invoke(GlBlend);
+        ClearSamplerBindings();
     }
 
     /// <summary>Uploads one fill's fan into the shape vertex buffer.</summary>

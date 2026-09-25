@@ -39,6 +39,11 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
 
 ## Client Invariants
 
+- The fixed GL post pass applies MilkDrop's centre-darkening sprite only within a
+  small diamond around the centre (3/32 peak alpha, radius 0.025 of the smaller
+  dimension). The legacy display pass mixes its animated hue shade with white by
+  `VisualizerFrameParameters.ShaderAmount`; `fShader=0` must not tint the image.
+
 - Every uniform passed to the fixed GL `Set` helper must first have its location
   resolved. Resolve the mesh vertex uniforms for custom warp programs when linking
   them as well as the fixed warp's decay/time/scale inputs. The fixed warp samples
@@ -59,6 +64,10 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
   shader only samples it. The mesh vertex layout is position plus the ten
   `PresetRenderer.MeshValues` motion values, mapped across four attributes; keep
   the attribute pointers and `PackVertices` in step when the value set changes.
+  When a per-pixel block writes both position (`x`/`y`) and motion (`dx`/`dy`,
+  rotation, zoom, etc.), the GL path must draw the CPU-evaluated motion mesh.
+  A fullscreen per-pixel fragment warp discards that motion and freezes presets
+  such as Royal Mashup (13).
   The custom warp draws the same mesh with the same vertex shader: its fragment
   stage comes from `ShaderTranspiler.TranspileGlslWarpMesh`, which reads the
   interpolated coordinate from the vertex stage and does not re-emit the per-pixel
@@ -75,6 +84,15 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
   for warp, updated after warp from the previous feedback (VS[0]), then read by comp. The comp
   main samplers also bind VS[0], not the current warp-and-overlay target VS[1].
   Apply progressive range compression, GetBlur decoding and first-level edge darkening.
+  Composite GLSL `rad` and `ang` follow MilkDrop's aspect-corrected
+  `UvToMathSpace` coordinates; hue corner indices follow the reference's
+  bottom-right, bottom-left, top-right, top-left vertex order.
+  Textured custom shapes sample the previous feedback texture (`VS[0]`) with
+  linear repeat, while their output is drawn into the current frame (`VS[1]`).
+- `VisualizerAudioHub` keeps a 1024-frame rolling PCM window for each analysis;
+  render ticks between audio writes reuse the most recent spectrum for at most
+  100 ms rather than injecting silence. Clear this window on reset or sample-rate
+  changes.
 
 - Dashboard and its Show all pages share DashboardScrollViewer. Album artwork
   assignment must update the bound ContentRow in place, never call

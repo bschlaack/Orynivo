@@ -14,7 +14,7 @@ public sealed class FrameParametersTests
     public void ReadFrameParameters_ReflectsTheKeys()
     {
         var preset = VisualizerPreset.Parse(
-            "decay=0.9\nblur_level=2\ndarken_center=0.25\nfGammaAdj=1.5\n" +
+            "decay=0.9\nblur_level=2\ndarken_center=0.25\nfGammaAdj=1.5\nfShader=0.3\n" +
             "echo_zoom=1.2\necho_alpha=0.4\necho_orient=2\n" +
             "ob_r=0.1\nob_g=0.2\nob_b=0.3\nob_a=0.5\nib_a=0.25");
         var renderer = new PresetRenderer(preset, 40, 40);
@@ -26,6 +26,7 @@ public sealed class FrameParametersTests
         Assert.Equal(2, parameters.BlurPasses);
         Assert.Equal(0.25f, parameters.DarkenCenter, 5);
         Assert.Equal(1.5f, parameters.Gamma, 5);
+        Assert.Equal(0.3f, parameters.ShaderAmount, 5);
         Assert.Equal(1.2f, parameters.EchoZoom, 5);
         Assert.Equal(0.4f, parameters.EchoAlpha, 5);
         Assert.Equal(2, parameters.EchoOrientation);

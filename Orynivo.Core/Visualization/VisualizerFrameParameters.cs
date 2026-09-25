@@ -50,4 +50,6 @@ public readonly record struct VisualizerFrameParameters(
     public float HueTime { get; init; }
     /// <summary>Gets the legacy composite's per-preset hue offsets.</summary>
     public (float X, float Y, float Z, float W) HueOffsets { get; init; }
+    /// <summary>Gets the legacy hue-shading blend amount, zero to one.</summary>
+    public float ShaderAmount { get; init; }
 }

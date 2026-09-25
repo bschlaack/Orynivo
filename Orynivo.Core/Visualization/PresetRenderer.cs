@@ -542,6 +542,15 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
     public bool MeshForPixelWarp { get; set; }
 
     /// <summary>
+    /// Gets a value indicating whether the per-pixel program writes a motion value the warp reads
+    /// (<c>zoom</c>, <c>zoomexp</c>, <c>rot</c>, <c>cx</c>/<c>cy</c>, <c>dx</c>/<c>dy</c>,
+    /// <c>sx</c>/<c>sy</c>, or <c>warp</c>). A GPU pipeline must draw the CPU-evaluated motion mesh
+    /// for such a program instead of a full-screen fragment warp, because the mesh carries the
+    /// per-vertex motion the preset computed.
+    /// </summary>
+    public bool PerPixelWritesMotion => _perPixelWritesMotion;
+
+    /// <summary>
     /// Gets or sets a value indicating whether the renderer runs only the preset's expressions and
     /// draws the overlay, leaving the frame itself to a GPU pipeline. The mesh is still built and the
     /// overlay is still drawn into <see cref="OverlayFrame"/>; every pixel pass is skipped, so this
@@ -1000,8 +1009,12 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
         Write("mid_att", MidAttRelative);
         Write("treb_att", TrebleAttRelative);
         WarpSampling.GetAspect(width, height, out var frameAspectX, out var frameAspectY);
-        Write("aspectx", frameAspectX);
-        Write("aspecty", frameAspectY);
+        // Milkdrop binds the preset's aspectx/aspecty to the *inverse* aspect factors
+        // (var_pf_aspectx = m_fInvAspectX, plugin.cpp), so a landscape frame is (1, width/height):
+        // Petal/Mashup presets multiply their per-vertex position delta by aspecty, and the
+        // non-inverse value compressed that delta a second time and flattened their warp.
+        Write("aspectx", 1f / frameAspectX);
+        Write("aspecty", 1f / frameAspectY);
         Write("pixelsx", width);
         Write("pixelsy", height);
         // Milkdrop's mesh is the sampling grid, and the progress through a preset's playlist time.
@@ -1974,8 +1987,7 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
         // Milkdrop shaders use "aspect" as the float4 pair, and a preset that swizzles it failed
         // outright when only the two scalars were bound, which disabled that shader. zw is the
         // reciprocal the presets read as aspect.zw.
-        var aspectX = Read("aspectx", 1f);
-        var aspectY = Read("aspecty", 1f);
+        WarpSampling.GetAspect(width, height, out var aspectX, out var aspectY);
         values[14] = ShaderValue.Vector(
             aspectX,
             aspectY,
@@ -2271,17 +2283,18 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
     /// <returns>The vector uniforms.</returns>
     private IReadOnlyDictionary<string, float[]> BuildSkiaVectors()
     {
-        var aspectX = Read("aspectx", 1f);
-        var aspectY = Read("aspecty", 1f);
+        var inverseAspectX = Read("aspectx", 1f);
+        var inverseAspectY = Read("aspecty", 1f);
         return new Dictionary<string, float[]>(StringComparer.Ordinal)
         {
-            // Milkdrop's aspect is a float4 whose zw are the reciprocals presets read as aspect.zw.
+            // Milkdrop's aspect is a float4 whose xy is the aspect and whose zw is the inverse pair
+            // presets read as aspect.zw. The preset's aspectx/aspecty variables are that inverse.
             ["aspect"] =
             [
-                aspectX,
-                aspectY,
-                1f / Math.Max(0.0001f, aspectX),
-                1f / Math.Max(0.0001f, aspectY)
+                1f / Math.Max(0.0001f, inverseAspectX),
+                1f / Math.Max(0.0001f, inverseAspectY),
+                inverseAspectX,
+                inverseAspectY
             ],
             ["rand_frame"] = _randFrame
         };
@@ -2345,15 +2358,15 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
             destination["hue_shader_b" + corner] = ShaderValue.Scalar(HueShadeCorner(2, corner));
         }
 
-        var aspectX = Read("aspectx", 1f);
-        var aspectY = Read("aspecty", 1f);
-        destination["aspectx"] = ShaderValue.Scalar(aspectX);
-        destination["aspecty"] = ShaderValue.Scalar(aspectY);
+        var inverseAspectX = Read("aspectx", 1f);
+        var inverseAspectY = Read("aspecty", 1f);
+        destination["aspectx"] = ShaderValue.Scalar(inverseAspectX);
+        destination["aspecty"] = ShaderValue.Scalar(inverseAspectY);
         destination["aspect"] = ShaderValue.Vector(
-            aspectX,
-            aspectY,
-            1f / Math.Max(0.0001f, aspectX),
-            1f / Math.Max(0.0001f, aspectY),
+            1f / Math.Max(0.0001f, inverseAspectX),
+            1f / Math.Max(0.0001f, inverseAspectY),
+            inverseAspectX,
+            inverseAspectY,
             4);
         destination["rand_frame"] = ShaderValue.Vector(_randFrame[0], _randFrame[1], _randFrame[2], _randFrame[3], 4);
         destination["roam_cos"] = _roam[0];
@@ -2443,19 +2456,19 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
             interpreter.SetVariable("q" + index, Read("q" + index, 0f));
         for (var index = 1; index <= 8; index++)
             interpreter.SetVariable("t" + index, Read("t" + index, 0f));
-        interpreter.SetVariable("aspectx", Read("aspectx", 1f));
-        interpreter.SetVariable("aspecty", Read("aspecty", 1f));
-        // Milkdrop's aspect is a float4: xy is the aspect and zw its reciprocal, which presets use
+        var inverseAspectX = Read("aspectx", 1f);
+        var inverseAspectY = Read("aspecty", 1f);
+        interpreter.SetVariable("aspectx", inverseAspectX);
+        interpreter.SetVariable("aspecty", inverseAspectY);
+        // Milkdrop's aspect is a float4: xy is the aspect and zw the inverse pair, which presets use
         // as aspect.zw. projectM binds the same four components to its first shader constant.
-        var aspectX = Read("aspectx", 1f);
-        var aspectY = Read("aspecty", 1f);
         interpreter.SetVariable(
             "aspect",
             ShaderValue.Vector(
-                aspectX,
-                aspectY,
-                1f / Math.Max(0.0001f, aspectX),
-                1f / Math.Max(0.0001f, aspectY),
+                1f / Math.Max(0.0001f, inverseAspectX),
+                1f / Math.Max(0.0001f, inverseAspectY),
+                inverseAspectX,
+                inverseAspectY,
                 4));
         // The reference passes its animated hue shade to every shader as hue_shader, interpolated from
         // the four quad corners by the pixel's own position.

@@ -245,6 +245,25 @@ public sealed class PerVertexMeshTests
         return renderer.Output.Pixels.ToArray();
     }
 
+    /// <summary>Position inputs and motion outputs coexist in a MilkDrop vertex program.</summary>
+    [Fact]
+    public void RenderFrame_PositionWritingMotionStillChangesMeshOffsets()
+    {
+        var preset = VisualizerPreset.Parse("per_pixel_1=x = 0.5 + (x - 0.5) * 0.8;\nper_pixel_2=dx = x * 0.2;");
+        using var renderer = new PresetRenderer(preset, 80, 60)
+        {
+            ExpressionsOnly = true,
+            MeshRequested = true,
+            MeshForPixelWarp = true,
+        };
+        Assert.True(renderer.PerPixelWritesMotion);
+        renderer.RenderFrame(new FakeAudio(), 1d / 60d);
+
+        var mesh = new float[(PresetRenderer.MeshGridX + 1) * (PresetRenderer.MeshGridY + 1) * PresetRenderer.MeshValues];
+        Assert.True(renderer.TryCopyMeshMotion(mesh, out _, out _));
+        Assert.True(mesh[5] < mesh[(PresetRenderer.MeshGridX * PresetRenderer.MeshValues) + 5]);
+    }
+
     /// <summary>A source that reports fixed levels and a sine waveform.</summary>
     private sealed class FakeAudio : IVisualizerAudioSource
     {

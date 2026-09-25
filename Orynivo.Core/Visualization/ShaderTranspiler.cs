@@ -109,9 +109,9 @@ public static class ShaderTranspiler
         for (var channel = 0; channel < 3; channel++)
         {
             builder.Append("    float hue_").Append("rgb"[channel]).Append(" = mix(mix(")
-                .Append(HueShaderUniform(channel, 0)).Append(", ").Append(HueShaderUniform(channel, 1))
+                .Append(HueShaderUniform(channel, 3)).Append(", ").Append(HueShaderUniform(channel, 2))
                 .Append(", hue_uv.x), mix(")
-                .Append(HueShaderUniform(channel, 2)).Append(", ").Append(HueShaderUniform(channel, 3))
+                .Append(HueShaderUniform(channel, 1)).Append(", ").Append(HueShaderUniform(channel, 0))
                 .Append(", hue_uv.x), hue_uv.y);\n");
         }
 
@@ -781,8 +781,10 @@ public static class ShaderTranspiler
         builder.Append("    float2 uv_orig = fragCoord / texsize.xy;\n");
         builder.Append("    float2 uv = uv_orig;\n");
         builder.Append("    float2 centred = (uv * 2.0) - 1.0;\n");
-        builder.Append("    float rad = length(centred);\n");
-        builder.Append("    float ang = atan(centred.y, centred.x);\n");
+        builder.Append("    float2 mathPos = centred * aspect.xy;\n");
+        builder.Append("    float rad = length(mathPos) / length(aspect.xy);\n");
+        builder.Append("    float ang = atan(mathPos.y, mathPos.x);\n");
+        builder.Append("    if (ang < 0.0) ang += 6.283185307179586;\n");
         builder.Append("    float3 ret = float3(0.0);\n");
         if (perPixelBody.Length > 0)
         {

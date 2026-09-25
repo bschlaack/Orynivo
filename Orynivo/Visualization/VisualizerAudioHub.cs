@@ -19,9 +19,12 @@ internal sealed class VisualizerAudioHub
     private readonly PcmVisualizationTap _tap = new();
     private readonly float[] _conversionBuffer = new float[AnalysisFrames * 2];
     private readonly float[] _analysisBuffer = new float[AnalysisFrames * 2];
+    private readonly float[] _analysisWindow = new float[1024 * 2];
     private readonly System.Diagnostics.Stopwatch _analysisClock = new();
     private AudioSpectrumAnalyzer? _analyzer;
     private int _sampleRate;
+    private int _windowFrames;
+    private long _lastAudioTick;
 
     /// <summary>Gets the shared hub instance.</summary>
     public static VisualizerAudioHub Shared { get; } = new();
@@ -115,13 +118,32 @@ internal sealed class VisualizerAudioHub
 
         var frames = _tap.ReadNewest(_analysisBuffer);
         if (frames <= 0)
-            return false;
+        {
+            // Render ticks can fall between audio writes. Reuse the last measured spectrum briefly
+            // instead of injecting a silent frame between two blocks of audible playback.
+            if (_windowFrames == 0 ||
+                System.Diagnostics.Stopwatch.GetElapsedTime(_lastAudioTick).TotalMilliseconds > 100)
+                return false;
+            source = _analyzer;
+            return true;
+        }
+
+        // Keep a contiguous window across render ticks. At 48 kHz/60 fps a tick may only
+        // receive about 800 frames, whereas the analyzer needs the preceding samples too.
+        var keep = Math.Min(frames, _analysisWindow.Length / 2);
+        var existing = Math.Min(_windowFrames, (_analysisWindow.Length / 2) - keep);
+        _analysisWindow.AsSpan((_windowFrames - existing) * 2, existing * 2)
+            .CopyTo(_analysisWindow);
+        _analysisBuffer.AsSpan((frames - keep) * 2, keep * 2)
+            .CopyTo(_analysisWindow.AsSpan(existing * 2));
+        _windowFrames = existing + keep;
+        _lastAudioTick = System.Diagnostics.Stopwatch.GetTimestamp();
 
         // Milkdrop scales its loudness smoothing by the actual frame time, so the hub measures it.
         var deltaSeconds = _analysisClock.Elapsed.TotalSeconds;
         _analysisClock.Restart();
         _analyzer.Analyze(
-            _analysisBuffer.AsSpan(0, frames * 2),
+            _analysisWindow.AsSpan(0, _windowFrames * 2),
             deltaSeconds <= 0d ? 1d / 60d : deltaSeconds);
         AnalyzedFrames += frames;
         source = _analyzer;
@@ -134,6 +156,8 @@ internal sealed class VisualizerAudioHub
         _tap.Clear();
         _analyzer?.Reset();
         AnalyzedFrames = 0;
+        _windowFrames = 0;
+        _lastAudioTick = 0;
     }
 
     /// <summary>Creates or replaces the analyzer when the output sample rate changes.</summary>
@@ -146,5 +170,7 @@ internal sealed class VisualizerAudioHub
         _sampleRate = sampleRate;
         _analyzer = new AudioSpectrumAnalyzer(Math.Max(8_000, sampleRate));
         _tap.Clear();
+        _windowFrames = 0;
+        _lastAudioTick = 0;
     }
 }

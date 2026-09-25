@@ -47,6 +47,33 @@ public sealed class VisualizerAudioHubTests
         }
     }
 
+    /// <summary>Short audio writes retain their preceding samples across visualizer frames.</summary>
+    [Fact]
+    public void ActiveHub_RetainsOverlappingAnalysisWindow()
+    {
+        var hub = VisualizerAudioHub.Shared;
+        hub.Clear();
+        hub.IsActive = true;
+        try
+        {
+            hub.PushFloats(Tone(1000f, 0.5f).AsSpan(0, 600), 48_000);
+            Assert.True(hub.TryAnalyze(out _));
+
+            hub.PushFloats(new float[600], 48_000);
+            Assert.True(hub.TryAnalyze(out var source));
+            Assert.Contains(source!.Waveform.ToArray(), sample => MathF.Abs(sample) > 0.05f);
+
+            // A render tick between player writes must retain the audible state.
+            Assert.True(hub.TryAnalyze(out var repeated));
+            Assert.Same(source, repeated);
+        }
+        finally
+        {
+            hub.IsActive = false;
+            hub.Clear();
+        }
+    }
+
     /// <summary>Raw PCM in the format FFmpeg produced is converted and analysed.</summary>
     [Theory]
     [InlineData("f32le")]

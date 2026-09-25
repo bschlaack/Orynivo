@@ -33,7 +33,7 @@ public sealed class PresetVariableLayout
         "fWarpAnimSpeed", "fWarpScale", "bTexWrap",
         "bass", "mid", "treb", "vol", "bass_att", "mid_att", "treb_att",
         "aspectx", "aspecty", "pixelsx", "pixelsy",
-        "decay", "fDecay", "fGammaAdj", "fWarpAmount", "fWaveAlpha", "fWaveScale",
+        "decay", "fDecay", "fGammaAdj", "shader", "fWarpAmount", "fWaveAlpha", "fWaveScale",
         "zoom", "zoomexp", "rot", "cx", "cy", "dx", "dy", "warp", "sx", "sy",
         "blur1", "blur2", "blur3", "darken_center",
         "blur1_min", "blur1_max", "blur1_edge_darken",
