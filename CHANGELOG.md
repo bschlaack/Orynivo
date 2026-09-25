@@ -52,6 +52,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   interpreter paths, and `vol_att` is bound as the attenuated overall level. A scan of a 10,353-preset
   collection found the banks used by about 600 presets and `vol_att` by 206.
 
+### Changed
+- Refreshed the built-in visualizer presets with richer motion, colour cycling, shapes, and a
+  spectrum wave: **Plasma**, **Nebula**, **Tunnel**, **Spectrum Bars**, **Bloom**, **Orbit**,
+  **Mandala**, and **Starfield**. **Spectrum Bars** draws a bright additive spectrum wave along the
+  bottom as an equalizer, and every built-in is verified to light up by
+  `VisualizerBrightnessDiagnosticTests`.
+
 ### Added
 - Added automatic preset advancement to the visualizer. Settings > Visualisierung gains an enable
   toggle and a per-preset dwell time in seconds; when enabled the window advances to the next preset

@@ -53,11 +53,14 @@ public sealed class VisualizerBrightnessDiagnosticTests
     {
         private readonly float[] _bands = new float[AudioSpectrumAnalyzer.BandCount];
         private readonly float[] _waveform = new float[AudioSpectrumAnalyzer.WaveformPoints];
+        private readonly float[] _spectrum = new float[AudioSpectrumAnalyzer.SpectrumPoints];
         private int _phase;
 
         public ReadOnlySpan<float> Bands => _bands;
 
         public ReadOnlySpan<float> Waveform => _waveform;
+
+        public ReadOnlySpan<float> Spectrum => _spectrum;
 
         public float Bass => 0.7f;
 
@@ -75,6 +78,8 @@ public sealed class VisualizerBrightnessDiagnosticTests
                 _bands[index] = 0.5f + (0.5f * MathF.Sin((index + _phase) * 0.3f));
             for (var index = 0; index < _waveform.Length; index++)
                 _waveform[index] = 0.6f * MathF.Sin((index * 0.2f) + (_phase * 0.1f));
+            for (var index = 0; index < _spectrum.Length; index++)
+                _spectrum[index] = 0.5f + (0.5f * MathF.Sin((index + _phase) * 0.15f));
         }
     }
 }
