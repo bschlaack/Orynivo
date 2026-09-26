@@ -748,7 +748,7 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
             Math.Clamp(Read("decay", Preset.Decay), 0f, 1f),
             BlurPasses(),
             Math.Clamp(Read("darken_center", 0f), 0f, 1f),
-            Math.Clamp(Read("fGammaAdj", 1f), 0.1f, 10f),
+            Math.Clamp(Read("gamma", 1f), 0.1f, 10f),
             Math.Clamp(Read("echo_zoom", Read("fVideoEchoZoom", 1f)), 0.1f, 4f),
             Math.Clamp(Read("echo_alpha", Read("fVideoEchoAlpha", 0f)), 0f, 1f),
             (int)Math.Clamp(Read("echo_orient", Read("nVideoEchoOrientation", 0f)), 0f, 3f),
@@ -757,7 +757,7 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
             (float)_elapsed * Read("fWarpAnimSpeed", 1f))
         {
             WarpScale = Read("fWarpScale", 1f),
-            TextureWrap = Read("bTexWrap", 0f) != 0f,
+            TextureWrap = Read("wrap", 0f) != 0f,
             ShaderAmount = Math.Clamp(Read("shader", 1f), 0f, 1f),
             HueTime = (float)_elapsed * 30f,
             HueOffsets = (_hueOffsets[0], _hueOffsets[1], _hueOffsets[2], _hueOffsets[3]),
@@ -1141,7 +1141,7 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
         // The per-frame defaults a preset can override before the warp reads them back.
         Write("decay", Preset.Decay);
         Write("fDecay", Preset.Decay);
-        Write("fGammaAdj", 1f);
+        Write("gamma", 1f);
         Write("fWarpAnimSpeed", 1f);
         Write("fWarpScale", 1f);
         Write("zoom", Preset.Zoom);
@@ -1170,7 +1170,7 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
         Write("wave_x", 0.5f);
         Write("wave_y", 0.5f);
         Write("wave_mystery", 0f);
-        Write("wave_dots", 0f);
+        Write("wave_usedots", 0f);
         Write("wave_thick", 0f);
         Write("wave_additive", 1f);
         Write("wave_brighten", 0f);
@@ -3077,7 +3077,7 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
 
     private void ApplyHueShadeAndGamma()
     {
-        var gamma = Math.Clamp(Read("fGammaAdj", 1f), 0.1f, 10f);
+        var gamma = Math.Clamp(Read("gamma", 1f), 0.1f, 10f);
         // The legacy composite mixes the animated hue shade with white by the shader amount, so a
         // zero value leaves the frame untinted (milkdropfs.cpp, ShowToUser_NoShaders). The preset key
         // is fShader, which the parser aliases onto the shader variable.
@@ -3248,7 +3248,7 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
             }
         }
 
-        var dots = Read("wave_dots", 0f) >= 0.5f;
+        var dots = Read("wave_usedots", 0f) >= 0.5f;
         var thick = Read("wave_thick", 0f) >= 0.5f;
         var additive = Read("wave_additive", 1f) >= 0.5f;
         var loop = MilkdropWaveform.IsLoop(mode);

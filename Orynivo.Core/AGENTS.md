@@ -151,7 +151,10 @@ This file applies to `Orynivo.Core/` and supplements `../AGENTS.md`.
   the variables use, so the `b1n`/`b1x`/`b1ed` and `b2`/`b3` blur and edge keys resolve to
   `blurN_min`/`blurN_max`/`blurN_edge_darken` instead of being dropped, and a preset that carries
   only them takes its blur amount from their `blurN_max` sum when Orynivo's own `blur_level` key is
-  absent. Keep new aliases in that one table. The default wave mode is the single line, which is six
+  absent. Keep new aliases in that one table. The reference's per-frame variable names are the
+  authoritative ones (`gamma`, `wrap`, `wave_usedots`), so register those and alias the MilkDrop 2
+  keys onto them (`fGammaAdj`, `bTexWrap`, `bWaveDots`); per-frame code writes the variable, not the
+  key. The default wave mode is the single line, which is six
   in the reference's `nWaveMode` numbering (its idle preset uses six), and the default `wave_scale`
   is one. Preset wave scales may exceed one (for example Mashup (129) uses 28.599); never
   clamp MilkDrop's `fWaveScale` to the zero-to-one range. `MilkdropWaveform` owns the default wave's per-mode geometry — ring, spiral, centred

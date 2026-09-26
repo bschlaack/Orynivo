@@ -53,7 +53,7 @@ public sealed class MilkdropCompatibilityTests
                      "time", "fps", "frame", "monitor", "bass_att", "mid_att", "treb_att",
                      "aspectx", "aspecty", "pixelsx", "pixelsy", "zoomexp", "rot", "cx", "cy",
                      "dx", "dy", "sx", "sy", "blur1", "blur2", "blur3", "darken_center",
-                     "fGammaAdj", "wave_mode", "wave_mystery", "ob_a", "ib_a", "echo_alpha",
+                     "gamma", "wave_mode", "wave_mystery", "ob_a", "ib_a", "echo_alpha",
                      "mv_x", "q32", "b8"
                  })
         {
@@ -174,7 +174,7 @@ public sealed class MilkdropCompatibilityTests
     public void RenderFrame_GammaBrightensTheDisplay()
     {
         var plain = RenderFeedback(string.Empty);
-        var brighter = RenderFeedback("fGammaAdj = 2.5;");
+        var brighter = RenderFeedback("gamma = 2.5;");
 
         Assert.True(Mean(brighter) > Mean(plain));
     }
@@ -302,7 +302,7 @@ public sealed class MilkdropCompatibilityTests
     public void RenderFrame_WaveDotsDifferFromALine()
     {
         var line = RenderOverlay(string.Empty);
-        var dots = RenderOverlay("wave_dots=1");
+        var dots = RenderOverlay("wave_usedots=1");
 
         Assert.True(MeanDifference(line, dots) > 0.001f);
     }

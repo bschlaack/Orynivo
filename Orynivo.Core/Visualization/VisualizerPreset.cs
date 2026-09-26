@@ -640,12 +640,14 @@ public sealed class VisualizerPreset
     private static readonly Dictionary<string, string> KeyAliases = new(StringComparer.OrdinalIgnoreCase)
     {
         ["nWaveMode"] = "wave_mode",
-        ["bWaveDots"] = "wave_dots",
+        ["bWaveDots"] = "wave_usedots",
         ["bWaveThick"] = "wave_thick",
         ["bAdditiveWaves"] = "wave_additive",
         ["bWaveBrighten"] = "wave_brighten",
         ["bMaximizeWaveColor"] = "wave_brighten",
         ["bDarkenCenter"] = "darken_center",
+        ["fGammaAdj"] = "gamma",
+        ["bTexWrap"] = "wrap",
         // The legacy display filters and the volume-modulated wave alpha.
         ["bModWaveAlphaByVolume"] = "mod_wave_alpha_by_volume",
         ["fModWaveAlphaStart"] = "mod_wave_alpha_start",
