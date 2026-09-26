@@ -95,6 +95,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   steps to the next or previous preset, advances automatically, or responds to the mouse. The dialog
   carries **All**/**None** actions and an active-count summary, and lists presets without reading the
   files so a large collection opens instantly.
+- Added a seedable `rand_frame` diagnostic mode to the visualizer renderer. The per-frame random
+  vector still uses `Random.Shared` by default so a preset looks different on every run like the
+  reference, but `PresetRenderer.RandomSeed` draws it from a private generator so successive renders
+  reproduce for A/B comparison; the GL harness exposes this as `GLH_RANDOM_SEED`.
 - Added automatic preset advancement to the visualizer. Settings > Visualisierung gains an enable
   toggle and a per-preset dwell time in seconds; when enabled the window advances to the next preset
   after that time. It is off by default and defaults to 15 seconds.

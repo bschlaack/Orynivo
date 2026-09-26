@@ -264,7 +264,10 @@ This file applies to `Orynivo.Core/` and supplements `../AGENTS.md`.
   before evaluating a pixel, so a handle can never point at a matrix another pixel built.
   `PresetRenderer.SeedFrameVariables` must keep `fps`
   finite on the first frame, because a preset that divides by it otherwise accumulates an infinity
-  that then reaches the sampler. `PresetSkiaComparisonDiagnosticTests` is the harness that compares
+  that then reaches the sampler. The per-frame `rand_frame` vector uses `Random.Shared` by default so
+  a preset still looks different on every run like the reference; `PresetRenderer.RandomSeed` draws it
+  from a private generator instead, so diagnostics and A/B comparison can reproduce a render, and the
+  GL harness exposes that as `GLH_RANDOM_SEED`. `PresetSkiaComparisonDiagnosticTests` is the harness that compares
   both execution paths over a real collection and reports their drift. Keep the interpreter and the
   emitter agreeing on the shader semantics the harness covers: a declaration and an assignment coerce
   their value to the declared type (`ShaderRuntime.Coerce`, which HLSL and the emitter both apply),

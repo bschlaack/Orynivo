@@ -133,6 +133,13 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
     private readonly VisualizerTextureBank _textures = new();
     private readonly float[] _randFrame = new float[4];
 
+    /// <summary>
+    /// The private generator used for <c>rand_frame</c> when <see cref="RandomSeed"/> is set, or
+    /// <see langword="null"/> to keep MilkDrop's random behaviour.
+    /// </summary>
+    private Random? _random;
+    private int? _randomSeed;
+
     /// <summary>The four roam vectors for the current frame: cos, sin, slow cos, slow sin.</summary>
     private readonly ShaderValue[] _roam = new ShaderValue[4];
     private PixelBuffer? _shaderOutput;
@@ -409,6 +416,15 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
     /// smooth instead of stalling playback.
     /// </summary>
     public double ShaderTimeBudgetMilliseconds { get; set; } = 30d;
+
+    /// <summary>
+    /// Gets or sets a seed for the per-frame random vector <c>rand_frame</c>. The default,
+    /// <see langword="null"/>, keeps MilkDrop's per-frame random behaviour, so a preset looks
+    /// different on every run. Setting a value before the first frame draws the vector from a
+    /// private generator, which makes successive renders of the same preset reproducible for
+    /// diagnostics and A/B comparison.
+    /// </summary>
+    public int? RandomSeed { get; set; }
 
     /// <summary>Gets how long the comp shaders took on the last rendered frame, in milliseconds.</summary>
     public double LastShaderMilliseconds { get; private set; }
@@ -1099,9 +1115,10 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
         Write("meshy", height);
         Write("progress", 0f);
         // Milkdrop keeps a random vector per frame; presets use it to vary a shader without
-        // changing it every pixel.
+        // changing it every pixel. The default generator is random; a configured seed uses a
+        // private generator so diagnostics can reproduce a render.
         for (var index = 0; index < _randFrame.Length; index++)
-            _randFrame[index] = Random.Shared.NextSingle();
+            _randFrame[index] = NextRandom();
         // The per-frame defaults a preset can override before the warp reads them back.
         Write("decay", Preset.Decay);
         Write("fDecay", Preset.Decay);
@@ -1156,6 +1173,30 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
         // them, and they are restored on the next frame just like in Milkdrop.
         foreach (var (name, value) in Preset.Defaults)
             Write(name, value);
+    }
+
+    /// <summary>
+    /// Returns the next per-frame random value for <c>rand_frame</c>. A configured
+    /// <see cref="RandomSeed"/> draws from a private generator so a render reproduces; otherwise
+    /// the process-wide random source keeps MilkDrop's random behaviour.
+    /// </summary>
+    /// <returns>A value in the range zero to one.</returns>
+    private float NextRandom()
+    {
+        if (RandomSeed is not { } seed)
+        {
+            _random = null;
+            _randomSeed = null;
+            return Random.Shared.NextSingle();
+        }
+
+        if (_random is null || _randomSeed != seed)
+        {
+            _random = new Random(seed);
+            _randomSeed = seed;
+        }
+
+        return _random.NextSingle();
     }
 
     /// <summary>How many box-blur passes the preset asked for across <c>blur1</c> to <c>blur3</c>.</summary>
