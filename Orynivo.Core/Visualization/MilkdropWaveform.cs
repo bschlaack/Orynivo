@@ -11,6 +11,13 @@ public static class MilkdropWaveform
     /// <summary>Number of PCM samples the geometries read.</summary>
     public const int SampleCount = 512;
 
+    /// <summary>
+    /// The reference's <c>NUM_WAVEFORM_SAMPLES</c>: the number of vertices the default wave draws.
+    /// The prepared buffer keeps <see cref="SampleCount"/> samples so the modes that peek
+    /// <c>i + 32</c> ahead still read valid data, but the drawn vertex count is 480, not 512.
+    /// </summary>
+    public const int VertexCount = 480;
+
     /// <summary>The Milkdrop wave modes, in the reference's numbering.</summary>
     public enum Mode
     {
@@ -118,7 +125,7 @@ public static class MilkdropWaveform
         out int secondCount)
     {
         secondCount = 0;
-        var buffer = Math.Max(2, Math.Min(sampleCount, SampleCount));
+        var buffer = Math.Max(2, Math.Min(sampleCount, VertexCount));
         switch (mode)
         {
             case Mode.Circle:

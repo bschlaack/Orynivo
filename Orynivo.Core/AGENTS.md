@@ -159,7 +159,10 @@ This file applies to `Orynivo.Core/` and supplements `../AGENTS.md`.
   reference's edge clipping, closed-loop modes and four-tap polyline smoothing; `DrawDefaultWave`
   only prepares the PCM, applies the legacy global `per_point` block, and draws the result. Never
   reintroduce a line/circle approximation, and keep the geometry's sample count following the
-  source so a short buffer cannot read an empty tail. `wave_smoothing` is a registered variable
+  source so a short buffer cannot read an empty tail. The default wave draws
+  `MilkdropWaveform.VertexCount` (480, the reference's `NUM_WAVEFORM_SAMPLES`) vertices while its
+  prepared buffer keeps 512 samples, because the explosive-hash and derivative modes peek
+  `i + 32` ahead. `wave_smoothing` is a registered variable
   (`fWaveSmoothing` aliases it) and `DrawDefaultWave` reads it from `Preset.Defaults`; it was
   missing from the layout, so a preset such as `suksma - frust` had its `fWaveSmoothing=0.9`
   ignored and its explosive hash stayed unsmoothed. The explosive-hash mode is the only mode that

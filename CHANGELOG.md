@@ -13,7 +13,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   alpha was not reduced by the reference's resolution factor (`milkdropfs.cpp` multiples it by
   `0.07` at 256 through `0.13` at 2048), which made the wave roughly an order of magnitude too
   bright. `DrawDefaultWave` now reads the smoothing from the preset defaults and applies
-  `ExplosiveHashAlphaScale`.
+  `ExplosiveHashAlphaScale`. The default wave also draws the reference's
+  `NUM_WAVEFORM_SAMPLES` count of 480 vertices instead of 512, while its buffer still keeps 512
+  samples for the modes that peek `i + 32` ahead.
 - Bound the shader sampler-size uniforms. MilkDrop exposes each generated texture's size as
   `texsize_noise_lq`/`texsize_noise_mq`/`texsize_noise_hq` and the volume pair, but Orynivo declared
   the GLSL spellings as a single `float4` the scalar-only GL uniform setter could never fill, and the
