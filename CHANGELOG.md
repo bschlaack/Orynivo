@@ -7,12 +7,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Fixed
-- Fixed the visualizer's OpenGL warp shader reading a one-generation-old blur chain. The shader
-  blur levels were built after the warp, so `GetBlur1`-`GetBlur3` referred to the frame before the
-  one the same shader read through `GetPixel`/`sampler_main`. A preset such as
-  `GetBlur1(uv_orig) - GetPixel(uv_orig)` oscillated between two brightness values on the GPU while
-  the CPU settled to a constant; the chain is now built from the feedback before the warp, the GL
-  and CPU frames agree, and the GL fidelity regression pins the case.
+- Fixed the CPU visualizer's warp shader reading a same-generation blur chain. MilkDrop's
+  `BlurPasses` runs after the warp and blurs the feedback the warp just sampled, and the frame
+  buffers then swap, so the next warp's `sampler_main` is deliberately one frame newer than its
+  `sampler_blur1`-`sampler_blur3` (`milkdropfs.cpp`: "when sampling the blurred textures in the warp
+  shader, they are one frame old"). The OpenGL path replicated that, but the CPU `SampleBlur` chain
+  was rebuilt from the current feedback, so a preset such as
+  `GetBlur1(uv_orig) - GetPixel(uv_orig)` settled on the CPU while the reference and the GPU
+  oscillated. The CPU now builds the chain once after the warp and retains it for the next warp, and
+  the Skia warp pass binds that retained chain instead of rebuilding it, so the CPU, GPU, and a
+  Winamp capture of the reference agree (verified with `PSVERSION_WARP=2`, without which Winamp
+  silently runs its default warp).
 - Corrected the MilkDrop preset variables `aspectx`/`aspecty`: the reference binds them to the *inverse* aspect factors (`var_pf_aspectx = m_fInvAspectX`, so a landscape frame is `(1, width/height)`), while Orynivo bound the non-inverse pair. Per-pixel code that multiplies its position delta by `aspecty` (for example Royal Mashup (13)) therefore applied the aspect correction twice. The shader `aspect` float4 keeps the reference layout `(aspectX, aspectY, 1/aspectX, 1/aspectY)`.
 - Corrected MilkDrop `bDarkenCenter`: Winamp draws only a small, faint centre fan, while
   Orynivo previously darkened almost the entire frame. Royal Mashup (10)'s isolated

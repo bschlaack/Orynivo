@@ -1527,6 +1527,54 @@ public static class ShaderTranspiler
     /// <returns><see langword="true"/> when the name is a type.</returns>
     private static bool IsTypeName(string name) => ShaderParser.IsType(name);
 
+    /// <summary>
+    /// Returns whether a shader samples a blur level (<c>sampler_blur1</c>-<c>sampler_blur3</c> or the
+    /// <c>GetBlur1</c>-<c>GetBlur3</c> macros). MilkDrop keeps the warp's blur chain one generation
+    /// older than <c>sampler_main</c>, which only the interpreter and the OpenGL pipeline reproduce,
+    /// so the renderer builds the retained chain and keeps the Skia warp pass away from such a shader.
+    /// </summary>
+    /// <param name="node">Shader body to inspect.</param>
+    /// <returns><see langword="true"/> when the shader reads a blur sampler.</returns>
+    internal static bool UsesBlur(ShaderNode node)
+    {
+        var names = new SortedSet<string>(StringComparer.Ordinal);
+        CollectSamplers(node, names);
+        foreach (var name in names)
+        {
+            if (ShaderSamplerName.Parse(name).BaseName.StartsWith("blur", StringComparison.Ordinal))
+                return true;
+        }
+
+        return HasBlurCall(node);
+    }
+
+    /// <summary>Reports whether a shader calls one of the <c>GetBlur1</c>-<c>GetBlur3</c> helpers.</summary>
+    /// <param name="node">Node to walk.</param>
+    /// <returns><see langword="true"/> when a blur helper is called.</returns>
+    private static bool HasBlurCall(ShaderNode node)
+    {
+        if (node.Kind == ShaderNodeKind.Call && node.Text.ToLowerInvariant() is "getblur1" or "getblur2" or "getblur3")
+            return true;
+
+        foreach (var child in node.Items)
+        {
+            if (HasBlurCall(child))
+                return true;
+        }
+
+        foreach (var parameter in node.ParameterList)
+        {
+            if (HasBlurCall(parameter))
+                return true;
+        }
+
+        if (node.Kind != ShaderNodeKind.Call && node.Left is not null && HasBlurCall(node.Left))
+            return true;
+        if (node.Right is not null && HasBlurCall(node.Right))
+            return true;
+        return node.Third is not null && HasBlurCall(node.Third);
+    }
+
     /// <summary>Collects the samplers a shader names as the first argument of a texture call.</summary>
     /// <param name="node">Node to walk.</param>
     /// <param name="names">Set to fill.</param>

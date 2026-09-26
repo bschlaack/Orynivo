@@ -779,13 +779,19 @@ public static class SkiaShaderRunner
         /// <param name="parameters">Motion parameters.</param>
         /// <param name="scalars">Scalar uniforms the shader and per-pixel block read.</param>
         /// <param name="vectors">Vector uniforms such as <c>rand_frame</c>.</param>
+        /// <param name="blurLevels">
+        /// Pre-built blur levels to bind for the blur samplers, or <see langword="null"/> to build
+        /// them from <paramref name="previous"/>. MilkDrop's warp blur is one generation older than
+        /// <c>sampler_main</c>, so the renderer passes its retained chain here.
+        /// </param>
         /// <exception cref="ArgumentException">The frames have different sizes.</exception>
         public void Render(
             PixelBuffer previous,
             PixelBuffer target,
             WarpParameters parameters,
             IReadOnlyDictionary<string, float> scalars,
-            IReadOnlyDictionary<string, float[]> vectors)
+            IReadOnlyDictionary<string, float[]> vectors,
+            IReadOnlyList<PixelBuffer>? blurLevels = null)
         {
             ArgumentNullException.ThrowIfNull(previous);
             ArgumentNullException.ThrowIfNull(target);
@@ -797,6 +803,7 @@ public static class SkiaShaderRunner
             using var sourceBitmap = CreateBitmap(previous.Pixels, width, height);
             using var sourceShader = sourceBitmap.ToShader(SKShaderTileMode.Clamp, SKShaderTileMode.Clamp, LinearSampling);
             var ownedShaders = new List<SKShader>();
+            var ownedBitmaps = new List<SKBitmap>();
             try
             {
                 var children = new SKRuntimeEffectChildren(_effect);
@@ -812,14 +819,29 @@ public static class SkiaShaderRunner
                         continue;
                     }
 
-                    if (_blurEffect is not null &&
-                        parsed.BaseName.StartsWith("blur", StringComparison.Ordinal) &&
+                    if (parsed.BaseName.StartsWith("blur", StringComparison.Ordinal) &&
                         int.TryParse(parsed.BaseName.AsSpan("blur".Length), out var level) &&
                         level is >= 1 and <= 3)
                     {
-                        children[name] = new SKRuntimeEffectChild(
-                            BuildBlurShader(blurCache, sourceShader, width, height, level, ownedShaders));
-                        continue;
+                        if (blurLevels is not null && level <= blurLevels.Count)
+                        {
+                            // Use the renderer's retained chain directly, so this pass reads exactly
+                            // the blur the interpreter reads instead of rebuilding it from the frame.
+                            var frame = blurLevels[level - 1];
+                            var bitmap = CreateBitmap(frame.Pixels, frame.Width, frame.Height);
+                            ownedBitmaps.Add(bitmap);
+                            var levelShader = bitmap.ToShader(SKShaderTileMode.Clamp, SKShaderTileMode.Clamp, LinearSampling);
+                            ownedShaders.Add(levelShader);
+                            children[name] = new SKRuntimeEffectChild(levelShader);
+                            continue;
+                        }
+
+                        if (_blurEffect is not null)
+                        {
+                            children[name] = new SKRuntimeEffectChild(
+                                BuildBlurShader(blurCache, sourceShader, width, height, level, ownedShaders));
+                            continue;
+                        }
                     }
 
                     if (parsed.Wrap == VisualizerTextureWrap.Clamp && !parsed.Nearest)
@@ -886,6 +908,8 @@ public static class SkiaShaderRunner
             {
                 foreach (var shader in ownedShaders)
                     shader.Dispose();
+                foreach (var bitmap in ownedBitmaps)
+                    bitmap.Dispose();
             }
         }
 

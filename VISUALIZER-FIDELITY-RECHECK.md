@@ -85,13 +85,13 @@ contracts are now implemented and covered by targeted tests:
 - **Warp constants:** `fWarpAnimSpeed` and `fWarpScale` reach CPU, Skia and GL warp
   inputs; time is multiplied by speed and displacement uses reciprocal scale.
 - **GL blur:** progressive min/max scale and bias, first-level edge darkening,
-  and GetBlur decoding. The chain is built from the feedback frame the warp is
-  about to sample before the warp runs, so the warp's GetBlur and its
-  GetPixel/sampler_main read the same generation; comp reads the same chain for
-  the same pre-comp feedback. Building it after the warp left the warp one
-  generation behind its own GetPixel, so a `GetBlur1 - GetPixel` shader
-  oscillated between frames while the CPU settled. Equal/reversed ranges are
-  widened to 0.1;
+  and GetBlur decoding. The chain is built from the feedback the warp just
+  sampled, after the warp, and retained for the next warp, which the reference
+  documents as intended ("when sampling the blurred textures in the warp shader,
+  they are one frame old"); comp reads the same freshly built chain. The CPU
+  interpreter and the Skia warp pass now follow that lifecycle too, so a
+  `GetBlur1 - GetPixel` shader oscillates on every path as it does in Winamp
+  instead of settling only on the CPU. Equal/reversed ranges are widened to 0.1;
   the local projectM source contains a zero-width typo in this safeguard, which
   is deliberately not copied. Newly allocated retained blur targets start black.
 - **Overlay compositing:** RGB carries accumulated premultiplied colour and alpha
@@ -114,8 +114,8 @@ contracts are now implemented and covered by targeted tests:
 - `the GL fidelity regression`: simultaneous point/linear and
   clamp/repeat reads, compressed and decoded blur ranges, multi-frame legacy
   gamma without feedback accumulation, asymmetric shape orientation and alpha, and
-  that a warp `GetBlur1 - GetPixel` shader settles to the CPU value (the blur chain is
-  built from the feedback before the warp).
+  that a warp `GetBlur1 - GetPixel` shader alternates between frames on the GPU and the
+  CPU alike (the chain is retained one generation old, as the reference documents).
 - `the GL warp-target regression`: full-size custom warp target.
 - `MilkdropFidelityRegressionTests`: real key spellings, enabled/sparse shapes,
   isolated wave state, once-per-frame execution, init T restoration, PCM scaling,

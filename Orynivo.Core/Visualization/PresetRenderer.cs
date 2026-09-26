@@ -102,6 +102,8 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
     private readonly List<CompiledShader> _compiledWarp = [];
     private readonly List<CompiledShader> _compiledComp = [];
     private bool _shaderGridReduced;
+    /// <summary>Whether any warp or comp shader samples a blur level, so the chain is worth building.</summary>
+    private readonly bool _shadersUseBlur;
     /// <summary>Whether each blur level's buffer holds this stage's picture.</summary>
     private readonly bool[] _blurLevelReady = new bool[3];
     /// <summary>Times one Skia comp pass, so an overrunning one hands the preset to the interpreter.</summary>
@@ -303,6 +305,9 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
             new PixelBuffer(Math.Max(16, width / 8), Math.Max(16, height / 8)),
             new PixelBuffer(Math.Max(16, width / 16), Math.Max(16, height / 16))
         ];
+        // A freshly allocated chain is black. Mark it ready so the first warp reads retained black,
+        // which is the reference's retained VS[0] blur, instead of rebuilding a same-frame blur.
+        Array.Fill(_blurLevelReady, true);
         _slots = new double[preset.Layout.Count];
         _pixelSlots = new double[preset.Layout.Count];
         _slotX = preset.Layout.IndexOf("x");
@@ -394,6 +399,9 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
             _compShaders.Add((new ShaderInterpreter(shader.Program, this), shader));
             _compiledComp.Add(CompiledShader.Create(shader.Program));
         }
+
+        _shadersUseBlur = preset.WarpShaders.Any(shader => ShaderTranspiler.UsesBlur(shader.Program)) ||
+                          preset.CompShaders.Any(shader => ShaderTranspiler.UsesBlur(shader.Program));
     }
 
     /// <summary>Gets the preset being rendered.</summary>
@@ -926,6 +934,12 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
         ProbeStage("warp", _previous);
         Warp(useShaders);
         var warp = Mark();
+
+        // MilkDrop's BlurPasses runs after the warp and blurs VS[0], the feedback the warp just
+        // sampled; the frame buffers then swap, so the next warp's sampler_main is one generation
+        // newer than its sampler_blur1-3 (the reference documents this as intended). Build the chain
+        // here from the current feedback so comp and the next warp both read it.
+        BuildShaderBlurChain(useShaders);
         trace?.Invoke($"stage=blur begin frame={_frame}");
         ProbeStage("blur", _warped);
 
@@ -1038,7 +1052,8 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
         _fresh.Clear();
         _frameCopy.Clear();
         foreach (var blurLevel in _blurLevels) blurLevel.Clear();
-        Array.Clear(_blurLevelReady);
+        // The cleared chain is retained black, ready for the next warp like the reference's VS[0] blur.
+        Array.Fill(_blurLevelReady, true);
         _shaderPixelTarget = ShaderPixelBudget;
         _shaderPixelsUsed = 0;
         _shaderGridReduced = false;
@@ -1216,9 +1231,9 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
     /// </summary>
     private void Warp(bool useShaders)
     {
-        // A warp shader's blur levels are rebuilt for this frame; the cached buffer would otherwise
-        // keep the previous frame's picture, because the buffer object is reused.
-        Array.Clear(_blurLevelReady);
+        // The warp shader reads the blur chain retained from the previous frame, which MilkDrop
+        // deliberately keeps one generation older than sampler_main (see BuildShaderBlurChain); it is
+        // rebuilt after this warp, not here.
         var zoom = Math.Max(0.01f, Read("zoom", Preset.Zoom));
         var zoomExp = Read("zoomexp", 1f);
         var rotation = Read("rot", 0f);
@@ -1782,7 +1797,10 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
                     stretchX,
                     stretchY),
                 BuildSkiaWarpScalars(_skiaWarp),
-                BuildSkiaVectors());
+                BuildSkiaVectors(),
+                // MilkDrop's warp blur is the chain built after the previous warp, one generation
+                // older than sampler_main; the interpreter reads the same retained buffers.
+                _shadersUseBlur ? _blurLevels : null);
             _warpShaderMilliseconds = 0d;
             return true;
         }
@@ -2229,9 +2247,8 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
         var height = _fresh.Height;
         _frameCopy.CopyFrom(_fresh);
         _compStageRan = true;
-        // MilkDrop reruns BlurPasses after warp, but its first source is still VS[0]: previous
-        // feedback. Rebuilding here follows that stage's cache lifetime.
-        Array.Clear(_blurLevelReady);
+        // MilkDrop's BlurPasses already built the chain from VS[0] after the warp, so the comp
+        // shader reads that same chain instead of rebuilding it.
 
         // A comp shader whose per-pixel block is empty is a pure post-process, so it can run as a
         // Skia runtime effect over the frame instead of the interpreter.
@@ -2779,6 +2796,24 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
         var source = _previous;
         source.SampleShader(u, v, parsed.Wrap, parsed.Nearest, _sample);
         return ShaderValue.Vector(_sample[0], _sample[1], _sample[2], _sample[3], 4);
+    }
+
+    /// <summary>
+    /// Rebuilds the shader blur chain from the current feedback. MilkDrop's BlurPasses runs after the
+    /// warp and blurs VS[0], the frame the warp just sampled; because the buffers then swap, the next
+    /// warp's <c>sampler_main</c> is one generation newer than its <c>sampler_blur1</c>-<c>3</c>. The
+    /// chain is therefore built once per frame here and retained for comp and the next warp.
+    /// </summary>
+    /// <param name="useShaders">Whether the preset runs a warp or comp shader.</param>
+    private void BuildShaderBlurChain(bool useShaders)
+    {
+        if (!useShaders || !_shadersUseBlur)
+            return;
+
+        Array.Clear(_blurLevelReady);
+        // Sampling level 3 builds all three levels from _previous through the shared SampleBlur path,
+        // so the chain cannot diverge from what a comp shader reads.
+        SampleBlur(3, 0.5f, 0.5f);
     }
 
     /// <inheritdoc/>

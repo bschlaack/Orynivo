@@ -951,14 +951,6 @@ internal sealed class VisualizerGlPipeline
             UploadOverlay(gl, overlayBgra, frameWidth, frameHeight);
             PackVertices(mesh, meshX, meshY);
 
-            // Build the shader blur chain from the feedback frame the warp and comp shaders are
-            // about to sample, so their GetBlur1-GetBlur3 and their GetPixel/sampler_main read the
-            // same frame. Building it after the warp left the warp reading the previous generation:
-            // for a shader computing GetBlur1 - GetPixel the two terms then came from different
-            // frames and the output oscillated between frames instead of matching the CPU path.
-            if (_warpShaderProgram != 0 || _compShaderProgram != 0)
-                BuildShaderBlurLevels(gl, _feedbackTexture, frameWidth, frameHeight, uniforms);
-
             // Warp the feedback into ping zero, with the emitted warp shader when the preset has one.
             gl.BindFramebuffer(GlFramebuffer, _pingFramebuffer[0]);
             gl.Viewport(0, 0, frameWidth, frameHeight);
@@ -966,8 +958,8 @@ internal sealed class VisualizerGlPipeline
             gl.Clear(GlColorBufferBit);
             if (_warpShaderProgram != 0)
             {
-                // Warp reads the blur chain built from this frame's feedback above. Draw into the
-                // full-resolution target.
+                // Warp reads the retained blur chain, which is one generation older than this frame's
+                // sampler_main. Draw into the full-resolution target.
                 gl.BindFramebuffer(GlFramebuffer, _pingFramebuffer[0]);
                 gl.Viewport(0, 0, frameWidth, frameHeight);
                 gl.UseProgram(_warpShaderProgram);
@@ -1011,6 +1003,15 @@ internal sealed class VisualizerGlPipeline
             }
 
             ClearSamplerBindings();
+
+            // MilkDrop's BlurPasses runs after the warp and binds VS[0], the feedback the warp just
+            // consumed, then the frame buffers swap. The next warp's sampler_main is therefore one
+            // generation newer than its sampler_blur1-3, which the reference documents as intended
+            // ("when sampling the blurred textures in the warp shader, they are one frame old").
+            // Build the chain here from the feedback before the post pass overwrites it; comp reads
+            // the same freshly built chain.
+            if (_warpShaderProgram != 0 || _compShaderProgram != 0)
+                BuildShaderBlurLevels(gl, _feedbackTexture, frameWidth, frameHeight, uniforms);
 
             // Remember the previous pre-comp frame for the comp shader before the post pass overwrites it.
             if (_compShaderProgram != 0)

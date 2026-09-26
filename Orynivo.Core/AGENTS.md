@@ -128,8 +128,15 @@ This file applies to `Orynivo.Core/` and supplements `../AGENTS.md`.
   the reference's animated hue shade, a four-corner colour whose three channels are animated sines
   normalised so their maximum is one; the per-preset offsets are seeded from the preset name so the
   look is reproducible, and the OpenGL display pass applies the same shade. The warp shader reads
-  the retained blur chain; after warp, MilkDrop refreshes blur from VS[0], the previous feedback,
-  despite a contradictory comment in its source. Its comp shader also binds VS[0] to every main
+  the **retained** blur chain; after the warp the chain is rebuilt from `VS[0]`, the feedback the warp
+  just sampled, and kept for the next warp, so the next warp's `sampler_main` is one generation newer
+  than its `GetBlur1`-`GetBlur3` chain. `milkdropfs.cpp` documents this as intentional ("when
+  sampling the blurred textures in the warp shader, they are one frame old"); never rebuild the chain
+  from the same feedback the warp samples to make a `GetBlur - GetPixel` shader settle. A fresh chain
+  is black and marked ready so the first warp reads retained black. The Skia warp pass binds the
+  renderer's retained levels (`WarpPass.Render`'s `blurLevels`) instead of rebuilding them, and a
+  blur-sampling program stays off the Skia frame path when the levels cannot be supplied. Its comp
+  shader also binds VS[0] to every main
   sampler; VS[1], the current warp plus overlays, only becomes feedback after presentation.
   `Composite` adds the overlay frame into the warped
   frame and `Publish` copies the finished frame into the display buffer, so a post effect never runs
