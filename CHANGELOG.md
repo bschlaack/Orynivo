@@ -73,6 +73,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   continues from the last frame of the previous one: the OpenGL feedback is kept across a switch
   (cleared only when its size changes), and the CPU path seeds the new renderer with the previous
   feedback through `PresetRenderer.SeedFeedback`.
+- Added Milkdrop's twenty-four `rot_*` shader matrices. They are `float4x3`, which neither the
+  interpreter's square-matrix pool nor SkSL models, so the engine rewrites the two constructs presets
+  use, the component read `rot_d1[1].y` and the product `mul(uv, rot_d1)`, onto three `float4` column
+  uniforms per matrix. The values follow the reference's row-vector composition (`Rx * T * Rz * Ry`,
+  randomised per preset load with the reference's speed progression, the last four re-randomised
+  every frame), so a preset that reads them as a slowly moving rotation no longer sees a constant
+  zero. `ShaderRotationMatricesTests` pins the rewrite and the columns.
 
 - Added a Windows-only Winamp MilkDrop capture harness that runs the supplied `vis_milk2.dll`
   inside an isolated copy of Winamp, plays the comparison tone, records Direct3D frames with

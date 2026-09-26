@@ -87,6 +87,14 @@ public static class ShaderTranspiler
                 uniforms[HueShaderUniform(channel, corner)] = 1;
         }
 
+        // Milkdrop's rot_* matrices are float4x3, which neither the interpreter's square-matrix pool
+        // nor SkSL models, so each arrives as three float4 columns and the source rewrite reads them.
+        foreach (var matrix in ShaderRotationMatrices.Names)
+        {
+            for (var column = 0; column < 3; column++)
+                uniforms[matrix + "_c" + column.ToString(CultureInfo.InvariantCulture)] = 4;
+        }
+
         return uniforms;
     }
 
@@ -132,6 +140,12 @@ public static class ShaderTranspiler
                 .Append(count switch { 2 => "float2", 4 => "float4", _ => "float" })
                 .Append(' ').Append(name).Append(";\n");
         }
+
+        // The product of a row vector and Milkdrop's non-square rot_* matrix, emitted by the source
+        // rewrite as one call. GLSL and SkSL both accept the dot-product expansion, and the value is
+        // exactly the row-vector mul the presets were written against.
+        builder.Append("float3 orynivo_mul4x3(float4 v, float4 c0, float4 c1, float4 c2) "
+            + "{ return float3(dot(v, c0), dot(v, c1), dot(v, c2)); }\n");
 
         return builder.ToString();
     }

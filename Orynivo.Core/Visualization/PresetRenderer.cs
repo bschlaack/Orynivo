@@ -214,6 +214,12 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
     // The reference's per-preset hue offsets. It seeds them randomly on every load; a stable seed
     // from the preset name keeps a preset's look reproducible across runs.
     private readonly float[] _hueOffsets = new float[4];
+
+    /// <summary>Milkdrop's randomised <c>rot_*</c> matrices for this preset.</summary>
+    private readonly ShaderRotationMatrices _rotationMatrices;
+
+    /// <summary>Whether any shader of the preset reads one of Milkdrop's rewritten <c>rot_*</c> columns.</summary>
+    private readonly bool _usesRotationMatrices;
     private readonly float[] _hueShadeR = new float[4];
     private readonly float[] _hueShadeG = new float[4];
     private readonly float[] _hueShadeB = new float[4];
@@ -325,6 +331,10 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
         _hueOffsets[1] = ((hueSeed >> 8) % 53751u) * 0.01f;
         _hueOffsets[2] = ((hueSeed >> 16) % 42661u) * 0.01f;
         _hueOffsets[3] = ((hueSeed >> 24) % 31571u) * 0.01f;
+        // Milkdrop randomises its rot_* matrices once per preset load. The same name seed keeps them
+        // reproducible, and they are only bound for a preset whose shaders actually read them.
+        _rotationMatrices = new ShaderRotationMatrices((int)hueSeed);
+        _usesRotationMatrices = PresetUsesRotationMatrices(preset);
         // A per-pixel pass may run in parallel when nothing it writes can be seen by another pixel
         // or by another stage of the preset. A value the engine re-seeds for every pixel is always
         // safe; a pixel-local temporary is safe when the block assigns it before it reads it and no
@@ -872,6 +882,9 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
         // The reference hands the animated hue shade to every shader as hue_shader, so it is computed
         // before anything can return early; a GPU pipeline reads the values through WriteShaderUniforms.
         ComputeHueShades();
+        // The rot_* matrices are rebuilt once per frame, before any stage can read them, because the
+        // four rot_rand matrices are re-randomised every frame and both execution paths share them.
+        _rotationMatrices.Build(Read("time", 0f));
         var useShaders = HasShaders;
         if (ExpressionsOnly)
         {
@@ -2443,6 +2456,7 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
         }
         for (var index = 1; index <= 8; index++)
             destination["t" + index] = ShaderValue.Scalar(Read("t" + index, 0f));
+        _rotationMatrices.Write(destination);
 
         // The reference's hue shade, which every shader may read as hue_shader. A single uniform cannot
         // carry the per-pixel interpolation, so the four corners travel and the emitted shader mixes
@@ -2580,6 +2594,17 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
         interpreter.SetVariable("roam_sin", _roam[1]);
         interpreter.SetVariable("slow_roam_cos", _roam[2]);
         interpreter.SetVariable("slow_roam_sin", _roam[3]);
+        // Milkdrop's rot_* matrices reach the interpreter as their three float4 columns. Binding them
+        // only for a preset that reads them keeps the per-pixel path free of the other seventy-two.
+        if (_usesRotationMatrices)
+        {
+            foreach (var matrix in ShaderRotationMatrices.Names)
+            {
+                interpreter.SetVariable(matrix + "_c0", _rotationMatrices.Column(matrix, 0));
+                interpreter.SetVariable(matrix + "_c1", _rotationMatrices.Column(matrix, 1));
+                interpreter.SetVariable(matrix + "_c2", _rotationMatrices.Column(matrix, 2));
+            }
+        }
         if (mathSpacePolar)
         {
             // MilkDrop's UvToMathSpace (milkdropfs.cpp): the position is scaled by the aspect, rad is
@@ -2835,6 +2860,54 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
     /// shader uses it or not"), so they are computed for every frame, not only for the legacy
     /// composite that also multiplies the finished frame by them.
     /// </summary>
+    /// <summary>
+    /// Checks whether any shader of a preset reads a rewritten <c>rot_*</c> column. The flag keeps the
+    /// seventy-two column uniforms out of the per-pixel interpreter binding for the presets that do
+    /// not use them, which is almost all of them.
+    /// </summary>
+    /// <param name="preset">Preset to inspect.</param>
+    /// <returns><see langword="true"/> when a shader reads a rotation matrix column.</returns>
+    private static bool PresetUsesRotationMatrices(VisualizerPreset preset)
+    {
+        foreach (var shader in preset.WarpShaders)
+        {
+            if (ReferencesRotationMatrices(shader.Program))
+                return true;
+        }
+
+        foreach (var shader in preset.CompShaders)
+        {
+            if (ReferencesRotationMatrices(shader.Program))
+                return true;
+        }
+
+        return false;
+    }
+
+    /// <summary>Checks one parsed shader tree for a rotation matrix column reference.</summary>
+    /// <param name="node">Tree to walk.</param>
+    /// <returns><see langword="true"/> when it references one.</returns>
+    private static bool ReferencesRotationMatrices(ShaderNode node)
+    {
+        if (node.Text is { Length: > 4 } text && text.StartsWith("rot_", StringComparison.Ordinal))
+            return true;
+
+        if (node.Left is { } left && ReferencesRotationMatrices(left))
+            return true;
+        if (node.Right is { } right && ReferencesRotationMatrices(right))
+            return true;
+        if (node.Third is { } third && ReferencesRotationMatrices(third))
+            return true;
+
+        foreach (var child in node.Items)
+        {
+            if (ReferencesRotationMatrices(child))
+                return true;
+        }
+
+        return false;
+    }
+
     private void ComputeHueShades()
     {
         var time = (float)_elapsed * 30f;

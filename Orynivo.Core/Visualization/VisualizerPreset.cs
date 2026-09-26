@@ -388,12 +388,15 @@ public sealed class VisualizerPreset
     /// <summary>
     /// Translates the parts of Milkdrop's shader source that are not HLSL: its preprocessor
     /// conditionals (which it writes with trailing comments) and its built-in math constants. The
-    /// result is plain HLSL that <see cref="ShaderParser"/> can read.
+    /// result is plain HLSL that <see cref="ShaderParser"/> can read. Milkdrop's non-square
+    /// <c>rot_*</c> matrices are rewritten onto column uniforms first, because the type itself has no
+    /// place in the parser.
     /// </summary>
     /// <param name="source">Shader source as stored in the preset.</param>
     /// <returns>The translated source.</returns>
     private static string TranslateShaderDialect(string source)
     {
+        source = ShaderRotationMatrices.Rewrite(source);
         var builder = new System.Text.StringBuilder();
         var constants = new Dictionary<string, string>(ShaderConstants, StringComparer.Ordinal);
         var enclosing = new Stack<bool>();

@@ -290,6 +290,17 @@ This file applies to `Orynivo.Core/` and supplements `../AGENTS.md`.
   components, and `WriteShaderUniforms` seeds them from the preset slots; a bank read as an unknown
   scalar (a zero) broke Royal Mashup (151) with a divide by zero. Do not drop these: a scan of a
   10,353-preset collection uses the banks in about 600 presets and `vol_att` in 206.
+  MilkDrop's twenty-four `rot_*` matrices are `float4x3`, a non-square type that neither the
+  interpreter's square-matrix pool nor SkSL models, so they are never materialised as a type.
+  `ShaderRotationMatrices` builds the reference's row-vector composition (`Rx * T * Rz * Ry`, the
+  rotation speeds following `0.9 * (k / 8)^3.2`, the last four re-randomised every frame) into three
+  `float4` columns per matrix, seeds them from the preset name so a preset looks the same across runs,
+  and rewrites the shader source before the parser sees it: `rot_d1[1].y` becomes the column component
+  `rot_d1_c1[1]` and `mul(uv, rot_d1)` becomes the `orynivo_mul4x3` call the prelude defines. Keep the
+  rewrite in `TranslateShaderDialect`, keep the columns in `ShaderTranspiler.UniformComponents` (so
+  both back ends declare and seed them), and keep `Build` once per frame in `RenderFrame` before any
+  stage reads them, because the interpreter binds them per pixel and the GPU reads them through
+  `WriteShaderUniforms`. Only bind them for a preset whose shaders reference a `rot_` name.
  `SkiaShaderRunner` must bind a
   child shader for every sampler `Transpile` reports, and the CPU/GPU comparison tests must keep
   passing. Its `CompPass` runs a comp shader, with its own per-pixel block emitted into the same
