@@ -12,10 +12,7 @@ Native/AsioBridge/**/x64/
 Native/CwAsioBridge/**/x64/
 third_party/asiosdk/
 external/asiosdk/
-scripts/gl-harness/
-scripts/projectm-oracle/
-scripts/visualizer-compare/
-scripts/winamp-milkdrop-harness/
+scripts/local/
 VISUALIZER-PRESET-CHECK.md
 errors/
 equalizer/
