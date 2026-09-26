@@ -4,7 +4,7 @@ All notable changes to Orynivo are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [Unreleased]
+## [0.46.0] - 2026-09-26
 
 ### Fixed
 
@@ -166,116 +166,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   over-blurred on the CPU while the OpenGL chain built the correct one pair, so
   a comp shader sampling `GetBlur2`/`GetBlur3` rendered differently on the two
   paths.
-
-### Changed
-
-- Reformatted every repository markdown file to follow markdownlint rule MD032
-  (lists surrounded by blank lines) and to keep lines at or below 80 characters,
-  and recorded that requirement in the central `AGENTS.md`. Code blocks, tables,
-  and long URLs are the only exceptions.
-- Rebuilt the built-in visualizer presets as structured warp-shader effects
-  instead of a flat full-screen waveform smear: **Spiral**, **Kaleidoscope**,
-  **Fractal**, **Ripple**, **Vortex**, **Bloom**, **Spectrum Bars**,
-  **Starfield**, and **Orbit**. Each draws a bright waveform and shapes through
-  its own warp shader, so the picture has structure; the earlier presets read as
-  a "graphic glitch"/"carpet". **Spectrum Bars** keeps the additive spectrum
-  wave along the bottom as an equalizer over a faint procedural background, and
-  **Orbit** uses custom shapes. Every built-in is verified to light up by
-  `VisualizerBrightnessDiagnosticTests`.
-
-### Added
-
-- Settings > Playback > Visualizer now explains that Orynivo ships no
-  third-party presets and offers a **Download presets…** action that opens the
-  projectM `presets-cream-of-the-crop` collection, so a user can add MilkDrop 2
-  presets to the **Preset folder**.
-- Added MilkDrop-style preset blending to the visualizer. A preset switch now
-  cross-fades over a configurable **Preset switch cross-fade duration**
-  (Settings > Playback > Visualizer, default 0 = hard switch). The outgoing
-  preset keeps running and the reference's non-motion per-frame variables
-  (`decay`, the waveform colours and position, both border bands, the
-  motion-vector display, the video echo, `gamma`, and the blur range keys) are
-  eased into the incoming preset with MilkDrop's cosine curve, while the motion
-  variables that drive the warp stay on the incoming preset; a boolean or
-  ordinal switch such as `wrap` or `echo_orient` flips at the blend midpoint
-  instead of landing between two values. On the OpenGL path the warp's sampling
-  coordinate additionally morphs from the outgoing preset's captured mesh to the
-  incoming one, so the geometry eases over the blend too. The switch still
-  continues from the previous preset's feedback instead of restarting from
-  black.
-- Added preset texture files to the visualizer. A shader that declares its own
-  texture, such as `sampler sampler_seaweed;`, now resolves to
-  `textures/seaweed.jpg` (or `.png`, `.bmp`, `.gif`, `.webp`, `.tga`) beside the
-  presets, matching MilkDrop's convention; previously an unknown sampler fell
-  back to the frame, so a preset such as `suksma - frust` looked nothing like
-  MilkDrop. Both the CPU interpreter and the OpenGL pipeline load and bind the
-  same decoded image, and no third-party texture is bundled.
-- Added visualizer preset activation. Settings > Visualisierung gains a **Select
-  presets…** action that opens a themed dialog listing every available preset —
-  the nine built-ins and every `.oryvis` or `.milk` file in the preset folder —
-  each with a checkbox. Deactivated presets are persisted by a stable key
-  (built-in name or preset-relative file path) and skipped when the visualizer
-  opens, steps to the next or previous preset, advances automatically, or
-  responds to the mouse. The dialog carries **All**/**None** actions and an
-  active-count summary, and lists presets without reading the files so a large
-  collection opens instantly.
-- Added a seedable `rand_frame` diagnostic mode to the visualizer renderer. The
-  per-frame random vector still uses `Random.Shared` by default so a preset
-  looks different on every run like the reference, but
-  `PresetRenderer.RandomSeed` draws it from a private generator so successive
-  renders reproduce for A/B comparison; the GL harness exposes this as
-  `GLH_RANDOM_SEED`.
-- Added automatic preset advancement to the visualizer. Settings >
-  Visualisierung gains an enable toggle and a per-preset dwell time in seconds;
-  when enabled the window advances to the next preset after that time. It is off
-  by default and defaults to 15 seconds.
-- Preset switches in the visualizer no longer reset the frame. Like Milkdrop,
-  the new preset continues from the last frame of the previous one: the OpenGL
-  feedback is kept across a switch (cleared only when its size changes), and the
-  CPU path seeds the new renderer with the previous feedback through
-  `PresetRenderer.SeedFeedback`.
-- Added Milkdrop's twenty-four `rot_*` shader matrices. They are `float4x3`,
-  which neither the interpreter's square-matrix pool nor SkSL models, so the
-  engine rewrites the two constructs presets use, the component read
-  `rot_d1[1].y` and the product `mul(uv, rot_d1)`, onto three `float4` column
-  uniforms per matrix. The values follow the reference's row-vector composition
-  (`Rx * T * Rz * Ry`, randomised per preset load with the reference's speed
-  progression, the last four re-randomised every frame), so a preset that reads
-  them as a slowly moving rotation no longer sees a constant zero.
-  `ShaderRotationMatricesTests` pins the rewrite and the columns.
-
-- Added a Windows-only Winamp MilkDrop capture harness that runs the supplied
-  `vis_milk2.dll` inside an isolated copy of Winamp, plays the comparison tone,
-  records Direct3D frames with playback timestamps, and produces a side-by-side
-  Orynivo comparison. A 300-frame Royal Mashup run now provides a direct Winamp
-  reference instead of relying on projectM as a proxy.
-- Added matched-music comparison for the visualizer: a reference oracle converts
-  a track that FFmpeg can read into one raw 16-bit stereo PCM file both
-  renderers consume, so a comparison runs on the same music instead of a
-  synthetic signal. The converted WAV beside it is what a reference player such
-  as Winamp should play.
-- A per-pixel block that writes the sample position `x` or `y` now runs on the
-  GPU by default. Such a block used to keep the CPU warp, because the mesh
-  cannot interpolate a sample position; it is now emitted as a warp fragment
-  shader that computes the coordinate per pixel instead, and
-  `ORYNIVO_VISUALIZER_PIXELWARP=0` forces the CPU warp.
-  `the GL pixel-warp regression` verifies it: a whole-frame comparison cannot
-  see the warp, because the display frame is dominated by the overlay that both
-  renderers composite identically, so the probe draws the overlay only for the
-  first frames and follows the brightness centroid of the remaining warped
-  feedback. The GPU tracks the CPU reference within 0.08 px over a 23 px travel,
-  and a control preset without the block stays 26 px away, so the probe fails if
-  the block does not reach the GPU.
-- Added a reference-player comparison, which renders a preset — or every preset
-  below a folder — with Orynivo and the reference implementation under identical
-  resolution, frame count, frame time, mesh and audio, writes the frames and a
-  settings manifest, and generates `compare-tone.wav`. That tone is a
-  deterministic 440 Hz stereo signal both renderers synthesize, so a capture
-  from a reference player such as MilkDrop in Winamp can be compared with the
-  renders under the same audio state.
-
-### Fixed
-
 - A preset whose per-pixel block writes the sample position now runs its warp on
   the GPU without also costing the CPU the full warp and comp passes.
   `PrepareMeshForGpu` refused to build a mesh for such a block, so the
@@ -348,184 +238,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   dropped from 72 ms to 22 ms per frame at 960 x 540.
   `RenderTimingDiagnosticTests` now measures both the interpreter and the Skia
   path, so this regression cannot return unnoticed.
-
-### Changed
-
-- The visualizer's audio analysis now uses the reference's geometry: a
-  1024-point transform over the most recent 480 samples of each channel,
-  windowed with a raised sine over that 480-sample window, and the loudness
-  bands read the average of the two channels' equalized magnitudes instead of
-  the transform of their mix, so a phase-inverted stereo pair is not cancelled
-  out of the bands. Orynivo's own 512-sample waveform and 256-point spectrum
-  contracts are unchanged. Measured on a real track the three bands now agree
-  with projectM's within about 0.4 — projectM `2.15/2.45/2.25`,
-  `1.30/1.11/1.23`, `0.80/0.78/1.19` against Orynivo's `2.10/2.63/2.24`,
-  `1.15/1.12/1.12`, `0.59/0.46/0.76` — where they had differed by up to a factor
-  of two.
-- The reference's logarithmic frequency equalization is now applied to the
-  magnitudes the Milkdrop loudness bands and the spectrum a custom waveform
-  reads use, matching projectM's own analyzer: the curve is
-  `-0.02 * ln((half - bin) / half)`, zero at DC and rising with frequency.
-  Orynivo's own normalized display bands stay un-equalized, because that is a
-  separate contract other consumers use. Measured on a real track this changes
-  the band _weighting_ only; a spectral shape change is what it is for, and it
-  neither fixed nor worsened the remaining `$$$ Royal - Mashup (138)` brightness
-  gap.
-- The visualizer draws a Milkdrop preset's shape fills on the GPU. The CPU
-  rasterizer scanned every fan triangle over its own bounding box, so the centre
-  of a 25-sided shape was tested by all 25 triangles: at 1920 x 1080 the overlay
-  cost 120 ms per frame for `$$$ Royal - Mashup (115)` and 475-500 ms for
-  `(135)`, against `warpMs` and `compShaderMs` of zero. The renderer now
-  publishes the fans as geometry and the GPU draws them with the same
-  premultiplied "over" blend `PaintPixel` applies, so overlapping shapes
-  accumulate identically and the picture is unchanged. Measured at 640 x 360 the
-  overlay falls from 54.8 ms to 0.8 ms. The polygon borders and the waves stay
-  on the CPU, because they cover few pixels; a preset whose fill cannot be drawn
-  keeps the CPU path.
-- The visualizer's audio analysis now follows the reference more closely: every
-  FFT input is damped with the reference's one-sample pre-emphasis, which
-  suppresses high-frequency noise, and the window is the reference's raised sine
-  over the complete transform length instead of the length-minus-one variant, so
-  the first and last samples are not both forced to zero. The stereo waveform is
-  now aligned to the previous frame with the reference's multi-octave
-  cross-correlation (`WaveformAligner`), so a custom waveform holds its shape
-  instead of sliding sideways. The reference's logarithmic frequency
-  equalization is still not adopted: it changes how much broadband content each
-  loudness band sums and needs the reference's unnormalized magnitude scale to
-  keep its guard meaningful. It is measured and recorded in
-  `VISUALIZER-FIDELITY-RECHECK.md`, and `the reference band measurement`
-  reproduces the reference's own band response.
-- The legacy final composite now applies the reference's animated hue shade:
-  before the gamma gain, the frame is multiplied by a four-corner colour whose
-  three channels are animated sines normalised so their maximum is one, blended
-  across the frame. The offsets are the reference's per-preset hue offsets,
-  seeded from the preset name so a preset keeps the same look across runs
-  instead of changing on every load. A comp shader still replaces the whole
-  legacy path, and the OpenGL display pass applies the same shade so the two
-  paths agree.
-- Textured custom shapes now sample the frame instead of drawing a flat
-  gradient. A shape whose `shapecode_N_textured` is set interpolates the
-  reference's texture coordinates across its triangle fan — the centre maps to
-  the texture centre and the rim to a circle of radius `0.5 / tex_zoom` rotated
-  by `tex_ang` — and reads the frame with repeat, so the presets that request
-  texturing draw their intended picture instead of the centre/edge gradient.
-- The default waveform now uses the reference's per-mode geometry instead of the
-  earlier line/circle approximation. `wave_mode` selects the reference's
-  `nWaveMode` modes — the single line is six, which the reference's idle preset
-  confirms — and `MilkdropWaveform` reproduces the ring, the XY spiral, the
-  centred spirograph, the derivative line, the explosive hash, the line, the
-  double line, and the spectrum line from the scaled PCM data, including the
-  edge clipping and the closed-loop modes. The geometry smooths the polyline
-  with the reference's four taps, honours
-  `wave_dots`/`wave_thick`/`wave_additive`, and still runs the legacy global
-  `per_point` block, whose `x`/`y` are now the vertex position in
-  minus-one-to-one space. The default `wave_scale` is now one and the default
-  `wave_mode` the single line, both matching the reference.
-- The visualizer's band variables now follow Milkdrop: `bass`, `mid`, `treble`,
-  `vol`, and their `_att` companions are relative to each band's long-term
-  average instead of being clamped to zero to one, so a value above one means
-  "louder than usual" and a preset condition such as `above(bass, 1.2)` can
-  fire. `AudioSpectrumAnalyzer` computes them from one sixth of the linear
-  spectrum with the reference's frame-rate-adjusted smoothing rates, and the
-  desktop hub measures the frame time they need. The analyzer also keeps left
-  and right separate, so a custom waveform's `value1` and `value2` are the two
-  channels and a spectrum-reading waveform can use
-  `SpectrumLeft`/`SpectrumRight`. The normalized `Bands`, `Bass`, `Mid`,
-  `Treble`, and `Volume` contract other consumers use is unchanged.
-  `ShaderTranspiler` now serializes its translation, because its static emitter
-  state let parallel translations emit broken shaders.
-- The visualizer's custom waveforms now follow the reference's semantics. Each
-  of the four `wavecode_N_*` waveforms has its own state (enabled, samples,
-  separation, spectrum, dots, thick, additive, scaling, smoothing, and colour)
-  and its own `wave_N_*` blocks, separate from the default waveform, which keeps
-  using the global `wave_*` settings and the global `per_point` block. The
-  per-point block receives the reference's `sample` (the normalized index),
-  `value1`, and `value2` contract and may move and colour the point, and the
-  trace is smoothed with the reference's four-tap polyline smoothing. The
-  unconditional spectrum bars are gone: spectrum geometry is drawn only by a
-  waveform whose `wavecode_N_bSpectrum` is set. `IVisualizerAudioSource` gained
-  a `Spectrum` member that `AudioSpectrumAnalyzer` fills from the FFT, so a
-  spectrum waveform has real data.
-- The visualizer's decay now belongs to the warp, as in the reference. The fixed
-  OpenGL warp fragment shader multiplies the sampled colour by it (the
-  reference's `frag_COLOR`), and the interpreter applies it right after the warp
-  and before its blur passes, so the blur passes see the faded frame. The comp
-  shader's blur levels are built from the same input frame the warp shader's
-  are, instead of being rebuilt from the composite the comp shader just
-  produced.
-- The visualizer's composite stage now follows the reference's final composite.
-  A preset with a comp shader no longer gets the legacy video echo and gamma
-  adjustment applied to the input the comp shader reads, because the reference
-  selects the custom composite shader **or** the legacy echo/gamma path, never
-  both. The shapes and waves are drawn before the centre darkening and the
-  border, so those later passes cover the overlay instead of the overlay
-  covering them, and the OpenGL post shader applies the same order.
-  `PresetRenderer.Composite` now adds the overlay into the warped frame and
-  `PresetRenderer.Publish` copies the finished frame into the display buffer.
-- The OpenGL custom warp now draws the prepared mesh instead of a full-screen
-  quad, so the per-pixel block reaches the geometry through the mesh (it runs
-  once per vertex, as the reference's per-vertex program does) and the warp
-  shader is a pure fragment stage over the interpolated coordinate.
-  `ShaderTranspiler.TranspileGlslWarpMesh` emits that fragment stage — the
-  per-pixel block is not emitted again, because the mesh already carries its
-  result — and the warp program links the same mesh vertex shader the fixed warp
-  uses. The emitted warp entry point therefore no longer computes the sampling
-  position before the block.
-- The visualizer's warp now transforms the texture coordinate at the mesh
-  vertices and interpolates the resulting coordinate, exactly as the reference
-  warp vertex shader does, instead of interpolating the motion values and
-  transforming per pixel. The OpenGL warp does it in its vertex shader (the mesh
-  now carries the tenth `warp` value as a vertex attribute and the
-  time-dependent displacement moved into the vertex stage), and the CPU mesh
-  warp interpolates a per-vertex coordinate mesh. For an affine transform the
-  two paths still agree to floating-point precision; the change is visible where
-  the radial zoom or the warp displacement makes the transform nonlinear. The
-  per-vertex block's `x`/`y`/`rad`/`ang` also use the reference aspect now, not
-  the preset's `aspectx`/`aspecty` variables.
-- The visualizer's shader samplers now follow Milkdrop's qualifier semantics:
-  `fc_`/`fw_`/`pc_`/`pw_` (and the swapped `cf_`/`wf_`/`cp_`/`wp_` spellings)
-  select a sampler's wrap and filter mode rather than a different moment in
-  time, so `sampler_main`, `sampler_pc_main`, and `sampler_fw_main` all read the
-  same frame. The prefix is stripped before the generated noise and random
-  textures are resolved, so `sampler_pw_noise_lq` now reads the noise texture
-  instead of the frame. `ShaderSamplerName` is the shared parser,
-  `PixelBuffer.SampleShader` performs the wrap and filter, and the interpreter,
-  the Skia passes, and the OpenGL pipeline all use them. The OpenGL frame
-  texture keeps its own filter and wrap (GL exposes no per-sampler state through
-  `GlInterface`), so a frame sampler's qualifier currently selects only the
-  texture it reads there.
-- The visualizer's warp now applies the reference implementation's
-  time-dependent displacement (the preset's `warp` value, which defaults to
-  one): four travelling sine/cosine waves whose phase depends on the vertex
-  position and whose amplitude is `warp * 0.0035`. It sits between the stretch
-  and the rotation, is computed by `WarpSampling.WarpDisplacement`, and is
-  carried as a tenth mesh value so the CPU warp, the Skia warp pass, and the
-  OpenGL warp shader stay identical. Because the displacement is active by
-  default, an identity warp is no longer exactly identity; this matches the
-  reference.
-- The visualizer's warp now uses the reference implementation's coordinate
-  contract instead of the engine's previous formula: the sample position is
-  scaled by the aspect, divided by the radial zoom, stretched, rotated,
-  translated, and scaled back by the inverse aspect, exactly as the reference
-  warp vertex shader does. The aspect keeps both factors at or below one
-  (`WarpSampling.GetAspect`), so a landscape frame scales the vertical axis by
-  `height/width` and a portrait frame the horizontal axis by `width/height`,
-  matching the reference. `WarpSampling.SamplePosition` stays the single
-  definition, so the CPU warp, the Skia warp pass, and the OpenGL warp fragment
-  shader cannot drift apart.
-- The visualizer's shader blur levels (`GetBlur1`-`GetBlur3`) now use the
-  reference implementation's weighted filter instead of a three-by-three box: a
-  long horizontal pass with eight weighted taps (about thirteen pixels wide)
-  followed by a short vertical pass with four, each level continuing from the
-  one below it. A single box blur is far too narrow, so a preset that feeds the
-  blurred frame into its own maths (the common `GetBlur1` then a `tan` term)
-  amplified the box's hard edges into visible steps. Against projectM the
-  `LuxXx - BadBallz Beta` correlation moved from 0.36-0.41 to 0.40-0.44;
-  `Jc - Crystal Shards` is within the noise, because its remaining difference is
-  the comp and video echo rather than the blur.
-
-### Fixed
-
 - MilkDrop preset equations now receive bass, mid and treble from the
   reference's separate eight-bit, 576-sample custom-sound FFT instead of the
   display spectrum. A matched 440 Hz capture showed Orynivo's middle and treble
@@ -708,12 +420,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   every sampled shader accepted.
 - Fixed the **Visualisierung** entry in Settings having no icon.
   `IconVisualizer` is a stroke-only
-
   geometry (rising spectrum bars over a baseline), while the Settings navigation
   style sets `Fill`, so the icon drew nothing. It now strokes with the
   navigation item's foreground, exactly like the transport button that already
   used the same geometry.
-
 - Fixed presets turning into a solid white screen a few seconds after the
   sixteen-bit feedback landed. Eight-bit textures clamp every write to the
   colour range, so a preset that amplifies its own feedback (`fGammaAdj` below
@@ -744,260 +454,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   at the configured frame rate while the control refreshes at the display rate,
   so an undrawn refresh is the normal case and the artefact appeared as a steady
   rubber band rather than an occasional hitch.
-
-### Changed
-
-- The visualizer's once-per-second diagnostic line now also reports the
-  brightness of the frame the presenter copied, sampled **before and after** the
-  copy under the presentation lock (`presentBrightness=source:…/destination:…`),
-  so a copy or bitmap fault is told apart from a genuinely white source frame
-  without another round trip. The line is bounded and carries no media names or
-  paths.
-- The visualizer's once-per-second diagnostic line now reports the frame's
-  brightness **per stage** (`stageBrightness=warp:…/blur:…/compShader:…/done:…`)
-  on **every** frame, each value sampled from the buffer that stage reads, so
-  the numbers follow the current frame instead of the first frame the stage
-  trace happens to cover. The saturated share alone says a frame went white; the
-  per-stage brightness says which stage turned it white, and a stale per-stage
-  value is worse than none because it looks authoritative while pointing at the
-  wrong stage. The renderer gained one small `StageBrightnessLogger` hook, and
-  `PixelBuffer.MeanBrightness`/`SaturatedShare` are the shared probes.
-- The visualizer's once-per-second diagnostic line now also reports the rendered
-  frame's **saturated share** and whether the per-pixel program is suspended. A
-  white window is either a genuinely saturated frame or a frame that never
-  reaches the screen, and the saturated share tells those apart because a
-  presentation fault leaves the rendered frame's brightness and saturation
-  untouched. The line already carried the mean brightness, the render size, the
-  shader grid state, the stage timings, and any shader, render, preset, or
-  presentation error.
-- The visualizer's resolution choices now run up to 3840 x 2160 and include 2560
-  x 1440 and 1920 x 1080; the window accepts up to 7680 x 4320 instead of 3840 x
-  2160, so the added choices are not silently clamped. A missing selection falls
-  back to 640 x 360 by value instead of by index, so adding a choice cannot move
-  the default.
-
-### Added
-
-- Added the GPU comp and warp shader pipeline for the visualizer (opt-in with
-  `ORYNIVO_VISUALIZER_OPENGL=1`). Shader presets now run their comp and warp
-  shaders as GLSL on the GPU at the full render resolution, instead of through
-  the CPU interpreter on a grid capped at 10,000 pixels and shrunk toward 1,024
-  when it overruns the 30 ms budget — which is why the Milk presets looked like
-  roughly 50-pixel pictures. `ShaderTranspiler` gained a GLSL dialect
-  (`TranspileGlsl`, `TranspileGlslComp`, `TranspileGlslWarp`);
-  `VisualizerGlPipeline` compiles it, runs the warp shader in place of the fixed
-  mesh warp, builds the three blur levels the shader's `GetBlur1`-`GetBlur3`
-  read, and runs the comp shader after the post pass into its own display target
-  so the feedback stays the pre-comp frame. The GLSL samples are normalised
-  (Skia's `eval` takes pixels), the vector uniforms are declared as scalars
-  because `GlInterface` only exposes scalar uniform setters, and a shader the
-  dialect cannot express falls back to the CPU path. Verified headlessly with
-  the local GL harness, which emits a real preset's shaders, compiles them in
-  the context, and compares the GPU frame against the CPU reference:
-  `LuxXx - BadBallz Beta` now renders 0.49 against the CPU's 0.53 instead of a
-  saturated white frame, and `martin - neon space ps2`,
-  `martin - lock and release`, and `Jc - Crystal Shards` all run with
-  `glError=0x0`.
-- Added `PresetBrightnessDiagnosticTests`, which renders one configured preset
-  file for a few frames and reports each frame's mean brightness and saturated
-  share, so a preset that turns white can be located to the frame it happens on.
-  Point `ORYNIVO_PRESET_BRIGHTNESS_FILE` at a preset to run it.
-- Added `CompFeedbackTests`, which pins down the comp stage's feedback rule: a
-  comp shader that writes white must paint the display white without whitening
-  the feedback, and an amplifying comp shader must settle instead of diverging.
-- Added `ShaderMatrixTests`, which verifies the two-by-two matrix constructor
-  and `mul` in both argument orders and for two matrices against hand-computed
-  values.
-- Added `PixelBuffer.MeanBrightness` and `PixelBuffer.SaturatedShare`, the
-  strided probes the visualizer diagnostics share.
-- Added `PresetRuntimeDiagnosticTests`, which renders every preset of the
-  configured folder for a few frames and reports the ones whose frame failed at
-  run time, separately counting the interpreter's loop budget. It is the harness
-  that decides whether a preset really loses its picture at run time, because a
-  block that fails to parse costs a preset its motion while a frame that throws
-  costs it the whole picture. Against the 2000-file sample collection it reports
-  0 runtime errors and 0 loop-budget errors, which retracts the roadmap's claim
-  that several presets lose their shaders to the loop budget: that claim had
-  counted a parse failure as a run-time loss.
-- Added the local development harness, a local development harness that renders
-  the visualizer's GPU pipeline without Avalonia. It compiles
-  `Orynivo/Controls/VisualizerGlPipeline.cs` unchanged and supplies its own
-  `Avalonia.OpenGL.GlInterface` over a hidden WGL context, so the real shaders
-  and pass order are verified headlessly and a change to the pipeline's GL calls
-  breaks that build instead of drifting. It writes the GPU and CPU frames side
-  by side and prints the pipeline's one-shot diagnostics.
-- Added the GPU frame pipeline for the visualizer, off by default. With
-  `ORYNIVO_VISUALIZER_OPENGL=1` a preset **without** shaders renders entirely
-  through `Orynivo.Controls.VisualizerGlPipeline`: the warp is a mesh draw whose
-  fragment shader is a translation of `WarpSampling.SamplePosition`, the blur is
-  the same nine-tap box filter, and decay, video echo, centre darkening, both
-  border bands, gamma, and the additive overlay composite share one pass. The
-  CPU supplies only the per-frame block, the per-vertex mesh, and the overlay,
-  which stays a vector drawing. `PresetRenderer.ExpressionsOnly` is the CPU half
-  of that split: it runs the expressions, builds the mesh, and draws the overlay
-  without any pixel pass. A preset with shaders keeps the CPU frame path,
-  because the GL shader dialect is a separate step, and the bitmap presentation
-  stays the fallback. A pipeline failure is logged once and hands the frame back
-  to the CPU.
-- The GPU pipeline's frame textures are sixteen-bit floats when the context
-  exposes `GL_EXT_color_buffer_float` or `GL_EXT_color_buffer_half_float`, and
-  eight-bit colour otherwise. An incomplete framebuffer falls back to eight-bit
-  colour rather than losing the pipeline. Repeated blur and feedback otherwise
-  rounds the frame to eight bits on every pass. On a blur-heavy synthetic preset
-  (five blur passes, 40 frames) the mean channel difference from the CPU
-  reference falls from 9.74 to 9.59 of 255; the remaining difference is
-  structural, not precision.
-- Completed the Core surface a GPU pipeline reads:
-  `PresetRenderer.ReadFrameParameters` publishes the clamped per-frame pass
-  values (decay, blur passes, centre darkening, gamma, video echo, and both
-  border bands) as `VisualizerFrameParameters`, and `RenderOverlayFrame` draws
-  the waveform, spectrum, motion vectors, and shapes into `OverlayFrame` without
-  touching the feedback buffers. A GPU path composites that overlay over its own
-  warped frame instead of re-drawing it.
-- Extracted the warp's sampling arithmetic into
-  `Orynivo.Visualization.WarpSampling`, which is now
-
-  the single definition of it: the CPU warp calls it per pixel and the GPU
-  warp's fragment shader is its translation, so a GPU warp cannot silently
-  disagree with the reference. `WarpSamplingTests` covers the identity, zoom,
-  offset, rotation, stretch, and radial-exponent cases. The extraction is
-  behaviour-preserving; the mesh and parallel tests still render byte-identical
-  frames.
-
-- Added the Core-side interface a GPU warp needs. `PresetRenderer.MeshGridX`,
-  `MeshGridY`, and `MeshValues` are public, `MeshRequested` evaluates the
-  per-vertex mesh without switching the CPU picture over, and
-  `TryCopyMeshMotion` copies the per-vertex motion while `MeshSource` exposes
-  the frame the mesh samples. A GPU warp uploads the values as vertex
-  attributes; the CPU keeps evaluating the per-pixel program until the GPU warp
-  replaces it.
-- Added an OpenGL presentation path to the visualizer, off by default. With
-  `ORYNIVO_VISUALIZER_OPENGL=1` the visualizer shows
-  `Orynivo.Controls.VisualizerGlPresenter`, which uploads the finished frame as
-  a texture and draws it with a shader instead of writing a `WriteableBitmap`,
-  and logs the negotiated GL version once through the diagnostics log. The
-  preset pipeline still renders on the CPU; this is the first step of roadmap
-  40f and proves the context, the shader compilation, the vertex buffer, and the
-  texture upload. Avalonia 12 negotiates OpenGL ES 3.0 through ANGLE on Windows.
-  Nothing changes unless the variable is set, and the bitmap presentation stays
-  the fallback.
-- Added the per-vertex mesh warp as an opt-in.
-  `PresetRenderer.MeshPerPixelEnabled` makes the warp stage evaluate the
-  preset's per-pixel program once per 64 x 48 mesh vertex and interpolate the
-  motion it produced across the quad, which is what Milkdrop's per-vertex
-  program does, instead of running it for every screen pixel. The interpolation
-  is a lerp, so a program that writes a constant motion is byte-identical to the
-  per-pixel path; a program that writes `x` or `y`, records motion vectors, or
-  feeds a warp shader keeps the per-pixel path, because an interpolated sample
-  position has no meaning. It is off by default: the engine's per-pixel `x`/`y`
-  are the warped position in minus-one-to-one space rather than Milkdrop's
-  aspect-scaled zero-to-one vertex position, so a preset that derives an offset
-  from them renders visibly differently once that offset is interpolated, and
-  that has to be reconciled before the mesh can become the default.
-- Added the local development harness, a local development harness that renders
-  a preset with the reference implementation (projectM) and with Orynivo and
-  reports the per-frame mean channel difference and correlation. It links a
-  projectM checkout the developer builds separately; no projectM source is
-  copied into the repository and no Orynivo artifact contains or links it.
-- Added `PresetSkiaComparisonDiagnosticTests`, which renders a sample of a real
-  collection with and without `PresetRenderer.UseSkiaPasses` and reports how far
-  the two pictures drift, grouped by whether the preset has a warp shader, a
-  comp shader, a per-pixel block, or none. It is the validation harness the
-  cutover needs.
-- Moved the comp shader's own per-pixel expression block onto the GPU.
-  `ShaderTranspiler.TranspileComp` emits `comp_N_per_pixel` into the same
-  runtime effect as the comp shader, seeding its `x`, `y`, `rad`, and `ang` from
-  the pixel position, and `SkiaShaderRunner.CompPass` seeds the block's
-  uniforms. `PresetRenderer` no longer requires the block to be empty, so a comp
-  shader with a per-pixel block runs on the Skia path; a block that cannot be
-  emitted still keeps the interpreter. The block has no effect on a compiled
-  (straight-line) shader, which is the reference the Skia path uses, so the
-  picture is unchanged.
-- Emitted the preset per-pixel expression block as SkSL so the warp stage can
-  run on the GPU without the per-pixel-block condition. `PresetCompiler` now
-  parses a block once into a `PresetSyntaxNode` tree that both the LINQ
-  interpreter back end and the new `PresetExpressionTranspiler` consume, so the
-  two paths cannot disagree about a block. The emitter reports the uniforms the
-  caller has to seed, maps the engine-bound `x`, `y`, `rad`, and `ang` onto
-  locals, and refuses `megabuf`/`gmegabuf` and `rand`, which stay on the
-  interpreter. Against a 500-file sample all 315 global per-pixel blocks
-  translate. `ShaderTranspiler.TranspileWarp` composes the block with a warp
-  shader (or a direct frame sample) into a warped-`uv` entry point, and
-  `SkiaShaderRunner.WarpPass` runs it over the previous frame; the renderer uses
-  it for a preset with at most one warp shader, no per-shader per-frame block,
-  no motion recording, and a per-pixel program whose written values are assigned
-  before they are read, so the GPU never has to reproduce a value carried from
-  the previous pixel. Against the same sample 249 of the 315 global blocks
-  qualify and all 249 translate and are accepted by Skia. Anything else keeps
-  the interpreter, which stays the reference and the fallback, and the passes
-  remain opt-in through `PresetRenderer.UseSkiaPasses`. The two SkSL emitters
-  now share the naming and type helpers in `SkSL`.
-- Moved the geometric warp onto the GPU. `SkiaShaderRunner.Warp` applies the
-  Milkdrop motion transform (centre, stretch, rotate, zoom, zoom exponent, and
-  offset) and reads the previous frame bilinearly, leaving a sample outside the
-  frame black the way `PixelBuffer.SampleBilinear` does. The renderer uses it
-  for a preset whose per-pixel block and warp shader are empty; a preset that
-  evaluates expressions per pixel keeps the interpreter, which is the reference
-  for those.
-- Moved the borders onto the GPU. `SkiaShaderRunner.Borders` draws the outer and
-  inner Milkdrop border bands as a Skia runtime effect, computing each pixel's
-  distance to the inset rectangle the way `PresetRenderer.DrawBorderFrame` does,
-  and the renderer uses it when the pass flag is enabled.
-- Moved the composite onto the GPU. `SkiaShaderRunner.Composite` adds the warped
-  frame onto the overlay frame with the same clamp the CPU pass applies, and the
-  renderer uses it when the pass flag is enabled.
-- Moved the video echo onto the GPU. `SkiaShaderRunner.VideoEcho` reproduces the
-  zoom, the optional horizontal or vertical flip, the alpha blend, and the
-  leave-untouched rule of `PresetRenderer.ApplyVideoEcho` as a Skia runtime
-  effect, and the renderer uses it when the pass flag is enabled. The flag is
-  now the general `PresetRenderer.UseSkiaPasses` because it gates the comp
-  shader and the frame passes together.
-- Moved the blur pass onto the GPU. `SkiaShaderRunner.BlurFrame` reproduces
-  `PixelBuffer.Blur`'s nine-tap clamped box filter as a Skia runtime effect, and
-  the Skia comp pass now builds its blur levels as a chain of those passes over
-  the composited frame instead of pre-blurring on the CPU. The frame-helper
-  translation also scales the `GetBlur1`-`GetBlur3` coordinate by `texsize`,
-  which is what the interpreter's normalised sample expects; the missing scale
-  made the GPU read the wrong texels whenever the frame was not the same size as
-  the blur buffer.
-- Added the first GPU pass: a comp shader with no per-pixel block now runs as a
-  Skia runtime effect over the renderer's frames instead of the CPU interpreter.
-  `SkiaShaderRunner` binds one frame per sampler (the composited frame, its blur
-  levels, and the previous frame), the generated noise and volume textures, and
-  the scalar and vector uniforms, and each sampler is scaled by its own
-  `texsize_*` so the noise textures are sampled at their real size instead of
-  the frame size. It is opt-in through `PresetRenderer.UseSkiaPasses` because
-  the Skia path carries the frame through eight-bit textures and therefore
-  differs from the interpreter by up to one level; the interpreter stays the
-  fallback, and the CPU/GPU tests keep the two within a level.
-
-### Changed
-
-- Parallelized the full-frame visualizer passes and reused the blur scratch.
-  `PixelBuffer.Blur` no longer allocates a copy per pass, and the blur, decay,
-  gamma, centre darkening, video echo, and composite passes now split into row
-  ranges through `ParallelRows.For`, gated by
-  `PresetRenderer.ParallelismEnabled` like the warp; `ParallelWarpTests` proves
-  both paths render identical frames. The built-in presets fell from 39 ms per
-  frame to 12 ms at 480 x 270 and from 70 ms to 21 ms at 640 x 360, so the
-  visualizer now defaults to 640 x 360 at 60 frames per second instead of 480 x
-  270 at 30.
-- Made the compiled SkSL shader passes the visualizer's default.
-  `VisualizerWindow` now creates its `PresetRenderer` with `UseSkiaPasses`
-  enabled, so a comp shader and a warp shader run as Skia runtime effects; the
-  interpreter stays the fallback for anything the Skia path cannot handle. The
-  full-frame passes (the geometric warp, the video echo, the borders, and the
-  composite) stay on the interpreter: measured on the raster Skia surface they
-  were about 2.6 times slower than the interpreter's in-place float passes,
-  because each one converts the whole frame to an eight-bit bitmap and back, so
-  they are gated by the new `PresetRenderer.UseSkiaFramePasses` and off by
-  default. The frame passes' runtime effects are cached for the process, because
-  their SkSL is constant and Skia compiles an effect when it is created.
-  Measured with the built-in presets at the default 480 x 270, the shader-pass
-  cutover costs 39 ms per frame on average against 57 ms before.
-
-### Fixed
-
 - Fixed three bugs the first GL runs exposed. The per-vertex mesh is only built
   when the preset's warp can be represented by one, but `ExpressionsOnly`
   published an all-zero mesh otherwise, which clamped the zoom and rendered a
@@ -1348,9 +804,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   template references such as `` `shader_body `` whose actual HLSL lives in
   Milkdrop 2's built-in templates rather than in the file, which is recorded as
   roadmap item 39i.
-
-### Fixed
-
 - Recorded every declared variable's type before emitting anything, so a use
   that stands before its declaration still knows what it is; the type table used
   to be filled as declarations were written out, which made the conversion that
@@ -1579,14 +1032,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   fill and border colours, `additive`) with optional per-shape `per_frame` and
   `per_point` programs, and a preset's `per_point` block may move every waveform
   point. A sixth preset (`Orbit`) demonstrates both. Covered by 7 tests.
-
 - The visualizer now also loads user presets: `.oryvis` and `.milk` files from a
   folder configured under **Preset folder** (default: a `visualizer-presets`
   folder below the per-user data directory). Presets use the documented
   expression subset and unknown keys are ignored, so third-party Milkdrop
   presets degrade instead of failing; a file that cannot be parsed is skipped
   and counted in the on-screen preset label.
-
 - Added the music visualizer window. The transport button **Visualisierung**
   opens a fullscreen window that renders the playing audio through the preset
   engine at 480 x 270 and scales the frame up; Escape closes it, a click or
@@ -1595,7 +1046,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   animating. Five presets ship with it, and the audio players publish their
   prepared PCM through the lock-free `VisualizerAudioHub`, which costs nothing
   while the window is closed.
-
 - Added the visualizer render pipeline: `PixelBuffer` (float RGBA with bilinear
   sampling, box blur, and a BGRA export), `VisualizerPreset` (INI parsing where
   every expression block shares one variable layout, so `q1` carries from the
@@ -1605,7 +1055,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   decimated waveform for the overlay. Covered by 25 tests; the warp and the
   per-frame decay override are asserted through deterministic frame statistics
   rather than by eye.
-
 - Added the preset expression language for the upcoming music visualizer: a
   lexer and a precedence parser that compiles Milkdrop-style expressions into
   JIT-compiled statements over a plain slot array. Assignments, arithmetic,
@@ -1613,7 +1062,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   `if(...)`, the usual math functions, `pi`, `rand(n)`, and `//` comments are
   supported, and malformed input or an unknown function reports the offending
   position. Covered by 22 tests.
-
 - Added the audio-analysis foundation for the upcoming music visualizer: a
   real-input radix-2 `Fft`, an `AudioSpectrumAnalyzer` that produces 64 smoothed
   logarithmic bands plus bass, mid, treble, and volume, and the lock-free
@@ -1621,9 +1069,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   visualizer without ever blocking playback. 21 tests cover sine-frequency
   detection, direct-current concentration, silence, band separation, decay and
   reset, ring-buffer overflow, oversized blocks, and clearing.
-
-### Fixed
-
 - Fixed every downloaded preset rendering the same picture. An expression block
   that used a function the engine did not know was dropped together with the
   whole preset, so those presets lost the per-frame and per-pixel code that
@@ -1647,7 +1092,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   brightness, and the preset name). It contains only counts, so an empty window
   can be told apart from a picture that never reaches the screen without
   recording any media metadata.
-
 - Fixed the visualizer staying black when nothing was playing: it now renders
   with a silent audio source, so a preset shows its picture before playback
   starts and while paused.
@@ -1670,6 +1114,524 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   transport bar: 36 px previous/next with the transport's own 16 px skip glyphs
   and a 50 px play button with its 20 px glyph, so the icons sit centred and the
   size relationship matches the player buttons.
+
+### Changed
+
+- Reformatted every repository markdown file to follow markdownlint rule MD032
+  (lists surrounded by blank lines) and to keep lines at or below 80 characters,
+  and recorded that requirement in the central `AGENTS.md`. Code blocks, tables,
+  and long URLs are the only exceptions.
+- Rebuilt the built-in visualizer presets as structured warp-shader effects
+  instead of a flat full-screen waveform smear: **Spiral**, **Kaleidoscope**,
+  **Fractal**, **Ripple**, **Vortex**, **Bloom**, **Spectrum Bars**,
+  **Starfield**, and **Orbit**. Each draws a bright waveform and shapes through
+  its own warp shader, so the picture has structure; the earlier presets read as
+  a "graphic glitch"/"carpet". **Spectrum Bars** keeps the additive spectrum
+  wave along the bottom as an equalizer over a faint procedural background, and
+  **Orbit** uses custom shapes. Every built-in is verified to light up by
+  `VisualizerBrightnessDiagnosticTests`.
+- The visualizer's audio analysis now uses the reference's geometry: a
+  1024-point transform over the most recent 480 samples of each channel,
+  windowed with a raised sine over that 480-sample window, and the loudness
+  bands read the average of the two channels' equalized magnitudes instead of
+  the transform of their mix, so a phase-inverted stereo pair is not cancelled
+  out of the bands. Orynivo's own 512-sample waveform and 256-point spectrum
+  contracts are unchanged. Measured on a real track the three bands now agree
+  with projectM's within about 0.4 — projectM `2.15/2.45/2.25`,
+  `1.30/1.11/1.23`, `0.80/0.78/1.19` against Orynivo's `2.10/2.63/2.24`,
+  `1.15/1.12/1.12`, `0.59/0.46/0.76` — where they had differed by up to a factor
+  of two.
+- The reference's logarithmic frequency equalization is now applied to the
+  magnitudes the Milkdrop loudness bands and the spectrum a custom waveform
+  reads use, matching projectM's own analyzer: the curve is
+  `-0.02 * ln((half - bin) / half)`, zero at DC and rising with frequency.
+  Orynivo's own normalized display bands stay un-equalized, because that is a
+  separate contract other consumers use. Measured on a real track this changes
+  the band _weighting_ only; a spectral shape change is what it is for, and it
+  neither fixed nor worsened the remaining `$$$ Royal - Mashup (138)` brightness
+  gap.
+- The visualizer draws a Milkdrop preset's shape fills on the GPU. The CPU
+  rasterizer scanned every fan triangle over its own bounding box, so the centre
+  of a 25-sided shape was tested by all 25 triangles: at 1920 x 1080 the overlay
+  cost 120 ms per frame for `$$$ Royal - Mashup (115)` and 475-500 ms for
+  `(135)`, against `warpMs` and `compShaderMs` of zero. The renderer now
+  publishes the fans as geometry and the GPU draws them with the same
+  premultiplied "over" blend `PaintPixel` applies, so overlapping shapes
+  accumulate identically and the picture is unchanged. Measured at 640 x 360 the
+  overlay falls from 54.8 ms to 0.8 ms. The polygon borders and the waves stay
+  on the CPU, because they cover few pixels; a preset whose fill cannot be drawn
+  keeps the CPU path.
+- The visualizer's audio analysis now follows the reference more closely: every
+  FFT input is damped with the reference's one-sample pre-emphasis, which
+  suppresses high-frequency noise, and the window is the reference's raised sine
+  over the complete transform length instead of the length-minus-one variant, so
+  the first and last samples are not both forced to zero. The stereo waveform is
+  now aligned to the previous frame with the reference's multi-octave
+  cross-correlation (`WaveformAligner`), so a custom waveform holds its shape
+  instead of sliding sideways. The reference's logarithmic frequency
+  equalization is still not adopted: it changes how much broadband content each
+  loudness band sums and needs the reference's unnormalized magnitude scale to
+  keep its guard meaningful. It is measured and recorded in
+  `VISUALIZER-FIDELITY-RECHECK.md`, and `the reference band measurement`
+  reproduces the reference's own band response.
+- The legacy final composite now applies the reference's animated hue shade:
+  before the gamma gain, the frame is multiplied by a four-corner colour whose
+  three channels are animated sines normalised so their maximum is one, blended
+  across the frame. The offsets are the reference's per-preset hue offsets,
+  seeded from the preset name so a preset keeps the same look across runs
+  instead of changing on every load. A comp shader still replaces the whole
+  legacy path, and the OpenGL display pass applies the same shade so the two
+  paths agree.
+- Textured custom shapes now sample the frame instead of drawing a flat
+  gradient. A shape whose `shapecode_N_textured` is set interpolates the
+  reference's texture coordinates across its triangle fan — the centre maps to
+  the texture centre and the rim to a circle of radius `0.5 / tex_zoom` rotated
+  by `tex_ang` — and reads the frame with repeat, so the presets that request
+  texturing draw their intended picture instead of the centre/edge gradient.
+- The default waveform now uses the reference's per-mode geometry instead of the
+  earlier line/circle approximation. `wave_mode` selects the reference's
+  `nWaveMode` modes — the single line is six, which the reference's idle preset
+  confirms — and `MilkdropWaveform` reproduces the ring, the XY spiral, the
+  centred spirograph, the derivative line, the explosive hash, the line, the
+  double line, and the spectrum line from the scaled PCM data, including the
+  edge clipping and the closed-loop modes. The geometry smooths the polyline
+  with the reference's four taps, honours
+  `wave_dots`/`wave_thick`/`wave_additive`, and still runs the legacy global
+  `per_point` block, whose `x`/`y` are now the vertex position in
+  minus-one-to-one space. The default `wave_scale` is now one and the default
+  `wave_mode` the single line, both matching the reference.
+- The visualizer's band variables now follow Milkdrop: `bass`, `mid`, `treble`,
+  `vol`, and their `_att` companions are relative to each band's long-term
+  average instead of being clamped to zero to one, so a value above one means
+  "louder than usual" and a preset condition such as `above(bass, 1.2)` can
+  fire. `AudioSpectrumAnalyzer` computes them from one sixth of the linear
+  spectrum with the reference's frame-rate-adjusted smoothing rates, and the
+  desktop hub measures the frame time they need. The analyzer also keeps left
+  and right separate, so a custom waveform's `value1` and `value2` are the two
+  channels and a spectrum-reading waveform can use
+  `SpectrumLeft`/`SpectrumRight`. The normalized `Bands`, `Bass`, `Mid`,
+  `Treble`, and `Volume` contract other consumers use is unchanged.
+  `ShaderTranspiler` now serializes its translation, because its static emitter
+  state let parallel translations emit broken shaders.
+- The visualizer's custom waveforms now follow the reference's semantics. Each
+  of the four `wavecode_N_*` waveforms has its own state (enabled, samples,
+  separation, spectrum, dots, thick, additive, scaling, smoothing, and colour)
+  and its own `wave_N_*` blocks, separate from the default waveform, which keeps
+  using the global `wave_*` settings and the global `per_point` block. The
+  per-point block receives the reference's `sample` (the normalized index),
+  `value1`, and `value2` contract and may move and colour the point, and the
+  trace is smoothed with the reference's four-tap polyline smoothing. The
+  unconditional spectrum bars are gone: spectrum geometry is drawn only by a
+  waveform whose `wavecode_N_bSpectrum` is set. `IVisualizerAudioSource` gained
+  a `Spectrum` member that `AudioSpectrumAnalyzer` fills from the FFT, so a
+  spectrum waveform has real data.
+- The visualizer's decay now belongs to the warp, as in the reference. The fixed
+  OpenGL warp fragment shader multiplies the sampled colour by it (the
+  reference's `frag_COLOR`), and the interpreter applies it right after the warp
+  and before its blur passes, so the blur passes see the faded frame. The comp
+  shader's blur levels are built from the same input frame the warp shader's
+  are, instead of being rebuilt from the composite the comp shader just
+  produced.
+- The visualizer's composite stage now follows the reference's final composite.
+  A preset with a comp shader no longer gets the legacy video echo and gamma
+  adjustment applied to the input the comp shader reads, because the reference
+  selects the custom composite shader **or** the legacy echo/gamma path, never
+  both. The shapes and waves are drawn before the centre darkening and the
+  border, so those later passes cover the overlay instead of the overlay
+  covering them, and the OpenGL post shader applies the same order.
+  `PresetRenderer.Composite` now adds the overlay into the warped frame and
+  `PresetRenderer.Publish` copies the finished frame into the display buffer.
+- The OpenGL custom warp now draws the prepared mesh instead of a full-screen
+  quad, so the per-pixel block reaches the geometry through the mesh (it runs
+  once per vertex, as the reference's per-vertex program does) and the warp
+  shader is a pure fragment stage over the interpolated coordinate.
+  `ShaderTranspiler.TranspileGlslWarpMesh` emits that fragment stage — the
+  per-pixel block is not emitted again, because the mesh already carries its
+  result — and the warp program links the same mesh vertex shader the fixed warp
+  uses. The emitted warp entry point therefore no longer computes the sampling
+  position before the block.
+- The visualizer's warp now transforms the texture coordinate at the mesh
+  vertices and interpolates the resulting coordinate, exactly as the reference
+  warp vertex shader does, instead of interpolating the motion values and
+  transforming per pixel. The OpenGL warp does it in its vertex shader (the mesh
+  now carries the tenth `warp` value as a vertex attribute and the
+  time-dependent displacement moved into the vertex stage), and the CPU mesh
+  warp interpolates a per-vertex coordinate mesh. For an affine transform the
+  two paths still agree to floating-point precision; the change is visible where
+  the radial zoom or the warp displacement makes the transform nonlinear. The
+  per-vertex block's `x`/`y`/`rad`/`ang` also use the reference aspect now, not
+  the preset's `aspectx`/`aspecty` variables.
+- The visualizer's shader samplers now follow Milkdrop's qualifier semantics:
+  `fc_`/`fw_`/`pc_`/`pw_` (and the swapped `cf_`/`wf_`/`cp_`/`wp_` spellings)
+  select a sampler's wrap and filter mode rather than a different moment in
+  time, so `sampler_main`, `sampler_pc_main`, and `sampler_fw_main` all read the
+  same frame. The prefix is stripped before the generated noise and random
+  textures are resolved, so `sampler_pw_noise_lq` now reads the noise texture
+  instead of the frame. `ShaderSamplerName` is the shared parser,
+  `PixelBuffer.SampleShader` performs the wrap and filter, and the interpreter,
+  the Skia passes, and the OpenGL pipeline all use them. The OpenGL frame
+  texture keeps its own filter and wrap (GL exposes no per-sampler state through
+  `GlInterface`), so a frame sampler's qualifier currently selects only the
+  texture it reads there.
+- The visualizer's warp now applies the reference implementation's
+  time-dependent displacement (the preset's `warp` value, which defaults to
+  one): four travelling sine/cosine waves whose phase depends on the vertex
+  position and whose amplitude is `warp * 0.0035`. It sits between the stretch
+  and the rotation, is computed by `WarpSampling.WarpDisplacement`, and is
+  carried as a tenth mesh value so the CPU warp, the Skia warp pass, and the
+  OpenGL warp shader stay identical. Because the displacement is active by
+  default, an identity warp is no longer exactly identity; this matches the
+  reference.
+- The visualizer's warp now uses the reference implementation's coordinate
+  contract instead of the engine's previous formula: the sample position is
+  scaled by the aspect, divided by the radial zoom, stretched, rotated,
+  translated, and scaled back by the inverse aspect, exactly as the reference
+  warp vertex shader does. The aspect keeps both factors at or below one
+  (`WarpSampling.GetAspect`), so a landscape frame scales the vertical axis by
+  `height/width` and a portrait frame the horizontal axis by `width/height`,
+  matching the reference. `WarpSampling.SamplePosition` stays the single
+  definition, so the CPU warp, the Skia warp pass, and the OpenGL warp fragment
+  shader cannot drift apart.
+- The visualizer's shader blur levels (`GetBlur1`-`GetBlur3`) now use the
+  reference implementation's weighted filter instead of a three-by-three box: a
+  long horizontal pass with eight weighted taps (about thirteen pixels wide)
+  followed by a short vertical pass with four, each level continuing from the
+  one below it. A single box blur is far too narrow, so a preset that feeds the
+  blurred frame into its own maths (the common `GetBlur1` then a `tan` term)
+  amplified the box's hard edges into visible steps. Against projectM the
+  `LuxXx - BadBallz Beta` correlation moved from 0.36-0.41 to 0.40-0.44;
+  `Jc - Crystal Shards` is within the noise, because its remaining difference is
+  the comp and video echo rather than the blur.
+- The visualizer's once-per-second diagnostic line now also reports the
+  brightness of the frame the presenter copied, sampled **before and after** the
+  copy under the presentation lock (`presentBrightness=source:…/destination:…`),
+  so a copy or bitmap fault is told apart from a genuinely white source frame
+  without another round trip. The line is bounded and carries no media names or
+  paths.
+- The visualizer's once-per-second diagnostic line now reports the frame's
+  brightness **per stage** (`stageBrightness=warp:…/blur:…/compShader:…/done:…`)
+  on **every** frame, each value sampled from the buffer that stage reads, so
+  the numbers follow the current frame instead of the first frame the stage
+  trace happens to cover. The saturated share alone says a frame went white; the
+  per-stage brightness says which stage turned it white, and a stale per-stage
+  value is worse than none because it looks authoritative while pointing at the
+  wrong stage. The renderer gained one small `StageBrightnessLogger` hook, and
+  `PixelBuffer.MeanBrightness`/`SaturatedShare` are the shared probes.
+- The visualizer's once-per-second diagnostic line now also reports the rendered
+  frame's **saturated share** and whether the per-pixel program is suspended. A
+  white window is either a genuinely saturated frame or a frame that never
+  reaches the screen, and the saturated share tells those apart because a
+  presentation fault leaves the rendered frame's brightness and saturation
+  untouched. The line already carried the mean brightness, the render size, the
+  shader grid state, the stage timings, and any shader, render, preset, or
+  presentation error.
+- The visualizer's resolution choices now run up to 3840 x 2160 and include 2560
+  x 1440 and 1920 x 1080; the window accepts up to 7680 x 4320 instead of 3840 x
+  2160, so the added choices are not silently clamped. A missing selection falls
+  back to 640 x 360 by value instead of by index, so adding a choice cannot move
+  the default.
+- Parallelized the full-frame visualizer passes and reused the blur scratch.
+  `PixelBuffer.Blur` no longer allocates a copy per pass, and the blur, decay,
+  gamma, centre darkening, video echo, and composite passes now split into row
+  ranges through `ParallelRows.For`, gated by
+  `PresetRenderer.ParallelismEnabled` like the warp; `ParallelWarpTests` proves
+  both paths render identical frames. The built-in presets fell from 39 ms per
+  frame to 12 ms at 480 x 270 and from 70 ms to 21 ms at 640 x 360, so the
+  visualizer now defaults to 640 x 360 at 60 frames per second instead of 480 x
+  270 at 30.
+- Made the compiled SkSL shader passes the visualizer's default.
+  `VisualizerWindow` now creates its `PresetRenderer` with `UseSkiaPasses`
+  enabled, so a comp shader and a warp shader run as Skia runtime effects; the
+  interpreter stays the fallback for anything the Skia path cannot handle. The
+  full-frame passes (the geometric warp, the video echo, the borders, and the
+  composite) stay on the interpreter: measured on the raster Skia surface they
+  were about 2.6 times slower than the interpreter's in-place float passes,
+  because each one converts the whole frame to an eight-bit bitmap and back, so
+  they are gated by the new `PresetRenderer.UseSkiaFramePasses` and off by
+  default. The frame passes' runtime effects are cached for the process, because
+  their SkSL is constant and Skia compiles an effect when it is created.
+  Measured with the built-in presets at the default 480 x 270, the shader-pass
+  cutover costs 39 ms per frame on average against 57 ms before.
+
+### Added
+
+- Settings > Playback > Visualizer now explains that Orynivo ships no
+  third-party presets and offers a **Download presets…** action that opens the
+  projectM `presets-cream-of-the-crop` collection, so a user can add MilkDrop 2
+  presets to the **Preset folder**.
+- Added MilkDrop-style preset blending to the visualizer. A preset switch now
+  cross-fades over a configurable **Preset switch cross-fade duration**
+  (Settings > Playback > Visualizer, default 0 = hard switch). The outgoing
+  preset keeps running and the reference's non-motion per-frame variables
+  (`decay`, the waveform colours and position, both border bands, the
+  motion-vector display, the video echo, `gamma`, and the blur range keys) are
+  eased into the incoming preset with MilkDrop's cosine curve, while the motion
+  variables that drive the warp stay on the incoming preset; a boolean or
+  ordinal switch such as `wrap` or `echo_orient` flips at the blend midpoint
+  instead of landing between two values. On the OpenGL path the warp's sampling
+  coordinate additionally morphs from the outgoing preset's captured mesh to the
+  incoming one, so the geometry eases over the blend too. The switch still
+  continues from the previous preset's feedback instead of restarting from
+  black.
+- Added preset texture files to the visualizer. A shader that declares its own
+  texture, such as `sampler sampler_seaweed;`, now resolves to
+  `textures/seaweed.jpg` (or `.png`, `.bmp`, `.gif`, `.webp`, `.tga`) beside the
+  presets, matching MilkDrop's convention; previously an unknown sampler fell
+  back to the frame, so a preset such as `suksma - frust` looked nothing like
+  MilkDrop. Both the CPU interpreter and the OpenGL pipeline load and bind the
+  same decoded image, and no third-party texture is bundled.
+- Added visualizer preset activation. Settings > Visualisierung gains a **Select
+  presets…** action that opens a themed dialog listing every available preset —
+  the nine built-ins and every `.oryvis` or `.milk` file in the preset folder —
+  each with a checkbox. Deactivated presets are persisted by a stable key
+  (built-in name or preset-relative file path) and skipped when the visualizer
+  opens, steps to the next or previous preset, advances automatically, or
+  responds to the mouse. The dialog carries **All**/**None** actions and an
+  active-count summary, and lists presets without reading the files so a large
+  collection opens instantly.
+- Added a seedable `rand_frame` diagnostic mode to the visualizer renderer. The
+  per-frame random vector still uses `Random.Shared` by default so a preset
+  looks different on every run like the reference, but
+  `PresetRenderer.RandomSeed` draws it from a private generator so successive
+  renders reproduce for A/B comparison; the GL harness exposes this as
+  `GLH_RANDOM_SEED`.
+- Added automatic preset advancement to the visualizer. Settings >
+  Visualisierung gains an enable toggle and a per-preset dwell time in seconds;
+  when enabled the window advances to the next preset after that time. It is off
+  by default and defaults to 15 seconds.
+- Preset switches in the visualizer no longer reset the frame. Like Milkdrop,
+  the new preset continues from the last frame of the previous one: the OpenGL
+  feedback is kept across a switch (cleared only when its size changes), and the
+  CPU path seeds the new renderer with the previous feedback through
+  `PresetRenderer.SeedFeedback`.
+- Added Milkdrop's twenty-four `rot_*` shader matrices. They are `float4x3`,
+  which neither the interpreter's square-matrix pool nor SkSL models, so the
+  engine rewrites the two constructs presets use, the component read
+  `rot_d1[1].y` and the product `mul(uv, rot_d1)`, onto three `float4` column
+  uniforms per matrix. The values follow the reference's row-vector composition
+  (`Rx * T * Rz * Ry`, randomised per preset load with the reference's speed
+  progression, the last four re-randomised every frame), so a preset that reads
+  them as a slowly moving rotation no longer sees a constant zero.
+  `ShaderRotationMatricesTests` pins the rewrite and the columns.
+- Added a Windows-only Winamp MilkDrop capture harness that runs the supplied
+  `vis_milk2.dll` inside an isolated copy of Winamp, plays the comparison tone,
+  records Direct3D frames with playback timestamps, and produces a side-by-side
+  Orynivo comparison. A 300-frame Royal Mashup run now provides a direct Winamp
+  reference instead of relying on projectM as a proxy.
+- Added matched-music comparison for the visualizer: a reference oracle converts
+  a track that FFmpeg can read into one raw 16-bit stereo PCM file both
+  renderers consume, so a comparison runs on the same music instead of a
+  synthetic signal. The converted WAV beside it is what a reference player such
+  as Winamp should play.
+- A per-pixel block that writes the sample position `x` or `y` now runs on the
+  GPU by default. Such a block used to keep the CPU warp, because the mesh
+  cannot interpolate a sample position; it is now emitted as a warp fragment
+  shader that computes the coordinate per pixel instead, and
+  `ORYNIVO_VISUALIZER_PIXELWARP=0` forces the CPU warp.
+  `the GL pixel-warp regression` verifies it: a whole-frame comparison cannot
+  see the warp, because the display frame is dominated by the overlay that both
+  renderers composite identically, so the probe draws the overlay only for the
+  first frames and follows the brightness centroid of the remaining warped
+  feedback. The GPU tracks the CPU reference within 0.08 px over a 23 px travel,
+  and a control preset without the block stays 26 px away, so the probe fails if
+  the block does not reach the GPU.
+- Added a reference-player comparison, which renders a preset — or every preset
+  below a folder — with Orynivo and the reference implementation under identical
+  resolution, frame count, frame time, mesh and audio, writes the frames and a
+  settings manifest, and generates `compare-tone.wav`. That tone is a
+  deterministic 440 Hz stereo signal both renderers synthesize, so a capture
+  from a reference player such as MilkDrop in Winamp can be compared with the
+  renders under the same audio state.
+- Added the GPU comp and warp shader pipeline for the visualizer (opt-in with
+  `ORYNIVO_VISUALIZER_OPENGL=1`). Shader presets now run their comp and warp
+  shaders as GLSL on the GPU at the full render resolution, instead of through
+  the CPU interpreter on a grid capped at 10,000 pixels and shrunk toward 1,024
+  when it overruns the 30 ms budget — which is why the Milk presets looked like
+  roughly 50-pixel pictures. `ShaderTranspiler` gained a GLSL dialect
+  (`TranspileGlsl`, `TranspileGlslComp`, `TranspileGlslWarp`);
+  `VisualizerGlPipeline` compiles it, runs the warp shader in place of the fixed
+  mesh warp, builds the three blur levels the shader's `GetBlur1`-`GetBlur3`
+  read, and runs the comp shader after the post pass into its own display target
+  so the feedback stays the pre-comp frame. The GLSL samples are normalised
+  (Skia's `eval` takes pixels), the vector uniforms are declared as scalars
+  because `GlInterface` only exposes scalar uniform setters, and a shader the
+  dialect cannot express falls back to the CPU path. Verified headlessly with
+  the local GL harness, which emits a real preset's shaders, compiles them in
+  the context, and compares the GPU frame against the CPU reference:
+  `LuxXx - BadBallz Beta` now renders 0.49 against the CPU's 0.53 instead of a
+  saturated white frame, and `martin - neon space ps2`,
+  `martin - lock and release`, and `Jc - Crystal Shards` all run with
+  `glError=0x0`.
+- Added `PresetBrightnessDiagnosticTests`, which renders one configured preset
+  file for a few frames and reports each frame's mean brightness and saturated
+  share, so a preset that turns white can be located to the frame it happens on.
+  Point `ORYNIVO_PRESET_BRIGHTNESS_FILE` at a preset to run it.
+- Added `CompFeedbackTests`, which pins down the comp stage's feedback rule: a
+  comp shader that writes white must paint the display white without whitening
+  the feedback, and an amplifying comp shader must settle instead of diverging.
+- Added `ShaderMatrixTests`, which verifies the two-by-two matrix constructor
+  and `mul` in both argument orders and for two matrices against hand-computed
+  values.
+- Added `PixelBuffer.MeanBrightness` and `PixelBuffer.SaturatedShare`, the
+  strided probes the visualizer diagnostics share.
+- Added `PresetRuntimeDiagnosticTests`, which renders every preset of the
+  configured folder for a few frames and reports the ones whose frame failed at
+  run time, separately counting the interpreter's loop budget. It is the harness
+  that decides whether a preset really loses its picture at run time, because a
+  block that fails to parse costs a preset its motion while a frame that throws
+  costs it the whole picture. Against the 2000-file sample collection it reports
+  0 runtime errors and 0 loop-budget errors, which retracts the roadmap's claim
+  that several presets lose their shaders to the loop budget: that claim had
+  counted a parse failure as a run-time loss.
+- Added the local development harness, a local development harness that renders
+  the visualizer's GPU pipeline without Avalonia. It compiles
+  `Orynivo/Controls/VisualizerGlPipeline.cs` unchanged and supplies its own
+  `Avalonia.OpenGL.GlInterface` over a hidden WGL context, so the real shaders
+  and pass order are verified headlessly and a change to the pipeline's GL calls
+  breaks that build instead of drifting. It writes the GPU and CPU frames side
+  by side and prints the pipeline's one-shot diagnostics.
+- Added the GPU frame pipeline for the visualizer, off by default. With
+  `ORYNIVO_VISUALIZER_OPENGL=1` a preset **without** shaders renders entirely
+  through `Orynivo.Controls.VisualizerGlPipeline`: the warp is a mesh draw whose
+  fragment shader is a translation of `WarpSampling.SamplePosition`, the blur is
+  the same nine-tap box filter, and decay, video echo, centre darkening, both
+  border bands, gamma, and the additive overlay composite share one pass. The
+  CPU supplies only the per-frame block, the per-vertex mesh, and the overlay,
+  which stays a vector drawing. `PresetRenderer.ExpressionsOnly` is the CPU half
+  of that split: it runs the expressions, builds the mesh, and draws the overlay
+  without any pixel pass. A preset with shaders keeps the CPU frame path,
+  because the GL shader dialect is a separate step, and the bitmap presentation
+  stays the fallback. A pipeline failure is logged once and hands the frame back
+  to the CPU.
+- The GPU pipeline's frame textures are sixteen-bit floats when the context
+  exposes `GL_EXT_color_buffer_float` or `GL_EXT_color_buffer_half_float`, and
+  eight-bit colour otherwise. An incomplete framebuffer falls back to eight-bit
+  colour rather than losing the pipeline. Repeated blur and feedback otherwise
+  rounds the frame to eight bits on every pass. On a blur-heavy synthetic preset
+  (five blur passes, 40 frames) the mean channel difference from the CPU
+  reference falls from 9.74 to 9.59 of 255; the remaining difference is
+  structural, not precision.
+- Completed the Core surface a GPU pipeline reads:
+  `PresetRenderer.ReadFrameParameters` publishes the clamped per-frame pass
+  values (decay, blur passes, centre darkening, gamma, video echo, and both
+  border bands) as `VisualizerFrameParameters`, and `RenderOverlayFrame` draws
+  the waveform, spectrum, motion vectors, and shapes into `OverlayFrame` without
+  touching the feedback buffers. A GPU path composites that overlay over its own
+  warped frame instead of re-drawing it.
+- Extracted the warp's sampling arithmetic into
+  `Orynivo.Visualization.WarpSampling`, which is now
+  the single definition of it: the CPU warp calls it per pixel and the GPU
+  warp's fragment shader is its translation, so a GPU warp cannot silently
+  disagree with the reference. `WarpSamplingTests` covers the identity, zoom,
+  offset, rotation, stretch, and radial-exponent cases. The extraction is
+  behaviour-preserving; the mesh and parallel tests still render byte-identical
+  frames.
+- Added the Core-side interface a GPU warp needs. `PresetRenderer.MeshGridX`,
+  `MeshGridY`, and `MeshValues` are public, `MeshRequested` evaluates the
+  per-vertex mesh without switching the CPU picture over, and
+  `TryCopyMeshMotion` copies the per-vertex motion while `MeshSource` exposes
+  the frame the mesh samples. A GPU warp uploads the values as vertex
+  attributes; the CPU keeps evaluating the per-pixel program until the GPU warp
+  replaces it.
+- Added an OpenGL presentation path to the visualizer, off by default. With
+  `ORYNIVO_VISUALIZER_OPENGL=1` the visualizer shows
+  `Orynivo.Controls.VisualizerGlPresenter`, which uploads the finished frame as
+  a texture and draws it with a shader instead of writing a `WriteableBitmap`,
+  and logs the negotiated GL version once through the diagnostics log. The
+  preset pipeline still renders on the CPU; this is the first step of roadmap
+  40f and proves the context, the shader compilation, the vertex buffer, and the
+  texture upload. Avalonia 12 negotiates OpenGL ES 3.0 through ANGLE on Windows.
+  Nothing changes unless the variable is set, and the bitmap presentation stays
+  the fallback.
+- Added the per-vertex mesh warp as an opt-in.
+  `PresetRenderer.MeshPerPixelEnabled` makes the warp stage evaluate the
+  preset's per-pixel program once per 64 x 48 mesh vertex and interpolate the
+  motion it produced across the quad, which is what Milkdrop's per-vertex
+  program does, instead of running it for every screen pixel. The interpolation
+  is a lerp, so a program that writes a constant motion is byte-identical to the
+  per-pixel path; a program that writes `x` or `y`, records motion vectors, or
+  feeds a warp shader keeps the per-pixel path, because an interpolated sample
+  position has no meaning. It is off by default: the engine's per-pixel `x`/`y`
+  are the warped position in minus-one-to-one space rather than Milkdrop's
+  aspect-scaled zero-to-one vertex position, so a preset that derives an offset
+  from them renders visibly differently once that offset is interpolated, and
+  that has to be reconciled before the mesh can become the default.
+- Added the local development harness, a local development harness that renders
+  a preset with the reference implementation (projectM) and with Orynivo and
+  reports the per-frame mean channel difference and correlation. It links a
+  projectM checkout the developer builds separately; no projectM source is
+  copied into the repository and no Orynivo artifact contains or links it.
+- Added `PresetSkiaComparisonDiagnosticTests`, which renders a sample of a real
+  collection with and without `PresetRenderer.UseSkiaPasses` and reports how far
+  the two pictures drift, grouped by whether the preset has a warp shader, a
+  comp shader, a per-pixel block, or none. It is the validation harness the
+  cutover needs.
+- Moved the comp shader's own per-pixel expression block onto the GPU.
+  `ShaderTranspiler.TranspileComp` emits `comp_N_per_pixel` into the same
+  runtime effect as the comp shader, seeding its `x`, `y`, `rad`, and `ang` from
+  the pixel position, and `SkiaShaderRunner.CompPass` seeds the block's
+  uniforms. `PresetRenderer` no longer requires the block to be empty, so a comp
+  shader with a per-pixel block runs on the Skia path; a block that cannot be
+  emitted still keeps the interpreter. The block has no effect on a compiled
+  (straight-line) shader, which is the reference the Skia path uses, so the
+  picture is unchanged.
+- Emitted the preset per-pixel expression block as SkSL so the warp stage can
+  run on the GPU without the per-pixel-block condition. `PresetCompiler` now
+  parses a block once into a `PresetSyntaxNode` tree that both the LINQ
+  interpreter back end and the new `PresetExpressionTranspiler` consume, so the
+  two paths cannot disagree about a block. The emitter reports the uniforms the
+  caller has to seed, maps the engine-bound `x`, `y`, `rad`, and `ang` onto
+  locals, and refuses `megabuf`/`gmegabuf` and `rand`, which stay on the
+  interpreter. Against a 500-file sample all 315 global per-pixel blocks
+  translate. `ShaderTranspiler.TranspileWarp` composes the block with a warp
+  shader (or a direct frame sample) into a warped-`uv` entry point, and
+  `SkiaShaderRunner.WarpPass` runs it over the previous frame; the renderer uses
+  it for a preset with at most one warp shader, no per-shader per-frame block,
+  no motion recording, and a per-pixel program whose written values are assigned
+  before they are read, so the GPU never has to reproduce a value carried from
+  the previous pixel. Against the same sample 249 of the 315 global blocks
+  qualify and all 249 translate and are accepted by Skia. Anything else keeps
+  the interpreter, which stays the reference and the fallback, and the passes
+  remain opt-in through `PresetRenderer.UseSkiaPasses`. The two SkSL emitters
+  now share the naming and type helpers in `SkSL`.
+- Moved the geometric warp onto the GPU. `SkiaShaderRunner.Warp` applies the
+  Milkdrop motion transform (centre, stretch, rotate, zoom, zoom exponent, and
+  offset) and reads the previous frame bilinearly, leaving a sample outside the
+  frame black the way `PixelBuffer.SampleBilinear` does. The renderer uses it
+  for a preset whose per-pixel block and warp shader are empty; a preset that
+  evaluates expressions per pixel keeps the interpreter, which is the reference
+  for those.
+- Moved the borders onto the GPU. `SkiaShaderRunner.Borders` draws the outer and
+  inner Milkdrop border bands as a Skia runtime effect, computing each pixel's
+  distance to the inset rectangle the way `PresetRenderer.DrawBorderFrame` does,
+  and the renderer uses it when the pass flag is enabled.
+- Moved the composite onto the GPU. `SkiaShaderRunner.Composite` adds the warped
+  frame onto the overlay frame with the same clamp the CPU pass applies, and the
+  renderer uses it when the pass flag is enabled.
+- Moved the video echo onto the GPU. `SkiaShaderRunner.VideoEcho` reproduces the
+  zoom, the optional horizontal or vertical flip, the alpha blend, and the
+  leave-untouched rule of `PresetRenderer.ApplyVideoEcho` as a Skia runtime
+  effect, and the renderer uses it when the pass flag is enabled. The flag is
+  now the general `PresetRenderer.UseSkiaPasses` because it gates the comp
+  shader and the frame passes together.
+- Moved the blur pass onto the GPU. `SkiaShaderRunner.BlurFrame` reproduces
+  `PixelBuffer.Blur`'s nine-tap clamped box filter as a Skia runtime effect, and
+  the Skia comp pass now builds its blur levels as a chain of those passes over
+  the composited frame instead of pre-blurring on the CPU. The frame-helper
+  translation also scales the `GetBlur1`-`GetBlur3` coordinate by `texsize`,
+  which is what the interpreter's normalised sample expects; the missing scale
+  made the GPU read the wrong texels whenever the frame was not the same size as
+  the blur buffer.
+- Added the first GPU pass: a comp shader with no per-pixel block now runs as a
+  Skia runtime effect over the renderer's frames instead of the CPU interpreter.
+  `SkiaShaderRunner` binds one frame per sampler (the composited frame, its blur
+  levels, and the previous frame), the generated noise and volume textures, and
+  the scalar and vector uniforms, and each sampler is scaled by its own
+  `texsize_*` so the noise textures are sampled at their real size instead of
+  the frame size. It is opt-in through `PresetRenderer.UseSkiaPasses` because
+  the Skia path carries the frame through eight-bit textures and therefore
+  differs from the interpreter by up to one level; the interpreter stays the
+  fallback, and the CPU/GPU tests keep the two within a level.
 
 ## [0.45.0] - 2026-09-20
 
