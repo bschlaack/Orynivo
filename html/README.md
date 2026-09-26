@@ -1,10 +1,11 @@
 # Orynivo Product Website
 
-Static, responsive product website for Orynivo. English is the default
-language; German, French, Spanish, Russian, Simplified Chinese, and Hindi are directly selectable. All required
-files and media assets live in this directory. Search engines receive static
-localized pages at `/`, `/de/`, `/fr/`, `/es/`, `/ru/`, `/zh/`, and `/hi/`, complete with canonical
-URLs, hreflang references, and structured software data.
+Static, responsive product website for Orynivo. English is the default language;
+German, French, Spanish, Russian, Simplified Chinese, and Hindi are directly
+selectable. All required files and media assets live in this directory. Search
+engines receive static localized pages at `/`, `/de/`, `/fr/`, `/es/`, `/ru/`,
+`/zh/`, and `/hi/`, complete with canonical URLs, hreflang references, and
+structured software data.
 
 All application screenshots use the fictional Neon Harbor demo library. Keep
 future website captures free of real library names, covers, playback history,
@@ -20,10 +21,10 @@ node html/generate-localized-pages.js
 
 All seven languages use the same named fields in `i18n.js`; no supplemental
 RU/ZH dictionaries or positional translation arrays are used. Metadata and
-gallery titles are shared by the generator and browser. Missing resource
-values fail validation. Accessible labels and image descriptions are generated
-in the selected language as well. Run `node scripts/verify-localization.cjs`
-from the repository root after regeneration.
+gallery titles are shared by the generator and browser. Missing resource values
+fail validation. Accessible labels and image descriptions are generated in the
+selected language as well. Run `node scripts/verify-localization.cjs` from the
+repository root after regeneration.
 
 With Node.js and Playwright available, run
 `node scripts/verify-website-locales.cjs` to exercise all language pages,

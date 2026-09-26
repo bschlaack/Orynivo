@@ -12,6 +12,8 @@ Native/AsioBridge/**/x64/
 Native/CwAsioBridge/**/x64/
 third_party/asiosdk/
 external/asiosdk/
+scripts/local/
+VISUALIZER-PRESET-CHECK.md
 errors/
 equalizer/
 Logo/Orynivo_Logo.ai

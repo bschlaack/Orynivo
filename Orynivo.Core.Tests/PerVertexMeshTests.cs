@@ -1,0 +1,299 @@
+using Orynivo.Visualization;
+using Xunit;
+
+namespace Orynivo.Core.Tests;
+
+/// <summary>
+/// Verifies the per-vertex mesh of the warp stage: Milkdrop evaluates the per-pixel program once per
+/// mesh vertex and interpolates the motion across the quad, so a program that writes a constant has
+/// to produce exactly the per-pixel result while a program that varies with the position is the
+/// coarser, interpolated picture.
+/// </summary>
+public sealed class PerVertexMeshTests
+{
+    /// <summary>Every vertex starts from frame motion, including when its equations use compound assignments.</summary>
+    [Fact]
+    public void RenderFrame_MeshReseedsMotionForEveryVertex()
+    {
+        var renderer = new PresetRenderer(VisualizerPreset.Parse("""
+            zoom=1.2
+            zoomexp=1
+            rot=0.1
+            cx=0.5
+            cy=0.5
+            dx=0.01
+            dy=0.02
+            sx=1
+            sy=1
+            warp=0.3
+            per_pixel_1=zoom+=0.1; zoomexp+=0.2; rot+=0.01; cx+=0.02; cy-=0.02; dx+=0.01; dy-=0.01; sx*=1.1; sy*=0.9; warp+=0.1; dx+=warp;
+            """), 40, 40)
+        {
+            ExpressionsOnly = true,
+            MeshRequested = true,
+        };
+        float[] expected = [1.3f, 1.2f, 0.11f, 0.52f, 0.48f, 0.42f, 0.01f, 1.1f, 0.9f];
+        for (var frame = 0; frame < 2; frame++)
+        {
+            renderer.RenderFrame(new FakeAudio(), 1d / 60d);
+            var mesh = new float[(PresetRenderer.MeshGridX + 1) * (PresetRenderer.MeshGridY + 1) * PresetRenderer.MeshValues];
+            Assert.True(renderer.TryCopyMeshMotion(mesh, out _, out _));
+            for (var vertex = 0; vertex < mesh.Length; vertex += PresetRenderer.MeshValues)
+                for (var component = 0; component < expected.Length; component++)
+                    Assert.Equal(expected[component], mesh[vertex + component], 5);
+        }
+    }
+
+    /// <summary>
+    /// A constant motion value transforms to the same affine coordinate everywhere, so both paths
+    /// agree to floating-point precision. They are not byte-identical, because the mesh transforms at
+    /// the vertices and interpolates the coordinate while the per-pixel path transforms per pixel.
+    /// </summary>
+    [Theory]
+    [InlineData("zoom = 1.05;")]
+    [InlineData("zoom = 1.02; rot = 0.03;")]
+    [InlineData("cx = 0.1; cy = -0.05; sx = 1.1; sy = 0.95;")]
+    [InlineData("zoom = 1.03; dx = 0.01; dy = -0.02;")]
+    public void RenderFrame_MeshMatchesThePerPixelPathForAConstantMotion(string perPixel)
+    {
+        var mesh = Render(perPixel, mesh: true);
+        var perPixelPath = Render(perPixel, mesh: false);
+
+        Assert.Equal(perPixelPath.Length, mesh.Length);
+        for (var index = 0; index < mesh.Length; index++)
+            Assert.InRange(Math.Abs(perPixelPath[index] - mesh[index]), 0f, 5e-4f);
+    }
+
+    /// <summary>A motion that varies with the position is interpolated, so the mesh differs.</summary>
+    [Theory]
+    [InlineData("zoom = 1.02 + 0.04 * x;")]
+    [InlineData("cx = 0.5 * x; cy = 0.5 * y;")]
+    [InlineData("rot = 0.2 * x;")]
+    public void RenderFrame_MeshInterpolatesAVaryingMotion(string perPixel)
+    {
+        var mesh = Render(perPixel, mesh: true);
+        var perPixelPath = Render(perPixel, mesh: false);
+
+        Assert.NotEqual(perPixelPath, mesh);
+    }
+
+    /// <summary>
+    /// A program that writes the sample position has no interpolated meaning, so it keeps the
+    /// per-pixel path and the mesh setting cannot change its picture.
+    /// </summary>
+    [Fact]
+    public void RenderFrame_PositionWritingProgramKeepsThePerPixelPath()
+    {
+        const string perPixel = "x = x + 0.01; y = y + 0.02;";
+        var mesh = Render(perPixel, mesh: true);
+        var perPixelPath = Render(perPixel, mesh: false);
+
+        Assert.Equal(perPixelPath, mesh);
+    }
+
+    /// <summary>
+    /// A GPU warp needs the mesh values while the CPU keeps evaluating per pixel, so
+    /// <c>MeshRequested</c> builds the mesh and exposes it without changing the CPU picture.
+    /// </summary>
+    [Fact]
+    public void RenderFrame_MeshRequestedExposesTheMeshWithoutChangingThePicture()
+    {
+        const string perPixel = "zoom = 1.02 + 0.04 * x;";
+        var text = "decay = 1;\nper_frame_1=wave_a = 1;\nper_pixel_1=" + perPixel;
+
+        var without = new PresetRenderer(VisualizerPreset.Parse(text), 200, 150) { ParallelismEnabled = false };
+        var with = new PresetRenderer(VisualizerPreset.Parse(text), 200, 150)
+        {
+            ParallelismEnabled = false,
+            MeshRequested = true,
+        };
+        var audio = new FakeAudio();
+        for (var frame = 0; frame < 3; frame++)
+        {
+            without.RenderFrame(audio, 1d / 60d);
+            with.RenderFrame(audio, 1d / 60d);
+        }
+
+        // The CPU picture is the per-pixel one in both cases, so the mesh build must not change it.
+        Assert.Equal(without.Output.Pixels.ToArray(), with.Output.Pixels.ToArray());
+
+        var mesh = new float[(PresetRenderer.MeshGridX + 1) * (PresetRenderer.MeshGridY + 1) * PresetRenderer.MeshValues];
+        Assert.True(with.TryCopyMeshMotion(mesh, out var meshX, out var meshY));
+        Assert.Equal(PresetRenderer.MeshGridX, meshX);
+        Assert.Equal(PresetRenderer.MeshGridY, meshY);
+        // Milkdrop hands the program the aspect-scaled vertex position in zero-to-one space. The
+        // reference aspect is one in landscape, so the first vertex sits at zero and the last at one;
+        // a zoom that grows with x is therefore exactly the constant term at the first vertex and
+        // above it at the last.
+        Assert.True(mesh[0] <= 1.02f, $"zoom at the first vertex was {mesh[0]}");
+        var last = mesh.Length - PresetRenderer.MeshValues;
+        Assert.True(mesh[last] > 1.02f, $"zoom at the last vertex was {mesh[last]}");
+    }
+
+    /// <summary>
+    /// A preset with no per-pixel motion still gets a mesh when one is requested, because a GPU warp
+    /// needs a mesh for every preset; the mesh is then the uniform frame motion.
+    /// </summary>
+    [Fact]
+    public void RenderFrame_ExposesAUniformMeshWithoutPerPixelMotion()
+    {
+        var renderer = new PresetRenderer(VisualizerPreset.Parse("decay = 1;\nzoom=1.5"), 40, 40)
+        {
+            MeshRequested = true,
+        };
+        renderer.RenderFrame(new FakeAudio(), 1d / 60d);
+
+        var mesh = new float[(PresetRenderer.MeshGridX + 1) * (PresetRenderer.MeshGridY + 1) * PresetRenderer.MeshValues];
+        Assert.True(renderer.TryCopyMeshMotion(mesh, out _, out _));
+        // Every vertex carries the frame's zoom.
+        for (var vertex = 0; vertex < mesh.Length; vertex += PresetRenderer.MeshValues)
+            Assert.Equal(1.5f, mesh[vertex], 4);
+        Assert.NotNull(renderer.MeshSource);
+    }
+
+    /// <summary>Without a request, a preset with no per-pixel motion exposes no mesh.</summary>
+    [Fact]
+    public void RenderFrame_ExposesNoMeshWithoutARequest()
+    {
+        var renderer = new PresetRenderer(VisualizerPreset.Parse("decay = 1;"), 40, 40);
+        renderer.RenderFrame(new FakeAudio(), 1d / 60d);
+
+        var mesh = new float[(PresetRenderer.MeshGridX + 1) * (PresetRenderer.MeshGridY + 1) * PresetRenderer.MeshValues];
+        Assert.False(renderer.TryCopyMeshMotion(mesh, out _, out _));
+    }
+
+    /// <summary>
+    /// The expressions-only mode is the CPU half of the GPU split: it still runs the per-frame block,
+    /// builds the mesh, and draws the overlay, but skips every pixel pass.
+    /// </summary>
+    [Fact]
+    public void RenderFrame_ExpressionsOnlyBuildsTheMeshAndTheOverlay()
+    {
+        var renderer = new PresetRenderer(
+            VisualizerPreset.Parse("decay = 1;\nzoom=1.25\nwave_alpha=1;\nper_pixel_1=rot = 0.1 * x;"),
+            40,
+            40)
+        {
+            ExpressionsOnly = true,
+            MeshRequested = true,
+        };
+        renderer.RenderFrame(new FakeAudio(), 1d / 60d);
+
+        var mesh = new float[(PresetRenderer.MeshGridX + 1) * (PresetRenderer.MeshGridY + 1) * PresetRenderer.MeshValues];
+        Assert.True(renderer.TryCopyMeshMotion(mesh, out _, out _));
+        // The overlay is drawn, so the overlay frame is not empty.
+        var overlay = renderer.OverlayFrame.Pixels;
+        var any = false;
+        for (var index = 0; index < overlay.Length; index++)
+            any |= overlay[index] > 0f;
+        Assert.True(any, "the overlay should be drawn in expressions-only mode");
+    }
+
+    /// <summary>
+    /// A per-pixel block that writes the sample position still gets a mesh when the GPU evaluates
+    /// that block in its warp fragment shader: the mesh is the source of the motion values the
+    /// fragment shader seeds from, so the CPU can stop evaluating the block itself. Without that
+    /// flag the same preset exposes no mesh, which is what sends it to the CPU frame path.
+    /// </summary>
+    [Fact]
+    public void RenderFrame_PixelWarpBuildsTheMeshWhileThePlainExpressionPathDoesNot()
+    {
+        var preset = VisualizerPreset.Parse("decay = 1;\nzoom=1.25\nwave_alpha=1;\nper_pixel_1=x = x + 0.1;");
+        var mesh = new float[(PresetRenderer.MeshGridX + 1) * (PresetRenderer.MeshGridY + 1) * PresetRenderer.MeshValues];
+
+        var pixelWarp = new PresetRenderer(preset, 40, 40)
+        {
+            ExpressionsOnly = true,
+            MeshRequested = true,
+            MeshForPixelWarp = true,
+        };
+        pixelWarp.RenderFrame(new FakeAudio(), 1d / 60d);
+        Assert.True(pixelWarp.TryCopyMeshMotion(mesh, out _, out _));
+        // Every vertex carries the frame's zoom, so the pixel-warp uniforms have a source.
+        for (var vertex = 0; vertex < mesh.Length; vertex += PresetRenderer.MeshValues)
+            Assert.Equal(1.25f, mesh[vertex], 4);
+
+        var plain = new PresetRenderer(preset, 40, 40)
+        {
+            ExpressionsOnly = true,
+            MeshRequested = true,
+        };
+        plain.RenderFrame(new FakeAudio(), 1d / 60d);
+        Assert.False(plain.TryCopyMeshMotion(mesh, out _, out _));
+    }
+
+    /// <summary>Renders a preset with a visible overlay so the feedback carries a picture.</summary>
+
+    /// <param name="perPixel">Per-pixel program text.</param>
+    /// <param name="mesh">Whether the mesh path is enabled.</param>
+    /// <returns>The rendered pixels of the last frame.</returns>
+    private static float[] Render(string perPixel, bool mesh)
+    {
+        // The mesh is 64 x 48, so the frame has to be larger than it for the interpolation to
+        // show; at the default render size it is. The time-dependent warp displacement is switched
+        // off so the transform stays affine and the constant-motion case is exact.
+        var text = "decay = 1;\nwarp=0\nper_frame_1=wave_a = 1;\nper_pixel_1=" + perPixel;
+        var renderer = new PresetRenderer(VisualizerPreset.Parse(text), 200, 150)
+
+        {
+            MeshPerPixelEnabled = mesh,
+            ParallelismEnabled = false,
+        };
+        for (var frame = 0; frame < 4; frame++)
+            renderer.RenderFrame(new FakeAudio(), 1d / 60d);
+
+        return renderer.Output.Pixels.ToArray();
+    }
+
+    /// <summary>Position inputs and motion outputs coexist in a MilkDrop vertex program.</summary>
+    [Fact]
+    public void RenderFrame_PositionWritingMotionStillChangesMeshOffsets()
+    {
+        var preset = VisualizerPreset.Parse("per_pixel_1=x = 0.5 + (x - 0.5) * 0.8;\nper_pixel_2=dx = x * 0.2;");
+        using var renderer = new PresetRenderer(preset, 80, 60)
+        {
+            ExpressionsOnly = true,
+            MeshRequested = true,
+            MeshForPixelWarp = true,
+        };
+        Assert.True(renderer.PerPixelWritesMotion);
+        renderer.RenderFrame(new FakeAudio(), 1d / 60d);
+
+        var mesh = new float[(PresetRenderer.MeshGridX + 1) * (PresetRenderer.MeshGridY + 1) * PresetRenderer.MeshValues];
+        Assert.True(renderer.TryCopyMeshMotion(mesh, out _, out _));
+        Assert.True(mesh[5] < mesh[(PresetRenderer.MeshGridX * PresetRenderer.MeshValues) + 5]);
+    }
+
+    /// <summary>A source that reports fixed levels and a sine waveform.</summary>
+    private sealed class FakeAudio : IVisualizerAudioSource
+    {
+        private readonly float[] _bands = [0.6f, 0.5f, 0.4f, 0.3f];
+        private readonly float[] _waveform = new float[64];
+
+        /// <summary>Creates the source.</summary>
+        public FakeAudio()
+        {
+            for (var index = 0; index < _waveform.Length; index++)
+                _waveform[index] = (float)Math.Sin(index * 0.2);
+        }
+
+        /// <inheritdoc/>
+        public ReadOnlySpan<float> Bands => _bands;
+
+        /// <inheritdoc/>
+        public ReadOnlySpan<float> Waveform => _waveform;
+
+        /// <inheritdoc/>
+        public float Volume => _bands[0];
+
+        /// <inheritdoc/>
+        public float Bass => _bands[0];
+
+        /// <inheritdoc/>
+        public float Mid => _bands[1];
+
+        /// <inheritdoc/>
+        public float Treble => _bands[2];
+    }
+}
+

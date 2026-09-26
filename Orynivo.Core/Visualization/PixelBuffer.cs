@@ -1,0 +1,428 @@
+namespace Orynivo.Visualization;
+
+/// <summary>
+/// A floating-point RGBA framebuffer. The visualizer works in floats because the feedback
+/// loop samples and re-blends the previous frame every frame; rounding to bytes each pass
+/// would visibly band the picture. The buffer is rendered at a low resolution and scaled up
+/// by the presenter, which is what keeps CPU rendering viable.
+/// </summary>
+public sealed class PixelBuffer
+{
+    private readonly float[] _pixels;
+
+    /// <summary>
+    /// Scratch copy of the previous blur pass, allocated once and reused. A blur needs a snapshot of
+    /// the frame it reads, and allocating that every pass added garbage to every frame.
+    /// </summary>
+    private float[]? _blurScratch;
+
+    /// <summary>Creates a buffer of the given size.</summary>
+    /// <param name="width">Buffer width in pixels.</param>
+    /// <param name="height">Buffer height in pixels.</param>
+    /// <exception cref="ArgumentOutOfRangeException">A dimension is not positive.</exception>
+    public PixelBuffer(int width, int height)
+    {
+        ArgumentOutOfRangeException.ThrowIfLessThan(width, 1);
+        ArgumentOutOfRangeException.ThrowIfLessThan(height, 1);
+        Width = width;
+        Height = height;
+        _pixels = new float[width * height * 4];
+    }
+
+    /// <summary>Gets the buffer width in pixels.</summary>
+    public int Width { get; }
+
+    /// <summary>Gets the buffer height in pixels.</summary>
+    public int Height { get; }
+
+    /// <summary>Gets the raw RGBA samples in the range zero to one.</summary>
+    public Span<float> Pixels => _pixels;
+
+    /// <summary>Gets the backing array, for a caller that needs a stable reference to it.</summary>
+    internal float[] RawPixels => _pixels;
+
+    /// <summary>
+    /// Measures the mean RGB brightness of the buffer over a fixed strided sample. It is the cheap
+    /// probe the diagnostics use to tell a black frame from a white one, so it never walks every
+    /// pixel of a full-resolution frame.
+    /// </summary>
+    /// <returns>The mean channel value, or zero for an empty buffer.</returns>
+    public float MeanBrightness()
+    {
+        var total = 0f;
+        var samples = 0;
+        for (var index = 0; index + 2 < _pixels.Length; index += 64)
+        {
+            total += _pixels[index] + _pixels[index + 1] + _pixels[index + 2];
+            samples += 3;
+        }
+
+        return samples == 0 ? 0f : total / samples;
+    }
+
+    /// <summary>
+    /// Measures the share of sampled pixels whose red, green, and blue channels are all saturated.
+    /// A frame that renders white is either genuinely saturated or never reaches the screen, and
+    /// this share tells those apart because a presentation fault leaves it untouched.
+    /// </summary>
+    /// <returns>The saturated share in the range zero to one.</returns>
+    public float SaturatedShare()
+    {
+        var saturated = 0;
+        var sampled = 0;
+        for (var index = 0; index + 2 < _pixels.Length; index += 64)
+        {
+            sampled++;
+            if (_pixels[index] >= 0.99f && _pixels[index + 1] >= 0.99f && _pixels[index + 2] >= 0.99f)
+                saturated++;
+        }
+
+        return sampled == 0 ? 0f : saturated / (float)sampled;
+    }
+
+    /// <summary>Sets every sample to zero.</summary>
+    public void Clear() => Array.Clear(_pixels);
+
+    /// <summary>Copies another buffer of the same size into this one.</summary>
+    /// <param name="source">Source buffer.</param>
+    /// <exception cref="ArgumentException">The sizes differ.</exception>
+    public void CopyFrom(PixelBuffer source)
+    {
+        ArgumentNullException.ThrowIfNull(source);
+        if (source.Width != Width || source.Height != Height)
+            throw new ArgumentException("The buffers must have the same size.", nameof(source));
+
+        source._pixels.CopyTo(_pixels, 0);
+    }
+
+    /// <summary>Multiplies every sample by a factor, which fades the feedback image.</summary>
+    /// <param name="factor">Factor in the range zero to one.</param>
+    /// <param name="parallel">Whether the pass may use more than one thread.</param>
+    public void Scale(float factor, bool parallel = true)
+    {
+        var pixels = _pixels;
+        var stride = Width * 4;
+        ParallelRows.For(parallel, Height, (worker, from, to) =>
+        {
+            var start = from * stride;
+            var end = to * stride;
+            for (var index = start; index < end; index++)
+                pixels[index] *= factor;
+        });
+    }
+
+    /// <summary>Reads one channel of one pixel.</summary>
+    /// <param name="x">Pixel column; out-of-range coordinates are clamped.</param>
+    /// <param name="y">Pixel row; out-of-range coordinates are clamped.</param>
+    /// <param name="channel">Channel index, zero to three.</param>
+    /// <returns>The channel value.</returns>
+    public float GetPixel(int x, int y, int channel)
+    {
+        var clampedX = Math.Clamp(x, 0, Width - 1);
+        var clampedY = Math.Clamp(y, 0, Height - 1);
+        return _pixels[(((clampedY * Width) + clampedX) * 4) + Math.Clamp(channel, 0, 3)];
+    }
+
+    /// <summary>Adds a colour to one pixel, saturating at one.</summary>
+    /// <param name="x">Pixel column.</param>
+    /// <param name="y">Pixel row.</param>
+    /// <param name="red">Red amount.</param>
+    /// <param name="green">Green amount.</param>
+    /// <param name="blue">Blue amount.</param>
+    public void AddPixel(int x, int y, float red, float green, float blue)
+    {
+        if (x < 0 || y < 0 || x >= Width || y >= Height)
+            return;
+
+        var offset = ((y * Width) + x) * 4;
+        _pixels[offset] = Math.Clamp(_pixels[offset] + red, 0f, 1f);
+        _pixels[offset + 1] = Math.Clamp(_pixels[offset + 1] + green, 0f, 1f);
+        _pixels[offset + 2] = Math.Clamp(_pixels[offset + 2] + blue, 0f, 1f);
+        _pixels[offset + 3] = 1f;
+    }
+
+    /// <summary>
+    /// Samples a pixel at normalized coordinates with bilinear filtering. Coordinates outside
+    /// the frame return transparent black instead of clamping to the edge, because a clamped
+    /// edge smears the border colour into long streaks when a preset zooms or warps outwards.
+    /// </summary>
+    /// <param name="u">Horizontal coordinate, where zero is the left edge and one the right.</param>
+    /// <param name="v">Vertical coordinate, where zero is the top edge and one the bottom.</param>
+    /// <param name="destination">Destination for the four channel values.</param>
+    public void SampleBilinear(float u, float v, Span<float> destination)
+    {
+        if (destination.Length < 4)
+            throw new ArgumentException("The destination must hold four channels.", nameof(destination));
+
+        if (u is < 0f or > 1f || v is < 0f or > 1f || float.IsNaN(u) || float.IsNaN(v))
+        {
+            destination[0] = destination[1] = destination[2] = destination[3] = 0f;
+            return;
+        }
+
+        var x = (u * (Width - 1));
+        var y = (v * (Height - 1));
+        var x0 = (int)x;
+        var y0 = (int)y;
+        var x1 = Math.Min(x0 + 1, Width - 1);
+        var y1 = Math.Min(y0 + 1, Height - 1);
+        var fx = x - x0;
+        var fy = y - y0;
+
+        for (var channel = 0; channel < 4; channel++)
+        {
+            var topLeft = _pixels[(((y0 * Width) + x0) * 4) + channel];
+            var topRight = _pixels[(((y0 * Width) + x1) * 4) + channel];
+            var bottomLeft = _pixels[(((y1 * Width) + x0) * 4) + channel];
+            var bottomRight = _pixels[(((y1 * Width) + x1) * 4) + channel];
+            var top = topLeft + ((topRight - topLeft) * fx);
+            var bottom = bottomLeft + ((bottomRight - bottomLeft) * fx);
+            destination[channel] = top + ((bottom - top) * fy);
+        }
+    }
+
+    /// <summary>
+    /// Samples a pixel the way a qualified shader sampler does: the coordinate is wrapped or clamped
+    /// first, then read with either bilinear filtering or the nearest texel. This is the sampling
+    /// behaviour of Milkdrop's <c>fw_</c>/<c>fc_</c>/<c>pw_</c>/<c>pc_</c> sampler prefixes.
+    /// </summary>
+    /// <param name="u">Horizontal coordinate, where zero is the left edge and one the right.</param>
+    /// <param name="v">Vertical coordinate, where zero is the top edge and one the bottom.</param>
+    /// <param name="wrap">Whether coordinates outside the frame repeat or clamp to the edge.</param>
+    /// <param name="nearest">Whether the nearest texel is read instead of filtering between texels.</param>
+    /// <param name="destination">Destination for the four channel values.</param>
+    public void SampleShader(float u, float v, VisualizerTextureWrap wrap, bool nearest, Span<float> destination)
+    {
+        if (destination.Length < 4)
+            throw new ArgumentException("The destination must hold four channels.", nameof(destination));
+
+        if (float.IsNaN(u) || float.IsNaN(v))
+        {
+            destination[0] = destination[1] = destination[2] = destination[3] = 0f;
+            return;
+        }
+
+        if (wrap == VisualizerTextureWrap.Repeat)
+        {
+            u -= MathF.Floor(u);
+            v -= MathF.Floor(v);
+        }
+        else
+        {
+            u = Math.Clamp(u, 0f, 1f);
+            v = Math.Clamp(v, 0f, 1f);
+        }
+
+        if (nearest)
+        {
+            var x = Math.Clamp((int)(u * Width), 0, Width - 1);
+            var y = Math.Clamp((int)(v * Height), 0, Height - 1);
+            var offset = ((y * Width) + x) * 4;
+            for (var channel = 0; channel < 4; channel++)
+                destination[channel] = _pixels[offset + channel];
+            return;
+        }
+
+        var fx = u * (Width - 1);
+        var fy = v * (Height - 1);
+        var x0 = (int)fx;
+        var y0 = (int)fy;
+        var x1 = Math.Min(x0 + 1, Width - 1);
+        var y1 = Math.Min(y0 + 1, Height - 1);
+        var dx = fx - x0;
+        var dy = fy - y0;
+        for (var channel = 0; channel < 4; channel++)
+        {
+            var topLeft = _pixels[(((y0 * Width) + x0) * 4) + channel];
+            var topRight = _pixels[(((y0 * Width) + x1) * 4) + channel];
+            var bottomLeft = _pixels[(((y1 * Width) + x0) * 4) + channel];
+            var bottomRight = _pixels[(((y1 * Width) + x1) * 4) + channel];
+            var top = topLeft + ((topRight - topLeft) * dx);
+            var bottom = bottomLeft + ((bottomRight - bottomLeft) * dx);
+            destination[channel] = top + ((bottom - top) * dy);
+        }
+    }
+
+    /// <summary>Applies one three-by-three box blur pass, softening the feedback image.</summary>
+    /// <param name="parallel">Whether the pass may use more than one thread.</param>
+    public void Blur(bool parallel = true)
+    {
+        // The scratch copy is reused across passes; the blur is row-independent, because a pixel
+        // reads the untouched copy and writes only itself.
+        _blurScratch ??= new float[_pixels.Length];
+        var copy = _blurScratch;
+        _pixels.CopyTo(copy, 0);
+        var pixels = _pixels;
+        var width = Width;
+        var height = Height;
+        ParallelRows.For(parallel, height, (worker, from, to) =>
+        {
+            for (var y = from; y < to; y++)
+            {
+                for (var x = 0; x < width; x++)
+                {
+                    var offset = ((y * width) + x) * 4;
+                    for (var channel = 0; channel < 4; channel++)
+                    {
+                        var sum = 0f;
+                        for (var dy = -1; dy <= 1; dy++)
+                        {
+                            var sampleY = Math.Clamp(y + dy, 0, height - 1);
+                            for (var dx = -1; dx <= 1; dx++)
+                            {
+                                var sampleX = Math.Clamp(x + dx, 0, width - 1);
+                                sum += copy[(((sampleY * width) + sampleX) * 4) + channel];
+                            }
+                        }
+
+                        pixels[offset + channel] = sum / 9f;
+                    }
+                }
+            }
+        });
+    }
+
+    /// <summary>
+    /// Applies one pass of the reference implementation's blur. It is a long horizontal pass with
+    /// eight weighted taps or a short vertical pass with four, and it is what a shader's
+    /// <c>GetBlur1</c>-<c>GetBlur3</c> read: a single three-by-three box is far too narrow and leaves
+    /// the hard edges a preset's own maths then amplifies.
+    /// </summary>
+    /// <param name="horizontal">Whether to blur along x (long) or y (short).</param>
+    public void BlurReference(bool horizontal)
+    {
+        // The reference weights, split into the two taps on either side of the centre.
+        ReadOnlySpan<float> weights = [4.0f, 3.8f, 3.5f, 2.9f, 1.9f, 1.2f, 0.7f, 0.3f];
+        _blurScratch ??= new float[_pixels.Length];
+        var copy = _blurScratch;
+        _pixels.CopyTo(copy, 0);
+        var pixels = _pixels;
+        var width = Width;
+        var height = Height;
+
+        // The reference folds the eight weights into four distances per axis, then divides by the
+        // summed weights so the pass preserves brightness.
+        Span<float> weight = stackalloc float[4];
+        Span<float> distance = stackalloc float[4];
+        float divisor;
+        if (horizontal)
+        {
+            weight[0] = weights[0] + weights[1];
+            weight[1] = weights[2] + weights[3];
+            weight[2] = weights[4] + weights[5];
+            weight[3] = weights[6] + weights[7];
+            distance[0] = 2f * weights[1] / weight[0];
+            distance[1] = 2f + (2f * weights[3] / weight[1]);
+            distance[2] = 4f + (2f * weights[5] / weight[2]);
+            distance[3] = 6f + (2f * weights[7] / weight[3]);
+            divisor = 0.5f / (weight[0] + weight[1] + weight[2] + weight[3]);
+        }
+        else
+        {
+            weight[0] = weights[0] + weights[1] + weights[2] + weights[3];
+            weight[1] = weights[4] + weights[5] + weights[6] + weights[7];
+            distance[0] = 2f * ((weights[2] + weights[3]) / weight[0]);
+            distance[1] = 2f + (2f * ((weights[6] + weights[7]) / weight[1]));
+            divisor = 1f / ((weight[0] + weight[1]) * 2f);
+        }
+
+        var taps = horizontal ? 4 : 2;
+        for (var y = 0; y < height; y++)
+        {
+            for (var x = 0; x < width; x++)
+            {
+                var offset = ((y * width) + x) * 4;
+                for (var channel = 0; channel < 3; channel++)
+                {
+                    var sum = 0f;
+                    for (var tap = 0; tap < taps; tap++)
+                    {
+                        var step = distance[tap];
+                        var other = horizontal
+                            ? (((y * width) + Math.Clamp((int)MathF.Round(x + step), 0, width - 1)) * 4) + channel
+                            : ((Math.Clamp((int)MathF.Round(y + step), 0, height - 1) * width) + x) * 4 + channel;
+                        var opposite = horizontal
+                            ? (((y * width) + Math.Clamp((int)MathF.Round(x - step), 0, width - 1)) * 4) + channel
+                            : ((Math.Clamp((int)MathF.Round(y - step), 0, height - 1) * width) + x) * 4 + channel;
+                        sum += (copy[other] + copy[opposite]) * weight[tap];
+                    }
+
+                    pixels[offset + channel] = sum * divisor;
+                }
+
+                pixels[offset + 3] = copy[offset + 3];
+            }
+        }
+    }
+
+    /// <summary>
+    /// Resamples another buffer into this one with bilinear filtering, which is how the reference
+    /// implementation builds a downscaled blur texture from the frame.
+    /// </summary>
+    /// <param name="source">Source buffer.</param>
+    /// <exception cref="ArgumentNullException"><paramref name="source"/> is <see langword="null"/>.</exception>
+    public void ResampleFrom(PixelBuffer source)
+    {
+        ArgumentNullException.ThrowIfNull(source);
+        var width = Width;
+        var height = Height;
+        Span<float> sample = stackalloc float[4];
+        for (var y = 0; y < height; y++)
+        {
+            var v = (y + 0.5f) / height;
+            for (var x = 0; x < width; x++)
+            {
+                source.SampleBilinear((x + 0.5f) / width, v, sample);
+                var offset = ((y * width) + x) * 4;
+                _pixels[offset] = sample[0];
+                _pixels[offset + 1] = sample[1];
+                _pixels[offset + 2] = sample[2];
+                _pixels[offset + 3] = sample[3];
+            }
+        }
+    }
+
+    /// <summary>Writes the buffer as BGRA bytes for a presentation bitmap.</summary>
+    /// <param name="destination">Destination of at least <c>width * height * 4</c> bytes.</param>
+    /// <param name="preserveAlpha">Preserves overlay coverage instead of forcing opaque output.</param>
+    public void WriteBgra(Span<byte> destination, bool preserveAlpha = false)
+    {
+        var needed = Width * Height * 4;
+        if (destination.Length < needed)
+            throw new ArgumentException("The destination is too small for the buffer.", nameof(destination));
+
+        for (var pixel = 0; pixel < Width * Height; pixel++)
+        {
+            var source = pixel * 4;
+            var target = pixel * 4;
+            destination[target] = ToByte(_pixels[source + 2]);
+            destination[target + 1] = ToByte(_pixels[source + 1]);
+            destination[target + 2] = ToByte(_pixels[source]);
+            destination[target + 3] = preserveAlpha ? ToByte(_pixels[source + 3]) : (byte)255;
+        }
+    }
+
+    /// <summary>Writes one row as BGRA bytes, for presenters whose row stride is padded.</summary>
+    /// <param name="y">Row index.</param>
+    /// <param name="destination">Destination of at least <c>width * 4</c> bytes.</param>
+    public void WriteRowBgra(int y, Span<byte> destination)
+    {
+        var needed = Width * 4;
+        if (destination.Length < needed)
+            throw new ArgumentException("The destination is too small for one row.", nameof(destination));
+        if (y < 0 || y >= Height)
+            return;
+
+        for (var x = 0; x < Width; x++)
+        {
+            var source = (((y * Width) + x) * 4);
+            var target = x * 4;
+            destination[target] = ToByte(_pixels[source + 2]);
+            destination[target + 1] = ToByte(_pixels[source + 1]);
+            destination[target + 2] = ToByte(_pixels[source]);
+            destination[target + 3] = ToByte(Math.Max(_pixels[source + 3], 1f));
+        }
+    }
+
+    private static byte ToByte(float value) => (byte)Math.Clamp(value * 255f + 0.5f, 0f, 255f);
+}

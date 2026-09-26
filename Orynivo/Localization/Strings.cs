@@ -1434,6 +1434,47 @@ public sealed record LocalizedStrings(
     public string ScheduledBackupFailed { get; init; } = "";
     /// <summary>Gets the status-bar format string after an automatic backup.</summary>
     public string ScheduledBackupDone { get; init; } = "";
+    public string VisualizerPresetFolder { get; init; } = "";
+    public string VisualizerPresetFolderHint { get; init; } = "";
+    public string VisualizerPresetRejected { get; init; } = "";
+    public string Visualizer { get; init; } = "";
+    public string VisualizerHint { get; init; } = "";
+    public string VisualizerPresetLabel { get; init; } = "";
+    public string VisualizerOverlayAlways { get; init; } = "";
+    public string VisualizerOverlayAlwaysHint { get; init; } = "";
+    public string VisualizerResolution { get; init; } = "";
+    public string VisualizerResolutionHint { get; init; } = "";
+    public string VisualizerFrameRate { get; init; } = "";
+    public string VisualizerFrameRateHint { get; init; } = "";
+    public string VisualizerAutoAdvance { get; init; } = "";
+    public string VisualizerAutoAdvanceHint { get; init; } = "";
+    public string VisualizerAutoAdvanceSeconds { get; init; } = "";
+    /// <summary>Gets the label for the seconds a preset switch cross-fades over.</summary>
+    public string VisualizerPresetBlendSeconds { get; init; } = "";
+    /// <summary>Gets the explanatory text below the preset blend duration field.</summary>
+    public string VisualizerPresetBlendSecondsHint { get; init; } = "";
+    /// <summary>Gets the action label that opens the preset selection dialog.</summary>
+    public string VisualizerSelectPresets { get; init; } = "";
+    /// <summary>Gets the explanatory text below the preset selection action.</summary>
+    public string VisualizerSelectPresetsHint { get; init; } = "";
+    /// <summary>Gets the hint that explains where MilkDrop 2 preset collections can be obtained.</summary>
+    public string VisualizerPresetDownloadHint { get; init; } = "";
+    /// <summary>Gets the action label that opens the preset collection download page.</summary>
+    public string VisualizerDownloadPresets { get; init; } = "";
+    /// <summary>Gets the title of the preset selection dialog.</summary>
+    public string VisualizerPresetSelectionTitle { get; init; } = "";
+    /// <summary>Gets the hint of the preset selection dialog.</summary>
+    public string VisualizerPresetSelectionHint { get; init; } = "";
+    /// <summary>Gets the action that activates every preset.</summary>
+    public string VisualizerPresetSelectionAll { get; init; } = "";
+    /// <summary>Gets the action that deactivates every preset.</summary>
+    public string VisualizerPresetSelectionNone { get; init; } = "";
+    /// <summary>Gets the message shown while the preset list is being loaded.</summary>
+    public string VisualizerPresetSelectionLoading { get; init; } = "";
+    /// <summary>Gets the message shown when no preset was found.</summary>
+    public string VisualizerPresetSelectionEmpty { get; init; } = "";
+    /// <summary>Gets the format string for the active preset count.</summary>
+    public string VisualizerPresetSelectionActiveCount { get; init; } = "";
     public string MaxOutputSampleRate { get; init; } = "";
     public string MaxOutputSampleRateHint { get; init; } = "";
     public string MaxOutputSampleRateAutomatic { get; init; } = "";

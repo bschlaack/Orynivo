@@ -1,0 +1,67 @@
+namespace Orynivo.Visualization;
+
+/// <summary>One of Milkdrop's two border bands: where it sits, how thick it is, and its colour.</summary>
+/// <param name="Inset">Inner ring radius in clip space, where one is the frame edge.</param>
+/// <param name="Thickness">Band width in clip space, the outer radius minus the inner radius.</param>
+/// <param name="Red">Red, zero to one.</param>
+/// <param name="Green">Green, zero to one.</param>
+/// <param name="Blue">Blue, zero to one.</param>
+/// <param name="Alpha">Blend weight, zero to one.</param>
+public readonly record struct VisualizerBorderBand(
+    float Inset,
+    float Thickness,
+    float Red,
+    float Green,
+    float Blue,
+    float Alpha);
+
+/// <summary>
+/// The per-frame values the frame passes use, read once after the preset's per-frame block has run.
+/// A GPU pipeline reads them instead of duplicating the key lookups and clamps, so the two paths
+/// cannot disagree about what a preset asked for.
+/// </summary>
+/// <param name="Decay">Feedback decay, zero to one.</param>
+/// <param name="BlurPasses">Number of box-blur passes over the warped frame.</param>
+/// <param name="DarkenCenter">Centre-darkening amount, zero to one.</param>
+/// <param name="Gamma">Gamma adjustment, 0.1 to 10.</param>
+/// <param name="EchoZoom">Video-echo zoom, 0.1 to 4.</param>
+/// <param name="EchoAlpha">Video-echo blend weight, zero to one.</param>
+/// <param name="EchoOrientation">Video-echo orientation, zero to three.</param>
+/// <param name="OuterBorder">Outer border band.</param>
+/// <param name="InnerBorder">Inner border band.</param>
+/// <param name="WarpTime">Warp animation time in seconds, which drives the time-dependent warp displacement.</param>
+public readonly record struct VisualizerFrameParameters(
+    float Decay,
+    int BlurPasses,
+    float DarkenCenter,
+    float Gamma,
+    float EchoZoom,
+    float EchoAlpha,
+    int EchoOrientation,
+    VisualizerBorderBand OuterBorder,
+    VisualizerBorderBand InnerBorder,
+    float WarpTime)
+{
+    /// <summary>Gets the spatial warp scale; the displacement uses its reciprocal.</summary>
+    public float WarpScale { get; init; } = 1f;
+    /// <summary>Gets whether the fixed warp repeats instead of clamping at the image edges.</summary>
+    public bool TextureWrap { get; init; }
+    /// <summary>Gets the legacy composite's hue animation time in seconds.</summary>
+    public float HueTime { get; init; }
+    /// <summary>Gets the legacy composite's per-preset hue offsets.</summary>
+    public (float X, float Y, float Z, float W) HueOffsets { get; init; }
+    /// <summary>Gets the legacy hue-shading blend amount, zero to one.</summary>
+    public float ShaderAmount { get; init; }
+
+    /// <summary>Gets whether the legacy display applies the brighten filter (<c>sqrt</c>).</summary>
+    public bool Brighten { get; init; }
+
+    /// <summary>Gets whether the legacy display applies the darken filter (square).</summary>
+    public bool Darken { get; init; }
+
+    /// <summary>Gets whether the legacy display applies the solarize filter.</summary>
+    public bool Solarize { get; init; }
+
+    /// <summary>Gets whether the legacy display inverts the frame.</summary>
+    public bool Invert { get; init; }
+}

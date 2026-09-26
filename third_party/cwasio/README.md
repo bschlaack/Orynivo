@@ -26,9 +26,9 @@ fairly easy to use the C interface.
 
 Possibly incomplete list of users of cwASIO:
 
-* [cwASIO demo driver](https://github.com/aholzinger/cwAsio4RtAudio) using
+- [cwASIO demo driver](https://github.com/aholzinger/cwAsio4RtAudio) using
   RtAudio as a backend.
-* [PortAudio with cwASIO support](https://github.com/aholzinger/portaudio)
+- [PortAudio with cwASIO support](https://github.com/aholzinger/portaudio)
 
 ## Structure of cwASIO
 
@@ -77,8 +77,8 @@ The native API is close to identical on Linux and Windows, because on Linux the
 COM interface used on Windows is mimicked. The functionality is the same, so it
 should not be difficult to accommodate either in a portable application.
 
-The native API is declared in `cwASIO.h`. It is a C interface that can be
-used in C++ when included inside an `extern "C" { ... }` bracket.
+The native API is declared in `cwASIO.h`. It is a C interface that can be used
+in C++ when included inside an `extern "C" { ... }` bracket.
 
 ### C++ API
 
@@ -97,9 +97,9 @@ applications that have been built with the original ASIO SDK can change to
 cwASIO with minimal effort. This applies to the core API, not the OS-specific
 driver enumeration interface. This same API is also available on Linux.
 
-The compatible API is declared in `asio.h`. It holds hidden global state so
-the application can only have one driver loaded at any time, a restriction that
-it shares with the original ASIO SDK.
+The compatible API is declared in `asio.h`. It holds hidden global state so the
+application can only have one driver loaded at any time, a restriction that it
+shares with the original ASIO SDK.
 
 This API is a thin C wrapper around the native API on each platform.
 
@@ -107,9 +107,9 @@ This API is a thin C wrapper around the native API on each platform.
 
 Enumerating must be done with the native API, and is not compatible with the
 ASIO SDK. The native API has a portable enumerating function, which uses an
-enumeration method appropriate for the platform. It consists of a single function
-`cwASIOenumerate()`, which accepts a callback that is called for each driver that
-was found installed in the system.
+enumeration method appropriate for the platform. It consists of a single
+function `cwASIOenumerate()`, which accepts a callback that is called for each
+driver that was found installed in the system.
 
 Enumerating works by scanning through the registration database (The registry on
 Windows, or the `/etc/cwASIO` directory on Linux) and calling the callback once
@@ -224,10 +224,10 @@ the same time.
 
 The Steinberg ASIO SDK supports only Windows. Support for the Mac has been
 dropped with version 2.3, and other platforms weren't supported for a long time.
-On Windows, ASIO depends on Microsoft COM, but there are deviations from the
-COM rules that make it noncompliant. Consequently, an ASIO driver can be found
-and enumerated on the system using COM functionality, but it doesn't present a
-COM compliant API, due to issues with calling conventions. This is particularly
+On Windows, ASIO depends on Microsoft COM, but there are deviations from the COM
+rules that make it noncompliant. Consequently, an ASIO driver can be found and
+enumerated on the system using COM functionality, but it doesn't present a COM
+compliant API, due to issues with calling conventions. This is particularly
 prominent on 32-bit Windows, where compatibility with C is severely impaired.
 
 cwASIO regards 32-bit Windows as obsolete and thus takes advantage of the fact
@@ -251,8 +251,8 @@ The native cwASIO API is a C API that doesn't need C++ even on Windows. This
 makes it more widely applicable, since host applications can be written in
 languages with a C binding, which is much more common than a C++ binding. It
 also makes writing portable applications easier, since the API is the same
-everywhere. Furthermore, the native API allows a host application to have
-more than one driver loaded and used at the same time, if so desired.
+everywhere. Furthermore, the native API allows a host application to have more
+than one driver loaded and used at the same time, if so desired.
 
 ## Multi-instance issues
 
@@ -431,8 +431,8 @@ On Windows, ASIO has always used GUIDs to unambiguously identify different
 drivers. This is part of the Microsoft Component Object Model (COM), which
 stipulates that both classes and interfaces are identified with a unique GUID,
 which is also used for discovery via the Microsoft Windows Registry. Under
-Linux, this functionality doesn't exist, and we have come up with a scheme
-that identifies drivers in a similar (and simpler) way.
+Linux, this functionality doesn't exist, and we have come up with a scheme that
+identifies drivers in a similar (and simpler) way.
 
 A GUID is a 128-bit data structure that is defined and described in RFC 9562, or
 equivalently in ITU-T Rec. X.667. There is a binary representation and a textual
@@ -461,11 +461,11 @@ doing your own comparisons, however, be aware of this problem.
 In ASIO on Windows, the GUID that serves as the class ID to locate the driver on
 the system, does double duty as the interface ID upon creating a driver
 instance. Those would normally be distinct GUIDs, but ASIO chose to simplify
-things. *(In theory, a class and an interface are not the same thing. A class
+things. _(In theory, a class and an interface are not the same thing. A class
 may implement several different interfaces at the same time, and the interface
 ID would be used to distinguish between them. This can be useful both for cases
 when different versions of an interface exist, or when completely different
-interfaces with different functionality are implemented)*.
+interfaces with different functionality are implemented)_.
 
 The bottomline is that for Windows, a driver provider must generate a unique
 GUID for each device that is controlled by the driver. This GUID is used when

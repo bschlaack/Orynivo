@@ -794,6 +794,15 @@ public partial class MainWindow : Window
             _settings.DsdOverPcmEnabled = window.DsdOverPcmEnabled;
             _settings.PcmOutputBoostEnabled = window.PcmOutputBoostEnabled;
             _settings.MaxOutputSampleRateHz  = window.MaxOutputSampleRateHz;
+            _settings.VisualizerPresetDirectory = window.VisualizerPresetDirectoryValue;
+            _settings.VisualizerAlwaysShowOverlay = window.VisualizerAlwaysShowOverlay;
+            _settings.VisualizerRenderWidth = window.VisualizerRenderWidthValue;
+            _settings.VisualizerRenderHeight = window.VisualizerRenderHeightValue;
+            _settings.VisualizerFrameRate = window.VisualizerFrameRateValue;
+            _settings.VisualizerAutoAdvanceEnabled = window.VisualizerAutoAdvanceEnabled;
+            _settings.VisualizerAutoAdvanceSeconds = window.VisualizerAutoAdvanceSeconds;
+            _settings.VisualizerPresetBlendSeconds = window.VisualizerPresetBlendSeconds;
+            _settings.DisabledVisualizerPresets = window.DisabledVisualizerPresets.ToList();
             _settings.NonGaplessCrossfadeSeconds = window.NonGaplessCrossfadeSeconds;
             _settings.EqualizerEnabled      = window.EqualizerEnabled;
             _settings.EqualizerProfile      = window.SelectedEqualizerProfile;

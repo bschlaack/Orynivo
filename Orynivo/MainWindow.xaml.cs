@@ -221,6 +221,8 @@ public partial class MainWindow : Window
     private readonly ObservableCollection<ContentRow> _queueRows = [];
     private readonly ObservableCollection<LyricLineViewModel> _lyricLines = [];
     private KaraokeWindow? _karaokeWindow;
+    private VisualizerWindow? _visualizerWindow;
+    private bool _isPlaying;
     private int _queueIndex = -1;
     private bool _shuffleEnabled;
     private readonly HashSet<string> _playedQueuePaths = new(StringComparer.OrdinalIgnoreCase);
