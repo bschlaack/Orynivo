@@ -7,6 +7,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Fixed
+- Fixed a preset texture being bound to the wrong OpenGL sampler. `VisualizerGlPipeline` resolved a
+  shader sampler before making its texture unit active, and a lazily uploaded preset texture
+  (`sampler sampler_seaweed;` in `suksma - frust`) bound itself to the previously active unit. The
+  unused samplers are skipped, so that unit was `sampler_main`'s, and the comp shader read the image
+  as if it were the previous frame — the preset rendered a full-frame image field instead of its
+  feedback. The unit is now selected before the texture is resolved.
 - Caught the visualizer's preset handling up to MilkDrop 2 in several reference areas that were
   missing or wrong:
   - The default waveform now applies the reference's per-mode alpha rules (mode 1 `*1.25`, modes 2

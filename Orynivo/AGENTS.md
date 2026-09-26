@@ -78,6 +78,12 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
   sampler bindings before fixed passes and before returning to Avalonia. Fixed warp
   uses `bTexWrap`. Custom comp frame/blur reads convert top-down UVs to bottom-up GL
   texture coordinates; generated noise coordinates are not flipped.
+  When a shader sampler is bound, make its unit active **before** resolving the texture.
+  A preset texture (`sampler_<name>`) is uploaded lazily during binding, and an upload
+  binds its new texture to the active unit, so resolving before selecting the unit let a
+  user texture overwrite the previous sampler's binding — the unused samplers are skipped,
+  which made the previous unit `sampler_main` and displayed the texture as the previous
+  frame. `verify-fidelity.ps1` check 6 pins this.
 - Legacy gamma/echo use a separate display target and must never enter feedback.
   Gamma is a linear brightness gain. The overlay's alpha is coverage, not forced
   opacity; non-additive elements cover feedback. The shader blur chain is built after the warp from

@@ -1697,6 +1697,13 @@ internal sealed class VisualizerGlPipeline
             if (location < 0) continue;
             if (nextUnit >= 16) throw new InvalidOperationException("Shader exceeds the supported texture unit count.");
             var parsed = ShaderSamplerName.Parse(name);
+            var unit = nextUnit++;
+            // Make this sampler's unit active before resolving the texture. A user texture is
+            // uploaded lazily here, and an upload binds its new texture to the active unit: if the
+            // active unit were still the previous sampler's, the upload would overwrite that
+            // sampler's binding. Unused samplers are skipped above, so the previous unit can be
+            // sampler_main's and the user texture then aliased it.
+            gl.ActiveTexture(GlTexture0 + unit);
             var texture = parsed.BaseName switch
             {
                 "main" => main,
@@ -1705,8 +1712,6 @@ internal sealed class VisualizerGlPipeline
                 "blur3" => _shaderBlurTexture[2],
                 _ => ResolveGeneratedOrUserSampler(gl, name, parsed.BaseName, parsed, main)
             };
-            var unit = nextUnit++;
-            gl.ActiveTexture(GlTexture0 + unit);
             gl.BindTexture(GlTexture2D, texture);
             var mode = (parsed.Nearest ? 1 : 0) | (parsed.Wrap == VisualizerTextureWrap.Repeat ? 2 : 0);
             if (parsed.BaseName.StartsWith("blur", StringComparison.Ordinal)) mode = 0;
