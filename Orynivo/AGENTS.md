@@ -719,7 +719,14 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
   expression trees; a collection of several hundred presets must never be compiled when the
   window opens. Keep the discovered count (`Count`) separate from the parsed presets, report a
   failure on first use through `RejectedReasons`, and fall back to the first built-in so one
-  broken file can never stop the visualizer. `LoadBuiltIns` is the only thing the window
+  broken file can never stop the visualizer. `AppSettings.DisabledVisualizerPresets` stores the
+  stable keys the user deactivated (`builtin:<name>` for a built-in, `file:<path relative to the
+  preset folder>` for a user file, so every section of one file shares the file's key).
+  `VisualizerPresetLibrary.Describe` lists the built-ins and every discovered file without reading
+  them for the **Select presets…** dialog, and `SetDisabledKeys`/`ResolveEnabledIndex` make the
+  window's open, step, auto-advance, and mouse navigation skip a deactivated preset in the
+  requested direction; when every preset is deactivated the requested index is kept so the
+  visualizer never stops rendering. `LoadBuiltIns` is the only thing the window
   constructor may call: it touches no disk, so the window opens and renders while `Discover`
   enumerates the folder on a worker thread. Discovery records file paths only, never file
   contents, because a real collection holds thousands of files and reading them up front froze

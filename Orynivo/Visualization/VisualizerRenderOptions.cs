@@ -19,6 +19,10 @@ namespace Orynivo.Visualization;
 /// </param>
 /// <param name="AutoAdvanceEnabled">Whether the window advances to the next preset automatically.</param>
 /// <param name="AutoAdvanceSeconds">Seconds to show one preset before advancing.</param>
+/// <param name="DisabledPresetKeys">
+/// Stable keys of the presets the window must skip, or <see langword="null"/> when every preset is
+/// active.
+/// </param>
 public sealed record VisualizerRenderOptions(
     int Width,
     int Height,
@@ -27,7 +31,8 @@ public sealed record VisualizerRenderOptions(
     bool AlwaysShowOverlay,
     string? PresetDirectory,
     bool AutoAdvanceEnabled = false,
-    int AutoAdvanceSeconds = 15);
+    int AutoAdvanceSeconds = 15,
+    IReadOnlyCollection<string>? DisabledPresetKeys = null);
 
 /// <summary>A selectable visualizer frame size.</summary>
 /// <param name="Width">Frame width in pixels.</param>

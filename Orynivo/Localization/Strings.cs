@@ -1449,6 +1449,24 @@ public sealed record LocalizedStrings(
     public string VisualizerAutoAdvance { get; init; } = "";
     public string VisualizerAutoAdvanceHint { get; init; } = "";
     public string VisualizerAutoAdvanceSeconds { get; init; } = "";
+    /// <summary>Gets the action label that opens the preset selection dialog.</summary>
+    public string VisualizerSelectPresets { get; init; } = "";
+    /// <summary>Gets the explanatory text below the preset selection action.</summary>
+    public string VisualizerSelectPresetsHint { get; init; } = "";
+    /// <summary>Gets the title of the preset selection dialog.</summary>
+    public string VisualizerPresetSelectionTitle { get; init; } = "";
+    /// <summary>Gets the hint of the preset selection dialog.</summary>
+    public string VisualizerPresetSelectionHint { get; init; } = "";
+    /// <summary>Gets the action that activates every preset.</summary>
+    public string VisualizerPresetSelectionAll { get; init; } = "";
+    /// <summary>Gets the action that deactivates every preset.</summary>
+    public string VisualizerPresetSelectionNone { get; init; } = "";
+    /// <summary>Gets the message shown while the preset list is being loaded.</summary>
+    public string VisualizerPresetSelectionLoading { get; init; } = "";
+    /// <summary>Gets the message shown when no preset was found.</summary>
+    public string VisualizerPresetSelectionEmpty { get; init; } = "";
+    /// <summary>Gets the format string for the active preset count.</summary>
+    public string VisualizerPresetSelectionActiveCount { get; init; } = "";
     public string MaxOutputSampleRate { get; init; } = "";
     public string MaxOutputSampleRateHint { get; init; } = "";
     public string MaxOutputSampleRateAutomatic { get; init; } = "";

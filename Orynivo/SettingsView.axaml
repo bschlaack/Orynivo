@@ -859,6 +859,20 @@
                                Foreground="{DynamicResource AppMutedTextBrush}"
                                TextWrapping="Wrap"
                                Margin="0,4,0,0"/>
+
+                    <Button x:Name="VisualizerSelectPresetsButton"
+                            Height="30"
+                            Padding="14,0"
+                            Margin="0,14,0,0"
+                            HorizontalAlignment="Left"
+                            Theme="{StaticResource SettingsButtonTheme}"
+                            Content="{DynamicResource L_VisualizerSelectPresets}"
+                            Click="VisualizerSelectPresetsButton_OnClick"/>
+                    <TextBlock Text="{DynamicResource L_VisualizerSelectPresetsHint}"
+                               FontSize="{DynamicResource FontSizeMeta}"
+                               Foreground="{DynamicResource AppMutedTextBrush}"
+                               TextWrapping="Wrap"
+                               Margin="0,6,0,0"/>
                 </StackPanel>
                 <StackPanel x:Name="LibraryPanel"
                             IsVisible="False">

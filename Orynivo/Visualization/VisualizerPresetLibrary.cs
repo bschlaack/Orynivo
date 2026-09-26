@@ -27,12 +27,15 @@ internal sealed class VisualizerPresetLibrary
 
     private readonly List<VisualizerPreset> _builtIn = [];
     private readonly List<PendingPreset> _pending = [];
+    private readonly List<string> _discoveredFiles = [];
+    private readonly HashSet<string> _disabledKeys = new(StringComparer.Ordinal);
     private readonly Dictionary<int, VisualizerPreset> _loaded = [];
     private readonly Dictionary<int, string> _sourceHashes = [];
     private readonly HashSet<int> _failed = [];
     private readonly List<string> _rejected = [];
     private readonly List<string> _rejectedReasons = [];
     private readonly object _gate = new();
+    private string? _discoveredFolder;
 
     /// <summary>Gets the number of available presets, built-ins first.</summary>
     public int Count
@@ -120,6 +123,9 @@ internal sealed class VisualizerPresetLibrary
         {
             _pending.Clear();
             _pending.AddRange(discovered);
+            _discoveredFiles.Clear();
+            _discoveredFiles.AddRange(discovered.Select(static preset => preset.Path));
+            _discoveredFolder = folder;
             _loaded.Clear();
             _sourceHashes.Clear();
             _failed.Clear();
@@ -248,6 +254,154 @@ internal sealed class VisualizerPresetLibrary
         }
     }
 
+    /// <summary>
+    /// Returns the stable key of the preset at an index, wrapping around. A built-in uses
+    /// <c>builtin:&lt;name&gt;</c>; a user preset file uses <c>file:&lt;path relative to the preset
+    /// folder&gt;</c>, so every section of one file shares the file's key.
+    /// </summary>
+    /// <param name="index">Preset index.</param>
+    /// <returns>The stable key, or an empty string when no preset is available.</returns>
+    public string KeyAt(int index)
+    {
+        lock (_gate)
+        {
+            var count = _builtIn.Count + _pending.Count;
+            if (count == 0)
+                return string.Empty;
+
+            return KeyAtLocked(((index % count) + count) % count);
+        }
+    }
+
+    /// <summary>
+    /// Lists every preset the library offers: the built-ins followed by every discovered file.
+    /// The list is built without reading the files, so opening the selection dialog over a large
+    /// collection stays fast; a multi-section file appears as one entry under its file name.
+    /// </summary>
+    /// <returns>One descriptor per preset, in display order.</returns>
+    public IReadOnlyList<VisualizerPresetDescriptor> Describe()
+    {
+        lock (_gate)
+        {
+            var result = new List<VisualizerPresetDescriptor>(_builtIn.Count + _discoveredFiles.Count);
+            foreach (var preset in _builtIn)
+                result.Add(new VisualizerPresetDescriptor(BuiltInKey(preset.Name), preset.Name, true));
+            foreach (var path in _discoveredFiles)
+            {
+                result.Add(new VisualizerPresetDescriptor(
+                    FileKey(RelativePathOf(path)),
+                    Path.GetFileNameWithoutExtension(path),
+                    false));
+            }
+
+            return result;
+        }
+    }
+
+    /// <summary>Replaces the set of preset keys the visualizer must skip.</summary>
+    /// <param name="keys">Stable keys to deactivate, or <see langword="null"/> for none.</param>
+    public void SetDisabledKeys(IEnumerable<string>? keys)
+    {
+        lock (_gate)
+        {
+            _disabledKeys.Clear();
+            if (keys is null)
+                return;
+
+            foreach (var key in keys)
+            {
+                if (!string.IsNullOrWhiteSpace(key))
+                    _disabledKeys.Add(key);
+            }
+        }
+    }
+
+    /// <summary>Gets a value indicating whether the preset at an index is deactivated.</summary>
+    /// <param name="index">Preset index.</param>
+    /// <returns><see langword="true"/> when the preset's key is in the disabled set.</returns>
+    public bool IsDisabled(int index)
+    {
+        lock (_gate)
+        {
+            var count = _builtIn.Count + _pending.Count;
+            if (count == 0 || _disabledKeys.Count == 0)
+                return false;
+
+            return _disabledKeys.Contains(KeyAtLocked(((index % count) + count) % count));
+        }
+    }
+
+    /// <summary>
+    /// Resolves an index to the first enabled preset at or after it in the requested direction,
+    /// wrapping around. When every preset is deactivated, the original wrapped index is returned
+    /// so the visualizer never stops rendering.
+    /// </summary>
+    /// <param name="index">Starting preset index.</param>
+    /// <param name="direction">Step direction; a negative value scans backwards.</param>
+    /// <returns>The resolved index.</returns>
+    public int ResolveEnabledIndex(int index, int direction)
+    {
+        if (direction == 0)
+            direction = 1;
+
+        lock (_gate)
+        {
+            var count = _builtIn.Count + _pending.Count;
+            if (count == 0)
+                return 0;
+
+            var wrapped = ((index % count) + count) % count;
+            if (_disabledKeys.Count == 0)
+                return wrapped;
+
+            for (var step = 0; step < count; step++)
+            {
+                if (!_disabledKeys.Contains(KeyAtLocked(wrapped)))
+                    return wrapped;
+                wrapped = ((wrapped + direction) % count + count) % count;
+            }
+
+            return ((index % count) + count) % count;
+        }
+    }
+
+    /// <summary>Builds the stable key of a built-in preset.</summary>
+    /// <param name="name">Built-in preset name.</param>
+    /// <returns>The namespaced key.</returns>
+    public static string BuiltInKey(string name) => "builtin:" + name;
+
+    /// <summary>Builds the stable key of a user preset file.</summary>
+    /// <param name="relativePath">Path relative to the configured preset folder.</param>
+    /// <returns>The namespaced key with forward slashes.</returns>
+    public static string FileKey(string relativePath) => "file:" + relativePath.Replace('\\', '/');
+
+    /// <summary>Returns the stable key for an already wrapped index; the caller holds the gate.</summary>
+    /// <param name="wrapped">Index inside the combined preset list.</param>
+    /// <returns>The stable key.</returns>
+    private string KeyAtLocked(int wrapped) =>
+        wrapped < _builtIn.Count
+            ? BuiltInKey(_builtIn[wrapped].Name)
+            : FileKey(RelativePathOf(_pending[wrapped - _builtIn.Count].Path));
+
+    /// <summary>Derives a preset file's path relative to the discovered folder.</summary>
+    /// <param name="path">Full preset file path.</param>
+    /// <returns>The relative path, or the file name when no folder is known.</returns>
+    private string RelativePathOf(string path)
+    {
+        if (!string.IsNullOrEmpty(_discoveredFolder))
+        {
+            try
+            {
+                return Path.GetRelativePath(_discoveredFolder, path);
+            }
+            catch (ArgumentException)
+            {
+            }
+        }
+
+        return Path.GetFileName(path);
+    }
+
     /// <summary>Returns the preset used when a user preset cannot be parsed.</summary>
     /// <returns>The first built-in, or an empty preset when none is available.</returns>
     private VisualizerPreset Fallback() =>
@@ -281,3 +435,12 @@ internal sealed class VisualizerPresetLibrary
     /// <param name="SectionCount">Number of sections the file is known to hold.</param>
     private sealed record PendingPreset(string Path, int SectionIndex, int SectionCount);
 }
+
+/// <summary>
+/// One preset offered by <see cref="VisualizerPresetLibrary"/>, identified by its stable key. The
+/// selection dialog lists these without reading the preset files.
+/// </summary>
+/// <param name="Key">Stable key used to persist the enabled state.</param>
+/// <param name="DisplayName">Name shown in the selection dialog.</param>
+/// <param name="IsBuiltIn">Whether the preset is one of the shipped built-ins.</param>
+internal sealed record VisualizerPresetDescriptor(string Key, string DisplayName, bool IsBuiltIn);

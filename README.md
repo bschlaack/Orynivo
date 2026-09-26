@@ -1729,7 +1729,15 @@ a reduced-resolution grid and left out for the rest of the frame when it would e
 frame budget. Own presets go into the
 folder configured under **Preset folder** as `.oryvis` or `.milk` files (default: a
 `visualizer-presets` folder below the per-user data directory); a file that cannot be parsed
-is skipped and counted in the on-screen label. Five presets ship with the application.
+is skipped and counted in the on-screen label. Nine presets ship with the application.
+
+Settings > Visualisierung also offers **Select presets…**, which opens a dialog listing every
+available preset — the built-ins and every discovered preset file — with a checkbox each.
+Deactivated presets are skipped when the visualizer opens, steps forward or back, advances
+automatically, or responds to a mouse click. The choice is stored by a stable key (the built-in
+name or the file's preset-relative path) and the dialog provides **All** and **None** actions plus
+an active-count summary. The list is built without reading the preset files, so a large collection
+opens instantly.
 
 ## Maximum output sample rate
 

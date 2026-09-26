@@ -57,6 +57,7 @@ internal partial class SettingsView : UserControl
     private readonly List<string> _libraryPaths = [];
     private string _scheduledBackupDirectory = string.Empty;
     private string _visualizerPresetDirectory = string.Empty;
+    private readonly List<string> _disabledVisualizerPresets = [];
     private long _scheduledBackupLastRunUnix;
     private readonly List<PlexServerSettings> _plexServers = [];
     private readonly Dictionary<string, string> _plexTokens = [];
@@ -211,6 +212,8 @@ internal partial class SettingsView : UserControl
         AlwaysConvertDsdToPcmCheckBox.IsCheckedChanged += AlwaysConvertDsdToPcmCheckBox_OnIsCheckedChanged;
         PcmOutputBoostCheckBox.IsChecked = settings.PcmOutputBoostEnabled;
         _visualizerPresetDirectory = settings.VisualizerPresetDirectory ?? string.Empty;
+        _disabledVisualizerPresets.Clear();
+        _disabledVisualizerPresets.AddRange(settings.DisabledVisualizerPresets ?? []);
         UpdateVisualizerPresetFolder();
         VisualizerAlwaysShowOverlayCheckBox.IsChecked = settings.VisualizerAlwaysShowOverlay;
         VisualizerAutoAdvanceCheckBox.IsChecked = settings.VisualizerAutoAdvanceEnabled;
@@ -550,6 +553,17 @@ internal partial class SettingsView : UserControl
         UpdateVisualizerPresetFolder();
     }
 
+    private async void VisualizerSelectPresetsButton_OnClick(object? sender, RoutedEventArgs e)
+    {
+        var dialog = new VisualizerPresetSelectionDialog(_visualizerPresetDirectory, _disabledVisualizerPresets);
+        await dialog.ShowDialog(GetHostWindow());
+        if (!dialog.Confirmed)
+            return;
+
+        _disabledVisualizerPresets.Clear();
+        _disabledVisualizerPresets.AddRange(dialog.DisabledKeys);
+    }
+
     private async void ScheduledBackupFolderButton_OnClick(object? sender, RoutedEventArgs e)
     {
         if (TopLevel.GetTopLevel(this) is not { } topLevel)
@@ -592,6 +606,9 @@ internal partial class SettingsView : UserControl
 
     /// <summary>Gets the configured visualizer preset folder, or an empty string for the default.</summary>
     public string VisualizerPresetDirectoryValue => _visualizerPresetDirectory;
+
+    /// <summary>Gets the stable keys of the visualizer presets the user deactivated.</summary>
+    public IReadOnlyList<string> DisabledVisualizerPresets => _disabledVisualizerPresets;
 
     /// <summary>Gets a value indicating whether the visualizer always shows its overlay.</summary>
     public bool VisualizerAlwaysShowOverlay => VisualizerAlwaysShowOverlayCheckBox.IsChecked == true;

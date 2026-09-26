@@ -82,6 +82,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   verified to light up by `VisualizerBrightnessDiagnosticTests`.
 
 ### Added
+- Added visualizer preset activation. Settings > Visualisierung gains a **Select presets…** action
+  that opens a themed dialog listing every available preset — the nine built-ins and every `.oryvis`
+  or `.milk` file in the preset folder — each with a checkbox. Deactivated presets are persisted by a
+  stable key (built-in name or preset-relative file path) and skipped when the visualizer opens,
+  steps to the next or previous preset, advances automatically, or responds to the mouse. The dialog
+  carries **All**/**None** actions and an active-count summary, and lists presets without reading the
+  files so a large collection opens instantly.
 - Added automatic preset advancement to the visualizer. Settings > Visualisierung gains an enable
   toggle and a per-preset dwell time in seconds; when enabled the window advances to the next preset
   after that time. It is off by default and defaults to 15 seconds.

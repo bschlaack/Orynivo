@@ -102,7 +102,8 @@ public partial class MainWindow : Window
                 _settings.VisualizerAlwaysShowOverlay,
                 _settings.VisualizerPresetDirectory,
                 _settings.VisualizerAutoAdvanceEnabled,
-                _settings.VisualizerAutoAdvanceSeconds),
+                _settings.VisualizerAutoAdvanceSeconds,
+                _settings.DisabledVisualizerPresets),
             new VisualizerTransport(
                 Previous: () => PreviousButton_OnClick(this, new RoutedEventArgs()),
                 PlayPause: () => PlayButton_OnClick(this, new RoutedEventArgs()),

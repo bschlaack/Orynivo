@@ -257,4 +257,95 @@ public sealed class VisualizerPresetLibraryTests : IDisposable
         Assert.Equal("mine", library.NameAt(-1));
         Assert.Equal(string.Empty, new VisualizerPresetLibrary().NameAt(0));
     }
+
+    /// <summary>
+    /// A built-in uses its name in the key and a user file uses its path relative to the preset
+    /// folder, so the persisted disabled set stays stable across sessions.
+    /// </summary>
+    [Fact]
+    public void KeyAt_NamespacesBuiltInsAndFiles()
+    {
+        var nested = Directory.CreateDirectory(Path.Combine(_directory, "pack"));
+        File.WriteAllText(Path.Combine(nested.FullName, "deep.milk"), "name=Deep");
+        File.WriteAllText(Path.Combine(_directory, "mine.oryvis"), "name=Mine");
+        var library = new VisualizerPresetLibrary();
+        library.Reload(_directory);
+
+        Assert.Equal("builtin:" + VisualizerPresets.BuiltIn[0].Name, library.KeyAt(0));
+        Assert.Equal("file:pack/deep.milk", library.KeyAt(BuiltInCount));
+        Assert.Equal("file:mine.oryvis", library.KeyAt(BuiltInCount + 1));
+    }
+
+    /// <summary>A multi-section file exposes one key for every section because the key is the file.</summary>
+    [Fact]
+    public void KeyAt_UsesTheFileKeyForEverySection()
+    {
+        File.WriteAllText(
+            Path.Combine(_directory, "two.milk"),
+            "[preset00]\nname=First\nper_pixel_1=x = -x;\n[preset01]\nname=Second\nper_pixel_1=y = -y;\n");
+        var library = new VisualizerPresetLibrary();
+        library.Reload(_directory);
+        library.At(BuiltInCount);
+        library.At(BuiltInCount + 1);
+
+        Assert.Equal("file:two.milk", library.KeyAt(BuiltInCount));
+        Assert.Equal("file:two.milk", library.KeyAt(BuiltInCount + 1));
+    }
+
+    /// <summary>
+    /// The list used by the selection dialog contains the built-ins and every discovered file,
+    /// without reading the files, so a broken preset is still listed and can be deactivated.
+    /// </summary>
+    [Fact]
+    public void Describe_ListsBuiltInsAndFilesWithoutReadingThem()
+    {
+        File.WriteAllText(Path.Combine(_directory, "good.oryvis"), "name=Good");
+        File.WriteAllText(Path.Combine(_directory, "broken.oryvis"), "name=Broken\nper_pixel_1=x = unknown(1);");
+        var library = new VisualizerPresetLibrary();
+        library.Reload(_directory);
+
+        var descriptors = library.Describe();
+
+        Assert.Equal(BuiltInCount + 2, descriptors.Count);
+        Assert.All(descriptors.Take(BuiltInCount), descriptor => Assert.True(descriptor.IsBuiltIn));
+        Assert.Contains(descriptors, descriptor => descriptor.Key == "file:good.oryvis" && descriptor.DisplayName == "good");
+        Assert.Contains(descriptors, descriptor => descriptor.Key == "file:broken.oryvis" && descriptor.DisplayName == "broken");
+    }
+
+    /// <summary>Deactivated presets are skipped in the requested direction, wrapping around.</summary>
+    [Fact]
+    public void ResolveEnabledIndex_SkipsDisabledPresetsInBothDirections()
+    {
+        File.WriteAllText(Path.Combine(_directory, "a.milk"), "name=A");
+        File.WriteAllText(Path.Combine(_directory, "b.milk"), "name=B");
+        File.WriteAllText(Path.Combine(_directory, "c.milk"), "name=C");
+        var library = new VisualizerPresetLibrary();
+        library.Reload(_directory);
+        library.SetDisabledKeys(
+        [
+            library.KeyAt(0),
+            library.KeyAt(1),
+            library.KeyAt(BuiltInCount)
+        ]);
+
+        // Forward from the first two disabled built-ins lands on the first enabled one.
+        Assert.Equal(2, library.ResolveEnabledIndex(0, 1));
+        // Backwards from the disabled first file lands on the last built-in.
+        Assert.Equal(BuiltInCount - 1, library.ResolveEnabledIndex(BuiltInCount, -1));
+        Assert.True(library.IsDisabled(0));
+        Assert.False(library.IsDisabled(2));
+    }
+
+    /// <summary>When every preset is deactivated the requested index is kept so rendering continues.</summary>
+    [Fact]
+    public void ResolveEnabledIndex_FallsBackWhenEverythingIsDisabled()
+    {
+        File.WriteAllText(Path.Combine(_directory, "a.milk"), "name=A");
+        var library = new VisualizerPresetLibrary();
+        library.Reload(_directory);
+        library.SetDisabledKeys(library.Describe().Select(descriptor => descriptor.Key));
+
+        Assert.Equal(3, library.ResolveEnabledIndex(3, 1));
+        Assert.True(library.IsDisabled(0));
+    }
 }

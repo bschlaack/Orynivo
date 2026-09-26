@@ -97,6 +97,14 @@ public sealed class AppSettings
 
     /// <summary>Gets or sets how many seconds the visualizer shows one preset before advancing.</summary>
     public int VisualizerAutoAdvanceSeconds { get; set; } = 15;
+
+    /// <summary>
+    /// Gets or sets the stable keys of the visualizer presets the user deactivated. The visualizer
+    /// skips them while browsing and during automatic advance. A built-in preset uses the key
+    /// <c>builtin:&lt;name&gt;</c>; a user preset file uses <c>file:&lt;path relative to the preset
+    /// folder&gt;</c>, so deactivating a file deactivates every section it contains.
+    /// </summary>
+    public List<string> DisabledVisualizerPresets { get; set; } = [];
     public bool PcmOutputBoostEnabled { get; set; }
     /// <summary>Gets or sets the fade duration used when advancing non-gapless queues, in seconds.</summary>
     public double NonGaplessCrossfadeSeconds { get; set; }

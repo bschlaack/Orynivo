@@ -293,7 +293,6 @@ public partial class VisualizerWindow : Window
         VisualizerTransport? transport = null)
     {
         _transport = transport;
-        _presetIndex = presetIndex;
             _renderWidth = Math.Clamp(options.Width, 160, 7680);
             _renderHeight = Math.Clamp(options.Height, 90, 4320);
 
@@ -305,6 +304,10 @@ public partial class VisualizerWindow : Window
         // because that would block the interface for as long as it takes.
         _presetDirectory = options.PresetDirectory;
         _library.LoadBuiltIns();
+        _library.SetDisabledKeys(options.DisabledPresetKeys);
+        // Deactivated presets are skipped from the first frame on, so opening the visualizer never
+        // shows a preset the user turned off.
+        _presetIndex = _library.ResolveEnabledIndex(presetIndex, 1);
         // Roadmap 40f: the GL pipeline and its presentation are the default, because the CPU frame
         // path costs tens of milliseconds per frame for a per-pixel preset. A platform whose GL
         // context never arrives falls back to the bitmap presentation automatically; setting
@@ -369,7 +372,7 @@ public partial class VisualizerWindow : Window
                 e.Source is Visual source && (source is Button || source.GetVisualAncestors().OfType<Button>().Any()))
                 return;
             SeekDiagnostics.Log("visualizer-preset", $"input=mouse currentIndex={_presetIndex} nextIndex={(_presetIndex + 1) % _library.Count}");
-            SelectPreset(_presetIndex + 1);
+            SelectRelative(1);
             ShowOverlay();
         };
     }
@@ -403,8 +406,9 @@ public partial class VisualizerWindow : Window
     }
 
     /// <summary>
-    /// Selects a preset by index, wrapping around the available presets. The render thread picks
-    /// the request up on its next frame, so this stays a cheap UI-thread operation.
+    /// Selects a preset by index, wrapping around the available presets and skipping deactivated
+    /// ones. The render thread picks the request up on its next frame, so this stays a cheap
+    /// UI-thread operation.
     /// </summary>
     /// <param name="index">Requested preset index.</param>
     public void SelectPreset(int index)
@@ -413,12 +417,28 @@ public partial class VisualizerWindow : Window
         if (count == 0)
             return;
 
-        _presetIndex = ((index % count) + count) % count;
+        _presetIndex = _library.ResolveEnabledIndex(index, 1);
         // Keep the analyzer's long-term loudness history across preset changes. Resetting it here
         // makes the first relative bass value spike, and presets such as Mashup (129) amplify that
         // spike into an extreme warp that destroys their existing feedback.
         // The label changes when a completed frame for this index is handed to the presenter.
         // Updating it here would name the new selection while GL still shows the old frame.
+    }
+
+    /// <summary>
+    /// Moves the preset selection by one step in a direction, skipping deactivated presets. The
+    /// direction is preserved so a backward step over a deactivated preset lands before it instead
+    /// of wrapping forward past it.
+    /// </summary>
+    /// <param name="direction">Positive to advance, negative to go back.</param>
+    private void SelectRelative(int direction)
+    {
+        var count = _library.Count;
+        if (count == 0)
+            return;
+
+        var candidate = ((_presetIndex + direction) % count + count) % count;
+        _presetIndex = _library.ResolveEnabledIndex(candidate, direction);
     }
 
     private void OnKeyDown(object? sender, KeyEventArgs e)
@@ -430,11 +450,11 @@ public partial class VisualizerWindow : Window
                 break;
             case Key.N or Key.Right or Key.Down or Key.Space:
                 SeekDiagnostics.Log("visualizer-preset", $"input=key-next key={e.Key} currentIndex={_presetIndex}");
-                SelectPreset(_presetIndex + 1);
+                SelectRelative(1);
                 break;
             case Key.P or Key.Left or Key.Up:
                 SeekDiagnostics.Log("visualizer-preset", $"input=key-previous key={e.Key} currentIndex={_presetIndex}");
-                SelectPreset(_presetIndex - 1);
+                SelectRelative(-1);
                 break;
             case Key.R:
                 _resetRequested = true;
@@ -592,7 +612,7 @@ public partial class VisualizerWindow : Window
             if (_presetSeconds >= _autoAdvanceSeconds)
             {
                 _presetSeconds = 0;
-                SelectPreset(_presetIndex + 1);
+                SelectRelative(1);
             }
         }
 
