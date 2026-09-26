@@ -1720,6 +1720,8 @@ hard switch) eases the switch like MilkDrop: the outgoing preset keeps running a
 per-frame variables (`decay`, the wave colours and position, both border bands, the motion-vector
 display, the video echo, `gamma`, and the blur range keys) are blended into the incoming preset with
 MilkDrop's cosine curve, while the motion variables that drive the warp stay on the incoming preset.
+On the OpenGL path the warp's sampling coordinate also morphs from the outgoing preset's captured
+mesh to the incoming one, so the geometry eases over the blend as well.
 
 Presets are INI-style text with `per_frame_init`, `per_frame`, and `per_pixel` expression
 blocks plus `decay`, `zoom`, `warp`, `blur_level`, `wave_alpha`, and `wave_scale`. A

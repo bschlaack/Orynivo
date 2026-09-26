@@ -161,6 +161,10 @@ public sealed class VisualizerGlPresenter : OpenGlControlBase
     private string? _pipelinePresetName;
     private IReadOnlyList<ShapeFill>? _pipelineShapeFills;
     private IReadOnlyList<WaveGeometry>? _pipelineWaveGeometry;
+    /// <summary>Outgoing preset's per-vertex motion while a blend runs, or <see langword="null"/>.</summary>
+    private float[]? _pipelineBlendMotion;
+    /// <summary>Eased blend progress where zero is the outgoing preset and one the incoming.</summary>
+    private float _pipelineBlendMix = 1f;
     private bool _pipelineFailed;
     private readonly VisualizerGlPipeline _pipeline = new();
 
@@ -219,6 +223,15 @@ public sealed class VisualizerGlPresenter : OpenGlControlBase
     /// <param name="waveGeometry">Custom-wave geometry the GPU draws itself, or <see langword="null"/>.</param>
     /// <param name="presetIndex">Index of the preset that produced this frame.</param>
     /// <param name="presetName">Name of the preset that produced this frame.</param>
+    /// <param name="blendMotion">
+    /// Outgoing preset's per-vertex motion while a preset blend runs, or <see langword="null"/> when
+    /// no blend runs. The GPU warp morphs its sampling coordinate between it and
+    /// <paramref name="mesh"/>.
+    /// </param>
+    /// <param name="blendMix">
+    /// Eased blend progress where zero is the outgoing preset and one the incoming; one disables the
+    /// morph.
+    /// </param>
     public void SetPipeline(
         byte[] overlayBgra,
         int frameWidth,
@@ -234,7 +247,9 @@ public sealed class VisualizerGlPresenter : OpenGlControlBase
         IReadOnlyList<ShapeFill>? shapeFills = null,
         IReadOnlyList<WaveGeometry>? waveGeometry = null,
         int presetIndex = -1,
-        string? presetName = null)
+        string? presetName = null,
+        float[]? blendMotion = null,
+        float blendMix = 1f)
     {
         lock (_frameLock)
         {
@@ -255,6 +270,8 @@ public sealed class VisualizerGlPresenter : OpenGlControlBase
             _pipelinePresetName = presetName;
             _pipelineShapeFills = shapeFills?.ToArray();
             _pipelineWaveGeometry = waveGeometry?.ToArray();
+            _pipelineBlendMotion = blendMotion is null ? null : (float[])blendMotion.Clone();
+            _pipelineBlendMix = blendMix;
             // The render thread owns the caller's dictionary and writes it under its own lock, so the
             // presenter takes its own copy here rather than reading a Dictionary the render thread may
             // be mutating: a concurrent read of a Dictionary is undefined and can loop forever.
@@ -374,6 +391,8 @@ public sealed class VisualizerGlPresenter : OpenGlControlBase
             string? pipelinePresetName = null;
             IReadOnlyList<ShapeFill>? pipelineShapeFills = null;
             IReadOnlyList<WaveGeometry>? pipelineWaveGeometry = null;
+            float[]? pipelineBlendMotion = null;
+            var pipelineBlendMix = 1f;
             byte[]? frame = null;
             int frameWidth = 0, frameHeight = 0;
             lock (_frameLock)
@@ -395,6 +414,8 @@ public sealed class VisualizerGlPresenter : OpenGlControlBase
                     pipelinePresetName = _pipelinePresetName;
                     pipelineShapeFills = _pipelineShapeFills;
                     pipelineWaveGeometry = _pipelineWaveGeometry;
+                    pipelineBlendMotion = _pipelineBlendMotion;
+                    pipelineBlendMix = _pipelineBlendMix;
                     _pipelinePending = false;
                 }
                 else if (_hasFrame)
@@ -435,7 +456,9 @@ public sealed class VisualizerGlPresenter : OpenGlControlBase
                     pipelineParameters,
                     pipelineUniforms,
                     pipelineShapeFills,
-                    pipelineWaveGeometry))
+                    pipelineWaveGeometry,
+                    pipelineBlendMotion,
+                    pipelineBlendMix))
                 {
                     _lastPresented = _pipeline.OutputTexture;
                     Volatile.Write(ref _drawnPresetName, pipelinePresetName);

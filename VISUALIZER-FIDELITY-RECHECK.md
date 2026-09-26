@@ -346,10 +346,14 @@ presets). No code was copied; only behaviour was reproduced.
   drawing model is still Orynivo's recorded field on a fixed grid, not the reference's
   reverse-propagated arrow grid driven by `mv_x`/`mv_y` and `mv_dx`/`mv_dy`.
 - **Preset blending geometry:** the cosine-eased variables and the retained
-  feedback are implemented, but the reference's second warp pass — the outgoing
-  preset's own per-vertex UV set with a per-vertex alpha, drawn over the incoming
-  preset's mesh — is not. The two presets' geometries therefore swap on the first
-  blend frame while the parameter values ease over the configured duration.
+  feedback are implemented, and the GPU warp morphs its sampling coordinate from
+  the outgoing preset's captured mesh to the incoming one (`uBlend`, a second
+  per-vertex motion block in `VisualizerGlPipeline`). The reference draws both
+  presets' warp shaders as two alpha-blended passes; Orynivo draws only the
+  incoming shader on the morphed coordinate, so a preset with a custom warp
+  shader does not show its outgoing shader during the blend. The outgoing mesh is
+  frozen at the switch rather than re-evaluated each blend frame, and the comp
+  shader is not blended.
 - **Version-dependent defaults** (`MILKDROP_PRESET_VERSION`): the reference
   applies version-specific default values while loading; Orynivo uses one fixed
   default set.

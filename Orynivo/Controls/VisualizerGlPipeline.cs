@@ -105,8 +105,13 @@ internal sealed class VisualizerGlPipeline
         }
         """;
 
-    /// <summary>Floats per mesh vertex: the position pair and the nine motion values.</summary>
-    private const int FloatsPerVertex = 2 + PresetRenderer.MeshValues;
+    /// <summary>
+    /// Floats per mesh vertex: the position pair, the ten motion values of the incoming preset, and
+    /// the ten of the outgoing preset. The outgoing block lets the vertex shader morph the sampling
+    /// coordinate between the two presets during a blend; when no blend runs its values are ignored
+    /// because <c>uBlend</c> is one.
+    /// </summary>
+    private const int FloatsPerVertex = 2 + (PresetRenderer.MeshValues * 2);
 
     private const string QuadVertexSource = """
         #version 300 es
@@ -128,6 +133,10 @@ internal sealed class VisualizerGlPipeline
         layout(location = 2) in vec3 aMotion1;
         layout(location = 3) in vec3 aMotion2;
         layout(location = 4) in float aWarp;
+        layout(location = 5) in vec3 aOldMotion0;
+        layout(location = 6) in vec3 aOldMotion1;
+        layout(location = 7) in vec3 aOldMotion2;
+        layout(location = 8) in float aOldWarp;
         out vec2 vUv;
         out vec2 vUvOrig;
         out float vRad;
@@ -137,46 +146,44 @@ internal sealed class VisualizerGlPipeline
         uniform float uNeedsRadius;
         uniform float uWarpTime;
         uniform float uWarpScale;
-        void main()
-        {
-            float zoom = max(0.01, aMotion0.x);
-            float zoomExp = aMotion0.y;
-            float rotation = aMotion0.z;
-            float cx = aMotion1.x;
-            float cy = aMotion1.y;
-            float dx = aMotion1.z;
-            float dy = aMotion2.x;
-            float sx = aMotion2.y;
-            float sy = aMotion2.z;
+        uniform float uBlend;
 
-            // The reference warp vertex shader's arithmetic, applied at the vertex so the resulting
-            // texture coordinate is interpolated across the quad. aPosition is the vertex position in
-            // minus-one-to-one space.
-            float aspectX = uFrameHeight > uFrameWidth ? uFrameWidth / uFrameHeight : 1.0;
-            float aspectY = uFrameWidth > uFrameHeight ? uFrameHeight / uFrameWidth : 1.0;
-            float radius = uNeedsRadius > 0.5 ? length(aPosition * vec2(aspectX, aspectY)) : 0.0;
+        // The reference warp vertex shader's arithmetic for one preset's motion, applied at the
+        // vertex so the resulting texture coordinate is interpolated across the quad. aPosition is
+        // the vertex position in minus-one-to-one space.
+        vec2 orynivoWarpUv(vec2 pos, vec3 m0, vec3 m1, vec3 m2, float warp, float radius, float aspectX, float aspectY)
+        {
+            float zoom = max(0.01, m0.x);
+            float zoomExp = m0.y;
+            float rotation = m0.z;
+            float cx = m1.x;
+            float cy = m1.y;
+            float dx = m1.z;
+            float dy = m2.x;
+            float sx = m2.y;
+            float sy = m2.z;
             float radialZoom = (uNeedsRadius > 0.5 && zoomExp != 1.0)
                 ? pow(zoom, pow(zoomExp, radius * 2.0 - 1.0))
                 : zoom;
             float inverseZoom = 1.0 / max(0.01, radialZoom);
 
-            float u = aPosition.x * aspectX * 0.5 * inverseZoom + 0.5;
-            float v = aPosition.y * aspectY * 0.5 * inverseZoom + 0.5;
+            float u = pos.x * aspectX * 0.5 * inverseZoom + 0.5;
+            float v = pos.y * aspectY * 0.5 * inverseZoom + 0.5;
             u = (u - cx) / max(abs(sx), 0.0001) * sign(sx) + cx;
             v = (v - cy) / max(abs(sy), 0.0001) * sign(sy) + cy;
 
-            if (aWarp != 0.0)
+            if (warp != 0.0)
             {
                 float scaleInverse = uWarpScale == 0.0 ? 1.0 : 1.0 / uWarpScale;
                 float factor0 = 11.68 + 4.0 * cos(uWarpTime * 1.413 + 10.0);
                 float factor1 = 8.77 + 3.0 * cos(uWarpTime * 1.113 + 7.0);
                 float factor2 = 10.54 + 3.0 * cos(uWarpTime * 1.233 + 3.0);
                 float factor3 = 11.49 + 4.0 * cos(uWarpTime * 0.933 + 5.0);
-                float amount = aWarp * 0.0035;
-                u += amount * sin(uWarpTime * 0.333 + scaleInverse * (aPosition.x * factor0 - aPosition.y * factor3))
-                   + amount * cos(uWarpTime * 0.753 - scaleInverse * (aPosition.x * factor1 - aPosition.y * factor2));
-                v += amount * cos(uWarpTime * 0.375 - scaleInverse * (aPosition.x * factor2 + aPosition.y * factor1))
-                   + amount * sin(uWarpTime * 0.825 + scaleInverse * (aPosition.x * factor0 + aPosition.y * factor3));
+                float amount = warp * 0.0035;
+                u += amount * sin(uWarpTime * 0.333 + scaleInverse * (pos.x * factor0 - pos.y * factor3))
+                   + amount * cos(uWarpTime * 0.753 - scaleInverse * (pos.x * factor1 - pos.y * factor2));
+                v += amount * cos(uWarpTime * 0.375 - scaleInverse * (pos.x * factor2 + pos.y * factor1))
+                   + amount * sin(uWarpTime * 0.825 + scaleInverse * (pos.x * factor0 + pos.y * factor3));
             }
 
             float cosine = cos(rotation);
@@ -190,7 +197,22 @@ internal sealed class VisualizerGlPipeline
             v -= dy;
             u = (u - 0.5) / aspectX + 0.5;
             v = (v - 0.5) / aspectY + 0.5;
-            vUv = vec2(u, v);
+            return vec2(u, v);
+        }
+
+        void main()
+        {
+            float aspectX = uFrameHeight > uFrameWidth ? uFrameWidth / uFrameHeight : 1.0;
+            float aspectY = uFrameWidth > uFrameHeight ? uFrameHeight / uFrameWidth : 1.0;
+            float radius = uNeedsRadius > 0.5 ? length(aPosition * vec2(aspectX, aspectY)) : 0.0;
+
+            vec2 newUv = orynivoWarpUv(aPosition, aMotion0, aMotion1, aMotion2, aWarp, radius, aspectX, aspectY);
+            vec2 oldUv = orynivoWarpUv(aPosition, aOldMotion0, aOldMotion1, aOldMotion2, aOldWarp, radius, aspectX, aspectY);
+
+            // During a blend the outgoing preset's coordinate is eased into the incoming one, the way
+            // the reference morphs the two per-vertex UV sets; uBlend is one when no blend runs, so
+            // the result is exactly the incoming coordinate.
+            vUv = mix(oldUv, newUv, clamp(uBlend, 0.0, 1.0));
             vUvOrig = aPosition * 0.5 + 0.5;
             vRad = radius;
             vAng = -atan(aPosition.y * aspectY, aPosition.x * aspectX);
@@ -737,7 +759,7 @@ internal sealed class VisualizerGlPipeline
             _shaderBlurProgram = BuildProgram(gl, QuadVertexSource, ShaderBlurFragmentSource, out _);
 
             _warpUniforms = Uniforms(gl, _warpProgram,
-                ["uSource", "uFrameWidth", "uFrameHeight", "uNeedsRadius", "uWarpTime", "uWarpScale", "uDecay"]);
+                ["uSource", "uFrameWidth", "uFrameHeight", "uNeedsRadius", "uWarpTime", "uWarpScale", "uDecay", "uBlend"]);
             _blurUniforms = Uniforms(gl, _blurProgram, ["uSource", "uTexelX", "uTexelY"]);
             _postUniforms = Uniforms(
                 gl,
@@ -815,6 +837,15 @@ internal sealed class VisualizerGlPipeline
         gl.VertexAttribPointer(3, 3, GlFloat, 0, stride, (IntPtr)(8 * sizeof(float)));
         gl.EnableVertexAttribArray(4);
         gl.VertexAttribPointer(4, 1, GlFloat, 0, stride, (IntPtr)(11 * sizeof(float)));
+            // The outgoing preset's motion block drives the blend's morphing coordinate.
+            gl.EnableVertexAttribArray(5);
+            gl.VertexAttribPointer(5, 3, GlFloat, 0, stride, (IntPtr)(12 * sizeof(float)));
+            gl.EnableVertexAttribArray(6);
+            gl.VertexAttribPointer(6, 3, GlFloat, 0, stride, (IntPtr)(15 * sizeof(float)));
+            gl.EnableVertexAttribArray(7);
+            gl.VertexAttribPointer(7, 3, GlFloat, 0, stride, (IntPtr)(18 * sizeof(float)));
+            gl.EnableVertexAttribArray(8);
+            gl.VertexAttribPointer(8, 1, GlFloat, 0, stride, (IntPtr)(21 * sizeof(float)));
             var indices = GCHandle.Alloc(_indices, GCHandleType.Pinned);
             try
             {
@@ -930,6 +961,14 @@ internal sealed class VisualizerGlPipeline
     /// <param name="needsRadius">Whether the warp needs the polar radius.</param>
     /// <param name="parameters">The frame's pass values.</param>
     /// <param name="uniforms">The shader uniforms to seed, or <see langword="null"/> for none.</param>
+    /// <param name="blendMotion">
+    /// Per-vertex motion of the outgoing preset during a preset blend, or <see langword="null"/> when
+    /// no blend runs. It gives the vertex shader the second coordinate it morphs from.
+    /// </param>
+    /// <param name="blendMix">
+    /// Eased blend progress where zero is the outgoing preset and one the incoming. One disables the
+    /// morph, so a frame that does not blend is byte-identical to the pre-blend pipeline.
+    /// </param>
     /// <returns><see langword="true"/> when the frame was drawn.</returns>
     public bool Render(
         GlInterface gl,
@@ -946,7 +985,9 @@ internal sealed class VisualizerGlPipeline
         VisualizerFrameParameters parameters,
         IReadOnlyDictionary<string, ShaderValue>? uniforms = null,
         IReadOnlyList<ShapeFill>? shapeFills = null,
-        IReadOnlyList<WaveGeometry>? waveGeometry = null)
+        IReadOnlyList<WaveGeometry>? waveGeometry = null,
+        float[]? blendMotion = null,
+        float blendMix = 1f)
     {
         if (!_ready || frameWidth <= 0 || frameHeight <= 0)
             return false;
@@ -956,7 +997,7 @@ internal sealed class VisualizerGlPipeline
             EnsureSize(gl, frameWidth, frameHeight);
             EnsureShaderPrograms(gl);
             UploadOverlay(gl, overlayBgra, frameWidth, frameHeight);
-            PackVertices(mesh, meshX, meshY);
+            PackVertices(mesh, blendMotion, meshX, meshY);
 
             // Warp the feedback into ping zero, with the emitted warp shader when the preset has one.
             gl.BindFramebuffer(GlFramebuffer, _pingFramebuffer[0]);
@@ -979,11 +1020,13 @@ internal sealed class VisualizerGlPipeline
                 Set(gl, _warpShaderUniforms, "uNeedsRadius", needsRadius ? 1f : 0f);
                 Set(gl, _warpShaderUniforms, "uWarpTime", parameters.WarpTime);
                 Set(gl, _warpShaderUniforms, "uWarpScale", parameters.WarpScale);
+                Set(gl, _warpShaderUniforms, "uBlend", blendMix);
                 if (_perPixelWarp)
                 {
                     // The fragment stage owns the whole warp, so the frame motion is seeded as
-                    // uniforms and the quad covers the frame instead of the warped mesh.
-                    SeedPixelWarpMotion(gl, mesh, frameWidth, frameHeight, parameters);
+                    // uniforms and the quad covers the frame instead of the warped mesh. A blend
+                    // eases the motion uniforms between the two presets' mesh positions.
+                    SeedPixelWarpMotion(gl, mesh, blendMotion, blendMix, frameWidth, frameHeight, parameters);
                     DrawQuad(gl);
                 }
                 else
@@ -1003,6 +1046,7 @@ internal sealed class VisualizerGlPipeline
                 Set(gl, _warpUniforms, "uNeedsRadius", needsRadius ? 1f : 0f);
                 Set(gl, _warpUniforms, "uWarpTime", parameters.WarpTime);
                 Set(gl, _warpUniforms, "uWarpScale", parameters.WarpScale);
+                Set(gl, _warpUniforms, "uBlend", blendMix);
                 // The fixed warp fragment shader applies the decay itself, like the reference's
                 // frag_COLOR, so the post pass must not apply it again.
                 Set(gl, _warpUniforms, "uDecay", parameters.Decay);
@@ -1175,28 +1219,38 @@ internal sealed class VisualizerGlPipeline
     /// </summary>
     /// <param name="gl">GL interface.</param>
     /// <param name="mesh">Packed per-vertex motion.</param>
+    /// <param name="blendMotion">Outgoing preset's mesh motion during a blend, or <see langword="null"/>.</param>
+    /// <param name="blendMix">Eased blend progress, zero for the outgoing preset and one for the incoming.</param>
     /// <param name="frameWidth">Frame width in pixels.</param>
     /// <param name="frameHeight">Frame height in pixels.</param>
     /// <param name="parameters">The frame's pass values.</param>
     private void SeedPixelWarpMotion(
         GlInterface gl,
         float[] mesh,
+        float[]? blendMotion,
+        float blendMix,
         int frameWidth,
         int frameHeight,
         VisualizerFrameParameters parameters)
     {
         if (mesh.Length >= PresetRenderer.MeshValues)
         {
-            Set(gl, _warpShaderUniforms, "_orynivo_zoom", Math.Max(0.01f, mesh[0]));
-            Set(gl, _warpShaderUniforms, "_orynivo_zoomExp", mesh[1]);
-            Set(gl, _warpShaderUniforms, "_orynivo_rotation", mesh[2]);
-            Set(gl, _warpShaderUniforms, "_orynivo_centre_x", mesh[3]);
-            Set(gl, _warpShaderUniforms, "_orynivo_centre_y", mesh[4]);
-            Set(gl, _warpShaderUniforms, "_orynivo_offset_x", mesh[5]);
-            Set(gl, _warpShaderUniforms, "_orynivo_offset_y", mesh[6]);
-            Set(gl, _warpShaderUniforms, "_orynivo_stretch_x", mesh[7]);
-            Set(gl, _warpShaderUniforms, "_orynivo_stretch_y", mesh[8]);
-            Set(gl, _warpShaderUniforms, "_orynivo_warp", mesh[9]);
+            // A blend eases the frame motion between the outgoing and incoming presets, so a
+            // per-pixel warp morphs its coordinate instead of switching it on the first frame.
+            float Blend(int index) => blendMotion is not null && index < blendMotion.Length
+                ? blendMotion[index] + ((mesh[index] - blendMotion[index]) * blendMix)
+                : mesh[index];
+
+            Set(gl, _warpShaderUniforms, "_orynivo_zoom", Math.Max(0.01f, Blend(0)));
+            Set(gl, _warpShaderUniforms, "_orynivo_zoomExp", Blend(1));
+            Set(gl, _warpShaderUniforms, "_orynivo_rotation", Blend(2));
+            Set(gl, _warpShaderUniforms, "_orynivo_centre_x", Blend(3));
+            Set(gl, _warpShaderUniforms, "_orynivo_centre_y", Blend(4));
+            Set(gl, _warpShaderUniforms, "_orynivo_offset_x", Blend(5));
+            Set(gl, _warpShaderUniforms, "_orynivo_offset_y", Blend(6));
+            Set(gl, _warpShaderUniforms, "_orynivo_stretch_x", Blend(7));
+            Set(gl, _warpShaderUniforms, "_orynivo_stretch_y", Blend(8));
+            Set(gl, _warpShaderUniforms, "_orynivo_warp", Blend(9));
         }
 
         Set(gl, _warpShaderUniforms, "_orynivo_size_x", frameWidth);
@@ -1475,7 +1529,7 @@ internal sealed class VisualizerGlPipeline
                         "_orynivo_offset_x", "_orynivo_offset_y", "_orynivo_stretch_x", "_orynivo_stretch_y",
                         "_orynivo_warp", "_orynivo_warpTime", "_orynivo_warpScale"
                     ]
-                    : ["uFrameWidth", "uFrameHeight", "uNeedsRadius", "uWarpTime", "uWarpScale"]);
+                    : ["uFrameWidth", "uFrameHeight", "uNeedsRadius", "uWarpTime", "uWarpScale", "uBlend"]);
             }
             else
                 ShaderError = "warp: " + error;
@@ -1865,11 +1919,15 @@ internal sealed class VisualizerGlPipeline
         }
     }
 
-    /// <summary>Fills the vertex buffer with the grid positions and the mesh motion.</summary>
-    /// <param name="motion">Per-vertex motion.</param>
+    /// <summary>Fills the vertex buffer with the grid positions and both presets' mesh motion.</summary>
+    /// <param name="motion">Per-vertex motion of the incoming preset.</param>
+    /// <param name="oldMotion">
+    /// Per-vertex motion of the outgoing preset, or <see langword="null"/> when no blend runs. The
+    /// vertex shader ignores it while <c>uBlend</c> is one.
+    /// </param>
     /// <param name="meshX">Mesh grid columns.</param>
     /// <param name="meshY">Mesh grid rows.</param>
-    private void PackVertices(float[] motion, int meshX, int meshY)
+    private void PackVertices(float[] motion, float[]? oldMotion, int meshX, int meshY)
     {
         var vertex = 0;
         var target = 0;
@@ -1883,7 +1941,11 @@ internal sealed class VisualizerGlPipeline
                 _vertices[target + 1] = positionY;
                 var source = vertex * PresetRenderer.MeshValues;
                 for (var value = 0; value < PresetRenderer.MeshValues; value++)
+                {
                     _vertices[target + 2 + value] = motion[source + value];
+                    _vertices[target + 2 + PresetRenderer.MeshValues + value] =
+                        oldMotion is not null && source + value < oldMotion.Length ? oldMotion[source + value] : 0f;
+                }
 
                 target += FloatsPerVertex;
                 vertex++;

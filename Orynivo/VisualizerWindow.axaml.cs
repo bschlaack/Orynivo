@@ -74,6 +74,22 @@ public partial class VisualizerWindow : Window
     private readonly float[] _glMeshSnapshot =
         new float[(PresetRenderer.MeshGridX + 1) * (PresetRenderer.MeshGridY + 1) * PresetRenderer.MeshValues];
 
+    /// <summary>Outgoing preset's mesh motion captured at the switch, for the geometric warp blend.</summary>
+    private readonly float[] _blendMeshSnapshot =
+        new float[(PresetRenderer.MeshGridX + 1) * (PresetRenderer.MeshGridY + 1) * PresetRenderer.MeshValues];
+
+    /// <summary>Whether <see cref="_blendMeshSnapshot"/> holds a usable outgoing mesh.</summary>
+    private bool _blendMeshValid;
+
+    /// <summary>Eased blend progress where zero is the outgoing preset and one the incoming.</summary>
+    private float _blendMix = 1f;
+
+    /// <summary>Blend mesh state published to the presenter together with the frame.</summary>
+    private bool _presentBlendMeshValid;
+
+    /// <summary>Blend progress published to the presenter together with the frame.</summary>
+    private float _presentBlendMix = 1f;
+
     /// <summary>
     /// Applies the GL mode's renderer settings. The GPU pipeline owns the frame when the preset has no
     /// shaders, and also when its shaders emit GLSL, because the pipeline can then run them; a preset
@@ -604,12 +620,25 @@ public partial class VisualizerWindow : Window
                 _blendPreset = previousPreset;
                 _blendState = previousState;
                 _blendElapsed = 0;
+                // Capture the outgoing preset's last GPU mesh so the warp can morph from it. The
+                // snapshot is only valid when the previous frame went through the GPU pipeline.
+                _blendMeshValid = _glPipelineActive && _useGlPresenter;
+                if (_blendMeshValid)
+                {
+                    lock (_presentLock)
+                    {
+                        Array.Copy(_glMeshSnapshot, _blendMeshSnapshot, _blendMeshSnapshot.Length);
+                    }
+                }
+                _blendMix = 0f;
                 _renderer.SetBlend(_blendPreset, _blendState, 0f);
             }
             else
             {
                 _blendPreset = null;
                 _blendState = null;
+                _blendMeshValid = false;
+                _blendMix = 1f;
             }
             // The first frames are traced stage by stage so a frozen frame names its own stage, and
             // every frame reports the brightness as it enters each stage. The renderer probes the
@@ -637,6 +666,8 @@ public partial class VisualizerWindow : Window
             _presetSeconds = 0;
             _blendPreset = null;
             _blendState = null;
+            _blendMeshValid = false;
+            _blendMix = 1f;
         }
 
         // Advance an active blend. The renderer eases the outgoing preset's per-frame variables into
@@ -649,11 +680,14 @@ public partial class VisualizerWindow : Window
                 ? 1f
                 : (float)Math.Clamp(_blendElapsed / _presetBlendSeconds, 0d, 1d);
             _renderer.SetBlend(_blendPreset, _blendState, progress);
+            _blendMix = PresetBlend.CosineInterp(progress);
             if (progress >= 1f)
             {
                 _renderer.SetBlend(null, null, 1f);
                 _blendPreset = null;
                 _blendState = null;
+                _blendMeshValid = false;
+                _blendMix = 1f;
             }
         }
 
@@ -764,6 +798,8 @@ public partial class VisualizerWindow : Window
             _presentWarpShader = _glWarpShader;
             _presentCompShader = _glCompShader;
             _presentPixelWarp = _glPixelWarp;
+            _presentBlendMeshValid = _blendMeshValid;
+            _presentBlendMix = _blendMix;
         }
 
         if (_renderer.FrameCount == 1)
@@ -993,7 +1029,9 @@ public partial class VisualizerWindow : Window
                         _glShapeFills,
                         _glWaveGeometry,
                         _framePresetIndex,
-                        _framePresetName);
+                        _framePresetName,
+                        _presentBlendMeshValid ? _blendMeshSnapshot : null,
+                        _presentBlendMix);
                 }
             }
 

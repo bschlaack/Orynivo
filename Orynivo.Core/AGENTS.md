@@ -303,9 +303,12 @@ This file applies to `Orynivo.Core/` and supplements `../AGENTS.md`.
   those slots; the outgoing preset's per-frame block runs each blend frame on its own `_blendSlots`
   so its user variables keep advancing, and `ApplyBlend` eases the interpolated values into `_slots`
   after the incoming per-frame block. Never blend the motion variables or the per-pixel state, and
-  never re-run the outgoing preset's init block on every frame. The reference's geometric second
-  warp pass (two per-vertex UV sets with per-vertex alpha) is not implemented; the feedback still
-  carries the previous picture, so a switch morphs rather than restarting from black.
+  never re-run the outgoing preset's init block on every frame. The GPU warp additionally morphs its
+  sampling coordinate from the outgoing preset's captured mesh to the incoming one (the outgoing
+  mesh is passed as a second per-vertex attribute block and `uBlend` eases the mix); the outgoing
+  preset's own warp shader is not drawn, so a preset with a custom warp shader shows the incoming
+  shader on the morphed coordinate. The feedback still carries the previous picture, so a switch
+  morphs rather than restarting from black.
   `PresetRenderer.SeedFrameVariables` must keep `fps`
   finite on the first frame, because a preset that divides by it otherwise accumulates an infinity
   that then reaches the sampler. The per-frame `rand_frame` vector uses `Random.Shared` by default so

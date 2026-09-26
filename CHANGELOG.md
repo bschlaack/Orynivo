@@ -133,8 +133,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   motion-vector display, the video echo, `gamma`, and the blur range keys) are eased into the
   incoming preset with MilkDrop's cosine curve, while the motion variables that drive the warp stay
   on the incoming preset; a boolean or ordinal switch such as `wrap` or `echo_orient` flips at the
-  blend midpoint instead of landing between two values. The switch still continues from the previous
-  preset's feedback instead of restarting from black.
+  blend midpoint instead of landing between two values. On the OpenGL path the warp's sampling
+  coordinate additionally morphs from the outgoing preset's captured mesh to the incoming one, so
+  the geometry eases over the blend too. The switch still continues from the previous preset's
+  feedback instead of restarting from black.
 - Added preset texture files to the visualizer. A shader that declares its own texture, such as
   `sampler sampler_seaweed;`, now resolves to `textures/seaweed.jpg` (or `.png`, `.bmp`, `.gif`,
   `.webp`, `.tga`) beside the presets, matching MilkDrop's convention; previously an unknown sampler

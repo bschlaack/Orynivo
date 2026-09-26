@@ -681,7 +681,10 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
   outgoing preset's live slots with `PresetRenderer.CaptureFrameState` before the old renderer is
   disposed and call `SetBlend` each frame with the eased progress, so a switch eases its non-motion
   parameters instead of snapping; the blend is cleared on reset, on the next switch, and when the
-  progress reaches one.
+  progress reaches one. The window additionally snapshots the outgoing preset's GPU mesh and passes
+  it with the eased mix to `VisualizerGlPresenter.SetPipeline`, whose warp morphs the sampling
+  coordinate from that mesh to the incoming one through the second per-vertex motion block and
+  `uBlend`.
   The defaults are 640 x 360 at 60 frames per second, which the parallel frame passes made affordable.
   The built-in presets are structured warp-shader effects (see `VisualizerPresets`), and
   `RenderTimingDiagnosticTests` documents their cost profile at two resolutions.
