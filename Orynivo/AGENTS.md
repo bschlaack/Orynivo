@@ -668,8 +668,9 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
   `VisualizerAutoAdvanceSeconds` (default 15) let the render loop advance to the next preset after
   the dwell time; the window only sets `_presetIndex` and lets the next frame apply the switch, so
   the change stays a render-thread request like the key and mouse navigation. The
-  defaults are 640 x 360 at 60 frames per second, which the parallel frame passes made affordable
-  (the built-in presets cost 21 ms per frame on average there against 39 ms at 480 x 270 before).
+  defaults are 640 x 360 at 60 frames per second, which the parallel frame passes made affordable.
+  The built-in presets are structured warp-shader effects (see `VisualizerPresets`), and
+  `RenderTimingDiagnosticTests` documents their cost profile at two resolutions.
   `VisualizerAlwaysShowOverlay` decides whether the overlay is permanent or appears on pointer
   activity for three seconds; the reveal is driven by the window's own `PointerMoved`, which
   only fires while the pointer is over it, so a mouse move on another monitor must never
@@ -724,7 +725,14 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
   contents, because a real collection holds thousands of files and reading them up front froze
   the whole application; a file is read the first time one of its presets is shown, and a
   multi-section file exposes its remaining sections then. Never move discovery back onto the UI
-  thread, and keep `Count` and `At` usable while it runs. Preset stages share one slot layout, so a
+  thread, and keep `Count` and `At` usable while it runs. `VisualizerPresets.BuiltIn` holds nine
+  hand-written warp-shader presets (`Spiral`, `Kaleidoscope`, `Fractal`, `Ripple`, `Vortex`, `Bloom`,
+  `Spectrum Bars`, `Starfield`, `Orbit`): each carries a small `warp_N` shader that reads the previous
+  feedback, so a first run shows structure instead of a flat full-screen smear. Keep them on the
+  documented expression and shader subset, because they double as authoring examples; a procedural
+  background that accumulates through the feedback must be bounded (for example with `max`) so it
+  cannot blow out to white. `VisualizerPresetsTests.BuiltIn_ContainsAWarpingPreset` accepts either a
+  per-pixel program or a warp shader. Preset stages share one slot layout, so a
   stage-local built-in such as `x` or `rad` is one slot that each stage seeds and reads back
   for itself: the per-pixel stage seeds it per pixel, a shape seeds it per shape and per
   vertex. Never let a stage assume another stage's value is still in place.

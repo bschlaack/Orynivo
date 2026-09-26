@@ -950,6 +950,9 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
             ProbeStage("compDone", _fresh);
         }
 
+        // The shader grid is adapted from the complete shader cost, but the reported shader stage is
+        // the comp pass only: a warp shader already runs inside the warp stage, so adding it again
+        // would make the stage sum exceed the measured frame.
         LastShaderMilliseconds = shader + _warpShaderMilliseconds;
         trace?.Invoke($"stage=done frame={_frame}");
         ProbeStage("done", _fresh);
@@ -959,7 +962,14 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
         _previous.CopyFrom(_compStageRan ? _frameCopy : _fresh);
         ProbeStage("feedback", _previous);
         _frame++;
-        RecordTimings(warp, blur, postProcess, overlay, composite, LastShaderMilliseconds);
+        // A frame that costs more than the budget means the optional shader work is what has to
+        // give, so it loses resolution rather than being dropped; a preset that never drew its
+        // shader at all is exactly the empty picture a user reported. The grid follows the complete
+        // shader cost (warp plus comp), which is why it uses LastShaderMilliseconds rather than the
+        // comp-only stage that RecordTimings reports.
+        if (useShaders)
+            AdaptShaderGrid(LastShaderMilliseconds);
+        RecordTimings(warp, blur, postProcess, overlay, composite, shader);
     }
 
     /// <summary>
@@ -1930,12 +1940,6 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
             _sumComposite / _timingFrames,
             _sumShader / _timingFrames,
             _sumTotal / _timingFrames);
-
-        // A frame that costs more than the budget means the optional shader work is what has to
-        // give, so it loses resolution rather than being dropped; a preset that never drew its
-        // shader at all is exactly the empty picture a user reported.
-        if (HasShaders)
-            AdaptShaderGrid(shader);
     }
 
     /// <summary>Runs the warp shaders for one pixel and stores the resulting colour.</summary>

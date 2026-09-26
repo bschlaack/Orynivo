@@ -34,7 +34,7 @@ public sealed class VisualizerPresetsTests
     [Fact]
     public void BuiltIn_ContainsAWarpingPreset()
     {
-        Assert.Contains(VisualizerPresets.BuiltIn, preset => !preset.PerPixel.IsEmpty);
+        Assert.Contains(VisualizerPresets.BuiltIn, preset => !preset.PerPixel.IsEmpty || preset.WarpShaders.Count > 0);
     }
 
     /// <summary>Indexing wraps around in both directions.</summary>

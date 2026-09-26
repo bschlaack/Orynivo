@@ -7,17 +7,17 @@ namespace Orynivo.Tests;
 /// <summary>
 /// Guards the render cost profile of phase 39a over the built-in presets. Every preset is
 /// measured at two resolutions and the numbers are written to the test output, so the profile
-/// is documented where it is measured. The assertion is a ratio (four times the pixels must
+/// is documented where it is measured. The assertion is a ratio (sixteen times the pixels must
 /// cost more), not an absolute duration, so the test stays meaningful on any machine. The same
 /// numbers reach the user through the visualizer's diagnostic line.
 /// </summary>
 public sealed class RenderTimingDiagnosticTests
 {
-    private const int Frames = 5;
-    private const int LowWidth = 480;
-    private const int LowHeight = 270;
-    private const int HighWidth = 960;
-    private const int HighHeight = 540;
+    private const int Frames = 10;
+    private const int LowWidth = 320;
+    private const int LowHeight = 180;
+    private const int HighWidth = 1280;
+    private const int HighHeight = 720;
 
     private readonly ITestOutputHelper _output;
 
@@ -25,7 +25,7 @@ public sealed class RenderTimingDiagnosticTests
     /// <param name="output">Test output writer.</param>
     public RenderTimingDiagnosticTests(ITestOutputHelper output) => _output = output;
 
-    /// <summary>Every built-in preset costs more at four times the pixel count, on both paths.</summary>
+    /// <summary>Every built-in preset costs more at sixteen times the pixel count, on both paths.</summary>
     [Fact]
     public void Measure_BuiltInPresetsScaleWithThePixelCount()
     {

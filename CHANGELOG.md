@@ -51,15 +51,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   scalar, so `mus = 0.01/(sqrt(0) + 0.001)` exploded. The banks now reach the GLSL, SkSL, and
   interpreter paths, and `vol_att` is bound as the attenuated overall level. A scan of a 10,353-preset
   collection found the banks used by about 600 presets and `vol_att` by 206.
+- Fixed the visualizer's reported frame timing. A warp shader's cost was added to the shader stage
+  even though it already runs inside the warp stage, so the sum of the stages could exceed the
+  measured frame and `RenderTimingDiagnosticTests` failed. The shader stage now reports only the comp
+  pass, matching its documented meaning.
 
 ### Changed
-- Refreshed the built-in visualizer presets with richer motion, colour cycling, and shapes:
-  **Plasma**, **Nebula**, **Tunnel**, **Spectrum Bars**, **Bloom**, **Orbit**, **Mandala**, and
-  **Starfield**. The plasma, nebula, tunnel, bloom, and starfield presets draw the bright full-width
-  PCM   waveform with a swirling warp (a spectrum-mode wave there only left a thin line at the
-  bottom), **Spectrum Bars** keeps the bright additive spectrum wave along the bottom as an
-  equalizer, and **Orbit** uses custom shapes. Every built-in is verified to light up by
-  `VisualizerBrightnessDiagnosticTests`.
+- Rebuilt the built-in visualizer presets as structured warp-shader effects instead of a flat
+  full-screen waveform smear: **Spiral**, **Kaleidoscope**, **Fractal**, **Ripple**, **Vortex**,
+  **Bloom**, **Spectrum Bars**, **Starfield**, and **Orbit**. Each draws a bright waveform and shapes
+  through its own warp shader, so the picture has structure; the earlier presets read as a "graphic
+  glitch"/"carpet". **Spectrum Bars** keeps the additive spectrum wave along the bottom as an
+  equalizer over a faint procedural background, and **Orbit** uses custom shapes. Every built-in is
+  verified to light up by `VisualizerBrightnessDiagnosticTests`.
 
 ### Added
 - Added automatic preset advancement to the visualizer. Settings > Visualisierung gains an enable
