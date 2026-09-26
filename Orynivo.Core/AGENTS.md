@@ -264,10 +264,12 @@ This file applies to `Orynivo.Core/` and supplements `../AGENTS.md`.
   `HueShadeAt(originalU, originalV)`, and the GPU path carries the four corners as the twelve
   `hue_shader_<channel><corner>` scalars that `ShaderTranspiler.EmitHueShader` mixes by the fragment's
   own position. Motion vectors are **not** an engine grid: the reference's `mv_x`/`mv_y` are the arrow
-  grid's size, `mv_dx`/`mv_dy`/`mv_l`/`mv_a` are ordinary blendable variables (`mv_a` defaults to one,
-  the legacy key is `bMotionVectorsOn`), and `DrawMotionVectors()` only draws that arrow grid.
-  Orynivo's own `mv_enabled`-gated recording is an extension, not reference behaviour, and must be
-  documented as such. The interpreter
+  grid's size, `mv_dx`/`mv_dy`/`mv_l`/`mv_a` are ordinary blendable variables (`mv_a` defaults to one
+  when the legacy `bMotionVectorsOn` key is set, otherwise zero), and `DrawMotionVectors()` only draws
+  that arrow grid. Orynivo gates the arrows on `mv_a` (via the `bMotionVectors`/`bMotionVectorsOn`
+  aliases) and colours them from `mv_r`/`mv_g`/`mv_b`, but the field itself is Orynivo's own
+  `mv_enabled`-gated recording on a fixed grid rather than the reference's reverse-propagated
+  `mv_x`/`mv_y` output; that recording remains a documented extension, not reference behaviour. The interpreter
   walks the tree per pixel, which is the known cost limit; a JIT compiler for shaders is the
   documented follow-up if the CPU cost proves too high.
   `PresetRenderer.Timings` and `AverageTimings` carry the `RenderTimings` breakdown per frame and

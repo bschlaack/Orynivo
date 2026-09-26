@@ -673,11 +673,11 @@ public sealed class VisualizerPreset
         ["fWaveB"] = "wave_b",
         ["fWaveX"] = "wave_x",
         ["fWaveY"] = "wave_y",
-        // Milkdrop keeps the enable flag and the length apart: bMotionVectors turns the vectors on
-        // and defaults to off, while mv_l is only their length and defaults to one. Writing the flag
-        // into the length drew a grid of stray lines on every preset that set a length but never
-        // asked for vectors.
-        ["bMotionVectors"] = "mv_enabled",
+        // Milkdrop keeps the enable flag and the length apart: bMotionVectorsOn turns the vectors on
+        // and defaults to off, while mv_l is only their length and defaults to one. The reference
+        // variable is mv_a (the arrow alpha); mv_enabled is Orynivo's own recording extension.
+        ["bMotionVectors"] = "mv_a",
+        ["bMotionVectorsOn"] = "mv_a",
         ["nMotionVectorsX"] = "mv_x",
         ["nMotionVectorsY"] = "mv_y",
         // Milkdrop 2 writes the blur and edge chain with short keys; they name the same parameters

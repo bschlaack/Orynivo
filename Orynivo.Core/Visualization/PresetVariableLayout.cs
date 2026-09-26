@@ -44,7 +44,7 @@ public sealed class PresetVariableLayout
         "mod_wave_alpha_by_volume", "mod_wave_alpha_start", "mod_wave_alpha_end",
         "red_blue_stereo", "brighten", "darken", "solarize", "invert",
         "ob_size", "ob_r", "ob_g", "ob_b", "ob_a", "ib_size", "ib_r", "ib_g", "ib_b", "ib_a",
-        "mv_x", "mv_y", "mv_dx", "mv_dy", "mv_l", "mv_enabled",
+        "mv_x", "mv_y", "mv_dx", "mv_dy", "mv_l", "mv_a", "mv_r", "mv_g", "mv_b", "mv_enabled",
         "echo_zoom", "echo_alpha", "echo_orient",
         "fVideoEchoZoom", "fVideoEchoAlpha", "nVideoEchoOrientation",
         "x", "y", "rad", "ang", "progress", "meshx", "meshy", "rand_frame"

@@ -337,11 +337,10 @@ presets). No code was copied; only behaviour was reproduced.
 
 ### Remaining gaps
 
-- **Motion vectors** use Orynivo's `mv_enabled`-gated recorded field and draw it
-  white with `mv_l`; the reference draws an arrow grid when `mv_a >= 0.001`
-  using `mv_x`/`mv_y` (fractional grid), `mv_dx`/`mv_dy` (offset), `mv_l`
-  (length), and `mv_r`/`mv_g`/`mv_b` (colour), before the warp. This is a
-  deliberate documented extension, not a match.
+- **Motion vectors:** the reference variables are now used (`bMotionVectors`/`bMotionVectorsOn`
+  alias onto `mv_a`, the arrows take `mv_r`/`mv_g`/`mv_b`, and `mv_l` is the length), but the
+  drawing model is still Orynivo's recorded field on a fixed grid, not the reference's
+  reverse-propagated arrow grid driven by `mv_x`/`mv_y` and `mv_dx`/`mv_dy`.
 - **Preset blending** (`m_bBlending`, the automatic/user blend time): MilkDrop
   cross-fades between two presets; Orynivo switches hard while retaining the
   feedback. Not implemented.

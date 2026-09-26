@@ -19,6 +19,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   - The reference variable names `gamma`, `wrap`, and `wave_usedots` are registered, so per-frame
     code that writes the MilkDrop spelling (`gamma = 1.5;`, `wave_usedots = 1;`) now affects the
     display; the `fGammaAdj`, `bTexWrap`, and `bWaveDots` keys alias onto them.
+  - Motion vectors use the reference variables: `bMotionVectors`/`bMotionVectorsOn` alias onto
+    `mv_a` (the arrow alpha), and the arrows take their colour from `mv_r`/`mv_g`/`mv_b`. The
+    recorded-field model itself remains Orynivo's documented extension.
   - The generated noise textures use MilkDrop's sizes: `noise_lq`, `noise_mq`, and `noise_hq` are
     256×256 and `noise_lq_lite` is 32×32 (previously `noise_lq` was 32 and `noise_hq` 512), so
     `texsize_noise_*` and every shader that scales its sampling by them agree with the reference.

@@ -1188,6 +1188,18 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
         Write("fVideoEchoZoom", 1f);
         Write("fVideoEchoAlpha", 0f);
         Write("nVideoEchoOrientation", 0f);
+        // The reference's motion-vector defaults: length one, white, alpha zero (off) unless a preset
+        // enables it. mv_enabled is Orynivo's own recording switch.
+        Write("mv_x", 0f);
+        Write("mv_y", 0f);
+        Write("mv_dx", 0f);
+        Write("mv_dy", 0f);
+        Write("mv_l", 1f);
+        Write("mv_a", 0f);
+        Write("mv_r", 1f);
+        Write("mv_g", 1f);
+        Write("mv_b", 1f);
+        Write("mv_enabled", 0f);
         // Preset keys are the per-frame starting values; the per-frame block may still override
         // them, and they are restored on the next frame just like in Milkdrop.
         foreach (var (name, value) in Preset.Defaults)
@@ -1256,7 +1268,7 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
         // when the preset's own code or the zoom exponent actually needs it.
         var needsRadius = _perPixelUsesRadius || zoomExp != 1f;
         var needsAngle = _perPixelUsesAngle;
-        var recordMotion = Read("mv_enabled", 0f) >= 0.5f;
+        var recordMotion = Read("mv_enabled", 0f) >= 0.5f || Read("mv_a", 0f) >= 0.001f;
         if (!recordMotion)
         {
             // Stale samples would otherwise survive into the next time the grid is drawn.
@@ -3925,9 +3937,23 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
     /// <summary>Draws the recorded motion field as a grid of vectors.</summary>
     private void DrawMotionVectors()
     {
+        // MilkDrop draws the arrows when mv_a is set; mv_enabled is Orynivo's own recording
+        // extension, which defaults the alpha to one.
+        var alpha = Math.Clamp(Read("mv_a", 0f), 0f, 1f);
+        if (alpha < 0.001f)
+        {
+            if (Read("mv_enabled", 0f) < 0.5f)
+                return;
+            alpha = 1f;
+        }
+
         var length = Math.Clamp(Read("mv_l", 1f), 0f, 1f);
         if (length <= 0f)
             return;
+
+        var colourR = Math.Clamp(Read("mv_r", 1f), 0f, 1f);
+        var colourG = Math.Clamp(Read("mv_g", 1f), 0f, 1f);
+        var colourB = Math.Clamp(Read("mv_b", 1f), 0f, 1f);
 
         var width = _fresh.Width;
         var height = _fresh.Height;
@@ -3950,10 +3976,10 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
                     PaintPixel(
                         (int)Math.Clamp(fromX + (deltaX * t), 0f, width - 1),
                         (int)Math.Clamp(fromY + (deltaY * t), 0f, height - 1),
-                        1f,
-                        1f,
-                        1f,
-                        length * 0.5f,
+                        colourR,
+                        colourG,
+                        colourB,
+                        alpha,
                         additive: true);
                 }
             }
