@@ -310,7 +310,13 @@ This file applies to `Orynivo.Core/` and supplements `../AGENTS.md`.
   uniforms in the SkSL prelude, the type table marks them `float4` so `float2x2(_qb)` spreads its
   components, and `WriteShaderUniforms` seeds them from the preset slots; a bank read as an unknown
   scalar (a zero) broke Royal Mashup (151) with a divide by zero. Do not drop these: a scan of a
-  10,353-preset collection uses the banks in about 600 presets and `vol_att` in 206.
+  10,353-preset collection uses the banks in about 600 presets and `vol_att` in 206. The sampler-size
+  uniforms (`texsize`, `texsize_main`/`fc_main`/`pc_main`, and `texsize_noise_lq`/`mq`/`hq`/
+  `noisevol_lq`/`hq`) are part of the same universe: declare each in the GLSL prelude as scalars with
+  a reconstructing macro (the GL setter is scalar-only), declare them as `float4` in the SkSL prelude,
+  and seed them in `WriteShaderUniforms`, `BindShaderVariables`, and `SeedCompiledShaderFrame`. A
+  shader that reads `texsize_noise_lq.zw` for a dither coordinate (Royal Mashup (188)) rendered a
+  different picture when they were left at zero. `SamplerSizeUniformTests` pins the values.
   MilkDrop's twenty-four `rot_*` matrices are `float4x3`, a non-square type that neither the
   interpreter's square-matrix pool nor SkSL models, so they are never materialised as a type.
   `ShaderRotationMatrices` builds the reference's row-vector composition (`Rx * T * Rz * Ry`, the

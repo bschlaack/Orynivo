@@ -2149,6 +2149,15 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
             1f / Math.Max(0.0001f, aspectY),
             4);
         values[15] = ShaderValue.Scalar(VolumeAtt);
+        // The texture-size uniforms, aligned with the tail of FrameVariables.
+        values[16] = ShaderValue.Vector(width, height, 1f / Math.Max(1, width), 1f / Math.Max(1, height), 4);
+        values[17] = values[16];
+        values[18] = values[16];
+        values[19] = SamplerSize(VisualizerTextureBank.SmallSize);
+        values[20] = SamplerSize(VisualizerTextureBank.MediumSize);
+        values[21] = SamplerSize(VisualizerTextureBank.LargeSize);
+        values[22] = SamplerSize(VisualizerTextureBank.VolumeSize);
+        values[23] = values[22];
         foreach (var compiled in _compiledWarp)
             SeedCompiledShader(compiled, values);
 
@@ -2457,6 +2466,12 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
         };
     }
 
+    /// <summary>Builds a sampler-size vector from a square texture size.</summary>
+    /// <param name="size">Texture size in pixels.</param>
+    /// <returns>The <c>(size, size, 1/size, 1/size)</c> vector.</returns>
+    private static ShaderValue SamplerSize(int size) =>
+        ShaderValue.Vector(size, size, 1f / size, 1f / size, 4);
+
     /// <summary>
     /// Fills every uniform a translated shader prelude declares from the current frame, so the OpenGL
     /// pipeline seeds the same values the interpreter binds. The caller owns the dictionary, because a
@@ -2474,7 +2489,16 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
         ArgumentNullException.ThrowIfNull(destination);
         var width = _previous.Width;
         var height = _previous.Height;
-        destination["texsize"] = ShaderValue.Vector(width, height, 1f / Math.Max(1, width), 1f / Math.Max(1, height), 4);
+        var mainSize = ShaderValue.Vector(width, height, 1f / Math.Max(1, width), 1f / Math.Max(1, height), 4);
+        destination["texsize"] = mainSize;
+        destination["texsize_main"] = mainSize;
+        destination["texsize_fc_main"] = mainSize;
+        destination["texsize_pc_main"] = mainSize;
+        destination["texsize_noise_lq"] = SamplerSize(VisualizerTextureBank.SmallSize);
+        destination["texsize_noise_mq"] = SamplerSize(VisualizerTextureBank.MediumSize);
+        destination["texsize_noise_hq"] = SamplerSize(VisualizerTextureBank.LargeSize);
+        destination["texsize_noisevol_lq"] = SamplerSize(VisualizerTextureBank.VolumeSize);
+        destination["texsize_noisevol_hq"] = SamplerSize(VisualizerTextureBank.VolumeSize);
         destination["time"] = ShaderValue.Scalar(Read("time", 0f));
         destination["frame"] = ShaderValue.Scalar(Read("frame", 0f));
         destination["fps"] = ShaderValue.Scalar(Read("fps", 0f));
@@ -2612,7 +2636,16 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
         var height = _previous.Height;
         interpreter.SetVariable("uv", ShaderValue.Vector(u, v, 0f, 0f, 2));
         interpreter.SetVariable("uv_orig", ShaderValue.Vector(originalU, originalV, 0f, 0f, 2));
-        interpreter.SetVariable("texsize", ShaderValue.Vector(width, height, 1f / Math.Max(1, width), 1f / Math.Max(1, height), 4));
+        var mainSize = ShaderValue.Vector(width, height, 1f / Math.Max(1, width), 1f / Math.Max(1, height), 4);
+        interpreter.SetVariable("texsize", mainSize);
+        interpreter.SetVariable("texsize_main", mainSize);
+        interpreter.SetVariable("texsize_fc_main", mainSize);
+        interpreter.SetVariable("texsize_pc_main", mainSize);
+        interpreter.SetVariable("texsize_noise_lq", SamplerSize(VisualizerTextureBank.SmallSize));
+        interpreter.SetVariable("texsize_noise_mq", SamplerSize(VisualizerTextureBank.MediumSize));
+        interpreter.SetVariable("texsize_noise_hq", SamplerSize(VisualizerTextureBank.LargeSize));
+        interpreter.SetVariable("texsize_noisevol_lq", SamplerSize(VisualizerTextureBank.VolumeSize));
+        interpreter.SetVariable("texsize_noisevol_hq", SamplerSize(VisualizerTextureBank.VolumeSize));
         interpreter.SetVariable("time", Read("time", 0f));
         interpreter.SetVariable("frame", Read("frame", 0f));
         interpreter.SetVariable("fps", Read("fps", 0f));
@@ -2699,7 +2732,10 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
         [
             "time", "frame", "fps", "bass", "mid", "treb", "vol",
             "bass_att", "mid_att", "treb_att", "aspectx", "aspecty", "texsize", "rand_frame", "aspect",
-            "vol_att"
+            "vol_att",
+            "texsize_main", "texsize_fc_main", "texsize_pc_main",
+            "texsize_noise_lq", "texsize_noise_mq", "texsize_noise_hq",
+            "texsize_noisevol_lq", "texsize_noisevol_hq"
         ];
 
         /// <summary>

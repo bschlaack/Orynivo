@@ -7,6 +7,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Fixed
+- Bound the shader sampler-size uniforms. MilkDrop exposes each generated texture's size as
+  `texsize_noise_lq`/`texsize_noise_mq`/`texsize_noise_hq` and the volume pair, but Orynivo declared
+  the GLSL spellings as a single `float4` the scalar-only GL uniform setter could never fill, and the
+  interpreter and compiled shader paths never seeded them at all, so a shader that reads
+  `texsize_noise_lq.zw` (Royal Mashup (188) uses it for a dither coordinate) saw zero and collapsed
+  the coordinate to a constant. All three paths now declare and seed the same values.
 - Fixed the CPU visualizer's warp shader reading a same-generation blur chain. MilkDrop's
   `BlurPasses` runs after the warp and blurs the feedback the warp just sampled, and the frame
   buffers then swap, so the next warp's `sampler_main` is deliberately one frame newer than its

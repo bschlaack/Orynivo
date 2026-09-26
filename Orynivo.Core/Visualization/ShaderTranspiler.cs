@@ -32,7 +32,10 @@ public static class ShaderTranspiler
     {
         "texsize", "time", "frame", "fps", "bass", "mid", "treb", "vol",
         "bass_att", "mid_att", "treb_att", "vol_att", "aspect", "rand_frame", "rand_preset",
-        "roam_cos", "roam_sin", "slow_roam_cos", "slow_roam_sin"
+        "roam_cos", "roam_sin", "slow_roam_cos", "slow_roam_sin",
+        "texsize_main", "texsize_fc_main", "texsize_pc_main",
+        "texsize_noise_lq", "texsize_noise_mq", "texsize_noise_hq",
+        "texsize_noisevol_lq", "texsize_noisevol_hq"
     };
 
     /// <summary>Builds the uniform table.</summary>
@@ -248,6 +251,14 @@ public static class ShaderTranspiler
     /// <summary>The uniform block every translated shader starts with.</summary>
     private const string Prelude = """
         uniform float4 texsize;
+        uniform float4 texsize_main;
+        uniform float4 texsize_fc_main;
+        uniform float4 texsize_pc_main;
+        uniform float4 texsize_noise_lq;
+        uniform float4 texsize_noise_mq;
+        uniform float4 texsize_noise_hq;
+        uniform float4 texsize_noisevol_lq;
+        uniform float4 texsize_noisevol_hq;
         uniform float time;
         uniform float frame;
         uniform float fps;
@@ -326,6 +337,46 @@ public static class ShaderTranspiler
         uniform float texsize_z;
         uniform float texsize_w;
         #define texsize float4(texsize_x, texsize_y, texsize_z, texsize_w)
+        uniform float texsize_main_x;
+        uniform float texsize_main_y;
+        uniform float texsize_main_z;
+        uniform float texsize_main_w;
+        #define texsize_main float4(texsize_main_x, texsize_main_y, texsize_main_z, texsize_main_w)
+        uniform float texsize_fc_main_x;
+        uniform float texsize_fc_main_y;
+        uniform float texsize_fc_main_z;
+        uniform float texsize_fc_main_w;
+        #define texsize_fc_main float4(texsize_fc_main_x, texsize_fc_main_y, texsize_fc_main_z, texsize_fc_main_w)
+        uniform float texsize_pc_main_x;
+        uniform float texsize_pc_main_y;
+        uniform float texsize_pc_main_z;
+        uniform float texsize_pc_main_w;
+        #define texsize_pc_main float4(texsize_pc_main_x, texsize_pc_main_y, texsize_pc_main_z, texsize_pc_main_w)
+        uniform float texsize_noise_lq_x;
+        uniform float texsize_noise_lq_y;
+        uniform float texsize_noise_lq_z;
+        uniform float texsize_noise_lq_w;
+        #define texsize_noise_lq float4(texsize_noise_lq_x, texsize_noise_lq_y, texsize_noise_lq_z, texsize_noise_lq_w)
+        uniform float texsize_noise_mq_x;
+        uniform float texsize_noise_mq_y;
+        uniform float texsize_noise_mq_z;
+        uniform float texsize_noise_mq_w;
+        #define texsize_noise_mq float4(texsize_noise_mq_x, texsize_noise_mq_y, texsize_noise_mq_z, texsize_noise_mq_w)
+        uniform float texsize_noise_hq_x;
+        uniform float texsize_noise_hq_y;
+        uniform float texsize_noise_hq_z;
+        uniform float texsize_noise_hq_w;
+        #define texsize_noise_hq float4(texsize_noise_hq_x, texsize_noise_hq_y, texsize_noise_hq_z, texsize_noise_hq_w)
+        uniform float texsize_noisevol_lq_x;
+        uniform float texsize_noisevol_lq_y;
+        uniform float texsize_noisevol_lq_z;
+        uniform float texsize_noisevol_lq_w;
+        #define texsize_noisevol_lq float4(texsize_noisevol_lq_x, texsize_noisevol_lq_y, texsize_noisevol_lq_z, texsize_noisevol_lq_w)
+        uniform float texsize_noisevol_hq_x;
+        uniform float texsize_noisevol_hq_y;
+        uniform float texsize_noisevol_hq_z;
+        uniform float texsize_noisevol_hq_w;
+        #define texsize_noisevol_hq float4(texsize_noisevol_hq_x, texsize_noisevol_hq_y, texsize_noisevol_hq_z, texsize_noisevol_hq_w)
         uniform float time;
         uniform float frame;
         uniform float fps;
