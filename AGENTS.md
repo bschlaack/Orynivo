@@ -11,21 +11,21 @@ Before completing any code change:
    formats, or known limitations change.
 4. Update this file or the applicable nested `AGENTS.md` whenever architecture,
    behavior, invariants, or implementation constraints change.
-5. Add or update English XML documentation for every affected public or
-   internal C# type and member, including parameter and return documentation.
+5. Add or update English XML documentation for every affected public or internal
+   C# type and member, including parameter and return documentation.
 6. Add every new or changed visible string to German, English, French, Spanish,
-   Russian, Simplified Chinese, and Hindi localization resources; never hard-code
-   visible UI text.
-   For every new feature, also update all currently supported interface
-   languages (including Russian, Simplified Chinese and Hindi) in the complete
-   built-in resources in `Orynivo/Localization/LocalizationManager.cs`. Run
+   Russian, Simplified Chinese, and Hindi localization resources; never
+   hard-code visible UI text. For every new feature, also update all currently
+   supported interface languages (including Russian, Simplified Chinese and
+   Hindi) in the complete built-in resources in
+   `Orynivo/Localization/LocalizationManager.cs`. Run
    `scripts/verify-localization-parity.ps1` before completing the change so
    language files cannot silently drift apart.
 7. Verify that credentials, authenticated URLs, and secrets are not persisted,
    logged, documented, or exposed to models.
 
-Documentation and verification are part of the implementation. They must not
-be deferred until the user asks for them separately.
+Documentation and verification are part of the implementation. They must not be
+deferred until the user asks for them separately.
 
 ## Instruction Routing
 
@@ -47,37 +47,36 @@ completion checklist above.
 
 Avalonia desktop music library with:
 
-- Cross-platform core library in `Orynivo.Core/`
-  (library scan, database, search, streaming models)
-- Avalonia UI 11 frontend in `Orynivo/` (Windows, Linux, and macOS; references `Orynivo.Core`)
-- Cross-platform headless music server in `Orynivo.Server/`
-  (ASP.NET Core; references `Orynivo.Core`; exposes REST + streaming over the
-  local network)
+- Cross-platform core library in `Orynivo.Core/` (library scan, database,
+  search, streaming models)
+- Avalonia UI 11 frontend in `Orynivo/` (Windows, Linux, and macOS; references
+  `Orynivo.Core`)
+- Cross-platform headless music server in `Orynivo.Server/` (ASP.NET Core;
+  references `Orynivo.Core`; exposes REST + streaming over the local network)
 - Native Steinberg ASIO bridge in `Native/AsioBridge/`
 - MIT-licensed cwASIO bridge in `Native/CwAsioBridge/`
 - Static localized product website in `html/`; edit the German source page and
   `i18n.js`, then run `node html/generate-localized-pages.js` so English,
   German, French, Spanish, Russian, Simplified Chinese, and Hindi pages remain
-  synchronized. Its five-minute
-  quick-start styles live in `html/quickstart.css`.
-- Structured public contribution forms live in `.github/ISSUE_TEMPLATE/`.
-  Bug reports must warn contributors not to disclose credentials,
-  authenticated URLs, private paths, device addresses, or personal library
-  data; security reports must route to private GitHub security advisories.
+  synchronized. Its five-minute quick-start styles live in
+  `html/quickstart.css`.
+- Structured public contribution forms live in `.github/ISSUE_TEMPLATE/`. Bug
+  reports must warn contributors not to disclose credentials, authenticated
+  URLs, private paths, device addresses, or personal library data; security
+  reports must route to private GitHub security advisories.
 - PCM playback through `ffmpeg`
 - Native DSF/DFF DSD playback through ASIO on Windows or direct ALSA on Linux
 - Real-time DSF/DFF-to-PCM conversion through `ffmpeg` for WASAPI playback
 
-The desktop project builds on Windows, Linux, and macOS. Windows retains the complete
-WASAPI/ASIO playback implementation. The current Linux `net10.0` build supports
-PCM playback through selectable direct ALSA hardware and OpenAL output devices
-in addition to the
-library and network/UI feature set; it excludes Windows audio, endpoint-volume,
-and SMTC implementations and uses compatibility types under
-`Orynivo/Compatibility/Linux`. System-media control on Linux is provided by
-MPRIS 2 (`org.mpris.MediaPlayer2.orynivo`) instead of SMTC. Linux credentials
-use the desktop client's AES-GCM current-user credential container and must
-never persist secrets in plaintext.
+The desktop project builds on Windows, Linux, and macOS. Windows retains the
+complete WASAPI/ASIO playback implementation. The current Linux `net10.0` build
+supports PCM playback through selectable direct ALSA hardware and OpenAL output
+devices in addition to the library and network/UI feature set; it excludes
+Windows audio, endpoint-volume, and SMTC implementations and uses compatibility
+types under `Orynivo/Compatibility/Linux`. System-media control on Linux is
+provided by MPRIS 2 (`org.mpris.MediaPlayer2.orynivo`) instead of SMTC. Linux
+credentials use the desktop client's AES-GCM current-user credential container
+and must never persist secrets in plaintext.
 
 Linux native DSD does not use either Windows ASIO bridge. Local and
 HTTP-range-streamed stereo DSF and uncompressed stereo DFF/DSDIFF use the
@@ -95,37 +94,40 @@ playback uses Apple's system OpenAL framework. FFmpeg/FFprobe discovery checks
 the application and per-user cache, inherited `PATH`, and conventional Homebrew,
 MacPorts, pkgsrc, Fink, and per-user binary directories because Finder-launched
 apps receive a minimal `PATH`; missing tools are downloaded for the current
-architecture into the per-user cache.
-ALSA and native DSD output remain Linux-only. Tagged releases package
-self-contained `Orynivo.app` bundles for both Mac architectures as installable
-PKGs, portable ZIPs, and tar archives. Each bundle generates `Orynivo.icns` from
-`Logo/icon.png`, stores it under `Contents/Resources`, and declares it through
-`CFBundleIconFile`; every package is included in the signed release manifest.
-The desktop updater selects the current process architecture's
-signed `pkg`, verifies its digest, and opens it through `/usr/bin/open`; Orynivo
-must never invoke a privileged installer command directly.
+architecture into the per-user cache. ALSA and native DSD output remain
+Linux-only. Tagged releases package self-contained `Orynivo.app` bundles for
+both Mac architectures as installable PKGs, portable ZIPs, and tar archives.
+Each bundle generates `Orynivo.icns` from `Logo/icon.png`, stores it under
+`Contents/Resources`, and declares it through `CFBundleIconFile`; every package
+is included in the signed release manifest. The desktop updater selects the
+current process architecture's signed `pkg`, verifies its digest, and opens it
+through `/usr/bin/open`; Orynivo must never invoke a privileged installer
+command directly.
 
 ## Orynivo.Core
 
-`Orynivo.Core` is a `net10.0` class library with no platform-specific dependencies.
-It holds everything needed to scan, store, index, and serve the music library:
+`Orynivo.Core` is a `net10.0` class library with no platform-specific
+dependencies. It holds everything needed to scan, store, index, and serve the
+music library:
 
-**Orynivo.Core/Library/**: `AudioDatabase`, `LibraryScanner`, `LibraryWatcherService`,
-`LibraryBackupService`, `TrackSearchIndex`, `GenreCloudService` plus its embedded
-`GenreTaxonomy.json` multi-parent graph, `CueSheetParser`, `M3u8PlaylistService`,
-`LyricsService`, `RadioBrowserService`, `RadioStreamMetadataService`, `PodcastService`,
-`ArtistProfileService`, `ArtistImageSearchService`, `ArtistNameNormalizer`,
-`ArtworkCache`, `MusicBrainzCoverSearch`, model records, `ArtistInfoSource` enum.
+**Orynivo.Core/Library/**: `AudioDatabase`, `LibraryScanner`,
+`LibraryWatcherService`, `LibraryBackupService`, `TrackSearchIndex`,
+`GenreCloudService` plus its embedded `GenreTaxonomy.json` multi-parent graph,
+`CueSheetParser`, `M3u8PlaylistService`, `LyricsService`, `RadioBrowserService`,
+`RadioStreamMetadataService`, `PodcastService`, `ArtistProfileService`,
+`ArtistImageSearchService`, `ArtistNameNormalizer`, `ArtworkCache`,
+`MusicBrainzCoverSearch`, model records, `ArtistInfoSource` enum.
 
 **Orynivo.Core/Audio/**: `ReplayGain`, `ReplayGainMode`, `EqualizerApoParser`,
 `ParametricEqualizer`, `FfmpegPcmDecoder`, `FfmpegLocator` (cross-platform:
-auto-downloads FFmpeg on Windows; expects system-installed FFmpeg on Linux/macOS),
-`WaveformCache` (cached compact FFmpeg-generated peak data for the transport
-waveform), `SeekDiagnostics` (sanitized transport seek, FFmpeg decoder, and
-server-side transcode diagnostics under `logs/seek.log`), `EqualizerProfile`,
-`EqualizerFilter`, `EqualizerFilterType`, `CrossfeedProcessor` (optional
-headphone crossfeed) and `CrossfeedStrength`, and `StreamingLoudnessNormalizer`
-(optional loudness matching for radio and podcast streams).
+auto-downloads FFmpeg on Windows; expects system-installed FFmpeg on
+Linux/macOS), `WaveformCache` (cached compact FFmpeg-generated peak data for the
+transport waveform), `SeekDiagnostics` (sanitized transport seek, FFmpeg
+decoder, and server-side transcode diagnostics under `logs/seek.log`),
+`EqualizerProfile`, `EqualizerFilter`, `EqualizerFilterType`,
+`CrossfeedProcessor` (optional headphone crossfeed) and `CrossfeedStrength`, and
+`StreamingLoudnessNormalizer` (optional loudness matching for radio and podcast
+streams).
 
 **Orynivo.Core/Web/**: `WebBrowsingService` (SSRF-guarded page fetch + SearXNG
 search), `WebBrowsingOptions` (persisted config), `HtmlContentExtractor`
@@ -135,11 +137,11 @@ search), `WebBrowsingOptions` (persisted config), `HtmlContentExtractor`
 **Orynivo.Core/Streaming/**: `IStreamingCatalog`, `IStreamingPlaybackProvider`,
 `IStreamingCredentialStore`, `StreamingModels` (all streaming model records,
 enums, `PlexServerSettings`, and `OrynivoServerSettings`), `PlexServerClient`,
-`OrynivoServerClient` (HTTP client for browsing and streaming a remote Orynivo Server
-library — provides `GetArtistsAsync`, `GetAlbumsByArtistAsync`, `GetAlbumsAsync`,
-`GetTracksByAlbumAsync`, `GetTracksAsync`, `GetLibrarySummaryAsync`,
-`TestConnectionAsync`, and static URL
-helpers `GetStreamUrl`/`GetAlbumArtworkUrl`/`GetArtistArtworkUrl`; also uploads
+`OrynivoServerClient` (HTTP client for browsing and streaming a remote Orynivo
+Server library — provides `GetArtistsAsync`, `GetAlbumsByArtistAsync`,
+`GetAlbumsAsync`, `GetTracksByAlbumAsync`, `GetTracksAsync`,
+`GetLibrarySummaryAsync`, `TestConnectionAsync`, and static URL helpers
+`GetStreamUrl`/`GetAlbumArtworkUrl`/`GetArtistArtworkUrl`; also uploads
 client-selected album and artist artwork through `UploadAlbumArtworkAsync` and
 `UploadArtistImageAsync`; remote track DTOs mirror the local list metadata used
 by shared table masks, including genre, track/disc totals, composer, BPM, file
@@ -165,8 +167,9 @@ stream endpoint.
 
 Windows-only items that remain exclusively in `Orynivo/`:
 
-- `Audio/SteinbergAsioStream`, `FfmpegAudioPlayer`, `WasapiAudioPlayer`, `WasapiDeviceProvider`,
-  `DsfAudioPlayer`, `DffAudioPlayer`, `WindowsEndpointVolumeSynchronizer`
+- `Audio/SteinbergAsioStream`, `FfmpegAudioPlayer`, `WasapiAudioPlayer`,
+  `WasapiDeviceProvider`, `DsfAudioPlayer`, `DffAudioPlayer`,
+  `WindowsEndpointVolumeSynchronizer`
 - `WindowsMediaTransportService`, `Streaming/WindowsStreamingCredentialStore`,
   and `Streaming/WindowsPlexCredentialStore` Windows implementations
 
@@ -190,36 +193,34 @@ covers pure desktop helpers that do not require a running Avalonia UI;
 `Orynivo.Server.Tests` covers server middleware without starting the web host.
 Do not move shared behavior into a UI-only class when a `Orynivo.Core` type can
 own it and stay cross-platform testable. The Windows build workflow runs all
-three test projects.
-`scripts/verify-all.ps1` runs the same checks locally in one command (managed
-builds with `--warnaserror`, the non-Windows desktop compile via `-p:OS=Unix`,
-all three test projects, and the three parity scripts) and stops at the first
-failure; CI still runs these steps itself. The non-Windows compile matters because
-the desktop swaps in `Compatibility/Linux` implementations for several Windows
-types, so a Windows-only local build cannot see a broken Linux or macOS call site.
-Use it before declaring work complete.
+three test projects. `scripts/verify-all.ps1` runs the same checks locally in
+one command (managed builds with `--warnaserror`, the non-Windows desktop
+compile via `-p:OS=Unix`, all three test projects, and the three parity scripts)
+and stops at the first failure; CI still runs these steps itself. The
+non-Windows compile matters because the desktop swaps in `Compatibility/Linux`
+implementations for several Windows types, so a Windows-only local build cannot
+see a broken Linux or macOS call site. Use it before declaring work complete.
 Every test that changes the process-wide playback profile through
-`AudioDatabase.SetActiveProfile` must save `AudioDatabase.ActiveProfileId` first and
-restore it in a `finally`. `ActiveProfileId` is process-wide `AsyncLocal` state, so
-a leaked profile makes unrelated profile-scoped queries (playback history, the
-year-in-review summary, cross-device positions) silently return nothing, and the
-resulting failure looks like a query bug instead of a test-isolation bug.
-Every test that opens a library database must use
+`AudioDatabase.SetActiveProfile` must save `AudioDatabase.ActiveProfileId` first
+and restore it in a `finally`. `ActiveProfileId` is process-wide `AsyncLocal`
+state, so a leaked profile makes unrelated profile-scoped queries (playback
+history, the year-in-review summary, cross-device positions) silently return
+nothing, and the resulting failure looks like a query bug instead of a
+test-isolation bug. Every test that opens a library database must use
 `Orynivo.Core.Tests.CoreTestDatabase`, which owns a unique temporary directory
 per test and clears only that database's SQLite pool on disposal. Never call
 `AudioDatabase.OpenDefault()`, reference `AppPaths.DataRoot`, delete a shared
-database file, or call `SqliteConnection.ClearAllPools()` from a test: xUnit runs
-test classes in parallel, so shared paths and process-wide pool clearing leak
-rows between tests and produce intermittent failures. `TestEnvironment`'s module
-initializer remains the safety net that keeps the whole run away from the real
-per-user data directory.
+database file, or call `SqliteConnection.ClearAllPools()` from a test: xUnit
+runs test classes in parallel, so shared paths and process-wide pool clearing
+leak rows between tests and produce intermittent failures. `TestEnvironment`'s
+module initializer remains the safety net that keeps the whole run away from the
+real per-user data directory.
 
 `build.ps1` always builds the vendored MIT-licensed `CwAsioBridge.dll`, then
 builds `AsioBridge.dll` when the Steinberg SDK is available, and finally builds
-the .NET application. It
-locates Visual Studio MSBuild through `vswhere.exe` or `PATH`. The ASIO SDK can
-be supplied with `-AsioSdkDir`, `ASIO_SDK_DIR`, or a local
-`third_party/asiosdk` / `external/asiosdk` directory. `-MSBuildPath` and
+the .NET application. It locates Visual Studio MSBuild through `vswhere.exe` or
+`PATH`. The ASIO SDK can be supplied with `-AsioSdkDir`, `ASIO_SDK_DIR`, or a
+local `third_party/asiosdk` / `external/asiosdk` directory. `-MSBuildPath` and
 `MSBUILD_EXE_PATH` override MSBuild discovery. If no SDK is found, the script
 builds without the Steinberg bridge; `-SkipAsio` forces that mode and
 `-RequireAsio` makes a missing SDK fatal. `-SkipCwAsio` additionally disables
@@ -231,64 +232,62 @@ managed Avalonia project in Debug and Release, and separately builds and
 publishes the self-contained `linux-x64` desktop artifact. The Windows job
 intentionally excludes only the Steinberg bridge because that SDK is not stored
 in the repository. Its Release artifact therefore contains cwASIO support
-without Steinberg SDK files.
-The same workflow has a dedicated `verify` job that runs
-`scripts/verify-mcp-tool-parity.ps1` and `scripts/verify-localization-parity.ps1`
-on every push and pull request, so MCP tool parity and the seven-language
-desktop/website/mobile localization coverage cannot silently drift. Keep these
-scripts passing; do not remove the job. `.github/dependabot.yml` tracks NuGet and
-GitHub Actions updates weekly, but ignores NuGet upgrades that cannot build on
-the pinned toolchain: Avalonia **major** updates plus major upgrades of
-Microsoft.Data.Sqlite and Microsoft.NET.Test.Sdk. Migrate those deliberately
-instead of merging an automatic bump. The projects target **.NET 10 LTS** and
-Avalonia **12.1.2**; do not move to .NET 9, which is already in security-only
-maintenance and reaches end of support on 10 November 2026, the same day as
-.NET 8. `Avalonia.Controls.DataGrid` is part of the Avalonia 12 line again, so
-it moves with the other Avalonia packages; the earlier "no release beyond
-11.3.13" note was wrong and is corrected here. SkiaSharp moves with Avalonia
-too: `Avalonia.Skia` 12.1.2 depends on SkiaSharp 3.119.4, so `Orynivo.Core` and
+without Steinberg SDK files. The same workflow has a dedicated `verify` job that
+runs `scripts/verify-mcp-tool-parity.ps1` and
+`scripts/verify-localization-parity.ps1` on every push and pull request, so MCP
+tool parity and the seven-language desktop/website/mobile localization coverage
+cannot silently drift. Keep these scripts passing; do not remove the job.
+`.github/dependabot.yml` tracks NuGet and GitHub Actions updates weekly, but
+ignores NuGet upgrades that cannot build on the pinned toolchain: Avalonia
+**major** updates plus major upgrades of Microsoft.Data.Sqlite and
+Microsoft.NET.Test.Sdk. Migrate those deliberately instead of merging an
+automatic bump. The projects target **.NET 10 LTS** and Avalonia **12.1.2**; do
+not move to .NET 9, which is already in security-only maintenance and reaches
+end of support on 10 November 2026, the same day as .NET 8.
+`Avalonia.Controls.DataGrid` is part of the Avalonia 12 line again, so it moves
+with the other Avalonia packages; the earlier "no release beyond 11.3.13" note
+was wrong and is corrected here. SkiaSharp moves with Avalonia too:
+`Avalonia.Skia` 12.1.2 depends on SkiaSharp 3.119.4, so `Orynivo.Core` and
 `Orynivo.Server` use that line and must not be raised independently. The
 deliberate migration triggers, steps, and required checks for every held-back
-line are recorded in
-[`DEPENDENCY-MIGRATION.md`](DEPENDENCY-MIGRATION.md); keep that record and the
-Dependabot `ignore` list in agreement, and never merge an ignored major upgrade
-without following the recorded plan.
-All GitHub-hosted CI and release workflows use Node.js 24-compatible action
-generations (`actions/checkout@v7`, `actions/setup-dotnet@v6`,
-`actions/upload-artifact@v7`, and `softprops/action-gh-release@v3` where
-applicable); do not reintroduce their Node.js 20 predecessors. Every action must
-be referenced with **one** version across every workflow: Dependabot's
-github_actions updater fails with `Error processing <action> (RuntimeError)` /
-`No files changed!` when the same action is pinned to different majors in
-different files, and mixed majors still run fine in CI, so nothing else catches
-the drift. `scripts/verify-github-actions-pins.ps1` enforces this and runs in both
-`scripts/verify-all.ps1` and the CI verify job.
-The Windows `.github/workflows/release.yml` workflow is the sole creator of the
-canonical `Orynivo <version>` draft release. Linux, macOS, and server matrix
-jobs must locate that exact draft through its numeric release ID and upload
-their assets to it; they must never independently create a draft by tag because
-concurrent draft lookup can create duplicate releases.
+line are recorded in [`DEPENDENCY-MIGRATION.md`](DEPENDENCY-MIGRATION.md); keep
+that record and the Dependabot `ignore` list in agreement, and never merge an
+ignored major upgrade without following the recorded plan. All GitHub-hosted CI
+and release workflows use Node.js 24-compatible action generations
+(`actions/checkout@v7`, `actions/setup-dotnet@v6`, `actions/upload-artifact@v7`,
+and `softprops/action-gh-release@v3` where applicable); do not reintroduce their
+Node.js 20 predecessors. Every action must be referenced with **one** version
+across every workflow: Dependabot's github_actions updater fails with
+`Error processing <action> (RuntimeError)` / `No files changed!` when the same
+action is pinned to different majors in different files, and mixed majors still
+run fine in CI, so nothing else catches the drift.
+`scripts/verify-github-actions-pins.ps1` enforces this and runs in both
+`scripts/verify-all.ps1` and the CI verify job. The Windows
+`.github/workflows/release.yml` workflow is the sole creator of the canonical
+`Orynivo <version>` draft release. Linux, macOS, and server matrix jobs must
+locate that exact draft through its numeric release ID and upload their assets
+to it; they must never independently create a draft by tag because concurrent
+draft lookup can create duplicate releases.
 
 `.github/workflows/player-linux-release.yml` publishes tagged self-contained
 desktop builds for `linux-x64` and `linux-arm64` as portable tarballs, DEB, and
 RPM packages, plus an Arch Linux `x86_64` package. These packages install the
 player under `/usr/lib/orynivo`, add `/usr/bin/orynivo`, and register its
-desktop launcher. Every Linux player artifact is required by and included in
-the signed release manifest.
-The Arch `.pkg.tar.zst` must store `.PKGINFO` as an exact root-level archive
-entry (not `./.PKGINFO`), and the workflow must validate that entry before
-uploading the package because `pacman -U` otherwise rejects the archive as
-missing package metadata.
+desktop launcher. Every Linux player artifact is required by and included in the
+signed release manifest. The Arch `.pkg.tar.zst` must store `.PKGINFO` as an
+exact root-level archive entry (not `./.PKGINFO`), and the workflow must
+validate that entry before uploading the package because `pacman -U` otherwise
+rejects the archive as missing package metadata.
 
 ## Orynivo.Server
 
-`Orynivo.Server` is a `net10.0` ASP.NET Core Minimal API server that exposes
-the local music library over the network. It references `Orynivo.Core` and has
-no Windows-specific dependencies; it runs on Windows, Linux, and macOS.
-The server project references `SkiaSharp.NativeAssets.Linux.NoDependencies` so
-Linux packages include the native SkiaSharp library required for artwork
-thumbnail generation; do not replace this with an external ImageMagick/convert
-runtime dependency.
+`Orynivo.Server` is a `net10.0` ASP.NET Core Minimal API server that exposes the
+local music library over the network. It references `Orynivo.Core` and has no
+Windows-specific dependencies; it runs on Windows, Linux, and macOS. The server
+project references `SkiaSharp.NativeAssets.Linux.NoDependencies` so Linux
+packages include the native SkiaSharp library required for artwork thumbnail
+generation; do not replace this with an external ImageMagick/convert runtime
+dependency.
 
 **Configuration** (`appsettings.json`, section `Orynivo`):
 
@@ -305,46 +304,43 @@ runtime dependency.
 **Key files:**
 
 - `Orynivo.Server/Program.cs`: builds and starts the server; calls
-  `FfmpegLocator.EnsureAvailableAsync()`, registers `LibraryWatcherService`
-  and the `LibraryService` hosted service, maps all endpoints including
-  remote configuration and directory browsing
+  `FfmpegLocator.EnsureAvailableAsync()`, registers `LibraryWatcherService` and
+  the `LibraryService` hosted service, maps all endpoints including remote
+  configuration and directory browsing
 - `Orynivo.Server/ServerSettings.cs`: configuration POCO bound from the
   `Orynivo` config section
 - `Orynivo.Server/Middleware/ApiKeyMiddleware.cs`: skips `/api/health`,
   validates `X-Api-Key` header or `?key=` query param, returns 401 JSON
 - `Orynivo.Server/Services/LibraryService.cs`: `IHostedService` that calls
   `LibraryWatcherService.UpdatePaths` on start and runs full scans via the
-  static `LibraryScanner.ScanAsync`; exposes `TriggerScan()` for manual
-  trigger and `ScanStatus` with current root, processed/total counts, current
-  file, last result, errors, and a persisted `LibraryChangedAt` Unix timestamp
-  that updates when scans or watcher runs add, update, or remove indexed tracks
+  static `LibraryScanner.ScanAsync`; exposes `TriggerScan()` for manual trigger
+  and `ScanStatus` with current root, processed/total counts, current file, last
+  result, errors, and a persisted `LibraryChangedAt` Unix timestamp that updates
+  when scans or watcher runs add, update, or remove indexed tracks
 - `Orynivo.Server/Endpoints/LibraryEndpoints.cs`: artists, albums, tracks,
-  playlists (smart playlists resolved via `SmartPlaylistCriteria.Resolve`),
-  and Lucene search endpoints; `GET /api/albums/recent` returns the most
-  recently added albums (id, title, artist, `ArtistId`, `AddedAt`, `HasArtwork`)
-  for the client dashboard's cross-library Recently Added widget;
+  playlists (smart playlists resolved via `SmartPlaylistCriteria.Resolve`), and
+  Lucene search endpoints; `GET /api/albums/recent` returns the most recently
+  added albums (id, title, artist, `ArtistId`, `AddedAt`, `HasArtwork`) for the
+  client dashboard's cross-library Recently Added widget;
   `GET /api/library/summary` returns aggregate album, track, artist, and
   favourite counts for cross-library Dashboard totals without materializing
-  complete library rows;
-  `GET /api/albums/recommendation-candidates` returns compact album genre and
-  average-BPM metadata for client-side history-based Dashboard recommendations;
-  `GET /api/artists/{id}` returns complete
-  cached artist profile fields, `POST /api/artists/{id}/profile` stores
+  complete library rows; `GET /api/albums/recommendation-candidates` returns
+  compact album genre and average-BPM metadata for client-side history-based
+  Dashboard recommendations; `GET /api/artists/{id}` returns complete cached
+  artist profile fields, `POST /api/artists/{id}/profile` stores
   client-refreshed biography/source fields plus optional image bytes, and
   `POST /api/artists/{id}/rename` renames or merges artists then rebuilds the
-  server Lucene index; Last.fm,
-  Wikipedia, and Wikimedia image-search requests run on the client, not on the
-  server; `GET`
-  `/api/tracks/{id}/lyrics` returns cached plain/synced lyrics with the last
-  fetch timestamp and `PUT /api/tracks/{id}/lyrics` stores client-downloaded
-  LRCLIB lyrics (the LRCLIB request runs on the client); `GET`
-  `/api/tracks/{id}/waveform` returns cached compact waveform peaks generated
-  server-side through `WaveformCache` and stored under the server data
-  directory; the track DTO includes the primary `ArtistId` and `AlbumId`, and
-  the album DTO includes `ArtistId`, for in-library navigation; `GET`
-  `/api/tracks/facets` returns lightweight
-  facet rows (`TrackFacetInfo`) and `POST` `/api/tracks/by-ids` returns track
-  rows for a posted ID list, together powering the remote Tracks facet filters;
+  server Lucene index; Last.fm, Wikipedia, and Wikimedia image-search requests
+  run on the client, not on the server; `GET` `/api/tracks/{id}/lyrics` returns
+  cached plain/synced lyrics with the last fetch timestamp and
+  `PUT /api/tracks/{id}/lyrics` stores client-downloaded LRCLIB lyrics (the
+  LRCLIB request runs on the client); `GET` `/api/tracks/{id}/waveform` returns
+  cached compact waveform peaks generated server-side through `WaveformCache`
+  and stored under the server data directory; the track DTO includes the primary
+  `ArtistId` and `AlbumId`, and the album DTO includes `ArtistId`, for
+  in-library navigation; `GET` `/api/tracks/facets` returns lightweight facet
+  rows (`TrackFacetInfo`) and `POST` `/api/tracks/by-ids` returns track rows for
+  a posted ID list, together powering the remote Tracks facet filters;
   `GET /api/playlists` (including `FilterCriteria` for smart playlists),
   `GET /api/playlists/{id}/tracks` (smart playlists are resolved server-side
   through `SmartPlaylistCriteria.Resolve` using the server's own favourite
@@ -355,44 +351,43 @@ runtime dependency.
   client's favourites instead of the server's unset flags),
   `POST /api/playlists/resolve-count` (resolves ad-hoc client-supplied criteria
   and returns only the match count, backing the smart-playlist editor's live
-  preview for remote playlists),
-  `POST /api/playlists`,
+  preview for remote playlists), `POST /api/playlists`,
   `POST /api/playlists/smart` and `PUT /api/playlists/{id}/smart` (create and
   update a smart playlist from client-supplied criteria, which the server
   re-validates through `SmartPlaylistCriteria`),
   `POST /api/playlists/{id}/tracks`, `DELETE /api/playlists/{id}`, and
   `DELETE /api/playlist-tracks/{id}` expose server-side playlist browsing and
   regular- and smart-playlist editing for remote clients; remote playlist writes
-  must use server-side track IDs, never credential-bearing stream URLs;
-  `GET` `/api/folders/tracks` returns lightweight track rows plus playback
-  metadata (artist, album, duration, format, primary `ArtistId`, `AlbumId`) for
-  building the remote server library folder tree and must materialize the
-  response before disposing the SQLite connection because JSON serialization
-  runs after the route handler returns
+  must use server-side track IDs, never credential-bearing stream URLs; `GET`
+  `/api/folders/tracks` returns lightweight track rows plus playback metadata
+  (artist, album, duration, format, primary `ArtistId`, `AlbumId`) for building
+  the remote server library folder tree and must materialize the response before
+  disposing the SQLite connection because JSON serialization runs after the
+  route handler returns
 - `Orynivo.Server/Endpoints/StreamEndpoints.cs`: byte-range streaming for
-  regular audio files; on-the-fly FLAC transcode via FFmpeg pipe for CUE
-  virtual tracks; `GET /api/stream/{trackId}?ss=<seconds>` performs a fast
-  server-side seek by transcoding the local file from that offset to FLAC (used
-  by remote clients so in-track seeking does not binary-search a seektable-less
-  file over HTTP); `?format=opus|aac&bitrate=<64-320>` requests a validated
-  lossy transcode (`StreamTranscodeOptions`) for regular files and virtual
-  segments alike, returning 400 for unsupported requests; the transcode/FFmpeg
-  process is stopped when the client disconnects; album, artist, and track
-  artwork endpoints (track artwork is
-  served both by file path via `/api/artwork/track?p=` and by database ID via
-  `/api/artwork/track/{id}` with an optional `?size=`); album artwork
-  requests fall back to an on-demand embedded-artwork repair for the requested
-  album before returning 404; `PUT` `/api/artwork/album/{id}` and
-  `/api/artwork/artist/{id}` accept raw image bytes from authenticated clients
-  and store them in the server-side artwork caches
+  regular audio files; on-the-fly FLAC transcode via FFmpeg pipe for CUE virtual
+  tracks; `GET /api/stream/{trackId}?ss=<seconds>` performs a fast server-side
+  seek by transcoding the local file from that offset to FLAC (used by remote
+  clients so in-track seeking does not binary-search a seektable-less file over
+  HTTP); `?format=opus|aac&bitrate=<64-320>` requests a validated lossy
+  transcode (`StreamTranscodeOptions`) for regular files and virtual segments
+  alike, returning 400 for unsupported requests; the transcode/FFmpeg process is
+  stopped when the client disconnects; album, artist, and track artwork
+  endpoints (track artwork is served both by file path via
+  `/api/artwork/track?p=` and by database ID via `/api/artwork/track/{id}` with
+  an optional `?size=`); album artwork requests fall back to an on-demand
+  embedded-artwork repair for the requested album before returning 404; `PUT`
+  `/api/artwork/album/{id}` and `/api/artwork/artist/{id}` accept raw image
+  bytes from authenticated clients and store them in the server-side artwork
+  caches
 - `Orynivo.Server/Endpoints/ConfigurationEndpoints.cs`: authenticated
   `/api/settings/library-paths` GET/PUT and `/api/files/directories?path=`
   endpoints plus authenticated `/api/settings/replaygain` GET/PUT for the
   server-owned scan-time ReplayGain preference; the ReplayGain PUT updates the
   live watcher and persists the value immediately. The library-path PUT persists
-  `Orynivo:LibraryPaths`, refreshes
-  `LibraryWatcherService`, and starts a scan. Settings are written to the
-  editable, service-writable config (`/etc/orynivo-server/appsettings.json` via
+  `Orynivo:LibraryPaths`, refreshes `LibraryWatcherService`, and starts a scan.
+  Settings are written to the editable, service-writable config
+  (`/etc/orynivo-server/appsettings.json` via
   `ConfigurationEndpoints.LinuxConfigFilePath` when that directory exists,
   otherwise the content-root `appsettings.json`); the content-root copy under
   `/usr/lib/orynivo-server` is root-owned/read-only and overwritten on package
@@ -408,22 +403,21 @@ dotnet run --project Orynivo.Server/Orynivo.Server.csproj
 
 **Linux packages** — `.github/workflows/server-release.yml` (triggered on the
 same `v*` tags as the Windows release) builds self-contained binaries for
-`linux-x64` and `linux-arm64` and publishes four packages to the draft
-GitHub Release: `amd64`/`arm64` DEB and `x86_64`/`aarch64` RPM.
-Support files live in `.github/server-release/` (systemd unit, postinst/prerm
-scripts). The packages install to `/usr/lib/orynivo-server/`, expose a
-`/usr/bin/orynivo-server` symlink, ship a default config at
-`/etc/orynivo-server/appsettings.json`, and register
-`orynivo-server.service` running as the `orynivo-server` system user.
-The signed update-manifest workflow waits for the Windows installer, every
-Linux and macOS desktop artifact, and all four server packages before signing,
-refuses partial manifests, and supports a manual tag input for rebuilding an
-already published release.
+`linux-x64` and `linux-arm64` and publishes four packages to the draft GitHub
+Release: `amd64`/`arm64` DEB and `x86_64`/`aarch64` RPM. Support files live in
+`.github/server-release/` (systemd unit, postinst/prerm scripts). The packages
+install to `/usr/lib/orynivo-server/`, expose a `/usr/bin/orynivo-server`
+symlink, ship a default config at `/etc/orynivo-server/appsettings.json`, and
+register `orynivo-server.service` running as the `orynivo-server` system user.
+The signed update-manifest workflow waits for the Windows installer, every Linux
+and macOS desktop artifact, and all four server packages before signing, refuses
+partial manifests, and supports a manual tag input for rebuilding an already
+published release.
 
 The `orynivo-server` service user is created with `--no-create-home` and has no
 writable `$HOME`, so the default data directory (`$HOME/.local/share/Orynivo`)
-cannot be created. `AppPaths.DataRoot` therefore honours the
-`ORYNIVO_DATA_DIR` environment variable, and the systemd unit sets
+cannot be created. `AppPaths.DataRoot` therefore honours the `ORYNIVO_DATA_DIR`
+environment variable, and the systemd unit sets
 `ORYNIVO_DATA_DIR=/var/lib/orynivo-server` plus `StateDirectory=orynivo-server`
 (the post-install also creates `/var/lib/orynivo-server` owned by the service
 user). The server's SQLite database, caches, and downloaded artwork live there.
@@ -433,11 +427,11 @@ startup with `UnauthorizedAccessException`/`SIGABRT`.
 **Signed updates:** Desktop and server release versions are injected only by
 GitHub release builds from semantic `v*` tags contained in `main`. Published
 releases receive an ECDSA P-256 signed manifest of SHA-256 asset digests. The
-desktop verifies it before self-update or server relay. Remote server updates are
-opt-in; `UpdateEndpoints` stages only matching bounded DEB/RPM bundles beneath
-the data root, and the fixed-command root systemd helper independently verifies
-the manifest/package before invoking the package manager. Never add an unsigned
-fallback or allow client-provided commands/paths to reach the helper.
+desktop verifies it before self-update or server relay. Remote server updates
+are opt-in; `UpdateEndpoints` stages only matching bounded DEB/RPM bundles
+beneath the data root, and the fixed-command root systemd helper independently
+verifies the manifest/package before invoking the package manager. Never add an
+unsigned fallback or allow client-provided commands/paths to reach the helper.
 
 ## Important Architecture
 
@@ -456,8 +450,8 @@ fallback or allow client-provided commands/paths to reach the helper.
   transport/protocol internals private so it can be released independently.
   Transient HAP pairing must send `X-Apple-HKP: 4`, verify the receiver SRP
   proof, and derive directional keys without logging key material. Encrypted
-  control frames use a two-byte little-endian length as authenticated data,
-  at most 1024 plaintext bytes per frame, and an independent monotonically
+  control frames use a two-byte little-endian length as authenticated data, at
+  most 1024 plaintext bytes per frame, and an independent monotonically
   increasing counter in each direction. Encrypted `GET /info` precedes the
   binary-plist session SETUP, which advertises a bound local NTP timing port and
   captures the receiver's event port. A live NTP responder is required before
@@ -468,8 +462,9 @@ fallback or allow client-provided commands/paths to reach the helper.
   periodic NTP/RTP anchors plus bounded receiver-requested retransmissions run
   over the negotiated control socket; session stop attempts encrypted teardown.
   Delivery pre-fills at most 1.75 seconds with a 1 ms minimum fill cadence and
-  then follows the PCM sample clock. The bridge remains unloaded by Orynivo until audible packet pacing,
-  event/lifecycle handling, and real-receiver playback verification are complete.
+  then follows the PCM sample clock. The bridge remains unloaded by Orynivo
+  until audible packet pacing, event/lifecycle handling, and real-receiver
+  playback verification are complete.
 - `Orynivo/OutputProfileDialog.axaml/.cs`: dialog for creating or editing an
   output profile; loads available devices asynchronously, validates unique
   names, and exposes the confirmed result via `Result`
@@ -481,21 +476,20 @@ fallback or allow client-provided commands/paths to reach the helper.
   caps FFmpeg's stream analysis (`-analyzeduration`/`-probesize`) and adds
   reconnect options so the first decode of a remote/HTTP track does not block on
   FFmpeg's default 5 s probe window. The PCM probe paths
-  (`FfmpegAudioPlayer.ProbeAsync`, `WasapiAudioPlayer.ProbeAsync`) apply the same
-  capped `ffprobe` settings for HTTP inputs. When a caller already knows the
-  stream characteristics it can skip the probe entirely: a
+  (`FfmpegAudioPlayer.ProbeAsync`, `WasapiAudioPlayer.ProbeAsync`) apply the
+  same capped `ffprobe` settings for HTTP inputs. When a caller already knows
+  the stream characteristics it can skip the probe entirely: a
   `GaplessPlaybackItem.KnownInfo` (`KnownAudioInfo`) lets both players build the
-  `AudioFileInfo` from cached metadata instead of running `ffprobe`. `MainWindow`
-  supplies it for remote Orynivo Server PCM tracks from the server-reported
-  sample rate/channels/format (via `BuildRemotePcmKnownInfo`), removing one HTTP
-  round-trip on the initial start and on gapless prefetch; DSD sources and tracks
-  without a reported sample rate leave `KnownInfo` unset and probe as before.
-  Seeking a remote Orynivo Server
-  stream (URL contains `/api/stream/`) uses **server-side seek**: the decoder
-  appends `?ss=<seconds>` and decodes the offset stream from position 0 instead
-  of seeking the HTTP stream itself (which binary-searches seektable-less files
-  over many range round-trips). Plex and other HTTP inputs keep client-side
-  `-ss` seeking.
+  `AudioFileInfo` from cached metadata instead of running `ffprobe`.
+  `MainWindow` supplies it for remote Orynivo Server PCM tracks from the
+  server-reported sample rate/channels/format (via `BuildRemotePcmKnownInfo`),
+  removing one HTTP round-trip on the initial start and on gapless prefetch; DSD
+  sources and tracks without a reported sample rate leave `KnownInfo` unset and
+  probe as before. Seeking a remote Orynivo Server stream (URL contains
+  `/api/stream/`) uses **server-side seek**: the decoder appends `?ss=<seconds>`
+  and decodes the offset stream from position 0 instead of seeking the HTTP
+  stream itself (which binary-searches seektable-less files over many range
+  round-trips). Plex and other HTTP inputs keep client-side `-ss` seeking.
 - `Orynivo/Audio/FfmpegLocator.cs`: checks `AppContext.BaseDirectory`,
   `%LOCALAPPDATA%\Orynivo\ffmpeg`, and PATH for `ffmpeg.exe`/`ffprobe.exe` at
   startup; when absent on Windows, resolves the current BtbN Windows LGPL ZIP
@@ -507,17 +501,17 @@ fallback or allow client-provided commands/paths to reach the helper.
   `FfmpegLocator.GetSafeWorkingDirectory()` as their
   `ProcessStartInfo.WorkingDirectory`; stale installer shortcuts can otherwise
   leave the process current directory pointing to a deleted install path.
-  `FfmpegLocator.IsAvailable()` is the shared platform-aware availability
-  check used by Settings; do not duplicate Windows executable names in UI code.
+  `FfmpegLocator.IsAvailable()` is the shared platform-aware availability check
+  used by Settings; do not duplicate Windows executable names in UI code.
 - `Orynivo/Audio/DsfAudioPlayer.cs`: native DSF-to-DSD path
 - `Orynivo/Compatibility/Linux/DsfDopAudioPlayer.cs`: local stereo DSF-to-DoP
   path for direct ALSA. It preserves the DSF payload, alternates `0x05`/`0xFA`
   marker bytes, derives the PCM carrier as DSD rate divided by 16, and bypasses
   volume, ReplayGain, boost, and equalizer processing. Its ALSA `S32_LE` frame
   order is low padding byte, two DSD bytes, then the marker in the most-
-  significant byte.
-  Direct ALSA DSF startup first tries the hardware-advertised `DSD_U32_BE`
-  format at DSD-rate/32 and falls back to `S32_LE` DoP at DSD-rate/16.
+  significant byte. Direct ALSA DSF startup first tries the hardware-advertised
+  `DSD_U32_BE` format at DSD-rate/32 and falls back to `S32_LE` DoP at
+  DSD-rate/16.
 - `Orynivo/Compatibility/Linux/RemoteDsfDopAudioPlayer.cs`: matching Linux DoP
   path for authenticated HTTP-range DSF streams. It incrementally reads the
   remote planar DSF blocks and applies the same direct-ALSA marker framing.
@@ -540,19 +534,20 @@ fallback or allow client-provided commands/paths to reach the helper.
   Transport Controls host for global media buttons, lock-screen/system-overlay
   metadata, artwork, playback status, and timeline updates; its `MediaPlayer`
   instance is control-only and never outputs Orynivo audio
-- `Orynivo/LibraryCatalogProviders.cs`: shared catalog abstraction for local
-  and remote Orynivo libraries. `ILibraryCatalogProvider` exposes common
-  artist, album, track, search, and album-artwork operations; `LocalLibraryCatalogProvider`
-  maps `AudioDatabase` rows, and `OrynivoServerLibraryCatalogProvider` maps
-  `OrynivoServerClient` responses into the same UI-facing models so library
-  masks can be reused instead of branching on local vs. server rows.
+- `Orynivo/LibraryCatalogProviders.cs`: shared catalog abstraction for local and
+  remote Orynivo libraries. `ILibraryCatalogProvider` exposes common artist,
+  album, track, search, and album-artwork operations;
+  `LocalLibraryCatalogProvider` maps `AudioDatabase` rows, and
+  `OrynivoServerLibraryCatalogProvider` maps `OrynivoServerClient` responses
+  into the same UI-facing models so library masks can be reused instead of
+  branching on local vs. server rows.
 - `Orynivo/NowPlayingMetadataProviders.cs`: reusable abstraction for the
   transport lyrics, artist-info, and cover views. `INowPlayingMetadataProvider`
   exposes `GetCachedLyricsAsync`/`DownloadLyricsAsync`, `GetArtistProfileAsync`,
   and `GetArtworkAsync` (the transport cover + lyrics background, returned as
-  local file paths; the remote implementation downloads the server track
-  artwork into the local remote-artwork cache);
-  `LocalNowPlayingMetadataProvider` reads/writes the local SQLite library, and
+  local file paths; the remote implementation downloads the server track artwork
+  into the local remote-artwork cache); `LocalNowPlayingMetadataProvider`
+  reads/writes the local SQLite library, and
   `OrynivoServerNowPlayingMetadataProvider` reads/writes a remote server's
   lyrics and artist-profile caches. The client always performs the external
   LRCLIB/Wikipedia/Last.fm fetch and uploads the result; the server only caches
@@ -576,9 +571,8 @@ fallback or allow client-provided commands/paths to reach the helper.
   `MainWindow.Search.cs`, `MainWindow.TrackFilters.cs`,
   `MainWindow.Settings.cs`, `MainWindow.FolderTree.cs`,
   `MainWindow.AlbumDetail.cs`, `MainWindow.ArtistInfo.cs`,
-  `MainWindow.Sidebar.cs`, `MainWindow.Navigation.cs`,
-  `MainWindow.Playback.cs`, `MainWindow.CoverSearch.cs`,
-  `MainWindow.Favorites.cs`, `MainWindow.Plex.cs`,
+  `MainWindow.Sidebar.cs`, `MainWindow.Navigation.cs`, `MainWindow.Playback.cs`,
+  `MainWindow.CoverSearch.cs`, `MainWindow.Favorites.cs`, `MainWindow.Plex.cs`,
   `MainWindow.RemoteOrynivo.cs`, `MainWindow.LibraryViews.cs`,
   `MainWindow.TableRendering.cs`, `MainWindow.Startup.cs`,
   `MainWindow.ContentLoading.cs`, `MainWindow.EntityFavorites.cs`,
@@ -589,17 +583,17 @@ fallback or allow client-provided commands/paths to reach the helper.
   sub-partials: `MainWindow.Dashboard.{Recommendations,Media,Stats}.cs`,
   `MainWindow.PlaybackState.cs` and `MainWindow.Transport.cs`,
   `MainWindow.ArtistInfo.{Rename,Albums,Profile}.cs`, and
-  `MainWindow.Playlists.DragDrop.cs`. Keep generic visual
-  helpers (`FindResource`, `ResolveFontSize`, `FindAncestor`,
-  `FindVisualChild`, `FindVisualChildren`) and the shared table-column factories
+  `MainWindow.Playlists.DragDrop.cs`. Keep generic visual helpers
+  (`FindResource`, `ResolveFontSize`, `FindAncestor`, `FindVisualChild`,
+  `FindVisualChildren`) and the shared table-column factories
   (`CreateFavoriteColumn`, `CreateSourceBadgeColumn`, `CreateEntityLinkColumn`,
   `GetContentRowSortMemberPath`) in dedicated helper/rendering partials rather
   than a single domain. Pure, UI-free logic must live in a standalone testable
   type instead (for example `Orynivo.Controls.ArtworkAccentColor` or
   `Orynivo.Controls.ListeningTrendGeometry`), covered by `Orynivo.Tests`.
 - `Orynivo/Audio/WindowsEndpointVolumeSynchronizer.cs`: bidirectional
-  synchronization between the transport volume slider and the selected
-  Windows render endpoint's master volume
+  synchronization between the transport volume slider and the selected Windows
+  render endpoint's master volume
 - `Orynivo/Audio/ReplayGain.cs` and `ReplayGainMode.cs`: parse persisted
   track/album gain values, select the configured fallback mode, and calculate
   the linear PCM gain factor
@@ -608,20 +602,20 @@ fallback or allow client-provided commands/paths to reach the helper.
 - `Orynivo/Audio/ParametricEqualizer.cs`: stereo biquad PCM equalizer with a
   short crossfade when the active profile changes and filter-state reset after
   seeks
-- `Orynivo.Core/Audio/CrossfeedProcessor.cs`: optional headphone crossfeed applied
-  after ReplayGain and the equalizer in the ASIO and WASAPI PCM paths, wired
-  through `ICrossfeedAudioPlayer`. It is off by default, must keep correlated
-  (mono) content centered, must not change native DSD output, and must reset its
-  filter history after a seek
+- `Orynivo.Core/Audio/CrossfeedProcessor.cs`: optional headphone crossfeed
+  applied after ReplayGain and the equalizer in the ASIO and WASAPI PCM paths,
+  wired through `ICrossfeedAudioPlayer`. It is off by default, must keep
+  correlated (mono) content centered, must not change native DSD output, and
+  must reset its filter history after a seek
 - `Orynivo.Core/Audio/StreamingLoudnessNormalizer.cs`: optional slow, bounded
   loudness matching applied last in the ASIO and WASAPI PCM paths, wired through
-  `ILoudnessNormalizerAudioPlayer`. It is off by default, runs **only** for radio
-  and podcast streams (never library tracks, which use ReplayGain, or native
-  DSD), must not pump on short passages, and must reset after a seek
+  `ILoudnessNormalizerAudioPlayer`. It is off by default, runs **only** for
+  radio and podcast streams (never library tracks, which use ReplayGain, or
+  native DSD), must not pump on short passages, and must reset after a seek
 - `Orynivo/Controls/EqualizerResponseControl.cs`: logarithmic frequency-response
-  graph for the editable parametric equalizer profile in Settings, including
-  a 20 Hz–20 kHz scale and numbered dashed markers that map filter frequencies
-  to dynamic editor rows. Marker bubbles sit below the scale; colliding numbers
+  graph for the editable parametric equalizer profile in Settings, including a
+  20 Hz–20 kHz scale and numbered dashed markers that map filter frequencies to
+  dynamic editor rows. Marker bubbles sit below the scale; colliding numbers
   remain bottom-aligned and shift horizontally with a short leader instead of
   moving upward.
 - `Orynivo/Controls/InitialsAvatar.cs`: reusable `TemplatedControl` placeholder
@@ -644,16 +638,18 @@ fallback or allow client-provided commands/paths to reach the helper.
   blocks on network calls; pending probes are cancelled per-list on rebuild and
   in `Deactivate()`. When a probe succeeds the timestamp is persisted through
   `ServerConnectionStore`; when it fails the row badge shows "Unreachable" and a
-  muted detail line reports the last successful connection (or "Never connected").
+  muted detail line reports the last successful connection (or "Never
+  connected").
 - `Orynivo/ServerConnectionStore.cs`: standalone JSON store
   (`%LOCALAPPDATA%\Orynivo\server-status.json`) mapping a server ID to the Unix
-  timestamp of its last successful connection. Kept separate from `settings.json`
-  so recording a connection never contends with the settings-save flow.
+  timestamp of its last successful connection. Kept separate from
+  `settings.json` so recording a connection never contends with the
+  settings-save flow.
 - `Orynivo/RemoteServerCache.cs`: single source of truth for the remote-server
-  caches (`remote-artworks`, `remote-track-cache`, `remote-folder-cache`). Exposes
-  the per-server track-list/folder-track cache file paths (used by `MainWindow`),
-  `GetTotalSizeBytes()`, `ClearAll()`, and `ClearServer(server)` (clears the
-  server's hashed track/folder caches plus its `track-art-<id>-*` /
+  caches (`remote-artworks`, `remote-track-cache`, `remote-folder-cache`).
+  Exposes the per-server track-list/folder-track cache file paths (used by
+  `MainWindow`), `GetTotalSizeBytes()`, `ClearAll()`, and `ClearServer(server)`
+  (clears the server's hashed track/folder caches plus its `track-art-<id>-*` /
   `artist-info-<id>-*` artwork). Settings shows the total size and offers a
   per-server "Clear cache" button and a clear-all button.
 - Remote server compatibility: `OrynivoServerClient.GetCapabilitiesAsync` probes
@@ -664,11 +660,11 @@ fallback or allow client-provided commands/paths to reach the helper.
   (`CheckServerCapabilitiesAsync`) shows a per-row "Server does not support: …"
   line for missing features.
 - Remote scan progress: `MainWindow` polls each configured server's `/api/scan`
-  (`_remoteScanPollTimer`, `PollRemoteServerScansAsync`) and shows an in-progress
-  scan in the shared sidebar activity line (`UpdateLibraryActivityIndicator`,
-  which prefers the local `_localScanText` over the remote `_remoteScanText`),
-  never reloading or blocking the current view.
-  Settings additionally exposes separate per-server **Scan library** and
+  (`_remoteScanPollTimer`, `PollRemoteServerScansAsync`) and shows an
+  in-progress scan in the shared sidebar activity line
+  (`UpdateLibraryActivityIndicator`, which prefers the local `_localScanText`
+  over the remote `_remoteScanText`), never reloading or blocking the current
+  view. Settings additionally exposes separate per-server **Scan library** and
   **Calculate ReplayGain** row actions. Both trigger only their owning server
   and display operation-specific progress in the row until completion.
 - `Orynivo/EqualizerProfileNameDialog.*`: themed unique-name dialog used when
@@ -677,39 +673,40 @@ fallback or allow client-provided commands/paths to reach the helper.
   PCM/DSD ring buffers, and callback
 - `Native/CwAsioBridge/CwAsioBridge.vcxproj`: builds the shared bridge against
   vendored cwASIO
-- `third_party/cwasio/`: pinned MIT-licensed cwASIO host and compatibility sources
+- `third_party/cwasio/`: pinned MIT-licensed cwASIO host and compatibility
+  sources
 - `Orynivo/SettingsView.*`: two-column settings view embedded in the main
   content area, with navigation on the left and the selected section on the
   right; the output-profile dropdown shows a compact `Backend  ·  Device`
   summary line (`OutputProfileSummaryTextBlock`) beneath it when a profile is
-  selected; `NavigateToSection(tag)` and `ScrollToEqualizerSection()` allow
-  the transport quick-pick buttons to jump directly into a settings section;
-  the **Integration** navigation group contains the **MCP SERVER** section
+  selected; `NavigateToSection(tag)` and `ScrollToEqualizerSection()` allow the
+  transport quick-pick buttons to jump directly into a settings section; the
+  **Integration** navigation group contains the **MCP SERVER** section
   (`Tag="Mcp"`) with an enable checkbox, configurable port field, and per-tool
   enable/disable checkboxes for all 37 tools (stored in
-  `AppSettings.DisabledMcpTools`); `NavigateToSection("Mcp")` jumps there;
-  the tool `UniformGrid` has `Rows="19"` for 37 tools (2 columns). The MCP
-  section also holds the **Web browsing** configuration (enable toggle, SearXNG
-  URL, block-private-networks toggle, and timeout/response-size/result limits)
-  edited via `WebBrowsingValue`
-  Remote Orynivo Server connection management belongs under its own
-  **Orynivo Server** navigation item in the **BIBLIOTHEK** settings group, not
-  under local directories or Streaming.
-- `Orynivo/Mcp/McpPlayerBridge.cs`: thread-safe bridge between the MCP layer
-  and Avalonia's UI thread; `MainWindow` populates all delegate properties at
+  `AppSettings.DisabledMcpTools`); `NavigateToSection("Mcp")` jumps there; the
+  tool `UniformGrid` has `Rows="19"` for 37 tools (2 columns). The MCP section
+  also holds the **Web browsing** configuration (enable toggle, SearXNG URL,
+  block-private-networks toggle, and timeout/response-size/result limits) edited
+  via `WebBrowsingValue` Remote Orynivo Server connection management belongs
+  under its own **Orynivo Server** navigation item in the **BIBLIOTHEK**
+  settings group, not under local directories or Streaming.
+- `Orynivo/Mcp/McpPlayerBridge.cs`: thread-safe bridge between the MCP layer and
+  Avalonia's UI thread; `MainWindow` populates all delegate properties at
   startup; `OnUiAsync` dispatches to `Dispatcher.UIThread` at
   `DispatcherPriority.Normal`; records `PlayerState` and `QueueEntry` are
-  returned by the state and queue delegates; `DisabledTools` (`HashSet<string>?`)
-  and `IsToolEnabled(name)` control per-tool gating; `RefreshPlaylistsFunc`
-  triggers `LoadNavPlaylists` after MCP creates a playlist; `WebBrowsing`
-  (`Orynivo.Web.WebBrowsingService`) backs the web tools; `GetOrynivoServersFunc`
-  returns the configured remote Orynivo Servers and `ResolveRemoteTrackFunc`
-  turns an `orynivo://serverId/track/trackId` reference into the real playable
-  stream URL (registering the track's metadata in `_orynivoTracksByUrl`), so MCP
-  and AI-chat playback of remote tracks work without exposing the server API key
+  returned by the state and queue delegates; `DisabledTools`
+  (`HashSet<string>?`) and `IsToolEnabled(name)` control per-tool gating;
+  `RefreshPlaylistsFunc` triggers `LoadNavPlaylists` after MCP creates a
+  playlist; `WebBrowsing` (`Orynivo.Web.WebBrowsingService`) backs the web
+  tools; `GetOrynivoServersFunc` returns the configured remote Orynivo Servers
+  and `ResolveRemoteTrackFunc` turns an `orynivo://serverId/track/trackId`
+  reference into the real playable stream URL (registering the track's metadata
+  in `_orynivoTracksByUrl`), so MCP and AI-chat playback of remote tracks work
+  without exposing the server API key
 - `Orynivo.Core/Web/WebBrowsingService.cs` (+ `WebBrowsingOptions`,
-  `HtmlContentExtractor`): the controlled internet layer used by both MCP and the
-  AI chat. `SearchAsync` queries the configured SearXNG JSON API (trusted
+  `HtmlContentExtractor`): the controlled internet layer used by both MCP and
+  the AI chat. `SearchAsync` queries the configured SearXNG JSON API (trusted
   endpoint, not SSRF-guarded, so a LAN/Docker instance works after the user
   configures its URL); `FetchTextAsync`/`FetchMarkdownAsync` fetch arbitrary
   pages behind a strong SSRF guard: http/https only, a
@@ -722,32 +719,33 @@ fallback or allow client-provided commands/paths to reach the helper.
   `AppSettings.WebBrowsing` (`WebBrowsingOptions`); `MainWindow` creates the
   service, wires the logger, and updates `Options` on settings save.
 - `Orynivo/Mcp/McpTools.cs`: 37 MCP tools annotated with `[McpServerToolType]`
-  and `[McpServerTool]`; read-only tools are marked `ReadOnly = true,
-  Idempotent = true`; every tool guards with `bridge.IsToolEnabled(name)` and
-  returns `"Tool is disabled."` when off; `get_current_time` returns the current
-  local/UTC date, time, day of week, and time-zone name; the web tools
-  `search_web`, `fetch_page`, and `fetch_page_as_markdown` delegate to
-  `bridge.WebBrowsing` (a `Orynivo.Web.WebBrowsingService`); `search_library`
-  calls
+  and `[McpServerTool]`; read-only tools are marked
+  `ReadOnly = true, Idempotent = true`; every tool guards with
+  `bridge.IsToolEnabled(name)` and returns `"Tool is disabled."` when off;
+  `get_current_time` returns the current local/UTC date, time, day of week, and
+  time-zone name; the web tools `search_web`, `fetch_page`, and
+  `fetch_page_as_markdown` delegate to `bridge.WebBrowsing` (a
+  `Orynivo.Web.WebBrowsingService`); `search_library` calls
   `TrackSearchIndex.SearchByCategory` then `AudioDatabase.OpenDefault()` for id
   resolution, and additionally queries every configured remote Orynivo Server
-  through `OrynivoServerClient.SearchFullAsync` (`AppendRemoteSearchResultsAsync`),
-  emitting remote tracks as opaque `orynivo://serverId/track/trackId` references
-  (`BuildOrynivoTrackReference`) rather than credential-bearing stream URLs;
+  through `OrynivoServerClient.SearchFullAsync`
+  (`AppendRemoteSearchResultsAsync`), emitting remote tracks as opaque
+  `orynivo://serverId/track/trackId` references (`BuildOrynivoTrackReference`)
+  rather than credential-bearing stream URLs;
   `play`/`queue_append`/`queue_play_next`/`replace_queue` first pass each path
   through `ResolvePlayablePathAsync` (→ `bridge.ResolveRemoteTrackFunc`) so a
-  remote reference resolves to a real registered stream URL while local paths and
-  real URLs pass through unchanged; `RedactKey` masks any `key=` query value in
-  tool output (`get_queue`, `get_now_playing`) so API keys never reach the model;
-  property access uses `AlbumInfo.Album`, `AlbumInfo.DisplayArtist`,
-  and `ArtistInfo.Artist`; playlist tools use `GetAllPlaylists`,
-  `GetPlaylistById`, `GetPlaylistTracks`, `CreatePlaylist`, and
-  `CreateSmartPlaylist`; `get_play_history` uses `GetHistoryForDay` for a
-  specific date and `GetRecentHistory` for the N most recent entries;
-  `create_smart_playlist` accepts individual filter parameters and serialises
-  them to `SmartPlaylistCriteria` JSON; `clear_queue` empties the queue
-  without stopping the current track; `replace_queue` atomically replaces the
-  queue and starts playback of the first new track
+  remote reference resolves to a real registered stream URL while local paths
+  and real URLs pass through unchanged; `RedactKey` masks any `key=` query value
+  in tool output (`get_queue`, `get_now_playing`) so API keys never reach the
+  model; property access uses `AlbumInfo.Album`, `AlbumInfo.DisplayArtist`, and
+  `ArtistInfo.Artist`; playlist tools use `GetAllPlaylists`, `GetPlaylistById`,
+  `GetPlaylistTracks`, `CreatePlaylist`, and `CreateSmartPlaylist`;
+  `get_play_history` uses `GetHistoryForDay` for a specific date and
+  `GetRecentHistory` for the N most recent entries; `create_smart_playlist`
+  accepts individual filter parameters and serialises them to
+  `SmartPlaylistCriteria` JSON; `clear_queue` empties the queue without stopping
+  the current track; `replace_queue` atomically replaces the queue and starts
+  playback of the first new track
 - `Orynivo/Mcp/McpServerService.cs`: starts/stops an embedded Kestrel HTTP/SSE
   server using `WebApplication`; binds to `http://localhost:{port}` by default
   or `http://0.0.0.0:{port}` only when `McpNetworkAccessEnabled` is explicitly
@@ -764,9 +762,9 @@ fallback or allow client-provided commands/paths to reach the helper.
   `models[].name`/`model` response shapes and never exposes response bodies,
   endpoint URLs, or credentials through Settings errors.
 - `Orynivo/AI/AiChatService.cs`: HTTP client for OpenAI-compatible
-  `/v1/chat/completions` endpoints using streaming SSE; internal tool-call
-  loop accumulates streamed function arguments, executes tools via
-  `AiToolExecutor`, and continues until the model emits `stop`; returns
+  `/v1/chat/completions` endpoints using streaming SSE; internal tool-call loop
+  accumulates streamed function arguments, executes tools via `AiToolExecutor`,
+  and continues until the model emits `stop`; returns
   `IAsyncEnumerable<AiStreamEvent>` (token, tool-call, error, done events);
   conversation history is maintained across turns; `AiChatSettings` is read on
   every send so settings changes take effect without restarting the view
@@ -778,14 +776,15 @@ fallback or allow client-provided commands/paths to reach the helper.
 - `Orynivo/AI/AiToolDefinitions.cs`: builds the OpenAI function-calling schema
   (`JsonObject` list) for all 37 Orynivo tools; definitions match the method
   signatures in `McpTools.cs`
-- `Orynivo/AI/AiToolExecutor.cs`: dispatches tool calls received from the LLM
-  to `McpTools` methods by name; parses JSON arguments from the model; no MCP
-  transport involved — tools are invoked directly against the bridge and database
+- `Orynivo/AI/AiToolExecutor.cs`: dispatches tool calls received from the LLM to
+  `McpTools` methods by name; parses JSON arguments from the model; no MCP
+  transport involved — tools are invoked directly against the bridge and
+  database
 - The shared `search_library` tool accepts an empty free-text query when a
   structured category, release-year range, library-added date range, or sort
   order is supplied. MCP and AI schema arguments must remain identical. Date
-  filters use an inclusive local-calendar `addedFrom`/`addedTo` contract and
-  are converted to a half-open Unix timestamp range. Returned tracks and albums
+  filters use an inclusive local-calendar `addedFrom`/`addedTo` contract and are
+  converted to a half-open Unix timestamp range. Returned tracks and albums
   include release year and library-addition date; remote playback identities
   remain opaque `orynivo://` references.
 - `Orynivo/AI/AiChatView.axaml/.cs`: embedded chat UI; user bubbles right-
@@ -796,31 +795,33 @@ fallback or allow client-provided commands/paths to reach the helper.
   executor; `GetSettings` delegate is read on each send. Messages are copyable:
   user bubbles use `SelectableTextBlock`, assistant bubbles render selectable
   Markdown, and each bubble has a copy button (`CopyMessage_OnClick` → the
-  `TopLevel` clipboard). Auto-scroll is robust: while `_stickToBottom`, the message
-  `ScrollViewer` is re-pinned to the true bottom from its `ScrollChanged` handler
-  (which — unlike `LayoutUpdated` on the `ScrollViewer`, that does not fire when
-  only the content's extent grows — reliably fires as the streamed reply grows;
-  `LayoutUpdated` is kept as a backup). `_stickToBottom` is released ONLY by a real
-  mouse-wheel gesture (`PointerWheelChanged` tunnel handler), never from
-  `ScrollChanged`/offset changes, so the constant re-layout of the streamed
-  Markdown cannot be misread as a manual scroll-up and disable auto-scroll. The
-  view is hosted in the bounded content row (`Grid.Row="2"`), never spanning the
-  Auto intro-card row, so its `ScrollViewer` is measured with a bounded height.
+  `TopLevel` clipboard). Auto-scroll is robust: while `_stickToBottom`, the
+  message `ScrollViewer` is re-pinned to the true bottom from its
+  `ScrollChanged` handler (which — unlike `LayoutUpdated` on the `ScrollViewer`,
+  that does not fire when only the content's extent grows — reliably fires as
+  the streamed reply grows; `LayoutUpdated` is kept as a backup).
+  `_stickToBottom` is released ONLY by a real mouse-wheel gesture
+  (`PointerWheelChanged` tunnel handler), never from `ScrollChanged`/offset
+  changes, so the constant re-layout of the streamed Markdown cannot be misread
+  as a manual scroll-up and disable auto-scroll. The view is hosted in the
+  bounded content row (`Grid.Row="2"`), never spanning the Auto intro-card row,
+  so its `ScrollViewer` is measured with a bounded height.
 - `Orynivo/AI/MarkdownTextBlock.cs`: lightweight Markdown renderer for assistant
-  messages. Block level: headings, bullet/numbered lists, block quotes, dividers,
-  and fenced code blocks (rendered verbatim). Inline level (`AppendInlines`):
-  `**bold**`/`__bold__`, `*italic*`/`_italic_`, `` `code` ``, and `[label](url)`
-  become styled `Run`s — applied to paragraphs, list items, and quotes alike, so
-  no raw `**markers**` leak through. Code blocks use `CreateLiteralText` so inline
-  Markdown is not interpreted inside them.
-- `Orynivo/ThemeManager.cs`: sets global Avalonia resources for light and dark themes
+  messages. Block level: headings, bullet/numbered lists, block quotes,
+  dividers, and fenced code blocks (rendered verbatim). Inline level
+  (`AppendInlines`): `**bold**`/`__bold__`, `*italic*`/`_italic_`, `` `code` ``,
+  and `[label](url)` become styled `Run`s — applied to paragraphs, list items,
+  and quotes alike, so no raw `**markers**` leak through. Code blocks use
+  `CreateLiteralText` so inline Markdown is not interpreted inside them.
+- `Orynivo/ThemeManager.cs`: sets global Avalonia resources for light and dark
+  themes
 - `Orynivo/Controls/DataGridColumnWidthStore.cs`: validates, captures, and
   restores per-table pixel widths
 - `Orynivo/Controls/DataGridColumnOrderStore.cs`: captures and restores
   identified data-column display order while retaining fixed-column slots
-- `Orynivo/Controls/DataGridColumnChooser.cs`: opens the themed `MenuFlyout`
-  for column visibility at the clicked header; entries remain open while
-  toggling multiple columns
+- `Orynivo/Controls/DataGridColumnChooser.cs`: opens the themed `MenuFlyout` for
+  column visibility at the clicked header; entries remain open while toggling
+  multiple columns
 - `Orynivo/Localization/*`: language model and localized German, English,
   French, Spanish, Russian, Simplified Chinese, and Hindi strings
 - `Orynivo/StartupWindow.*`: lightweight splash screen shown during initial
@@ -845,9 +846,9 @@ fallback or allow client-provided commands/paths to reach the helper.
   or artist navigation actions to the main window. A source-filter chip row
   (`HistorySource`: Track/Radio/Podcast/Remote/Plex, classified via
   `ClassifySource`) toggles which categories are shown; only categories present
-  that day get a chip. Album/artist links are available for local, remote Orynivo
-  Server, and Plex entries; Plex clickability requires the stored Plex context
-  (album/artist rating keys) and a still-configured Plex server
+  that day get a chip. Album/artist links are available for local, remote
+  Orynivo Server, and Plex entries; Plex clickability requires the stored Plex
+  context (album/artist rating keys) and a still-configured Plex server
 - `Orynivo/SettingsStore.cs`: persists non-secret settings in
   `%LOCALAPPDATA%\Orynivo\settings.json`, overlays secrets from
   `ApplicationCredentialStore`, and migrates legacy plaintext JSON credentials
@@ -860,9 +861,11 @@ fallback or allow client-provided commands/paths to reach the helper.
   it must never block or fail playback, and its settings are configured under
   **Artist information**.
 - `Orynivo/Streaming/IStreamingCatalog.cs` and `IStreamingPlaybackProvider.cs`:
-  provider-neutral contracts for future streaming catalog and playback integrations
+  provider-neutral contracts for future streaming catalog and playback
+  integrations
 - `Orynivo/Streaming/QobuzStreamingProvider.cs`: inactive Qobuz scaffold; do not
-  add unofficial endpoints, enable it only with approved partner API documentation
+  add unofficial endpoints, enable it only with approved partner API
+  documentation
 - `Orynivo/Streaming/WindowsStreamingCredentialStore.cs`: compatibility facade
   that stores future provider secrets through `ApplicationCredentialStore`
 - `Orynivo/PlaylistProviders.cs`: provider-neutral playlist persistence for
@@ -870,82 +873,78 @@ fallback or allow client-provided commands/paths to reach the helper.
   Current track, album, and folder context menus always target the local mixed
   playlist list; remote selections persist stable `orynivo://` references while
   their queue paths remain immediately playable authenticated URLs.
-- `Orynivo/Streaming/PlexServerClient.cs`: queries configured Plex Media Servers,
-  exposes only music library sections (`type=artist`), pages
+- `Orynivo/Streaming/PlexServerClient.cs`: queries configured Plex Media
+  Servers, exposes only music library sections (`type=artist`), pages
   artists/albums/tracks, resolves drill-down children, browses folders lazily,
   and builds authenticated direct-part URLs. `PlexMediaItem` also carries the
   optional `ParentRatingKey` (album) and `GrandparentRatingKey` (artist) so a
   played Plex track can record a stable album/artist context in playback history
 - `Orynivo.Core/Streaming/OrynivoServerClient.cs`: HTTP client for a remote
-  Orynivo Server; methods load artists, a single artist profile (`GetArtistAsync`),
-  aggregate library totals (`GetLibrarySummaryAsync`), albums by artist, albums,
-  tracks by
-  album, all tracks, tracks by ID list (`GetTracksByIdsAsync`), track facet rows
-  (`GetTrackFacetsAsync`), lightweight folder-tree tracks, per-track cached lyrics
+  Orynivo Server; methods load artists, a single artist profile
+  (`GetArtistAsync`), aggregate library totals (`GetLibrarySummaryAsync`),
+  albums by artist, albums, tracks by album, all tracks, tracks by ID list
+  (`GetTracksByIdsAsync`), track facet rows (`GetTrackFacetsAsync`), lightweight
+  folder-tree tracks, per-track cached lyrics
   (`GetTrackLyricsAsync`/`UploadTrackLyricsAsync`), remote artist rename/merge
   (`RenameArtistAsync`), server playlists (`GetPlaylistsAsync`, which now also
   carries each smart playlist's `FilterCriteria`), playlist tracks, regular
   playlist create/append/delete, smart-playlist create/update
   (`CreateSmartPlaylistAsync`/`UpdateSmartPlaylistAsync`), and smart-playlist
-  resolution with client-side favourites
-  (`ResolveSmartPlaylistTracksAsync`), server library paths,
-  server directory listings, and scan status including `LibraryChangedAt` for
-  remote client cache invalidation; `SetLibraryPathsAsync` replaces
-  the remote server's configured library
-  roots; `TriggerScanAsync` starts a remote scan; `UploadAlbumArtworkAsync` and
+  resolution with client-side favourites (`ResolveSmartPlaylistTracksAsync`),
+  server library paths, server directory listings, and scan status including
+  `LibraryChangedAt` for remote client cache invalidation;
+  `SetLibraryPathsAsync` replaces the remote server's configured library roots;
+  `TriggerScanAsync` starts a remote scan; `UploadAlbumArtworkAsync` and
   `UploadArtistImageAsync` send client-selected image bytes to the server so the
   server does not perform external artwork searches itself;
   `GetTrackWaveformAsync` downloads cached compact waveform peak data from the
-  server for the transport progress view;
-  `UpdateArtistProfileAsync` sends client-refreshed biography/source fields and
-  optional image bytes for server-side caching, without sending the Last.fm API
-  key; `GetStreamUrl`, `GetAlbumArtworkUrl`, `GetArtistArtworkUrl`, and
-  `GetTrackArtworkUrl` are pure URL builders that include `?key=` so the URLs can
-  be passed directly to FFmpeg or Avalonia's image loader
-- The main sidebar library accordion is labelled **Library**/**Bibliothek**.
-  Its shared Genre Cloud view merges compact snapshots from the local library
-  and every configured Orynivo Server; remote recommendations retain their
-  server context and client-side favorite state. Older servers fall back to
-  `/api/tracks/facets` when `/api/genres/cloud` is unavailable. Genre nodes carry
-  both matching-track and distinct matching-album counts; the desktop chooses
-  the count matching its current recommendation mode.
-  Local media live under a collapsible **Local** child node followed by local
-  Artists, Albums, Tracks, Folder structure, and a nested local Playlists group.
-  The complete **Local** child node (and its rows/playlists) is hidden whenever
-  no local library directory is configured (`AppSettings.LibraryPaths` empty).
-  When neither a local directory nor any Orynivo Server is configured, a hint
-  row (`LibraryEmptyHintItem`, `L_LibraryEmptyHint`) is shown directly under the
-  Library header telling the user to add local directories or one or more Orynivo
-  Servers in Settings. The hint disappears immediately when a directory or server
-  is added because `ApplyLibrarySectionVisibility` re-runs on every settings save,
-  navigation rebuild, and the live directory-change callback.
-  Configured remote Orynivo
-  Server entries are rendered in that same Library accordion, after the local
-  media rows, as one collapsible server-name row followed by Artists, Albums,
-  Tracks, and Folder structure. Legacy server playlists are not displayed in
-  the current sidebar; all sources use the shared mixed playlist list. The local
-  Playlists group is a child of the Local node, indented to align with the local
-  Artists/Albums/Tracks/Folder rows, and its entries are indented one level
-  deeper. There is no separate Orynivo Server sidebar accordion or separate
-  Orynivo Server sidebar visibility setting;
+  server for the transport progress view; `UpdateArtistProfileAsync` sends
+  client-refreshed biography/source fields and optional image bytes for
+  server-side caching, without sending the Last.fm API key; `GetStreamUrl`,
+  `GetAlbumArtworkUrl`, `GetArtistArtworkUrl`, and `GetTrackArtworkUrl` are pure
+  URL builders that include `?key=` so the URLs can be passed directly to FFmpeg
+  or Avalonia's image loader
+- The main sidebar library accordion is labelled **Library**/**Bibliothek**. Its
+  shared Genre Cloud view merges compact snapshots from the local library and
+  every configured Orynivo Server; remote recommendations retain their server
+  context and client-side favorite state. Older servers fall back to
+  `/api/tracks/facets` when `/api/genres/cloud` is unavailable. Genre nodes
+  carry both matching-track and distinct matching-album counts; the desktop
+  chooses the count matching its current recommendation mode. Local media live
+  under a collapsible **Local** child node followed by local Artists, Albums,
+  Tracks, Folder structure, and a nested local Playlists group. The complete
+  **Local** child node (and its rows/playlists) is hidden whenever no local
+  library directory is configured (`AppSettings.LibraryPaths` empty). When
+  neither a local directory nor any Orynivo Server is configured, a hint row
+  (`LibraryEmptyHintItem`, `L_LibraryEmptyHint`) is shown directly under the
+  Library header telling the user to add local directories or one or more
+  Orynivo Servers in Settings. The hint disappears immediately when a directory
+  or server is added because `ApplyLibrarySectionVisibility` re-runs on every
+  settings save, navigation rebuild, and the live directory-change callback.
+  Configured remote Orynivo Server entries are rendered in that same Library
+  accordion, after the local media rows, as one collapsible server-name row
+  followed by Artists, Albums, Tracks, and Folder structure. Legacy server
+  playlists are not displayed in the current sidebar; all sources use the shared
+  mixed playlist list. The local Playlists group is a child of the Local node,
+  indented to align with the local Artists/Albums/Tracks/Folder rows, and its
+  entries are indented one level deeper. There is no separate Orynivo Server
+  sidebar accordion or separate Orynivo Server sidebar visibility setting;
   `ShowLocalLibrarySection` and `IsLocalLibrarySectionExpanded` control the
   complete Library accordion, including remote Orynivo Server rows.
   `IsLocalMediaLibraryGroupExpanded` persists the Local child group state,
   `IsPlaylistsSectionExpanded` persists the local Playlists child group state,
   `CollapsedOrynivoServerLibraryGroups` persists collapsed server child groups;
-  `CollapsedOrynivoServerPlaylistGroups` is retained only for persisted
-  settings compatibility.
-  Remote
-  Artists, Albums, and Tracks reuse the **same** local table/artwork column masks
-  (`ApplyColumns("Artists"/"Albums"/"Tracks")`), intro card
-  (`UpdateLibraryIntroCard`), per-entity Favorites-only toggle, and A-Z index as
-  the local library. There are no separate `Orynivo*` column masks. Server
-  artwork hydrates lazily as rows or artwork cards become visible; downloaded
-  remote artwork is cached client-side under
-  `%LOCALAPPDATA%\Orynivo\remote-artworks\`.
-  In the shared Artists view and global search, local and Orynivo Server artists
-  with the same `ArtistNameNormalizer.CreateComparisonKey` are represented by
-  one `UnifiedArtist` row with an `L+OS` source badge. Opening that row loads and
+  `CollapsedOrynivoServerPlaylistGroups` is retained only for persisted settings
+  compatibility. Remote Artists, Albums, and Tracks reuse the **same** local
+  table/artwork column masks (`ApplyColumns("Artists"/"Albums"/"Tracks")`),
+  intro card (`UpdateLibraryIntroCard`), per-entity Favorites-only toggle, and
+  A-Z index as the local library. There are no separate `Orynivo*` column masks.
+  Server artwork hydrates lazily as rows or artwork cards become visible;
+  downloaded remote artwork is cached client-side under
+  `%LOCALAPPDATA%\Orynivo\remote-artworks\`. In the shared Artists view and
+  global search, local and Orynivo Server artists with the same
+  `ArtistNameNormalizer.CreateComparisonKey` are represented by one
+  `UnifiedArtist` row with an `L+OS` source badge. Opening that row loads and
   combines the matching artist's albums from the local library and every
   configured Orynivo Server; each album row must retain its own source IDs and
   `OrynivoServer` context so album navigation, artwork, and favorites continue
@@ -959,154 +958,148 @@ fallback or allow client-provided commands/paths to reach the helper.
   only into equivalent identities without artwork, preserve manual artist
   images, invalidate unified/provider caches after writes, and never let an
   unreachable server block navigation. Album and artist detail headers expose
-  localized upload actions
-  plus contrast-safe vector trash buttons with explicit delete tooltips; local
-  and remote mutations use their owning artwork cache/API. Dashboard artist
-  analytics use the same unified drill-down,
-  Back navigation restores it as `UnifiedArtistAlbums`, and changing the unified
+  localized upload actions plus contrast-safe vector trash buttons with explicit
+  delete tooltips; local and remote mutations use their owning artwork
+  cache/API. Dashboard artist analytics use the same unified drill-down, Back
+  navigation restores it as `UnifiedArtistAlbums`, and changing the unified
   artist favorite applies to every matching local and remote artist identity.
-  Plex artists remain separate and must not be folded into this identity.
-  Mixed local/server rows expose stable source keys (`local` and `server:<id>`)
-  for the source column, the Tracks source facet, and source-aware smart
-  playlists. The visible source column belongs directly after the favorite
-  column in shared tables and playlist tables. Source tooltips must use
-  theme-aware foreground and surface brushes.
-  Large mixed local/server row sets must be composed before the first visible
-  `DataGrid` bind, or through a proven virtualized/paged binding strategy:
-  diagnostics showed that replacing an already-visible large mixed table's
-  `ItemsSource` can stall Avalonia's UI thread during scrolling.
+  Plex artists remain separate and must not be folded into this identity. Mixed
+  local/server rows expose stable source keys (`local` and `server:<id>`) for
+  the source column, the Tracks source facet, and source-aware smart playlists.
+  The visible source column belongs directly after the favorite column in shared
+  tables and playlist tables. Source tooltips must use theme-aware foreground
+  and surface brushes. Large mixed local/server row sets must be composed before
+  the first visible `DataGrid` bind, or through a proven virtualized/paged
+  binding strategy: diagnostics showed that replacing an already-visible large
+  mixed table's `ItemsSource` can stall Avalonia's UI thread during scrolling.
   Artist/album entity links and double-click navigate **within** the remote
-  library via `OpenOrynivoArtistAlbumsAsync`/`OpenOrynivoAlbumTracksAsync`
-  (the link handlers `ArtistLinkButton_OnClick`/`AlbumLinkButton_OnClick`
-  dispatch by `EntityType` prefix `"Orynivo"`). This requires remote rows to
-  carry IDs: remote track rows have `ArtistId`/`AlbumId`, remote album rows have
-  `ArtistId`.
-  Remote album drill-downs use the shared provider-backed album-track detail
-  surface with the same album header/card, cover actions, favorite toggle, and
-  grouped track tables as local albums; do not route server albums to a separate
-  plain track-list view. When a remote album is opened from a remote artist's
-  album list, the detail view must initially scope tracks to that artist and
-  expose the same **Show all album tracks** checkbox used by local album
-  details. Persisting remote album tracks in mixed local playlists uses stable
-  `orynivo://serverId/track/trackId` references and must never store the
-  credential-bearing playback URL. Smart playlists work identically for local and
-  remote libraries: the remote Tracks **Save smart playlist** action and the
-  sidebar **Edit smart playlist** context entry persist criteria on the server
-  through `CreateSmartPlaylistAsync`/`UpdateSmartPlaylistAsync`, while the server
-  resolves them live through `SmartPlaylistCriteria.Resolve`. Because remote
-  favourites are client-side, the client opens a remote smart playlist through
-  `ResolveSmartPlaylistTracksAsync` (`POST /api/playlists/{id}/resolve`), sending
-  its favourite track IDs so a `FavoritesOnly` criterion matches the client's
-  favourites; regular remote playlists still use `GetPlaylistTracksAsync`.
-  Back navigation must capture remote album details as remote states carrying
-  the Orynivo Server navigation tag; never restore a remote album detail through
-  the local `ShowAlbumTracksAsync` path because server and local album IDs can
-  collide.
+  library via `OpenOrynivoArtistAlbumsAsync`/`OpenOrynivoAlbumTracksAsync` (the
+  link handlers `ArtistLinkButton_OnClick`/`AlbumLinkButton_OnClick` dispatch by
+  `EntityType` prefix `"Orynivo"`). This requires remote rows to carry IDs:
+  remote track rows have `ArtistId`/`AlbumId`, remote album rows have
+  `ArtistId`. Remote album drill-downs use the shared provider-backed
+  album-track detail surface with the same album header/card, cover actions,
+  favorite toggle, and grouped track tables as local albums; do not route server
+  albums to a separate plain track-list view. When a remote album is opened from
+  a remote artist's album list, the detail view must initially scope tracks to
+  that artist and expose the same **Show all album tracks** checkbox used by
+  local album details. Persisting remote album tracks in mixed local playlists
+  uses stable `orynivo://serverId/track/trackId` references and must never store
+  the credential-bearing playback URL. Smart playlists work identically for
+  local and remote libraries: the remote Tracks **Save smart playlist** action
+  and the sidebar **Edit smart playlist** context entry persist criteria on the
+  server through `CreateSmartPlaylistAsync`/`UpdateSmartPlaylistAsync`, while
+  the server resolves them live through `SmartPlaylistCriteria.Resolve`. Because
+  remote favourites are client-side, the client opens a remote smart playlist
+  through `ResolveSmartPlaylistTracksAsync`
+  (`POST /api/playlists/{id}/resolve`), sending its favourite track IDs so a
+  `FavoritesOnly` criterion matches the client's favourites; regular remote
+  playlists still use `GetPlaylistTracksAsync`. Back navigation must capture
+  remote album details as remote states carrying the Orynivo Server navigation
+  tag; never restore a remote album detail through the local
+  `ShowAlbumTracksAsync` path because server and local album IDs can collide.
   Remote artist-info views must use the bound remote row/server profile data,
   not local `AudioDatabase.GetArtistById`, because server IDs can collide with
   local artist IDs. The remote artist-info rename/merge and Wikimedia image
   actions must call the Orynivo Server API (`RenameArtistAsync`,
   `UploadArtistImageAsync`) and update the remote row/detail view rather than
-  writing to the local database.
-  Remote Tracks offers the same Genre/Audio-Type/Bitrate facet filters as local,
-  reusing the client's `MatchesTrackFilters`/facet-popup logic fed by the server
-  aggregation endpoint `/api/tracks/facets` (favorite state overridden with the
-  client-side favorites); filtered results load via `/api/tracks/by-ids`
-  (`ResolveOrynivoTrackRowsAsync`). Typing in the header search box while a remote
-  Tracks view is active shows the shared three-section search result (Tracks,
-  Albums, Artists) via `ShowOrynivoSearchResultsAsync`, backed by the server
-  `/api/search/full` endpoint (`OrynivoServerClient.SearchFullAsync` /
+  writing to the local database. Remote Tracks offers the same
+  Genre/Audio-Type/Bitrate facet filters as local, reusing the client's
+  `MatchesTrackFilters`/facet-popup logic fed by the server aggregation endpoint
+  `/api/tracks/facets` (favorite state overridden with the client-side
+  favorites); filtered results load via `/api/tracks/by-ids`
+  (`ResolveOrynivoTrackRowsAsync`). Typing in the header search box while a
+  remote Tracks view is active shows the shared three-section search result
+  (Tracks, Albums, Artists) via `ShowOrynivoSearchResultsAsync`, backed by the
+  server `/api/search/full` endpoint (`OrynivoServerClient.SearchFullAsync` /
   `OrynivoServerLibraryCatalogProvider.SearchFullAsync`), mirroring the local
   `ShowSearchResultsAsync`. Result rows carry `Orynivo*` entity types so the
   shared link columns and the `SearchAlbumsDataGrid`/`SearchArtistsDataGrid`
   double-click handlers navigate within the remote library, and remote tracks
-  play directly from the result list. Clearing the search box restores the remote
-  Tracks list. The three search-result sections use the same accent-bordered card
-  style as the library headline/intro card for local and remote results. The
-  facet rows live in `_orynivoTrackFacets` while a remote Tracks view is active
-  and are cleared otherwise.
-  Remote folder tree file nodes must register the same `ContentRow` metadata as
-  remote Tracks rows before queuing playback. This is required so the transport
-  shows title/artist/artwork instead of authenticated stream URLs and enables
-  lyrics, artist-info, favorite, and mixed-playlist actions. Remote folder
-  playlist persistence must convert registered server track IDs to stable
-  `orynivo://` references in local SQLite, never credential-bearing stream URLs.
-  When `/api/folders/tracks` lacks the newer playback metadata because an older
-  server is connected, the client may batch-hydrate folder track metadata through
-  `/api/tracks/by-ids` before registering the folder rows. Before loading remote
-  folder data, clear any existing local folder nodes and show the localized
-  server-loading placeholder; do not display stale local tree data while the
-  remote request is in flight. Cache remote folder-track lists under
+  play directly from the result list. Clearing the search box restores the
+  remote Tracks list. The three search-result sections use the same
+  accent-bordered card style as the library headline/intro card for local and
+  remote results. The facet rows live in `_orynivoTrackFacets` while a remote
+  Tracks view is active and are cleared otherwise. Remote folder tree file nodes
+  must register the same `ContentRow` metadata as remote Tracks rows before
+  queuing playback. This is required so the transport shows title/artist/artwork
+  instead of authenticated stream URLs and enables lyrics, artist-info,
+  favorite, and mixed-playlist actions. Remote folder playlist persistence must
+  convert registered server track IDs to stable `orynivo://` references in local
+  SQLite, never credential-bearing stream URLs. When `/api/folders/tracks` lacks
+  the newer playback metadata because an older server is connected, the client
+  may batch-hydrate folder track metadata through `/api/tracks/by-ids` before
+  registering the folder rows. Before loading remote folder data, clear any
+  existing local folder nodes and show the localized server-loading placeholder;
+  do not display stale local tree data while the remote request is in flight.
+  Cache remote folder-track lists under
   `%LOCALAPPDATA%\Orynivo\remote-folder-cache\` and reuse them only while the
   server's `LibraryChangedAt` scan status timestamp matches the cached value.
   The top-level **Folder structure** view (`ShowUnifiedFolderTreeAsync`) merges
   sources into one tree: a top-level **Local** group (only when a local library
   directory is configured and has tracks) plus one group per configured Orynivo
   Server (only when it reports folder tracks), each built through
-  `AddFolderRootsInto`/`BuildUnifiedFolderTree`.
-  The sidebar item remains visible whenever either local media or at least one
-  Orynivo Server is configured; server-only setups must not require a local
-  library path to open this view.
-  `FolderTag` carries an optional
-  `OrynivoServerSettings? Server` so remote directory nodes are resolved through
-  the in-memory `FolderTree` (`_folderTreesBySource[sourceKey].AllFilePathsUnder`)
-  instead of the local database — this is required because folder child nodes are
-  built lazily and may not be materialized. `_folderViewCts` cancels an in-flight
-  load when the user navigates away. Folder nodes are materialized lazily: each
-  directory node gets a placeholder child, and its real children are populated the
-  first time it is expanded. Because Avalonia does not reliably re-render children
-  swapped in during a node's own `Expanded` pass, the expand gesture is
-  intercepted (tunnel-phase `PointerPressed` on the chevron/header + a
-  `DoubleTapped` guard) so the children are inserted *before* `IsExpanded` is
-  set — the same pattern the Plex lazy folders use. Eagerly building the whole
-  tree froze the UI for ~9 s on a ~150k-track merged library. The server
-  folder-track cache file is read/deserialized and written off the UI thread
+  `AddFolderRootsInto`/`BuildUnifiedFolderTree`. The sidebar item remains
+  visible whenever either local media or at least one Orynivo Server is
+  configured; server-only setups must not require a local library path to open
+  this view. `FolderTag` carries an optional `OrynivoServerSettings? Server` so
+  remote directory nodes are resolved through the in-memory `FolderTree`
+  (`_folderTreesBySource[sourceKey].AllFilePathsUnder`) instead of the local
+  database — this is required because folder child nodes are built lazily and
+  may not be materialized. `_folderViewCts` cancels an in-flight load when the
+  user navigates away. Folder nodes are materialized lazily: each directory node
+  gets a placeholder child, and its real children are populated the first time
+  it is expanded. Because Avalonia does not reliably re-render children swapped
+  in during a node's own `Expanded` pass, the expand gesture is intercepted
+  (tunnel-phase `PointerPressed` on the chevron/header + a `DoubleTapped` guard)
+  so the children are inserted _before_ `IsExpanded` is set — the same pattern
+  the Plex lazy folders use. Eagerly building the whole tree froze the UI for ~9
+  s on a ~150k-track merged library. The server folder-track cache file is
+  read/deserialized and written off the UI thread
   (`LoadOrynivoFolderTracksAsync` wraps the cache I/O in `Task.Run`). The
   per-server sidebar Folders view still uses `BuildOrynivoFolderTree`, which
   shares the `MapOrynivoFolderTrackLites` mapping so remote folder file nodes
-  register the same transport metadata.
-  The unfiltered remote Tracks list is loaded with a large page size (one or two
-  requests instead of one per 500 rows) and is likewise cached under
+  register the same transport metadata. The unfiltered remote Tracks list is
+  loaded with a large page size (one or two requests instead of one per 500
+  rows) and is likewise cached under
   `%LOCALAPPDATA%\Orynivo\remote-track-cache\`, reused while the server's
   `LibraryChangedAt` matches the cached value. That cache stores mapped
   `LibraryCatalogTrack` rows, so its file key includes the server API key
   (cached playback URLs embed the key) and client-side favourites are re-applied
-  after loading instead of trusting the cached favourite flags.
-  While a remote track plays, the transport lyrics and artist-info buttons work
-  through `OrynivoServerNowPlayingMetadataProvider` (see
+  after loading instead of trusting the cached favourite flags. While a remote
+  track plays, the transport lyrics and artist-info buttons work through
+  `OrynivoServerNowPlayingMetadataProvider` (see
   `Orynivo/NowPlayingMetadataProviders.cs`): lyrics and the artist
   biography/image are fetched on the client and cached on that track's server.
   The remote track's server and primary artist ID are carried on its
   `ContentRow` (`OrynivoServer`, `ArtistId`); the now-playing artist button is
   enabled for a remote track and navigates within that track's server library
-  (`OpenOrynivoArtistAlbumsAsync`) rather than the local album view.
-  Remote transport waveform loading first asks the server for cached peaks and
-  falls back to client-side FFmpeg analysis of the authenticated stream URL when
-  the server cannot analyse the format; this keeps DFF waveforms available
-  without requiring the server's FFmpeg build to support every source format.
-  The transport favourite (heart) button is enabled for a playing remote track
-  and toggles the client-side favourite (`OrynivoServerFavorites`) for that
-  track via `CurrentOrynivoFavoriteTarget`; the change is written to
-  `settings.json` and reflected in any visible remote track rows. For local
-  tracks it still writes `tracks.is_favorite`.
+  (`OpenOrynivoArtistAlbumsAsync`) rather than the local album view. Remote
+  transport waveform loading first asks the server for cached peaks and falls
+  back to client-side FFmpeg analysis of the authenticated stream URL when the
+  server cannot analyse the format; this keeps DFF waveforms available without
+  requiring the server's FFmpeg build to support every source format. The
+  transport favourite (heart) button is enabled for a playing remote track and
+  toggles the client-side favourite (`OrynivoServerFavorites`) for that track
+  via `CurrentOrynivoFavoriteTarget`; the change is written to `settings.json`
+  and reflected in any visible remote track rows. For local tracks it still
+  writes `tracks.is_favorite`.
 - `Orynivo/OrynivoServerDialog.axaml/.cs`: themed dialog for adding or editing a
   remote Orynivo Server (name, URL, API key, per-server streaming quality, Test
-  Connection); it can load, add,
-  remove, and save the remote server's music directories through the server API,
-  start a remote scan, and show live scan progress; returned server record is
-  stored in `AppSettings.OrynivoServers`
+  Connection); it can load, add, remove, and save the remote server's music
+  directories through the server API, start a remote scan, and show live scan
+  progress; returned server record is stored in `AppSettings.OrynivoServers`
 - `Orynivo/RemoteDirectoryBrowserDialog.axaml/.cs`: browses the remote server
   filesystem through `/api/files/directories?path=` and returns a server-side
   directory path for `OrynivoServerDialog`
-- `AppSettings.OrynivoServers` stores configured remote server connections;
-  API keys are overlaid from `ApplicationCredentialStore` and excluded from
-  `settings.json`;
-  `AppSettings.OrynivoServerFavorites` stores client-side favorite keys for
-  remote artists, albums, and tracks. Legacy `ShowOrynivoServerSection` and
-  `IsOrynivoServerSectionExpanded` settings may still exist in persisted JSON
-  for compatibility, but the current sidebar renders remote servers under the
-  main Library accordion controlled by `ShowLocalLibrarySection` and
-  `IsLocalLibrarySectionExpanded`.
+- `AppSettings.OrynivoServers` stores configured remote server connections; API
+  keys are overlaid from `ApplicationCredentialStore` and excluded from
+  `settings.json`; `AppSettings.OrynivoServerFavorites` stores client-side
+  favorite keys for remote artists, albums, and tracks. Legacy
+  `ShowOrynivoServerSection` and `IsOrynivoServerSectionExpanded` settings may
+  still exist in persisted JSON for compatibility, but the current sidebar
+  renders remote servers under the main Library accordion controlled by
+  `ShowLocalLibrarySection` and `IsLocalLibrarySectionExpanded`.
 - `Orynivo/Streaming/WindowsPlexCredentialStore.cs`: compatibility facade that
   stores per-server Plex access tokens through `ApplicationCredentialStore`
 - `AppSettings.PlexServers` stores Plex server IDs, display names, and base
@@ -1160,12 +1153,11 @@ fallback or allow client-provided commands/paths to reach the helper.
 - `AppSettings.PcmOutputBoostEnabled` applies an additional +6 dB linear gain to
   every PCM playback path (local, remote, Plex, radio, podcasts, and converted
   DSD). Native ASIO/cwASIO DSD remains bit-perfect and ignores the boost.
-- `AppSettings.EqualizerProfiles` persists all named imported or manually
-  edited Equalizer APO/AutoEQ profiles, while
-  `SelectedEqualizerProfileName`, `EqualizerProfile`, and `EqualizerEnabled`
-  identify the only selected/active profile and retain compatibility with the
-  previous single-profile settings format. The source file path is not required
-  after import.
+- `AppSettings.EqualizerProfiles` persists all named imported or manually edited
+  Equalizer APO/AutoEQ profiles, while `SelectedEqualizerProfileName`,
+  `EqualizerProfile`, and `EqualizerEnabled` identify the only selected/active
+  profile and retain compatibility with the previous single-profile settings
+  format. The source file path is not required after import.
 - `AppSettings.DataGridColumnWidths` persists user-adjusted pixel widths per
   stable table/view key; dynamic main-content views capture their current widths
   before replacing columns
@@ -1175,23 +1167,23 @@ fallback or allow client-provided commands/paths to reach the helper.
 - `AppSettings.DataGridColumnOrders` persists drag-and-drop display order per
   stable table/view key; fixed artwork and action columns keep their structural
   positions
-- `AppSettings.McpServerEnabled` enables the embedded MCP server on startup
-  and when settings are saved; `AppSettings.McpServerPort` sets the TCP port
+- `AppSettings.McpServerEnabled` enables the embedded MCP server on startup and
+  when settings are saved; `AppSettings.McpServerPort` sets the TCP port
   (default 49200); the server binds exclusively to `localhost`;
-  `AppSettings.DisabledMcpTools` persists the set of tool names whose
-  checkboxes are unchecked in Settings — an empty set means all tools are
-  active; the bridge reads this set on startup and after every settings save
+  `AppSettings.DisabledMcpTools` persists the set of tool names whose checkboxes
+  are unchecked in Settings — an empty set means all tools are active; the
+  bridge reads this set on startup and after every settings save
 - `AppSettings.AiChat` stores the embedded AI chat configuration
   (`AiChatSettings`): `Enabled`, `EndpointUrl` (default
   `http://localhost:1234/v1`), `ApiKey`, `ModelName`, and `MaxTokens` (default
-  2048); any OpenAI-compatible provider works (LM Studio, Ollama, OpenAI,
-  etc.); the API key is excluded from JSON and overlaid from
-  `ApplicationCredentialStore`; the `AiChatView` re-reads
-  `GetSettings` on every send so settings changes take effect immediately
+  2048); any OpenAI-compatible provider works (LM Studio, Ollama, OpenAI, etc.);
+  the API key is excluded from JSON and overlaid from
+  `ApplicationCredentialStore`; the `AiChatView` re-reads `GetSettings` on every
+  send so settings changes take effect immediately
 - `AppSettings.ShowInternetRadioItem`, `ShowPodcastsItem`, `ShowQueueItem`, and
   `ShowAiChatItem` control the individual sidebar items for Internet Radio,
-  Podcasts, **Up Next**, and AI Chat from Settings > Appearance; they default
-  to visible and are independent of the accordion-section toggles
+  Podcasts, **Up Next**, and AI Chat from Settings > Appearance; they default to
+  visible and are independent of the accordion-section toggles
 - `AppSettings.Theme` stores the `Light` or `Dark` theme
 - `AppSettings.GenreCloudBackground` stores whether Genre Cloud background
   rendering is disabled or uses recommendation-ranked album covers or artist
@@ -1206,24 +1198,25 @@ fallback or allow client-provided commands/paths to reach the helper.
 - `Orynivo/Library/PlaylistRecord.cs`: playlist model including denormalized
   `TrackCount`, `IsSmartPlaylist`, and `FilterCriteria`
 - `Orynivo/Library/SmartPlaylistCriteria.cs`: backward-compatible serialized
-  smart-playlist criteria covering favourites, a free-text `SearchText`
-  (matched case-insensitively against title, artist, and album), genres,
-  formats, bitrates, source keys, metadata ranges, library/play-history rules,
-  ordering, and result limits
+  smart-playlist criteria covering favourites, a free-text `SearchText` (matched
+  case-insensitively against title, artist, and album), genres, formats,
+  bitrates, source keys, metadata ranges, library/play-history rules, ordering,
+  and result limits
 - `Orynivo/SmartPlaylistDialog.*`: localized editor for the name and advanced
   criteria of an existing smart playlist. An optional `CountResolver`
-  (`Func<SmartPlaylistCriteria, CancellationToken, Task<int?>>`) drives a debounced
-  live preview ("N tracks match") that re-evaluates on every criteria change. The
-  preview resolves the criteria exactly how the playlist opens: a locally stored
-  smart playlist uses `ResolveUnifiedSmartPlaylistCountAsync`
-  (`BuildUnifiedSmartPlaylistCandidates` = local library + every configured server,
-  the same candidate set as `ResolveUnifiedSmartPlaylistRows`), so smart playlists
-  do not distinguish local vs server sources; the server-stored edit path uses a
-  resolver backed by `OrynivoServerClient.ResolveSmartPlaylistCountAsync`
+  (`Func<SmartPlaylistCriteria, CancellationToken, Task<int?>>`) drives a
+  debounced live preview ("N tracks match") that re-evaluates on every criteria
+  change. The preview resolves the criteria exactly how the playlist opens: a
+  locally stored smart playlist uses `ResolveUnifiedSmartPlaylistCountAsync`
+  (`BuildUnifiedSmartPlaylistCandidates` = local library + every configured
+  server, the same candidate set as `ResolveUnifiedSmartPlaylistRows`), so smart
+  playlists do not distinguish local vs server sources; the server-stored edit
+  path uses a resolver backed by
+  `OrynivoServerClient.ResolveSmartPlaylistCountAsync`
   (`POST /api/playlists/resolve-count`, server-side `criteria.Resolve` with the
-  client's favourite IDs; older servers without the endpoint return no count → no
-  preview). `TryBuildCriteriaCore` builds criteria without touching the validation
-  UI so the preview can reuse it.
+  client's favourite IDs; older servers without the endpoint return no count →
+  no preview). `TryBuildCriteriaCore` builds criteria without touching the
+  validation UI so the preview can reuse it.
 - `Orynivo/Library/PlaylistTrackRecord.cs`: playlist entry model with position,
   optional TrackId reference, and required path
 - `Orynivo/Library/M3u8PlaylistService.cs`: UTF-8 M3U8 import/export with
@@ -1232,7 +1225,8 @@ fallback or allow client-provided commands/paths to reach the helper.
 - `Orynivo/Library/AudioDatabase.cs`: SQLite database layer through
   `Microsoft.Data.Sqlite`; database at `%LOCALAPPDATA%\Orynivo\library.db`
 - `Orynivo/Library/LibraryScanner.cs`: directory scanner using TagLibSharp;
-  writes through `AudioDatabase.Upsert()`, reports progress, and supports cancellation
+  writes through `AudioDatabase.Upsert()`, reports progress, and supports
+  cancellation
 - `Orynivo/Library/CueSheetParser.cs`: parses UTF-8 or legacy-encoded CUE sheets
   and creates stable virtual track paths with physical source paths and segment
   boundaries
@@ -1266,12 +1260,12 @@ fallback or allow client-provided commands/paths to reach the helper.
 - `Orynivo/Library/ArtistProfileService.cs`: configurable artist biography and
   image lookup (Wikipedia or Last.fm) with preferred curated Fanart.tv
   `artistthumb` artwork when an encrypted stored key or `FANART_TV_API_KEY` is
-  available; static source/key properties are applied by the desktop, and
-  images are cached under `%LOCALAPPDATA%\Orynivo\artist-images\`. Fanart.tv
-  resolution uses embedded MusicBrainz IDs or an unambiguous exact MusicBrainz
-  match. The Fanart.tv key may only be persisted in
-  `ApplicationCredentialStore`; it must never be written to JSON or caches,
-  logged, sent to an Orynivo Server, or exposed to a model.
+  available; static source/key properties are applied by the desktop, and images
+  are cached under `%LOCALAPPDATA%\Orynivo\artist-images\`. Fanart.tv resolution
+  uses embedded MusicBrainz IDs or an unambiguous exact MusicBrainz match. The
+  Fanart.tv key may only be persisted in `ApplicationCredentialStore`; it must
+  never be written to JSON or caches, logged, sent to an Orynivo Server, or
+  exposed to a model.
 - `Orynivo/Library/ArtistImageSearchService.cs` and
   `Orynivo/ArtistImageSearchWindow.*`: manual artist-image search with an
   editable query; it tries Fanart.tv first when a key is configured and falls
@@ -1279,14 +1273,15 @@ fallback or allow client-provided commands/paths to reach the helper.
   sets `image_is_manual`, and preserves the biography source; automatic profile
   refreshes must not download over manually selected image files. The Artist
   information Settings action processes missing images from the local library
-  and every configured Orynivo Server strictly sequentially, remains cancellable,
-  tries Fanart.tv first only when a key is available, and then falls back to
-  Wikimedia Commons. Every in-memory candidate must be explicitly accepted or
-  rejected in a preview before it may be saved to its owning local or remote
-  library; progress includes a provider-search-based remaining-time estimate.
+  and every configured Orynivo Server strictly sequentially, remains
+  cancellable, tries Fanart.tv first only when a key is available, and then
+  falls back to Wikimedia Commons. Every in-memory candidate must be explicitly
+  accepted or rejected in a preview before it may be saved to its owning local
+  or remote library; progress includes a provider-search-based remaining-time
+  estimate.
 - `Orynivo/EditArtistNameDialog.*` and `Orynivo/ArtistMergeDialog.*`:
-  artist-info rename flow; collisions require an explicit merge-profile
-  priority choice
+  artist-info rename flow; collisions require an explicit merge-profile priority
+  choice
 
 ## Audio Database
 
@@ -1310,39 +1305,39 @@ fallback or allow client-provided commands/paths to reach the helper.
   background and cancel the series when another album replaces it. Fallback
   resolution persists a newly identified MBID, but community ratings must use
   direct recording lookups because MusicBrainz search responses do not reliably
-  include them. Never mark a search-only empty rating as freshly fetched.
-  Rows sharing a recording MBID within one album refresh must reuse one direct
-  lookup result and persist it independently to each owning library.
-  Direct rating lookups also cache curated MusicBrainz genres with positive
-  counts and tags with at least two positive votes as separate JSON arrays.
-  `GetTrackFacets` combines them with embedded genre text for classification;
-  embedded tags are never overwritten.
-  After playback first starts, one client-side low-priority worker continues
-  stale MusicBrainz enrichment for local and configured Orynivo Server tracks
-  only while playback is active. Album-detail and explicit requests take
-  priority between API calls. Known MBIDs refresh after 30 days; conservative
-  text matching that resolves no unique recording stores only its attempt
-  timestamp and waits 90 days before retrying. This timestamp is not a cached
-  search-response rating and scans must preserve it.
+  include them. Never mark a search-only empty rating as freshly fetched. Rows
+  sharing a recording MBID within one album refresh must reuse one direct lookup
+  result and persist it independently to each owning library. Direct rating
+  lookups also cache curated MusicBrainz genres with positive counts and tags
+  with at least two positive votes as separate JSON arrays. `GetTrackFacets`
+  combines them with embedded genre text for classification; embedded tags are
+  never overwritten. After playback first starts, one client-side low-priority
+  worker continues stale MusicBrainz enrichment for local and configured Orynivo
+  Server tracks only while playback is active. Album-detail and explicit
+  requests take priority between API calls. Known MBIDs refresh after 30 days;
+  conservative text matching that resolves no unique recording stores only its
+  attempt timestamp and waits 90 days before retrying. This timestamp is not a
+  cached search-response rating and scans must preserve it.
 - `albums` contains stable album IDs (`id`, `title`, `artist_id`, `year`,
   `artwork_id`, `is_favorite`)
 - `artworks` deduplicates artwork by SHA-256 hash; originals and thumbnails live
-  under `%LOCALAPPDATA%\Orynivo\artworks\` as `original`, `thumb_96`, and `thumb_320`
+  under `%LOCALAPPDATA%\Orynivo\artworks\` as `original`, `thumb_96`, and
+  `thumb_320`
 - `favorites` is an older generic extension point; visible favorites use the
   direct flags
 - `play_history` records local tracks, remote Orynivo Server and Plex tracks,
   podcast episodes, and internet-radio sessions with media type, display
   title/subtitle, optional external ID, an optional `genre` captured at playback
   time (so genre statistics include tracks without a local library row),
-    playback start/end, duration, final position, and completion state.
-  The `external_id` stores a stable source context for non-local tracks:
+  playback start/end, duration, final position, and completion state. The
+  `external_id` stores a stable source context for non-local tracks:
   `orynivo:{serverId}:track:{trackId}` for remote Orynivo Server tracks
   (`ResolveNowPlayingExternalId` / `BuildOrynivoHistoryExternalId`), and
   `plex:{serverId}:{trackKey}:{albumKey}:{artistKey}` for Plex tracks
   (`BuildPlexHistoryExternalId`, using the Plex track/parent/grandparent rating
   keys carried on the `ContentRow` as `PlexServerId`/`PlexAlbumRatingKey`/
-  `PlexArtistRatingKey`). This is what makes Plex history albums/artists clickable
-  (`TryGetPlexHistoryTarget` → `OpenPlexAlbumFromHistoryAsync` /
+  `PlexArtistRatingKey`). This is what makes Plex history albums/artists
+  clickable (`TryGetPlexHistoryTarget` → `OpenPlexAlbumFromHistoryAsync` /
   `OpenPlexArtistFromHistoryAsync`, which synthesize a Plex parent row and reuse
   `ShowPlexChildrenAsync`)
 - `radio_stations` stores personal Radio Browser stations by stable station
@@ -1351,12 +1346,14 @@ fallback or allow client-provided commands/paths to reach the helper.
   RSS feed URL, artwork URL, and genre
 - `podcast_episode_progress` stores resume position, known duration, completion
   state, and update time per pinned podcast episode; RSS GUID is the preferred
-    episode key and the audio URL is the fallback
+  episode key and the audio URL is the fallback
 - `AudioDatabase.GetTrackIdAndFavorite(path)` performs a lightweight `id` and
   `is_favorite` lookup
-- `AudioDatabase.OpenDefault()` creates or opens `%LOCALAPPDATA%\Orynivo\library.db`
+- `AudioDatabase.OpenDefault()` creates or opens
+  `%LOCALAPPDATA%\Orynivo\library.db`
 - On first launch after the rename, missing data is copied from
-  `%LOCALAPPDATA%\Player\` and cached database paths are rebased to `%LOCALAPPDATA%\Orynivo\`
+  `%LOCALAPPDATA%\Player\` and cached database paths are rebased to
+  `%LOCALAPPDATA%\Orynivo\`
 - Cache-path rebasing is guarded by the `cache_paths_orynivo_v1` database
   migration marker and must not run on every database open
 - `Upsert()` is idempotent through `INSERT ... ON CONFLICT DO UPDATE`
@@ -1388,11 +1385,11 @@ fallback or allow client-provided commands/paths to reach the helper.
   library… N / M files") and never reloads a view for it.
 - A background library change (`OnWatchedLibraryChanged`) must NOT auto-reload
   the visible content view. It refreshes the sidebar playlist list and, for a
-  view that `CanReloadCurrentViewAfterLibraryChange()` allows, shows the
-  header `LibraryRefreshButton` ("New library data available" / "Refresh"). The
-  user reloads on demand (`LibraryRefreshButton_OnClick`); the button is hidden
-  again on any explicit navigation (`ShowTopLevelViewAsync`). No automatic
-  navigation and no skeleton for background changes.
+  view that `CanReloadCurrentViewAfterLibraryChange()` allows, shows the header
+  `LibraryRefreshButton` ("New library data available" / "Refresh"). The user
+  reloads on demand (`LibraryRefreshButton_OnClick`); the button is hidden again
+  on any explicit navigation (`ShowTopLevelViewAsync`). No automatic navigation
+  and no skeleton for background changes.
 - Removing a configured library root removes tracks outside the remaining roots
   from SQLite, Lucene, and the waveform cache through
   `LibraryScanner.RemoveTracksOutsideRoots`.
@@ -1401,10 +1398,10 @@ fallback or allow client-provided commands/paths to reach the helper.
   whose actual codec support is provided by FFmpeg.
 - Chaptered MKA files are probed through FFprobe and stored as stable
   `mka://chapter/` virtual tracks sharing the physical MKA through
-  `source_path`; their time bounds reuse `segment_start` / `segment_end` and
-  the defining MKA path is stored in `cue_path` for lifecycle cleanup. The
-  physical file is exposed as a normal track only when no usable chapters exist.
-  MKA probing caps FFprobe analysis and has a 30-second per-file timeout so a
+  `source_path`; their time bounds reuse `segment_start` / `segment_end` and the
+  defining MKA path is stored in `cue_path` for lifecycle cleanup. The physical
+  file is exposed as a normal track only when no usable chapters exist. MKA
+  probing caps FFprobe analysis and has a 30-second per-file timeout so a
   malformed or slow network file cannot block a complete library scan.
 - `track_title_overrides` stores library-only title corrections keyed by stable
   track path. `AudioDatabase.Upsert` reapplies them after every scan, so virtual
@@ -1423,8 +1420,8 @@ fallback or allow client-provided commands/paths to reach the helper.
   tracks once so existing libraries receive those values. New or changed files
   that do not contain ReplayGain tags are analysed with FFmpeg during the scan:
   the scanner calculates missing track gain per file and missing album gain by
-  analysing the affected album as a whole through a temporary FFmpeg concat list.
-  Existing ReplayGain metadata is preserved. Settings > Playback exposes
+  analysing the affected album as a whole through a temporary FFmpeg concat
+  list. Existing ReplayGain metadata is preserved. Settings > Playback exposes
   **Calculate missing ReplayGain** to backfill the local library and every
   configured Orynivo Server. Remote calculations use authenticated
   `POST /api/replaygain`, report progress through `/api/scan`, and preserve all
@@ -1440,15 +1437,15 @@ fallback or allow client-provided commands/paths to reach the helper.
   `album_artist` so compilations are not split by track artist
 - `album_title_uniqueness_v1` and `album_title_artist_identity_v1` are
   historical album migrations. `album_disc_directory_identity_v1` supersedes
-  them and rebuilds album identity from normalized album title plus the
-  physical album root (`source_path` for CUE tracks). Conventional disc
-  directories such as `CD1`, `CD 2`, `Disc 1`, and `Disk-2` resolve to their
-  common parent directory.
+  them and rebuilds album identity from normalized album title plus the physical
+  album root (`source_path` for CUE tracks). Conventional disc directories such
+  as `CD1`, `CD 2`, `Disc 1`, and `Disk-2` resolve to their common parent
+  directory.
 - `RebuildAlbumsFromAlbumArtists()` retains its historical public name but now
   rebuilds by title and physical album root. It keeps compilations and
-  multi-disc releases together even when their track artists or disc
-  directories differ, preserves favorites, and prefers the embedded cover
-  from each physical album.
+  multi-disc releases together even when their track artists or disc directories
+  differ, preserves favorites, and prefers the embedded cover from each physical
+  album.
 - Settings includes **Repair album artwork**, which re-reads a sample file per
   album through TagLib when historical assignments are missing
 - Orynivo Server full scans run the same missing-album-artwork repair after
@@ -1479,22 +1476,22 @@ fallback or allow client-provided commands/paths to reach the helper.
 - The album track detail header uses the same accent border and asymmetric
   `CornerRadius="0,24,0,24"` card shape as the radio, podcast, and shared
   library intro cards.
-- `AppSettings.StartMaximized` defaults to maximized startup. When disabled,
-  the main window restores its last normal logical size and physical screen
+- `AppSettings.StartMaximized` defaults to maximized startup. When disabled, the
+  main window restores its last normal logical size and physical screen
   position; saved bounds must be validated against current screen working areas
   so removed-monitor positions fall back to centered startup. Never persist or
   restore a minimized state.
 - `artwork_files_v1` exports legacy artwork BLOBs into the file cache;
-  `artworks.data` remains for compatibility with old `NOT NULL` schemas
-  Artwork file paths are also verified per current app-data artwork root; when
-  cached files are missing or point to another environment, originals and
-  thumbnails are recreated from `artworks.data` and the stored paths are
-  updated.
+  `artworks.data` remains for compatibility with old `NOT NULL` schemas Artwork
+  file paths are also verified per current app-data artwork root; when cached
+  files are missing or point to another environment, originals and thumbnails
+  are recreated from `artworks.data` and the stored paths are updated.
 - Thumbnail generation is intentionally fault tolerant; invalid embedded artwork
   must not prevent startup
 - `normalized_library_v1` prevents expensive legacy migration checks on every
   database open
-- `AudioDatabase.Optimize()` runs `wal_checkpoint(TRUNCATE)`, `VACUUM`, and `ANALYZE`
+- `AudioDatabase.Optimize()` runs `wal_checkpoint(TRUNCATE)`, `VACUUM`, and
+  `ANALYZE`
 - Settings library backup creates a consistent SQLite snapshot, includes album
   artwork, artist images, and library paths, reports percentage and current-file
   progress for both export and import, writes to `.tmp` before publishing the
@@ -1541,8 +1538,8 @@ fallback or allow client-provided commands/paths to reach the helper.
   closes the artist-info overlay and opens the album's tracks
   (`OpenArtistInfoAlbumAsync`): local via `ShowAlbumTracksAsync`, remote via
   `OpenOrynivoAlbumTracksAsync` on the album's own server.
-- The same artist-info controls form the normal non-Plex artist detail page.
-  Its accent-bordered hero places the image beside the artist name, bounded
+- The same artist-info controls form the normal non-Plex artist detail page. Its
+  accent-bordered hero places the image beside the artist name, bounded
   scrollable biography, source, rename, image-management, and refresh actions;
   its album strip combines normalized matching local and Orynivo Server
   identities. The image occupies a fixed left column and must never overlap the
@@ -1560,8 +1557,8 @@ fallback or allow client-provided commands/paths to reach the helper.
   through the target row and defer `ScrollIntoView` until layout has processed
   the collection changes; rebinding an artwork view resets its old offset.
 - The artist information view can search Wikimedia Commons using editable text
-  and assign the selected image without replacing the cached biography
-  or its source URL.
+  and assign the selected image without replacing the cached biography or its
+  source URL.
 - Opening artist information must synchronously clear the previous artist's
   image, biography, source URL, IDs, and mutation targets before any local or
   remote lookup begins. Unified artist info buttons use the row `Title`, never
@@ -1585,8 +1582,8 @@ fallback or allow client-provided commands/paths to reach the helper.
 - The artist information view can rename artists. A matching normalized name
   opens a merge dialog that asks which artist record and profile data survive;
   the transaction consolidates duplicate albums, reassigns tracks, preserves
-  favorites and available album artwork, updates denormalized artist names,
-  and rebuilds the Lucene index. Audio-file tags are not changed.
+  favorites and available album artwork, updates denormalized artist names, and
+  rebuilds the Lucene index. Audio-file tags are not changed.
 - Artist rename/merge dialogs must not be awaited while an `AudioDatabase`
   connection remains open. Resolve a possible collision first, dispose the
   connection, show the modal choice, then run the rename transaction.
@@ -1601,16 +1598,16 @@ fallback or allow client-provided commands/paths to reach the helper.
   current/filter artist state immediately. The potentially expensive complete
   Lucene rebuild runs afterward in the background and must not delay visible
   confirmation of the new name.
-- On large libraries, do not open `AudioDatabase` for collision lookup on the
-  UI thread after the rename dialog. Collision lookup and a collision-free
-  rename share one background connection; only an actual collision returns to
-  the UI for the merge-choice dialog. Verify the committed artist name before
+- On large libraries, do not open `AudioDatabase` for collision lookup on the UI
+  thread after the rename dialog. Collision lookup and a collision-free rename
+  share one background connection; only an actual collision returns to the UI
+  for the merge-choice dialog. Verify the committed artist name before
   refreshing lists.
 - `EditArtistNameDialog` owns the complete confirmation lifecycle through
   `CommitAsync`: clicking **Rename** or pressing Enter disables its inputs,
   awaits the verified SQLite rename/merge operation, and closes only after
-  success. Failures keep the dialog open with a localized status message.
-  Its local button themes explicitly define centered content and theme-aware
+  success. Failures keep the dialog open with a localized status message. Its
+  local button themes explicitly define centered content and theme-aware
   hover/pressed surfaces.
 - Artist names are normalized when scanned: only the primary performer is
   retained, `feat.`/`ft.` suffixes are removed, and Unicode, whitespace, case,
@@ -1634,9 +1631,10 @@ fallback or allow client-provided commands/paths to reach the helper.
   **New playlist...**. Plex tracks expose only the in-memory queue actions so
   authenticated URLs cannot be written to playlist or settings storage.
 - Local and remote Orynivo Server playlist context actions use
-  `LocalLibraryPlaylistProvider` and `PlaylistSelection` against the shared mixed
-  playlist list. Remote selections store stable `orynivo://` references; legacy
-  server playlist providers/endpoints are not exposed in current context menus.
+  `LocalLibraryPlaylistProvider` and `PlaylistSelection` against the shared
+  mixed playlist list. Remote selections store stable `orynivo://` references;
+  legacy server playlist providers/endpoints are not exposed in current context
+  menus.
 - Selecting a playlist immediately adds the track or all album tracks and
   updates the status bar
 - Track-row playlist `ContextFlyout` instances are rebuilt directly before they
@@ -1646,11 +1644,13 @@ fallback or allow client-provided commands/paths to reach the helper.
   `ContentDataGrid.ItemsSource`, so it saves exactly the album tracks currently
   displayed after the artist-scope checkbox is applied, and opens the shared
   themed playlist `MenuFlyout` for an existing or new regular playlist.
-- **New playlist...** opens `NewPlaylistDialog`; a name is required and Enter confirms
+- **New playlist...** opens `NewPlaylistDialog`; a name is required and Enter
+  confirms
 - `Orynivo/NewPlaylistDialog.axaml/.cs` is themed with dynamic brushes and a
   DWM-colored native title bar
 - `AppendPlaylistItems()` builds context-menu items dynamically
-- Album artwork cards extend their existing cover menu through `ContextMenu.Opened`
+- Album artwork cards extend their existing cover menu through
+  `ContextMenu.Opened`
 - `GetPathsForRow()` returns one track path or all album tracks through
   `GetTrackListByAlbum`. For a remote Orynivo Server album row it resolves the
   album's track list through a server request, so it must never be called
@@ -1659,24 +1659,25 @@ fallback or allow client-provided commands/paths to reach the helper.
   remote album's playlist targets off the UI thread only when the flyout is
   opened. Resolving remote rows synchronously on the UI thread froze the whole
   Albums table once a server was merged into the unified library.
-- `PlaylistMenuTag(long PlaylistId, IReadOnlyList<string> Paths)` stores paths directly
+- `PlaylistMenuTag(long PlaylistId, IReadOnlyList<string> Paths)` stores paths
+  directly
 - Folder nodes recursively collect tracks through `GetTrackPathsUnderDirectory`;
   empty folders have no menu
 - Main-window context menus use application theme resources and a custom border
   template without the default white icon strip
-- The global `ControlTheme x:Key="{x:Type ContextMenu}"` in `App.axaml`
-  provides a complete `Template` with a `Border` bound to `Background`,
-  `BorderBrush`, `BorderThickness`, and `CornerRadius`; this is required so
-  that programmatically created context menus (e.g. the built-in cut/copy/paste
-  menu of `NumericUpDown`) also render with theme colors instead of the
+- The global `ControlTheme x:Key="{x:Type ContextMenu}"` in `App.axaml` provides
+  a complete `Template` with a `Border` bound to `Background`, `BorderBrush`,
+  `BorderThickness`, and `CornerRadius`; this is required so that
+  programmatically created context menus (e.g. the built-in cut/copy/paste menu
+  of `NumericUpDown`) also render with theme colors instead of the
   Fluent-default white popup background. Property-only themes without a
   `Template` are silently ignored by the Fluent renderer.
 - Dynamically created menu objects receive their styles through Avalonia
   `ControlTheme` resources looked up via `TryGetResource`
 - Track, search-result, album-row, and folder-tree playlist actions follow the
-  same proven pattern as sidebar radio/podcast/playlist actions: assign a
-  themed `MenuFlyout` to the item's `ContextFlyout` property before opening,
-  then register the tunnel-phase `PointerPressed` handler directly on that
+  same proven pattern as sidebar radio/podcast/playlist actions: assign a themed
+  `MenuFlyout` to the item's `ContextFlyout` property before opening, then
+  register the tunnel-phase `PointerPressed` handler directly on that
   `DataGridRow` or `TreeViewItem` with `handledEventsToo: true`. The item marks
   the right-button event handled and calls
   `ContextFlyout.ShowAt(item, showAtPointer: true)` itself; do not resolve the
@@ -1694,11 +1695,12 @@ fallback or allow client-provided commands/paths to reach the helper.
   `ShowAt(item, showAtPointer: true)`. The flyouts use dedicated presenter and
   item themes based on the Fluent defaults with Orynivo's dynamic surface,
   border, text, hover, pressed, and separator resources. Sidebar accordion and
-  repeated-selection handlers must explicitly accept only the left mouse
-  button. Explicitly created `MenuItem` objects must also receive the shared
-  item theme directly; `ItemContainerTheme` alone does not reliably restyle
-  preconstructed controls.
-- **Remove from playlist** appears only for regular playlist entries with a `PlaylistEntryId`
+  repeated-selection handlers must explicitly accept only the left mouse button.
+  Explicitly created `MenuItem` objects must also receive the shared item theme
+  directly; `ItemContainerTheme` alone does not reliably restyle preconstructed
+  controls.
+- **Remove from playlist** appears only for regular playlist entries with a
+  `PlaylistEntryId`
 - `_activePlaylistId` is set by `ShowTopLevelViewAsync` only for playlist views
 - `ContentRow.PlaylistEntryId` contains `playlist_tracks.id` only in regular
   playlist views
@@ -1712,39 +1714,41 @@ fallback or allow client-provided commands/paths to reach the helper.
 - Queue rows retain their `PlaylistItem` reference so duplicate paths can be
   removed and moved independently. Moving the active item must recalculate
   `_queueIndex` by reference, not by path equality.
-- Queue rows can move up/down or be removed, and the complete queue can be
-  saved as a regular playlist through `NewPlaylistDialog`.
+- Queue rows can move up/down or be removed, and the complete queue can be saved
+  as a regular playlist through `NewPlaylistDialog`.
 - The Up Next header exposes a localized **Clear queue** action that clears the
   editable queue without stopping the currently playing track; MCP `clear_queue`
   uses the same `ClearPlaybackQueue` path.
 - Queue mutations update navigation buttons, the visible queue table, shuffle
   history, and persisted settings together.
-- The gapless PCM players receive an immutable item list at startup. Mutating
-  an active gapless queue therefore restarts the current stream and seeks back
-  to its audible position so the revised order takes effect immediately.
+- The gapless PCM players receive an immutable item list at startup. Mutating an
+  active gapless queue therefore restarts the current stream and seeks back to
+  its audible position so the revised order takes effect immediately.
 - **Restore last queue**: `CapturePlaybackQueueState` detects a wholesale queue
-  replacement (the new queue shares no path with the outgoing one) and stores the
-  outgoing queue via `AudioDatabase.SavePreviousPlaybackQueue` (kept in `app_meta`
-  as `previous_playback_queue`). The Up Next header shows `RestoreQueueButton`
-  when `GetPreviousPlaybackQueue()` is non-empty; `RestorePreviousQueueAsync`
-  swaps it back in and re-captures the outgoing queue, so restore is reversible.
-- **Drag & drop into the queue**: `SetupQueueDragAndDrop` makes the `ContentDataGrid`,
-  `AlbumArtworkListBox`, and `FolderTreeView` drag sources (tunnel pointer
-  handlers start a `DragDrop` operation carrying `orynivo/queue-paths`) and the
-  always-visible `QueueNavItem` the drop target. Dropping on **Up Next** appends
-  the resolved paths to the queue end and must not restart the active playback
-  session. Track rows (local, remote, Plex) use their
-  `FilePath`; local album rows and album cards resolve via `GetTrackListByAlbum`;
-  local folders via `GetTrackPathsUnderDirectory`; remote folders via the in-memory
-  `FolderTree` (`_folderTreesBySource`). Remote album rows/cards carry an
-  `orynivo-album:server:id` reference that
-  `ResolveDroppedQueuePathsAsync` expands to registered track stream URLs on drop
-  (`QueueNavItem_OnDrop` is async). The queue and the source lists are never
-  co-visible, so the sidebar item is the drop target.
+  replacement (the new queue shares no path with the outgoing one) and stores
+  the outgoing queue via `AudioDatabase.SavePreviousPlaybackQueue` (kept in
+  `app_meta` as `previous_playback_queue`). The Up Next header shows
+  `RestoreQueueButton` when `GetPreviousPlaybackQueue()` is non-empty;
+  `RestorePreviousQueueAsync` swaps it back in and re-captures the outgoing
+  queue, so restore is reversible.
+- **Drag & drop into the queue**: `SetupQueueDragAndDrop` makes the
+  `ContentDataGrid`, `AlbumArtworkListBox`, and `FolderTreeView` drag sources
+  (tunnel pointer handlers start a `DragDrop` operation carrying
+  `orynivo/queue-paths`) and the always-visible `QueueNavItem` the drop target.
+  Dropping on **Up Next** appends the resolved paths to the queue end and must
+  not restart the active playback session. Track rows (local, remote, Plex) use
+  their `FilePath`; local album rows and album cards resolve via
+  `GetTrackListByAlbum`; local folders via `GetTrackPathsUnderDirectory`; remote
+  folders via the in-memory `FolderTree` (`_folderTreesBySource`). Remote album
+  rows/cards carry an `orynivo-album:server:id` reference that
+  `ResolveDroppedQueuePathsAsync` expands to registered track stream URLs on
+  drop (`QueueNavItem_OnDrop` is async). The queue and the source lists are
+  never co-visible, so the sidebar item is the drop target.
 
 ## Playlist Database Structure
 
-- `playlists`: id, name, description, created_at, modified_at, `is_smart`, `filter_criteria`
+- `playlists`: id, name, description, created_at, modified_at, `is_smart`,
+  `filter_criteria`
 - `playlist_tracks`: id, playlist_id, nullable track_id, path, one-based
   contiguous position, added_at
 - Nullable `track_id` keeps playlist entries after a library track is removed;
@@ -1767,7 +1771,8 @@ fallback or allow client-provided commands/paths to reach the helper.
   unless artwork is requested
 - `GetTrackList()` and related list queries load compact scalar metadata used by
   selectable track columns, but continue to omit artwork BLOBs and lyrics text
-- `GetTrackListByIds(ids)` batches large ID sets to stay below SQLite variable limits
+- `GetTrackListByIds(ids)` batches large ID sets to stay below SQLite variable
+  limits
 - `GetTrackListByPaths(paths)` batches queue metadata lookup and deduplicates
   query paths while the queue view restores the original order and duplicates.
 - `GetTrackListPage(page, pageSize)` applies ordering and `LIMIT`/`OFFSET` in
@@ -1777,7 +1782,8 @@ fallback or allow client-provided commands/paths to reach the helper.
 - The shared Artists, Albums, and Tracks views retain at most three versioned
   final row snapshots. Local/remote loading runs concurrently where independent;
   watcher, remote-version, favorite, and artwork mutations invalidate the cache.
-- `GetTracksByDirectory(dirPath)` uses an SQL prefix query plus a direct-child filter
+- `GetTracksByDirectory(dirPath)` uses an SQL prefix query plus a direct-child
+  filter
 - `GetTrackPathsUnderDirectory(rootPath)` returns all recursive track paths
   below a root
 - Folder-tree lazy loading uses an in-memory parent-to-children map
@@ -1785,7 +1791,8 @@ fallback or allow client-provided commands/paths to reach the helper.
   for both local and remote sources (`CreateDirItemLazy` adds a placeholder and
   populates on the intercepted expand gesture)
 - `TrackLite`, `TrackListInfo`, `ArtistInfo`, and `AlbumInfo` remain
-  intentionally small; `TrackRecord` is reserved for complete metadata operations
+  intentionally small; `TrackRecord` is reserved for complete metadata
+  operations
 - `GetTrackFacets()` remains a lightweight interactive-filter query;
   `GetSmartPlaylistTracks()` separately aggregates playback counts and the last
   playback timestamp only while resolving a smart playlist
@@ -1793,11 +1800,12 @@ fallback or allow client-provided commands/paths to reach the helper.
 - `TrackSearchIndex.cs` stores a Lucene.NET index under
   `%LOCALAPPDATA%\Orynivo\search-index`, supports category-specific fields,
   partial words, and German umlaut/eszett variants, rebuilds stale indexes,
-  updates incrementally after scans, and removes missing files below rescanned roots
-  Supplemental MusicBrainz genres/tags are included in the all-fields document;
-  persisting enrichment must update that track's Lucene document.
+  updates incrementally after scans, and removes missing files below rescanned
+  roots Supplemental MusicBrainz genres/tags are included in the all-fields
+  document; persisting enrichment must update that track's Lucene document.
 - Search-index freshness is determined by the stored schema marker; indexed
-  `Field.Store.NO` fields must not be tested through stored-document field access
+  `Field.Store.NO` fields must not be tested through stored-document field
+  access
 - `TrackSearchIndex.RemovePaths(paths)` removes explicit watcher/full-scan
   deletions without rebuilding the complete index.
 - Track `title` and `sort_title` values are trimmed before database persistence
@@ -1835,16 +1843,17 @@ fallback or allow client-provided commands/paths to reach the helper.
   download so the cover appears without exposing the `?key=` URL.
 - `SteinbergAsioStream.IsBackendAvailable()` validates each native bridge and
   loads its shared export API dynamically. Settings shows **Steinberg ASIO**
-  only when `AsioBridge.dll` exists and **cwASIO** only when
-  `CwAsioBridge.dll` exists. A missing selected backend migrates to the other
-  ASIO implementation when available, otherwise to WASAPI.
+  only when `AsioBridge.dll` exists and **cwASIO** only when `CwAsioBridge.dll`
+  exists. A missing selected backend migrates to the other ASIO implementation
+  when available, otherwise to WASAPI.
 - `OutputBackend` values are persisted numerically; existing values remain
   `Asio=0`, `Wasapi=1`, and `KernelStreaming=2`, while `CwAsio=3` is appended.
   Classic network AirPlay is appended as `AirPlay=4`; never renumber existing
   values.
 - Native DSD supports `.dsf` and uncompressed stereo `.dff`
 - DST-compressed `.dff` is not played natively
-- Output types represented by settings: Steinberg `ASIO`, `CwAsio`, `WASAPI`, `KernelStreaming`
+- Output types represented by settings: Steinberg `ASIO`, `CwAsio`, `WASAPI`,
+  `KernelStreaming`
 - Steinberg ASIO, cwASIO, and WASAPI are implemented; Kernel Streaming is not
 - Windows WASAPI handles PCM only. Native DSD uses ASIO/cwASIO on Windows and
   direct ALSA `DSD_U32_BE` on Linux; Linux DSD must not depend on either bridge.
@@ -1856,12 +1865,12 @@ fallback or allow client-provided commands/paths to reach the helper.
 - WASAPI plays DSF/DFF by converting DSD to PCM through `ffmpeg` without a
   temporary file using the same endpoint-aware sample-rate and precision
   selection as other PCM playback.
-- Settings can force DSF/DFF through the same FFmpeg PCM path for
-  ASIO/cwASIO. Forced conversion participates in gapless PCM playback and
-  enables volume, ReplayGain, and equalizer processing; disabling the option
-  restores native bit-perfect ASIO/cwASIO DSD routing.
-- Linux native DSF/DFF playback bypasses the ASIO/cwASIO selection entirely:
-  it writes native `DSD_U32_BE` or DoP directly to the selected ALSA hardware
+- Settings can force DSF/DFF through the same FFmpeg PCM path for ASIO/cwASIO.
+  Forced conversion participates in gapless PCM playback and enables volume,
+  ReplayGain, and equalizer processing; disabling the option restores native
+  bit-perfect ASIO/cwASIO DSD routing.
+- Linux native DSF/DFF playback bypasses the ASIO/cwASIO selection entirely: it
+  writes native `DSD_U32_BE` or DoP directly to the selected ALSA hardware
   profile and must not load or require either Windows bridge.
 - ASIO/cwASIO PCM playback queries the driver's reported sample rates before
   opening the stream and converts sources above or between supported rates to
@@ -1883,33 +1892,32 @@ fallback or allow client-provided commands/paths to reach the helper.
   directions are disabled. Small UI icons should use shared `StreamGeometry`
   resources from `App.axaml` instead of text glyphs or emoji.
 - Seeking is implemented for ASIO PCM, WASAPI PCM, DSF, and DFF
-- Loading a file or folder builds a playback queue; completion advances automatically
+- Loading a file or folder builds a playback queue; completion advances
+  automatically
 - Sequential PCM queues use one persistent ASIO/cwASIO or exclusive WASAPI
   output session. The next FFmpeg decoder is started and prefetched while the
   current track plays, then its samples are appended without reopening the
-  device. Audible track changes are derived from rendered/buffered frame
-  counts so transport metadata and playback history change at the actual
-  boundary.
-- Gapless playback is disabled for shuffle queues and native ASIO DSD
-  (DSF/DFF). Those paths retain title-by-title device handling; DSD converted
-  to PCM through WASAPI participates in the PCM gapless pipeline.
+  device. Audible track changes are derived from rendered/buffered frame counts
+  so transport metadata and playback history change at the actual boundary.
+- Gapless playback is disabled for shuffle queues and native ASIO DSD (DSF/DFF).
+  Those paths retain title-by-title device handling; DSD converted to PCM
+  through WASAPI participates in the PCM gapless pipeline.
 - Seeking remains available inside multi-track gapless PCM sessions. A seek
   clears buffered output, restarts the current FFmpeg decoder at the selected
   position, and rebuilds preparation of the following track.
-- Gapless PCM position offsets are stored per queued track. Preparing or
-  writing the next decoder must not reset the seek offset of the track that is
-  still audible; the transport changes offsets only with the rendered track
-  boundary.
+- Gapless PCM position offsets are stored per queued track. Preparing or writing
+  the next decoder must not reset the seek offset of the track that is still
+  audible; the transport changes offsets only with the rendered track boundary.
 - PCM user volume is applied at the active output stage rather than baked into
   prefetched samples: WASAPI follows the selected Windows endpoint's master
   volume bidirectionally and the native ASIO bridge applies an atomic volume
   factor in its callback. Per-track ReplayGain remains part of PCM sample
   preparation.
 - `StartPlaybackAsync` accepts an optional `initialPosition` parameter. When
-  provided, the new player is seeked to that position immediately after
-  creation and before transport UI setup, ensuring no audio from position 0 is
-  heard. Used by the output quick-pick popup to resume at the exact track
-  position after a device switch.
+  provided, the new player is seeked to that position immediately after creation
+  and before transport UI setup, ensuring no audio from position 0 is heard.
+  Used by the output quick-pick popup to resume at the exact track position
+  after a device switch.
 - The transport action buttons for artist information, lyrics, favorite, and
   shuffle are left-aligned above the position slider; previous/play/next remain
   independently centered
@@ -1929,12 +1937,13 @@ fallback or allow client-provided commands/paths to reach the helper.
 - Volume affects PCM paths; native DSD remains bit-perfect
 - ReplayGain can be disabled or use track/album gain with fallback to the other
   available value. It is combined with the user volume for PCM output and uses
-  saturating sample conversion to prevent integer overflow; native DSD ignores it.
+  saturating sample conversion to prevent integer overflow; native DSD ignores
+  it.
 - The parametric equalizer runs after ReplayGain and before ASIO/cwASIO or
   WASAPI PCM output. It supports peak, low/high shelf, low/high pass, preamp,
   and imported `GraphicEQ` curves. Live changes crossfade over 50 ms, gapless
-  transitions preserve filter state, seeks reset it, and native DSD ignores
-  the equalizer.
+  transitions preserve filter state, seeks reset it, and native DSD ignores the
+  equalizer.
 - Settings displays the combined equalizer response and a dynamic row for every
   filter. Preamp, type, frequency, gain, and Q can be edited; filters can be
   added or removed up to the same 512-filter bound used by profile import.
@@ -1945,20 +1954,20 @@ fallback or allow client-provided commands/paths to reach the helper.
   most one. The profile dropdown may be empty; in that state the enable option,
   import action, graph, and parameter editor remain hidden. Creating a profile
   selects it immediately, and deleting one requires confirmation.
-- Equalizer profile changes and seek resets must never synchronously lock the
-  UI thread against the PCM pump. Players atomically queue those requests and
-  apply them from the audio pump before processing the next block. Profile
-  file reading/parsing runs off the UI thread and enforces bounded input size
-  and filter count.
+- Equalizer profile changes and seek resets must never synchronously lock the UI
+  thread against the PCM pump. Players atomically queue those requests and apply
+  them from the audio pump before processing the next block. Profile file
+  reading/parsing runs off the UI thread and enforces bounded input size and
+  filter count.
 - Settings previews equalizer enable/disable immediately against the active PCM
   player through a debounced background request; the checkbox event itself must
   never call into the player. Cancel restores the original state. Saving
-  settings must only
-  reconfigure endpoint synchronization when the backend or selected device
-  actually changed. Driver enumeration, endpoint open/close, and player
-  disposal during a device change must not run on the UI thread. Device-change
-  settings application waits at most two seconds for old-player disposal
-  before continuing; a misbehaving driver must not hold the settings workflow.
+  settings must only reconfigure endpoint synchronization when the backend or
+  selected device actually changed. Driver enumeration, endpoint open/close, and
+  player disposal during a device change must not run on the UI thread.
+  Device-change settings application waits at most two seconds for old-player
+  disposal before continuing; a misbehaving driver must not hold the settings
+  workflow.
 - Settings output-device enumeration is serialized and guarded by a load
   version. Initial ComboBox setup must not start enumeration through its
   selection-changed event in addition to the explicit initial load.
@@ -1982,8 +1991,8 @@ fallback or allow client-provided commands/paths to reach the helper.
   `FontSizeDisplayLarge` 52, `FontSizeHero` 72). New visible text must reference
   these tokens via `{DynamicResource FontSize…}` instead of hard-coded pixel
   sizes. Immersive detail titles (album, artist, podcast headers) use
-  `FontSizeDisplay`; tables use `FontSizeCaption`/`FontSizeBody`; small meta text
-  uses `FontSizeMeta` with a muted foreground.
+  `FontSizeDisplay`; tables use `FontSizeCaption`/`FontSizeBody`; small meta
+  text uses `FontSizeMeta` with a muted foreground.
 - The main window uses a modern sidebar, content area, and full-width transport
   bar
 - The full Orynivo logo appears directly, without a surrounding logo surface, in
@@ -2024,13 +2033,13 @@ fallback or allow client-provided commands/paths to reach the helper.
   title, count, search, filters, or album mode controls
 - Main library views keep the plain content header for title, count, search,
   filters, and mode controls. Directly below it, Artists, Albums, Tracks, Folder
-  structure, and equivalent library overview views use a shared
-  compact accent-bordered intro card (`#20D9E8`, `CornerRadius="14"`)
-  with a short view-specific headline and explanatory text. Search and filter
-  controls stay outside and above that card in the plain header layout; A-Z
-  indexes stay aligned with the content/table area, not the intro card. The
-  Dashboard deliberately has no shared intro card because its greeting hero is
-  the first content surface.
+  structure, and equivalent library overview views use a shared compact
+  accent-bordered intro card (`#20D9E8`, `CornerRadius="14"`) with a short
+  view-specific headline and explanatory text. Search and filter controls stay
+  outside and above that card in the plain header layout; A-Z indexes stay
+  aligned with the content/table area, not the intro card. The Dashboard
+  deliberately has no shared intro card because its greeting hero is the first
+  content surface.
 - Main content view switches use short opacity fade-ins and longer library,
   remote-library, Dashboard, and album-detail loads show the shared
   `ContentLoadingOverlay` skeleton/progress state. Keep this motion subtle and
@@ -2043,26 +2052,25 @@ fallback or allow client-provided commands/paths to reach the helper.
   floating card) showing 72 × 72 px rounded album artwork, track information,
   favorite state, playback controls, position, volume, two quick-pick buttons
   (EQ and Output), and an output-device lock toggle below the volume control.
-  The EQ popup contains a
-  profile ComboBox, a vector settings button, and a themed enable/disable checkbox
-  (`PopupCheckBoxTheme`). The Output popup contains a profile ComboBox and a
-  vector settings button. All three buttons use vector path icons and tooltips.
-  The lock is closed only while an active player owns the configured output;
-  selecting it snapshots playback context and position, disposes the player to
-  release an exclusive device, and changes to an open lock that can reacquire
-  the device and resume. A normal pause does not release the device.
-  Right-clicking the now-playing cover opens a compact themed menu for opening
-  the current album or artist, searching album artwork, and toggling the
-  current track favorite.
+  The EQ popup contains a profile ComboBox, a vector settings button, and a
+  themed enable/disable checkbox (`PopupCheckBoxTheme`). The Output popup
+  contains a profile ComboBox and a vector settings button. All three buttons
+  use vector path icons and tooltips. The lock is closed only while an active
+  player owns the configured output; selecting it snapshots playback context and
+  position, disposes the player to release an exclusive device, and changes to
+  an open lock that can reacquire the device and resume. A normal pause does not
+  release the device. Right-clicking the now-playing cover opens a compact
+  themed menu for opening the current album or artist, searching album artwork,
+  and toggling the current track favorite.
 - The transport uses a cover-derived accent brush (`AppTransportAccentBrush`,
   default `#20D9E8`) for the position-slider progress fill/thumb and the
   play/pause button background. `UpdateTransportAccentFromArtwork` recomputes it
   whenever the now-playing cover changes (subscribed on
-  `NowPlayingArtworkImage.Source`): `ExtractAccentColor` samples a 24 × 24 scaled
-  copy, bins pixels by hue weighted by saturation × value, and normalises the
-  dominant vibrant hue. It falls back to the default accent when there is no
-  artwork or extraction fails; the brush is mutated in place so `DynamicResource`
-  consumers repaint.
+  `NowPlayingArtworkImage.Source`): `ExtractAccentColor` samples a 24 × 24
+  scaled copy, bins pixels by hue weighted by saturation × value, and normalises
+  the dominant vibrant hue. It falls back to the default accent when there is no
+  artwork or extraction fails; the brush is mutated in place so
+  `DynamicResource` consumers repaint.
 - **Up next** is a top-level sidebar view using the shared track table styling.
   It displays queue order, title, artist, album, duration, and themed
   move/remove actions, plus a header action to save the queue as a playlist.
@@ -2080,8 +2088,8 @@ fallback or allow client-provided commands/paths to reach the helper.
   available content width, and device information follows the active theme and
   title-bar color
 - The Plex server editor uses themed inputs and buttons plus a DWM-colored  
-native title bar; Plex credential persistence must not synchronously wait on
-asynchronous file I/O from the UI thread
+  native title bar; Plex credential persistence must not synchronously wait on
+  asynchronous file I/O from the UI thread
 - Selecting a Plex audio library exposes Artists, Albums, Tracks, and Folders
   modes; lists load in pages of 500, artist/album rows drill down to children,
   and folder nodes query Plex only when expanded
@@ -2091,8 +2099,8 @@ asynchronous file I/O from the UI thread
   and view and validates a load version before applying rows so stale responses
   cannot replace another mode's content or columns.
 - Plex track rows reuse the main track table and playback path; Plex access
-  tokens remain memory-only in generated stream URLs and must never be written to
-  settings, documentation, logs, or source
+  tokens remain memory-only in generated stream URLs and must never be written
+  to settings, documentation, logs, or source
 - Starting a Plex track from the folder tree queues only direct track siblings
   from that same tree level; subfolder tracks are excluded and the existing
   shuffle state applies to that sibling queue
@@ -2102,23 +2110,22 @@ asynchronous file I/O from the UI thread
   part, because playback would advance before the Plex metadata duration ends.
 - A Plex FFmpeg decoder EOF is accepted as the track boundary only when the
   decoded position is within five seconds of Plex's authoritative duration.
-  Earlier HTTP EOFs reopen the same logical item at the decoded position with
-  at most three retries; they must not immediately advance the queue.
+  Earlier HTTP EOFs reopen the same logical item at the decoded position with at
+  most three retries; they must not immediately advance the queue.
 - Plex folder nodes use real `TreeViewItem` children in `Items`, matching the
   local folder tree. Do not bind an `ObservableCollection<TreeViewItem>` to
-  `ItemsSource`: Avalonia can wrap those controls in additional item
-  containers, producing expanded nodes with large blank child rows. The
-  expand-toggle pointer event must be intercepted while a lazy node is
-  unloaded; fetch and insert real child controls first, then set
-  `IsExpanded=true`. Keep the `Expanded` event only as a keyboard-accessibility
-  fallback that immediately collapses until loading completes. Suppress
-  concurrent requests, classify nodes through `PlexMediaItem.IsFolder` rather
-  than `PartKey`, and retain the placeholder after failure so loading can be
-  retried. Double-clicking a folder header must intercept the second
-  `PointerPressed` (`ClickCount >= 2`) in the tunnel phase and route it through
-  the same lazy-load function before toggling expansion; handling only
-  `DoubleTapped` is too late because Avalonia may already expose the
-  placeholder row.
+  `ItemsSource`: Avalonia can wrap those controls in additional item containers,
+  producing expanded nodes with large blank child rows. The expand-toggle
+  pointer event must be intercepted while a lazy node is unloaded; fetch and
+  insert real child controls first, then set `IsExpanded=true`. Keep the
+  `Expanded` event only as a keyboard-accessibility fallback that immediately
+  collapses until loading completes. Suppress concurrent requests, classify
+  nodes through `PlexMediaItem.IsFolder` rather than `PartKey`, and retain the
+  placeholder after failure so loading can be retried. Double-clicking a folder
+  header must intercept the second `PointerPressed` (`ClickCount >= 2`) in the
+  tunnel phase and route it through the same lazy-load function before toggling
+  expansion; handling only `DoubleTapped` is too late because Avalonia may
+  already expose the placeholder row.
 - The A–Z index in Plex Folders is built only from the currently displayed
   top-level directory nodes. A click or drag scrolls the real root
   `TreeViewItem` into view, and manual tree scrolling updates the active letter;
@@ -2136,29 +2143,30 @@ asynchronous file I/O from the UI thread
   foreground. Do not add empty `ListBoxItem` styles or rely on Fluent's
   selected-item foreground in themed dialogs; it can become black on dark
   surfaces.
-- Search result lists for artist images, album covers, and lyrics use the
-  shared `AppSearchResultItemTheme`. Its custom presenter must forward
-  `Content`, `ContentTemplate`, `DataContext`, and `TextBlock.Foreground`;
-  selected items retain `AppPrimaryTextBrush` in both themes.
+- Search result lists for artist images, album covers, and lyrics use the shared
+  `AppSearchResultItemTheme`. Its custom presenter must forward `Content`,
+  `ContentTemplate`, `DataContext`, and `TextBlock.Foreground`; selected items
+  retain `AppPrimaryTextBrush` in both themes.
 - Visible primary text and runtime messages use `LocalizationManager`
 - TextBox normal, pointer-over, and focused Fluent theme resources must remain
   synchronized with `AppInputBrush`, `AppPrimaryTextBrush`, and the active
   input-border colors so entered text keeps sufficient contrast in both themes
 - Any text placed on an accent, selected, tinted, image-derived, or otherwise
-  colored background must use an explicit contrast-safe foreground resource
-  (for example `AppAccentTextBrush` or a dynamically computed foreground), not a
+  colored background must use an explicit contrast-safe foreground resource (for
+  example `AppAccentTextBrush` or a dynamically computed foreground), not a
   hard-coded assumption such as white text. Check dark and light themes before
   accepting new color combinations.
 - Empty artwork areas use a dedicated placeholder resource
-- Empty library, radio, and podcast states should explain the next useful
-  setup or discovery action instead of only reporting that no rows exist.
-- Tables, lists, and trees must not expose default-white backgrounds in dark mode
+- Empty library, radio, and podcast states should explain the next useful setup
+  or discovery action instead of only reporting that no rows exist.
+- Tables, lists, and trees must not expose default-white backgrounds in dark
+  mode
 - DataGrid and ScrollViewer backgrounds are overridden via Avalonia styles in
   `MainWindow.axaml`
 - DataGrid row headers remain disabled through `HeadersVisibility="Column"`
 - Visible rows whose playback path matches the currently audible local, Plex,
-  radio, or podcast item receive the `nowPlaying` class. Its background uses
-  the theme-specific `AppNowPlayingRowBrush`; selected rows retain the stronger
+  radio, or podcast item receive the `nowPlaying` class. Its background uses the
+  theme-specific `AppNowPlayingRowBrush`; selected rows retain the stronger
   selection background. Loading-row handlers must also clear the class on
   recycled virtualized rows.
 - Local and Plex track nodes in the folder tree use the same `nowPlaying` class
@@ -2169,37 +2177,36 @@ asynchronous file I/O from the UI thread
   nodes apply the class immediately. Unlike table rows, a selected folder-tree
   track must retain the `AppNowPlayingRowBrush`; otherwise the selection
   background hides the playing indicator immediately after double-clicking it.
-  Local file nodes are additionally indexed by case-insensitive absolute path
-  in `_localFolderTrackItems`; previous/next and gapless queue advances update
+  Local file nodes are additionally indexed by case-insensitive absolute path in
+  `_localFolderTrackItems`; previous/next and gapless queue advances update
   those exact node references instead of relying only on TreeView traversal.
-  Avalonia's Fluent local-tree template does not reliably paint the nested
-  local node container background, so every local file node uses a dedicated
-  header `Border` indexed in `_localFolderTrackHeaders`. The audible path sets
+  Avalonia's Fluent local-tree template does not reliably paint the nested local
+  node container background, so every local file node uses a dedicated header
+  `Border` indexed in `_localFolderTrackHeaders`. The audible path sets
   `AppNowPlayingRowBrush` directly on that visible header and clears the prior
   header on playback start, previous/next, or gapless transition. Theme changes
   must refresh the complete highlight.
 - DataGrid columns are user-resizable. Main library, search, radio, podcast,
   podcast-episode, Plex, playlist, and daily-history widths are restored from
   `settings.json`; invalid or structurally outdated width sets are ignored.
-- Right-clicking a DataGrid column header opens a localized, themed
-  `MenuFlyout` column chooser at the pointer position. It uses
-  `StaysOpenOnClick` so several columns can be changed in one session. Do not
-  replace this with a dynamically attached and programmatically opened
-  Avalonia `ContextMenu`; Avalonia 11.2/11.3 retains internal ownership in that
-  sequence and can throw during placement.
-  Track contexts additionally expose file name, album artist, year, track/disc
-  numbers, genre, bitrate, sample rate, bit depth, channels, composer, BPM,
-  file size, added date, and ReplayGain values. Radio and podcast tables expose
-  only metadata appropriate to those catalogs. Artwork and action columns stay
-  fixed, and at least one selectable data column remains visible.
+- Right-clicking a DataGrid column header opens a localized, themed `MenuFlyout`
+  column chooser at the pointer position. It uses `StaysOpenOnClick` so several
+  columns can be changed in one session. Do not replace this with a dynamically
+  attached and programmatically opened Avalonia `ContextMenu`; Avalonia
+  11.2/11.3 retains internal ownership in that sequence and can throw during
+  placement. Track contexts additionally expose file name, album artist, year,
+  track/disc numbers, genre, bitrate, sample rate, bit depth, channels,
+  composer, BPM, file size, added date, and ReplayGain values. Radio and podcast
+  tables expose only metadata appropriate to those catalogs. Artwork and action
+  columns stay fixed, and at least one selectable data column remains visible.
 - Identified data columns can be reordered by dragging their headers. The order
   is restored independently for each table/view; fixed artwork and action
   columns cannot be dragged.
 - Every selectable or reorderable data column must have a stable,
   language-independent string in `DataGridColumn.Tag`. These IDs are persisted
   in `VisibleDataGridColumns` and `DataGridColumnOrders`; changing an ID is a
-  settings-compatibility change. Fixed artwork/action columns intentionally
-  have no persisted ID.
+  settings-compatibility change. Fixed artwork/action columns intentionally have
+  no persisted ID.
 
 ## Dashboard
 
@@ -2223,12 +2230,13 @@ asynchronous file I/O from the UI thread
   while category and language filters combine with AND semantics.
 - Internet-radio genres are loaded from Radio Browser's complete tag statistics
   instead of the first station-result page. Initial catalog options
-  intentionally omit counts because normalized genre groups overlap multiple
-  raw tags. Selecting genres performs Radio Browser tag queries (OR across
-  selected genres) and may load up to 10,000 stations per genre.
+  intentionally omit counts because normalized genre groups overlap multiple raw
+  tags. Selecting genres performs Radio Browser tag queries (OR across selected
+  genres) and may load up to 10,000 stations per genre.
 - Podcast category selections work without a title query by sending the cached
   Apple genre IDs to the catalog search. Language-only filtering uses the
-  regional top 100 podcasts as its starting set and then evaluates feed languages.
+  regional top 100 podcasts as its starting set and then evaluates feed
+  languages.
 - The cached catalog options are used only while the radio or podcast search
   field is empty. After a text search, visible filter values and counts are
   rebuilt from that search result; clearing the search restores the cached
@@ -2257,151 +2265,156 @@ asynchronous file I/O from the UI thread
 - The dashboard is laid out as a personal "music hub" and is built entirely in
   code in `BuildDashboardAsync`. Section headers are created by the reusable
   `DashboardCreateSectionHeader` (accent underline, optional month navigation).
-  The page contains, top to bottom:
-  0. **Greeting hero** (`DashboardBuildGreeting`): a 210-px hero with a
-  3-px rounded rim that uses a lightened version of the same background artwork
-  using the linked `Logo/bg.png` asset (`Assets/DashboardHeroBackground.png` at
-  runtime). It contains the localized time-of-day greeting, welcome overline and
-  descriptive text (all explicitly left-aligned within the hero content column);
-  working random-play and Up Next buttons; and four live
-  album, track, artist, and favorite counters. Local aggregates come from
+  The page contains, top to bottom: 0. **Greeting hero**
+  (`DashboardBuildGreeting`): a 210-px hero with a 3-px rounded rim that uses a
+  lightened version of the same background artwork using the linked
+  `Logo/bg.png` asset (`Assets/DashboardHeroBackground.png` at runtime). It
+  contains the localized time-of-day greeting, welcome overline and descriptive
+  text (all explicitly left-aligned within the hero content column); working
+  random-play and Up Next buttons; and four live album, track, artist, and
+  favorite counters. Local aggregates come from
   `AudioDatabase.GetDashboardLibrarySummary()`; remote track and album totals
   come from `/api/library/summary` (with lightweight fallbacks for older
   servers), while artist names are normalized and unified exactly like the
-  shared Artists view. The favorite counter additionally
-  includes only client-side track favorites that still occur in each configured
-  Orynivo Server's current facets and resolve through `GetTracksByIdsAsync`
+  shared Artists view. The favorite counter additionally includes only
+  client-side track favorites that still occur in each configured Orynivo
+  Server's current facets and resolve through `GetTracksByIdsAsync`
   (`ResolveDashboardRemoteLibrarySummaryAsync`). Stale IDs and unavailable
   servers must not make the hero/Quick Access count differ from the Favorites
-  view. The database query returns only
-  aggregate counts and must not materialize complete library lists. The four
-  counters are compact 148-px cards in a right-aligned horizontal group; their
-  circular icon badges remain left-aligned above the value and label.
+  view. The database query returns only aggregate counts and must not
+  materialize complete library lists. The four counters are compact 148-px cards
+  in a right-aligned horizontal group; their circular icon badges remain
+  left-aligned above the value and label.
   1. **Recently played** (`DashboardBuildRecentlyPlayed`, when history exists):
-  a horizontal carousel of up to 20 cards from `GetRecentHistory` (deduped by path)
-  placed beside Recently Added in a matching surface card. History cards use the
-  same 180 × 276 proportions and 160-px cover size as album artwork cards. Each
-  shows a local/remote album thumbnail or `InitialsAvatar`, hover play overlay,
-  favorite heart, and an `L`, `OS`, or `P` source badge. Local and remote Orynivo
-  hearts are toggleable; Plex hearts are display-only because Plex favorites are
-  not persisted. A card is playable (`IsPlayableHistoryEntry`) when the entry is
-  a music track (media type `track`, not radio/podcast) that is either a locally
-  available file or a playable stream URL (remote server / Plex), independent of
-  the history track id or artist tag. Clicking the card outside its link/favorite
-  buttons plays it **in place** through `PlayHistoryEntryInPlaceAsync` (replaces
-  the queue with just that track and starts playback) without leaving the
-  dashboard.
+     a horizontal carousel of up to 20 cards from `GetRecentHistory` (deduped by
+     path) placed beside Recently Added in a matching surface card. History
+     cards use the same 180 × 276 proportions and 160-px cover size as album
+     artwork cards. Each shows a local/remote album thumbnail or
+     `InitialsAvatar`, hover play overlay, favorite heart, and an `L`, `OS`, or
+     `P` source badge. Local and remote Orynivo hearts are toggleable; Plex
+     hearts are display-only because Plex favorites are not persisted. A card is
+     playable (`IsPlayableHistoryEntry`) when the entry is a music track (media
+     type `track`, not radio/podcast) that is either a locally available file or
+     a playable stream URL (remote server / Plex), independent of the history
+     track id or artist tag. Clicking the card outside its link/favorite buttons
+     plays it **in place** through `PlayHistoryEntryInPlaceAsync` (replaces the
+     queue with just that track and starts playback) without leaving the
+     dashboard.
   2. **Recently added albums**: horizontal artwork carousel of up to 20 albums,
-  merging the local library with every configured remote Orynivo Server
-  (`LoadRecentAlbumsAsync`, sorted by each album's last-added timestamp). Cards
-  are the **same** artwork cards as the Albums view: each `DashboardAlbum` is
-  mapped to a `ContentRow` (`BuildRecentAlbumRow`, local `Album` / remote
-  `OrynivoAlbum` carrying `OrynivoServer`) rendered from the shared
-  `AlbumArtworkCardTemplate` resource (`BuildRecentAlbumCard`), so covers can be
-  changed and favorites toggled directly, and album/artist links navigate in
-  library. Because those shared handlers are location-independent via
-  `ActivateRowOrynivoServer` (activates `row.OrynivoServer`), they work for the
-  dashboard's mixed local/remote list. Double-clicking a card opens the album
-  (`RecentAlbumCard_OnDoubleTapped`). Local artwork uses the album's 320-px
-  path (`RecentAlbumInfo.ArtworkPath`); remote uses the authenticated server URL.
-  Backed by the server endpoint `GET /api/albums/recent`
-  (`OrynivoServerClient.GetRecentAlbumsAsync`); servers without it are skipped.
-  Selecting a card supports Back navigation. Cover/favorite handlers refresh the
-  bound card in place on the dashboard surface (`UpdateRowArtworkFromBytes`)
-  instead of rebuilding the hidden Albums list.
+     merging the local library with every configured remote Orynivo Server
+     (`LoadRecentAlbumsAsync`, sorted by each album's last-added timestamp).
+     Cards are the **same** artwork cards as the Albums view: each
+     `DashboardAlbum` is mapped to a `ContentRow` (`BuildRecentAlbumRow`, local
+     `Album` / remote `OrynivoAlbum` carrying `OrynivoServer`) rendered from the
+     shared `AlbumArtworkCardTemplate` resource (`BuildRecentAlbumCard`), so
+     covers can be changed and favorites toggled directly, and album/artist
+     links navigate in library. Because those shared handlers are
+     location-independent via `ActivateRowOrynivoServer` (activates
+     `row.OrynivoServer`), they work for the dashboard's mixed local/remote
+     list. Double-clicking a card opens the album
+     (`RecentAlbumCard_OnDoubleTapped`). Local artwork uses the album's 320-px
+     path (`RecentAlbumInfo.ArtworkPath`); remote uses the authenticated server
+     URL. Backed by the server endpoint `GET /api/albums/recent`
+     (`OrynivoServerClient.GetRecentAlbumsAsync`); servers without it are
+     skipped. Selecting a card supports Back navigation. Cover/favorite handlers
+     refresh the bound card in place on the dashboard surface
+     (`UpdateRowArtworkFromBytes`) instead of rebuilding the hidden Albums list.
   3. **Stats section** (`DashboardBuildStatsSection`): a first row mirrors the
-  visual hierarchy of the reference design with Listening stats, Most listened
-  genres, Calendar, and Quick access cards. The period selector lives inside the
-  Listening stats card, defaults to Last 30 days, and governs listening, genre,
-  album, and artist data (All time / This year / This month / Last 30 days / Last
-  7 days); changing it rebuilds the dashboard. Listening data comes from
-  `GetTotalListeningSeconds` and `GetListeningTrend`. The trend uses daily points
-  for Last 7 days, Last 30 days, and the elapsed current month; This year and All
-  time use 12 buckets. At most seven localized date/month labels are rendered on
-  the X-axis independently of the point count. The minute Y-axis ends at a rounded
-  scale value strictly above the peak so the smoothed curve retains headroom. The
-  cyan line uses Catmull-Rom-derived cubic Bézier segments (never straight
-  point-to-point joins). Clamp each segment's two Bézier control-point Y values
-  to the range of that segment's real endpoints so smoothing can never invent a
-  peak or trough outside the measured values. The area under the line uses a
-  vertical cyan-to-nearly-transparent gradient; do not replace it with a flat
-  fill. It compares with the immediately preceding period where one exists.
-  Quick access links to favorites, Up Next, full recent history, and
-  random local playback and shows short secondary labels/counts. The calendar
-  keeps independent month navigation. On wide dashboards the four overview
-  cards sit in one row; on narrow dashboards they form a 2 × 2 grid. The layout
-  switches at a 980-px threshold
-  (`ComputeDashboardTwoColumn`) and re-flows on the
-  `DashboardScrollViewer.SizeChanged` boundary crossing only.
-  The wide overview uses equal star-width columns with fixed gaps and no outside
-  card margins, so its outer edges align with the media cards above; all cards in
-  one row stretch to a common height.
-  Every listening-trend point has its own transparent hover zone and tooltip
-  containing the corresponding localized date and listened-minute value; sparse
-  X-axis labels must not reduce tooltip granularity.
-  Because the chart path uses `Stretch.Fill`, its geometry must retain the
-  zero-length `M 0,0 L 0,0` origin anchor before the curve. Without that anchor,
-  Avalonia normalizes the curve's own peak to the top and falsifies the Y scale.
-  Recently Played cards must not assign borders from pointer handlers; their
-  normal and gradient hover borders come exclusively from `motionCard` styles.
+     visual hierarchy of the reference design with Listening stats, Most
+     listened genres, Calendar, and Quick access cards. The period selector
+     lives inside the Listening stats card, defaults to Last 30 days, and
+     governs listening, genre, album, and artist data (All time / This year /
+     This month / Last 30 days / Last 7 days); changing it rebuilds the
+     dashboard. Listening data comes from `GetTotalListeningSeconds` and
+     `GetListeningTrend`. The trend uses daily points for Last 7 days, Last 30
+     days, and the elapsed current month; This year and All time use 12 buckets.
+     At most seven localized date/month labels are rendered on the X-axis
+     independently of the point count. The minute Y-axis ends at a rounded scale
+     value strictly above the peak so the smoothed curve retains headroom. The
+     cyan line uses Catmull-Rom-derived cubic Bézier segments (never straight
+     point-to-point joins). Clamp each segment's two Bézier control-point Y
+     values to the range of that segment's real endpoints so smoothing can never
+     invent a peak or trough outside the measured values. The area under the
+     line uses a vertical cyan-to-nearly-transparent gradient; do not replace it
+     with a flat fill. It compares with the immediately preceding period where
+     one exists. Quick access links to favorites, Up Next, full recent history,
+     and random local playback and shows short secondary labels/counts. The
+     calendar keeps independent month navigation. On wide dashboards the four
+     overview cards sit in one row; on narrow dashboards they form a 2 × 2 grid.
+     The layout switches at a 980-px threshold (`ComputeDashboardTwoColumn`) and
+     re-flows on the `DashboardScrollViewer.SizeChanged` boundary crossing only.
+     The wide overview uses equal star-width columns with fixed gaps and no
+     outside card margins, so its outer edges align with the media cards above;
+     all cards in one row stretch to a common height. Every listening-trend
+     point has its own transparent hover zone and tooltip containing the
+     corresponding localized date and listened-minute value; sparse X-axis
+     labels must not reduce tooltip granularity. Because the chart path uses
+     `Stretch.Fill`, its geometry must retain the zero-length `M 0,0 L 0,0`
+     origin anchor before the curve. Without that anchor, Avalonia normalizes
+     the curve's own peak to the top and falsifies the Y scale. Recently Played
+     cards must not assign borders from pointer handlers; their normal and
+     gradient hover borders come exclusively from `motionCard` styles.
      - **Calendar** (`DashboardBuildCalendarCard`): compact Monday-first month
-     grid with day numbers, today highlight, activity dots, month navigation,
-     tooltips, and clickable populated days.
+       grid with day numbers, today highlight, activity dots, month navigation,
+       tooltips, and clickable populated days.
      - **Top genres** (`DashboardBuildTopGenresCard`): the five leading linked
-     genres in compact rows with cyan proportional bars and listened-minute
-     totals. Genre bars use `DashboardBuildStatBar`, including the complete muted
-     100-percent background track; do not render them as fill-only bars. Their
-     31-px rows and spacing intentionally fill the complete overview-card body.
-     - **Most listened albums** (`DashboardBuildTopAlbumsCard`) and **Most listened
-     artists** (`DashboardBuildTopArtistsCard`): matching bordered analytics
-     cards below the overview row, with wide cyan proportional bars (including
-     the muted 100-percent background track) and listened-minute totals, backed
-     by `AudioDatabase.GetTopAlbums`/`GetTopArtists`
-     (`TopAlbumStat`/`TopArtistStat`), which merge local, remote Orynivo Server,
-     and Plex playback by album title+artist / artist name in the selected period.
-     Album rows show a small cover (local thumbnail, remote track artwork, or an
-     `InitialsAvatar`); artist rows retain colored rank markers. Album/artist
-     labels are links that open the entity in its own library through
-     `OpenTopAlbumAsync`/`OpenTopArtistAsync`, which route a
-     synthetic `DailyHistoryEntry` (`MakeStatHistoryEntry`) through the shared
-     `OpenHistoryAlbumAsync`/`OpenHistoryArtistAsync` so local, remote, and Plex
-     targets all work.
-     Album and artist ranking rows both use a 40-px minimum height so the two
-     side-by-side cards remain vertically aligned.
-  Quick-access buttons must set both `HorizontalAlignment` and
-  `HorizontalContentAlignment` to `Stretch`, so every action occupies the full
-  inner width of its card.
+       genres in compact rows with cyan proportional bars and listened-minute
+       totals. Genre bars use `DashboardBuildStatBar`, including the complete
+       muted 100-percent background track; do not render them as fill-only bars.
+       Their 31-px rows and spacing intentionally fill the complete
+       overview-card body.
+     - **Most listened albums** (`DashboardBuildTopAlbumsCard`) and **Most
+       listened artists** (`DashboardBuildTopArtistsCard`): matching bordered
+       analytics cards below the overview row, with wide cyan proportional bars
+       (including the muted 100-percent background track) and listened-minute
+       totals, backed by `AudioDatabase.GetTopAlbums`/`GetTopArtists`
+       (`TopAlbumStat`/`TopArtistStat`), which merge local, remote Orynivo
+       Server, and Plex playback by album title+artist / artist name in the
+       selected period. Album rows show a small cover (local thumbnail, remote
+       track artwork, or an `InitialsAvatar`); artist rows retain colored rank
+       markers. Album/artist labels are links that open the entity in its own
+       library through `OpenTopAlbumAsync`/`OpenTopArtistAsync`, which route a
+       synthetic `DailyHistoryEntry` (`MakeStatHistoryEntry`) through the shared
+       `OpenHistoryAlbumAsync`/`OpenHistoryArtistAsync` so local, remote, and
+       Plex targets all work. Album and artist ranking rows both use a 40-px
+       minimum height so the two side-by-side cards remain vertically aligned.
+       Quick-access buttons must set both `HorizontalAlignment` and
+       `HorizontalContentAlignment` to `Stretch`, so every action occupies the
+       full inner width of its card.
 - The side-by-side **Recently played** and **Recently added** surface-card
   headers carry a right-aligned **Show all** link
   (`DashboardBuildMediaSectionCard`). It opens a full-page view
-  (`ShowAllRecentlyPlayedAsync` /
-  `ShowAllRecentAlbumsAsync`) that reuses the dashboard scroll surface and shows
-  up to 100 entries in a `WrapPanel` of the same cards (identical double-click /
-  click behaviour). These views are pseudo-top-level tags `RecentlyPlayedAll` /
-  `RecentAlbumsAll` handled in `ShowTopLevelViewAsync`
-  (`BuildAllRecentlyPlayedViewAsync` / `BuildAllRecentAlbumsViewAsync`); opening
-  one pushes the current state onto `_navigationStack`, so Back returns to the
-  dashboard, and opening an album from a full-page view returns to that full-page
-  view. `DashboardScrollViewer.SizeChanged` only re-flows the real dashboard
+  (`ShowAllRecentlyPlayedAsync` / `ShowAllRecentAlbumsAsync`) that reuses the
+  dashboard scroll surface and shows up to 100 entries in a `WrapPanel` of the
+  same cards (identical double-click / click behaviour). These views are
+  pseudo-top-level tags `RecentlyPlayedAll` / `RecentAlbumsAll` handled in
+  `ShowTopLevelViewAsync` (`BuildAllRecentlyPlayedViewAsync` /
+  `BuildAllRecentAlbumsViewAsync`); opening one pushes the current state onto
+  `_navigationStack`, so Back returns to the dashboard, and opening an album
+  from a full-page view returns to that full-page view.
+  `DashboardScrollViewer.SizeChanged` only re-flows the real dashboard
   (`_currentTopLevelTag == "Dashboard"`), never the full-page views. Dashboard
   album and recently-played thumbnails decode off the UI thread
-  (`LoadDashboardLocalArtworkAsync`) so the 100-item views build without a hitch.
-  Each 20-item strip has smoothly animated vector previous/next buttons in the
-  header immediately before **Show all**. These buttons must not overlay or hide
-  any artwork card, and their layout slots remain visible at both ends: unavailable
-  directions are disabled and muted rather than hidden. Keep their compact size
-  aligned with the **Show all** link and leave a clear gap before that link.
-- Clicking a calendar day with playback opens a modal history table with playback
-  time, media type, title, artist, album, listened duration, and total duration
+  (`LoadDashboardLocalArtworkAsync`) so the 100-item views build without a
+  hitch. Each 20-item strip has smoothly animated vector previous/next buttons
+  in the header immediately before **Show all**. These buttons must not overlay
+  or hide any artwork card, and their layout slots remain visible at both ends:
+  unavailable directions are disabled and muted rather than hidden. Keep their
+  compact size aligned with the **Show all** link and leave a clear gap before
+  that link.
+- Clicking a calendar day with playback opens a modal history table with
+  playback time, media type, title, artist, album, listened duration, and total
+  duration
 - Local-track title links in daily history open Tracks, select the title, and
   start playback; album and artist links open their existing drill-down views.
   Daily-history cells without an available action must render as plain text, not
   disabled link-style buttons.
 - Data comes from `GetRecentAlbums` (now also exposing `ArtistId`/`AddedAt` for
-  cross-library merging), `GetDashboardLibrarySummary`, `GetTotalListeningSeconds`,
-  `GetListeningTrend`, `GetCalendarData`, `GetTopGenres`, `GetTopAlbums`, and
-  `GetTopArtists`. Listening and top-stat queries take an optional `sinceUnix`
-  lower bound driven by the dashboard period selector.
+  cross-library merging), `GetDashboardLibrarySummary`,
+  `GetTotalListeningSeconds`, `GetListeningTrend`, `GetCalendarData`,
+  `GetTopGenres`, `GetTopAlbums`, and `GetTopArtists`. Listening and top-stat
+  queries take an optional `sinceUnix` lower bound driven by the dashboard
+  period selector.
 - Dashboard calendar playback time includes local, remote Orynivo Server, and
   Plex tracks, podcasts, and internet radio. The Top genres / albums / artists
   statistics include local, remote Orynivo Server, and Plex tracks: the genre
@@ -2409,13 +2422,13 @@ asynchronous file I/O from the UI thread
   falling back to the genre captured at playback time (`ResolveNowPlayingGenre`)
   for tracks without a local library row; the album/artist aggregations merge by
   album title+artist / artist name and prefer a local match (album ID + artwork)
-  as the representative identity, otherwise keep a representative external ID and
-  path for remote/Plex resolution
+  as the representative identity, otherwise keep a representative external ID
+  and path for remote/Plex resolution
 - Clicking a dashboard genre opens Tracks with only that genre facet selected;
   other track filters are cleared and the genre filter section is expanded
 - `RecentAlbumInfo` and `CalendarDayData` are records in `AudioDatabase.cs`
-- `_dashboardYear`, `_dashboardMonth`, `_calendarInner`, and `_genreColors`
-  hold dashboard state
+- `_dashboardYear`, `_dashboardMonth`, `_calendarInner`, and `_genreColors` hold
+  dashboard state
 - Month navigation rebuilds the dashboard so the section title changes
 - Dashboard code uses `HorizontalAlignment` and `Brushes` from `Avalonia.Layout`
   and `Avalonia.Media`; no WPF namespaces are present
@@ -2424,12 +2437,11 @@ asynchronous file I/O from the UI thread
 
 - **Artists**: distinct alphabetical artist list with table and artwork-card
   modes; double-click opens albums containing that artist
-- **Albums**: normalized title-plus-physical-album-root list with favorite,
-  96 px thumbnail, album, album artist, and year, plus a switchable artwork
-  grid using 320 px thumbnails. Equal titles in different album roots are
-  separate album records and open separate full detail headers and covers.
-  Compilation tracks and conventional `CD1`/`CD2` sibling directories remain
-  one album.
+- **Albums**: normalized title-plus-physical-album-root list with favorite, 96
+  px thumbnail, album, album artist, and year, plus a switchable artwork grid
+  using 320 px thumbnails. Equal titles in different album roots are separate
+  album records and open separate full detail headers and covers. Compilation
+  tracks and conventional `CD1`/`CD2` sibling directories remain one album.
 - Album views show a common album artist when one exists. The artist is display
   metadata and is not part of album identity; differing artists inside one
   physical album directory therefore do not split compilations.
@@ -2440,8 +2452,8 @@ asynchronous file I/O from the UI thread
   is disabled when the current file has no database track
 - `VirtualizingWrapPanel.cs` is an Avalonia `Panel` subclass that lays out
   fixed-size artwork cards from the top-left; sparse artist/album card result
-  sets must not be vertically centered. It uses `StyledProperty` for
-  `ItemWidth` and `ItemHeight`
+  sets must not be vertically centered. It uses `StyledProperty` for `ItemWidth`
+  and `ItemHeight`
 - **Album tracks**: `GetTrackListByAlbum(albumId)` sorts by disc, track number,
   and file name. Normalized album IDs represent one title and physical album
   root. Multi-disc releases keep one full album header while the detail view
@@ -2457,12 +2469,12 @@ asynchronous file I/O from the UI thread
 - When album tracks are opened from an artist drill-down, the list initially
   contains only tracks by that artist; a localized **Show all album tracks**
   switch removes the artist filter and rebuilds the visible playback queue
-- Artist-filtered compilation details always retain the full album cover
-  header, metadata, favorite/cover/playlist actions, and the **Show all album
-  tracks** switch. CD/directory group headers appear below it only when the
-  current filter produces more than one physical group. Enabling the switch
-  includes every directory assigned to the album; disabling it restores the
-  artist filter.
+- Artist-filtered compilation details always retain the full album cover header,
+  metadata, favorite/cover/playlist actions, and the **Show all album tracks**
+  switch. CD/directory group headers appear below it only when the current
+  filter produces more than one physical group. Enabling the switch includes
+  every directory assigned to the album; disabling it restores the artist
+  filter.
 - The album-track view has a centered header with a large 240 px cover, album
   title, album artist, and optional year; artwork can be searched, reassigned,
   or deleted
@@ -2521,23 +2533,24 @@ asynchronous file I/O from the UI thread
   sidebar icons, resolve live when opened, and do not permit manual entry
   removal. Criteria can include favourites, genre, format, bitrate, year,
   artist, album, duration, recently added/played windows, never played,
-  playback-count ranges, alphabetical/random/recent/least-recent ordering, and
-  a result limit.
+  playback-count ranges, alphabetical/random/recent/least-recent ordering, and a
+  result limit.
 - **Save smart playlist**: available in the local and remote Orynivo Server
   Tracks views when facet filters are active **or** the search box holds a
   query; opens the compact `NewPlaylistDialog` and serializes the active
   favourite, search text, genre, format, bitrate, and source facets through the
-  shared `BuildCurrentTrackFilterCriteria` helper. In
-  the local Tracks view it calls `AudioDatabase.CreateSmartPlaylist`; in a remote
-  Tracks view it calls `OrynivoServerClient.CreateSmartPlaylistAsync` so the
-  smart playlist is persisted on that server.
+  shared `BuildCurrentTrackFilterCriteria` helper. In the local Tracks view it
+  calls `AudioDatabase.CreateSmartPlaylist`; in a remote Tracks view it calls
+  `OrynivoServerClient.CreateSmartPlaylistAsync` so the smart playlist is
+  persisted on that server.
 - Tracks **search** honours the active facets: the source facet gates which
   sources contribute results (`ShowSearchResultsAsync` skips local when the
   source facet excludes it and `AddRemoteSearchResultsAsync` skips servers not
   in the source set), while favourite/genre/format/bitrate filter the track
   section through the shared `MatchesTrackFilters`
-  (`RemoteSearchTrackMatchesFilters` re-applies client-side favourites for remote
-  hits). The same applies to the per-server `ShowOrynivoSearchResultsAsync`.
+  (`RemoteSearchTrackMatchesFilters` re-applies client-side favourites for
+  remote hits). The same applies to the per-server
+  `ShowOrynivoSearchResultsAsync`.
 - Right-clicking a smart playlist in the sidebar exposes **Edit smart
   playlist**, which opens the shared `SmartPlaylistDialog` with the stored name
   and full criteria. Local smart playlists update `filter_criteria` through
@@ -2546,9 +2559,9 @@ asynchronous file I/O from the UI thread
   own server. Saving never replaces playlist rows.
 - Right-clicking the Playlists accordion header exposes **Import M3U8
   playlist**. Imports are UTF-8, resolve relative local paths against the M3U8
-  directory, preserve missing local paths, and retain HTTP/HTTPS entries.
-  URLs containing user-info credentials or `X-Plex-Token` are skipped and
-  never persisted.
+  directory, preserve missing local paths, and retain HTTP/HTTPS entries. URLs
+  containing user-info credentials or `X-Plex-Token` are skipped and never
+  persisted.
 - Right-clicking a regular playlist exposes **Export as M3U8**. Export writes
   UTF-8 without BOM, uses relative forward-slash local paths where possible,
   keeps HTTP/HTTPS entries, and skips credential-bearing URLs. Smart playlists
@@ -2558,11 +2571,11 @@ asynchronous file I/O from the UI thread
 
 ## XML Documentation Comments
 
-All public and internal C# types, members, and parameters must carry XML documentation
-comments (`///`). Write comments in **English**.
+All public and internal C# types, members, and parameters must carry XML
+documentation comments (`///`). Write comments in **English**.
 
-- Every `class`, `interface`, `enum`, `record`, `struct`, and `delegate` needs
-  a `<summary>`.
+- Every `class`, `interface`, `enum`, `record`, `struct`, and `delegate` needs a
+  `<summary>`.
 - Every public or internal method and property needs a `<summary>`.
 - Every method parameter needs a `<param name="…">` tag.
 - Non-void methods need a `<returns>` tag.
@@ -2572,10 +2585,8 @@ comments (`///`). Write comments in **English**.
   exempt.
 
 When adding or changing C# code, add or update the XML comments for all affected
-members
-in the same edit. Never leave a newly introduced public or internal declaration
-without a
-`<summary>`.
+members in the same edit. Never leave a newly introduced public or internal
+declaration without a `<summary>`.
 
 ## Maintenance Requirement
 
@@ -2600,9 +2611,21 @@ and move those entries into a dated version section when preparing a release.
   explanatory prose may remain in its surrounding language, but UI labels must
   not be translated ad hoc.
 
+### Markdown formatting
+
+- Every `.md` file must follow markdownlint rule MD032: a list is preceded and
+  followed by a blank line.
+- Keep every markdown line at or below 80 characters and wrap prose and list
+  continuations instead of exceeding it. Code blocks, tables, and long URLs are
+  the only exceptions, because wrapping them would change their content.
+- Format `.md` files with Prettier
+  (`prettier --prose-wrap always --print-width 80 --write`) and check them with
+  `markdownlint-cli2` before completing a documentation change.
+
 ## Localization Rule
 
-- Do not hard-code new visible UI text or status/error messages in XAML or code-behind
+- Do not hard-code new visible UI text or status/error messages in XAML or
+  code-behind
 - Store all such text under `Orynivo/Localization/`
 - Every new or changed string must be provided in German, English, French,
   Spanish, Russian, Simplified Chinese, and Hindi
@@ -2621,10 +2644,10 @@ and move those entries into a dated version section when preparing a release.
   label; the icon `Fill` follows the nav item foreground (selected/hover) via a
   `ListBox#NavListBox ListBoxItem Path` style so icons recolour with the row.
 - Genuine on/off options use the pill toggle `SettingsToggleTheme` (still a
-  `CheckBox`, so code that reads `IsChecked` is unchanged): DSD-to-PCM, equalizer
-  enable, MCP server enable, AI chat enable, and the Appearance sidebar-visibility
-  options. The toggle track is placed immediately before its label. The 24 MCP
-  per-tool entries stay on `SettingsCheckBoxTheme` because
+  `CheckBox`, so code that reads `IsChecked` is unchanged): DSD-to-PCM,
+  equalizer enable, MCP server enable, AI chat enable, and the Appearance
+  sidebar-visibility options. The toggle track is placed immediately before its
+  label. The 24 MCP per-tool entries stay on `SettingsCheckBoxTheme` because
   they form a permission checklist, not a single on/off switch.
 - Interactive settings inputs (TextBox, ComboBox, NumericUpDown, buttons) share
   a consistent 30 px height.

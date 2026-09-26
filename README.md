@@ -7,13 +7,12 @@
 An Avalonia desktop music library for Windows, Linux, and macOS, plus a
 cross-platform music server for local Hi-Fi libraries.
 
-**Official website:** [orynivo.app](https://orynivo.app/) ·
-**Documentation:** [GitHub Wiki](https://github.com/bschlaack/Orynivo/wiki) ·
-**Downloads:** [Latest release](https://github.com/bschlaack/Orynivo/releases/latest)
+**Official website:** [orynivo.app](https://orynivo.app/) · **Documentation:**
+[GitHub Wiki](https://github.com/bschlaack/Orynivo/wiki) · **Downloads:**
+[Latest release](https://github.com/bschlaack/Orynivo/releases/latest)
 
 cwASIO/Steinberg ASIO/WASAPI · DSD/DSF/DFF · Gapless Playback · ReplayGain ·
-Parametric EQ
-Plex · Radio · Podcasts · AI Chat · MCP Server · Network Streaming
+Parametric EQ Plex · Radio · Podcasts · AI Chat · MCP Server · Network Streaming
 
 ## Why Orynivo?
 
@@ -37,12 +36,12 @@ the ability to reach that library from any device on the local network.
 - Unified artist detail pages with an album-style image-and-biography hero,
   synchronized favorites, image management, refreshable biographies, and
   combined local/Orynivo Server albums. Their cards include cover search,
-  favorites, and local/server source badges, and a source-aware track table below them lists
-  the artist's tracks ordered by album and track number. Manual biography refresh can use an
-  editable external lookup name without changing the library artist name
-  while the artist's albums render before profile loading and remain available
-  throughout it; profile text follows German, English, French, Spanish,
-  Russian, Simplified Chinese, or Hindi
+  favorites, and local/server source badges, and a source-aware track table
+  below them lists the artist's tracks ordered by album and track number. Manual
+  biography refresh can use an editable external lookup name without changing
+  the library artist name while the artist's albums render before profile
+  loading and remain available throughout it; profile text follows German,
+  English, French, Spanish, Russian, Simplified Chinese, or Hindi
 - Hierarchical Genre Cloud with source-aware track and album recommendations
   across the local library and connected Orynivo Servers, backed by a subtle
   cached grayscale mosaic of matching artist images
@@ -55,14 +54,14 @@ the ability to reach that library from any device on the local network.
 - Optional curated Fanart.tv artist thumbnails. Enter a personal key under
   Settings > Artist information, or set the `FANART_TV_API_KEY` environment
   variable before starting Orynivo. Entered keys are stored in Orynivo's
-  encrypted current-user credential container. Manual artist images always
-  take priority. The same Settings section can fill missing artist images in
-  the local library and every configured Orynivo Server sequentially, trying
+  encrypted current-user credential container. Manual artist images always take
+  priority. The same Settings section can fill missing artist images in the
+  local library and every configured Orynivo Server sequentially, trying
   Fanart.tv first when a key is available and Wikimedia Commons as the fallback.
   With a configured Fanart.tv key, the review dialog can automatically accept
   Fanart.tv results for the remainder of the run. Wikimedia candidates always
-  remain subject to individual acceptance or rejection, and the complete run
-  can be cancelled from the review dialog. Manual image searches from artist
+  remain subject to individual acceptance or rejection, and the complete run can
+  be cancelled from the review dialog. Manual image searches from artist
   information use an editable query and the same Fanart.tv-first, Wikimedia-
   fallback order. The batch displays progress and an estimated remaining time
 - Unified local and Orynivo Server artist browsing: matching artists appear once
@@ -74,23 +73,25 @@ the ability to reach that library from any device on the local network.
   Cached biographies and images are shared across matching identities, and new
   profile downloads or manual image selections are synchronized to each source.
   Opening a unified artist or album also fills missing artwork in either the
-  local library or matching reachable Orynivo Servers from an existing counterpart.
+  local library or matching reachable Orynivo Servers from an existing
+  counterpart.
 - AI control via local LLMs, LM Studio/Ollama/OpenAI-compatible endpoints
 - MCP server for external AI assistants
-- **Orynivo Server** — headless cross-platform music server (Linux, macOS, Windows)
-  that exposes the same library over the local network via REST and HTTP streaming
+- **Orynivo Server** — headless cross-platform music server (Linux, macOS,
+  Windows) that exposes the same library over the local network via REST and
+  HTTP streaming
 
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 
 ## Product website
 
 The official website is available at [orynivo.app](https://orynivo.app/). Its
-self-contained responsive source lives in [`html/`](html/). It
-defaults to English, can switch to German, French, Spanish, Russian,
-Simplified Chinese or Hindi, and includes
-current application screenshots, feature and installation guides, and download
-links that resolve through GitHub's latest public release API. See
-[`html/README.md`](html/README.md) for local preview and publishing notes.
+self-contained responsive source lives in [`html/`](html/). It defaults to
+English, can switch to German, French, Spanish, Russian, Simplified Chinese or
+Hindi, and includes current application screenshots, feature and installation
+guides, and download links that resolve through GitHub's latest public release
+API. See [`html/README.md`](html/README.md) for local preview and publishing
+notes.
 
 The Windows desktop includes cwASIO/Steinberg ASIO and WASAPI playback. The
 Linux desktop is a separately packaged player with direct ALSA hardware profiles
@@ -100,8 +101,8 @@ local files, remote streams, CUE/MKA segments, gapless queues, seeking,
 ReplayGain, PCM boost, and the parametric equalizer. The macOS desktop provides
 the same library, streaming, playlist, radio, podcast, AI Chat, MCP, and PCM
 processing features through the system OpenAL output path on Intel and Apple
-Silicon. Native DSD output remains available only through Windows ASIO/cwASIO
-or Linux direct ALSA. Windows System Media Transport Controls remain
+Silicon. Native DSD output remains available only through Windows ASIO/cwASIO or
+Linux direct ALSA. Windows System Media Transport Controls remain
 Windows-specific, while the Linux desktop exposes the MPRIS 2 media player
 interface so desktop media keys, panels, and applets can control playback.
 
@@ -112,29 +113,28 @@ receiver-requested RTP retransmission. This path has been verified with clean
 audible playback on a Sonos stereo pair. Playback is decoded to 44.1 kHz stereo
 PCM; volume and ReplayGain are applied before it reaches the native bridge.
 AirPlay volume uses a perceptual curve with additional control at normal
-listening levels instead of mapping the slider directly to linear PCM gain.
-The receiver now-playing display receives the current title, artist, album,
-and bounded JPEG/PNG cover artwork when it is available locally or through the
-active library provider.
-Receiver-side Play, Pause, Next, and Previous controls are synchronized back to
-Orynivo through the authenticated AirPlay event channel. Resuming after a
-receiver-side pause rebuilds the stream at its current position for Sonos
-compatibility. Receiver-originated timeline seeking is not currently supported;
-it requires a separate DACP
-control endpoint rather than the reverse event channel used by those buttons.
-If the bridge is unavailable, Orynivo falls back to a compatible `raop_play`
-executable beside Orynivo or on `PATH`. The helper is deliberately not bundled
-because available RAOP implementations use licenses independent of Orynivo's
-Apache-2.0 distribution. Gapless transitions and Orynivo's parametric equalizer
-are not yet supported for either network path.
+listening levels instead of mapping the slider directly to linear PCM gain. The
+receiver now-playing display receives the current title, artist, album, and
+bounded JPEG/PNG cover artwork when it is available locally or through the
+active library provider. Receiver-side Play, Pause, Next, and Previous controls
+are synchronized back to Orynivo through the authenticated AirPlay event
+channel. Resuming after a receiver-side pause rebuilds the stream at its current
+position for Sonos compatibility. Receiver-originated timeline seeking is not
+currently supported; it requires a separate DACP control endpoint rather than
+the reverse event channel used by those buttons. If the bridge is unavailable,
+Orynivo falls back to a compatible `raop_play` executable beside Orynivo or on
+`PATH`. The helper is deliberately not bundled because available RAOP
+implementations use licenses independent of Orynivo's Apache-2.0 distribution.
+Gapless transitions and Orynivo's parametric equalizer are not yet supported for
+either network path.
 
 > **Experimental:** Native AirPlay 2 support is an interoperability
 > implementation based on observed protocol behavior rather than a public Apple
 > sender specification. Continuous playback, seeking, timing, and stereo-pair
 > output have been verified with the tested Sonos receiver, but other receiver
 > models, firmware versions, grouped configurations, and network environments
-> may behave differently. Keep a conventional local output profile available
-> and report reproducible receiver-specific problems with model and firmware
+> may behave differently. Keep a conventional local output profile available and
+> report reproducible receiver-specific problems with model and firmware
 > information.
 
 The Qt-free `AirPlay2Bridge` provides native AirPlay 2 support while retaining
@@ -151,41 +151,40 @@ Orynivo, or Qt, so it can later be published and consumed independently. The
 current milestone provides portable sockets, fail-closed transient pairing,
 authenticated encrypted control, unicast gPTP timing, timing-peer registration,
 session/audio-stream SETUP, official Apple ALAC support, partial-PCM buffering,
-and encrypted realtime type-96 media over receiver-selected UDP ports.
-Its PTP clock behavior follows a complete working iPhone-to-Sonos capture;
-352-frame ALAC packets use a PTP/RTP synchronization anchor and bounded
-retransmission. Captured type-103 TCP framing remains isolated for later AAC use.
-Initial receiver volume, RTP-anchored DMAP metadata, encrypted teardown, and
+and encrypted realtime type-96 media over receiver-selected UDP ports. Its PTP
+clock behavior follows a complete working iPhone-to-Sonos capture; 352-frame
+ALAC packets use a PTP/RTP synchronization anchor and bounded retransmission.
+Captured type-103 TCP framing remains isolated for later AAC use. Initial
+receiver volume, RTP-anchored DMAP metadata, encrypted teardown, and
 PTP/buffered-packet diagnostics are included. These paths are backed by native
 tests. Session negotiation, encrypted media, PTP timing, retransmission,
 teardown, and clean audible playback are verified against a Sonos stereo-pair
 receiver. The Windows build copies the bridge beside Orynivo and loads it
 through its stable C ABI.
 
-Settings > Playback offers mutually exclusive DSD routing preferences for
-lossy DSD-to-PCM conversion and bit-perfect DSD over PCM (DoP). DoP requires a
+Settings > Playback offers mutually exclusive DSD routing preferences for lossy
+DSD-to-PCM conversion and bit-perfect DSD over PCM (DoP). DoP requires a
 DoP-capable DAC and an exact-rate output path; PCM volume, ReplayGain, boost,
-and equalizer processing do not apply to the encapsulated DSD payload. The
-Linux path supports local and Orynivo-Server-streamed stereo DSF and
-uncompressed stereo DFF/DSDIFF through direct ALSA. When ALSA exposes the
-native `DSD_U32_BE` hardware format, Orynivo sends bit-perfect DSD directly to
-the DAC; otherwise it uses DoP as a fallback (for example a 176.4-kHz carrier
-for DSD64). Neither Linux DSD path requires cwASIO, the Steinberg SDK, or an
-Orynivo native bridge.
+and equalizer processing do not apply to the encapsulated DSD payload. The Linux
+path supports local and Orynivo-Server-streamed stereo DSF and uncompressed
+stereo DFF/DSDIFF through direct ALSA. When ALSA exposes the native `DSD_U32_BE`
+hardware format, Orynivo sends bit-perfect DSD directly to the DAC; otherwise it
+uses DoP as a fallback (for example a 176.4-kHz carrier for DSD64). Neither
+Linux DSD path requires cwASIO, the Steinberg SDK, or an Orynivo native bridge.
 
 API keys and access tokens for Last.fm, Fanart.tv, AI Chat, Orynivo Server,
 Plex, and streaming providers are kept out of `settings.json`. Orynivo stores
 them in one current-user encrypted credential container: Windows uses
 current-user DPAPI; Linux and macOS use AES-GCM with a separate random key file
-restricted to the current operating-system user. Existing plaintext settings
-and the older Windows Plex/streaming credential files are migrated automatically.
+restricted to the current operating-system user. Existing plaintext settings and
+the older Windows Plex/streaming credential files are migrated automatically.
 
 The application uses the Orynivo wordmark in the startup screen, sidebar, and
 About dialog, plus a multi-resolution Windows application icon based on the
 standalone logo.
 
-> This project is under active development. The database schema, user
-> interface, and available features may still change.
+> This project is under active development. The database schema, user interface,
+> and available features may still change.
 
 ## Desktop builds
 
@@ -194,8 +193,8 @@ The desktop project selects its target from the build host:
 - Windows builds target `net10.0-windows10.0.19041.0` and include the existing
   WASAPI/ASIO integrations.
 - Linux builds target `net10.0`; PCM audio is rendered through direct ALSA or
-  OpenAL. The Windows endpoint-volume integration is replaced by a
-  compatibility service, and system-media integration is provided by MPRIS 2
+  OpenAL. The Windows endpoint-volume integration is replaced by a compatibility
+  service, and system-media integration is provided by MPRIS 2
   (`org.mpris.MediaPlayer2.orynivo`) for desktop media keys and panels.
 - macOS builds target `net10.0`; PCM audio is rendered through Apple's system
   OpenAL framework. Windows audio, endpoint-volume, and SMTC integrations are
@@ -228,10 +227,10 @@ dotnet publish Orynivo/Orynivo.csproj --configuration Release \
 
 Version tags publish self-contained desktop releases for `linux-x64` and
 `linux-arm64`. Each architecture receives a portable `.tar.gz`, a DEB package,
-and an RPM package; Arch Linux additionally receives an
-`x86_64 .pkg.tar.zst`. Installed packages place Orynivo under
-`/usr/lib/orynivo`, add the `orynivo` command, and register a desktop launcher.
-All Linux player artifacts are covered by the signed release manifest.
+and an RPM package; Arch Linux additionally receives an `x86_64 .pkg.tar.zst`.
+Installed packages place Orynivo under `/usr/lib/orynivo`, add the `orynivo`
+command, and register a desktop launcher. All Linux player artifacts are covered
+by the signed release manifest.
 
 Build and publish the macOS desktop for either supported architecture:
 
@@ -243,20 +242,20 @@ dotnet publish Orynivo/Orynivo.csproj --configuration Release \
 ```
 
 Use `osx-x64` instead on an Intel Mac. Tagged releases package both runtime
-identifiers as self-contained installable PKGs, portable `Orynivo.app` ZIPs,
-and tar archives. Orynivo detects FFmpeg and FFprobe in the normal Homebrew,
+identifiers as self-contained installable PKGs, portable `Orynivo.app` ZIPs, and
+tar archives. Orynivo detects FFmpeg and FFprobe in the normal Homebrew,
 MacPorts, pkgsrc, Fink, and per-user binary locations even when it is launched
 from Finder. If neither tool is installed, it downloads architecture-matching
 builds into the Orynivo per-user cache. OpenAL is provided by macOS.
 
-An X11 or Wayland desktop session is required to run the Avalonia UI. FFmpeg
-and FFprobe must be installed and available on `PATH` for playback, media
-probing, waveforms, ReplayGain analysis, and other FFmpeg-backed library
-functions. Settings checks the platform-appropriate executable names through
-the same locator used at startup. The ALSA runtime (`libasound.so.2`, commonly
-packaged as `libasound2`)
-is required for direct hardware output. The OpenAL runtime (`libopenal.so.1`,
-commonly packaged as `libopenal1`) is required for the system/default route.
+An X11 or Wayland desktop session is required to run the Avalonia UI. FFmpeg and
+FFprobe must be installed and available on `PATH` for playback, media probing,
+waveforms, ReplayGain analysis, and other FFmpeg-backed library functions.
+Settings checks the platform-appropriate executable names through the same
+locator used at startup. The ALSA runtime (`libasound.so.2`, commonly packaged
+as `libasound2`) is required for direct hardware output. The OpenAL runtime
+(`libopenal.so.1`, commonly packaged as `libopenal1`) is required for the
+system/default route.
 
 ## AI Integration
 
@@ -272,7 +271,7 @@ provider. No external configuration file or MCP server is required: tools are
 dispatched directly inside the application.
 
 Responses stream token by token. The model calls tools autonomously — asking
-*"Spiele alle Beatles-Alben"* makes it search the library, fill the queue with
+_"Spiele alle Beatles-Alben"_ makes it search the library, fill the queue with
 the results, and start playback, all in one turn.
 
 Configure the endpoint URL, optional API key, model name, and max-token limit
@@ -280,28 +279,27 @@ under **Settings → Integration → AI Chat**. Orynivo queries the
 OpenAI-compatible `/v1/models` endpoint when this section is opened or the
 connection values change, presents the returned identifiers in a selectable
 list, and retains a free-form model field for compatibility endpoints that do
-not advertise models. **Load models** refreshes the list manually, while
-**Test connection** validates the current URL and key without saving them.
-LM Studio and Ollama work without an API key.
-The sidebar entry can be shown or hidden independently under
-**Settings → Appearance**, without disabling or deleting the saved AI Chat
-configuration.
+not advertise models. **Load models** refreshes the list manually, while **Test
+connection** validates the current URL and key without saving them. LM Studio
+and Ollama work without an API key. The sidebar entry can be shown or hidden
+independently under **Settings → Appearance**, without disabling or deleting the
+saved AI Chat configuration.
 
 **Available tools:**
 
-| Category | Tools |
-| --- | --- |
-| State | `get_now_playing`, `get_queue`, `get_current_time` |
-| Playback | `play`, `pause_resume`, `next_track`, `previous_track`, `stop`, `seek`, `set_volume` |
-| Queue | `queue_append`, `queue_play_next`, `clear_queue`, `replace_queue` |
-| Library | `search_library`, `get_track_key` |
-| Favorites, ratings, and discovery | `set_current_favorite`, `set_tracks_favorite`, `set_tracks_rating`, `control_infinite_mix` |
-| Audio configuration | `list_output_profiles`, `select_output_profile`, `list_equalizer_profiles`, `configure_equalizer` |
-| Lyrics | `get_current_lyrics` |
-| Orynivo Server | `list_orynivo_servers`, `scan_orynivo_server` |
-| Playlists | `list_playlists`, `get_playlist_tracks`, `create_playlist`, `create_smart_playlist`, `create_similar_playlist` |
-| History | `get_play_history`, `get_year_in_review` |
-| Web | `search_web`, `fetch_page`, `fetch_page_as_markdown` |
+| Category                          | Tools                                                                                                          |
+| --------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| State                             | `get_now_playing`, `get_queue`, `get_current_time`                                                             |
+| Playback                          | `play`, `pause_resume`, `next_track`, `previous_track`, `stop`, `seek`, `set_volume`                           |
+| Queue                             | `queue_append`, `queue_play_next`, `clear_queue`, `replace_queue`                                              |
+| Library                           | `search_library`, `get_track_key`                                                                              |
+| Favorites, ratings, and discovery | `set_current_favorite`, `set_tracks_favorite`, `set_tracks_rating`, `control_infinite_mix`                     |
+| Audio configuration               | `list_output_profiles`, `select_output_profile`, `list_equalizer_profiles`, `configure_equalizer`              |
+| Lyrics                            | `get_current_lyrics`                                                                                           |
+| Orynivo Server                    | `list_orynivo_servers`, `scan_orynivo_server`                                                                  |
+| Playlists                         | `list_playlists`, `get_playlist_tracks`, `create_playlist`, `create_smart_playlist`, `create_similar_playlist` |
+| History                           | `get_play_history`, `get_year_in_review`                                                                       |
+| Web                               | `search_web`, `fetch_page`, `fetch_page_as_markdown`                                                           |
 
 `search_library` accepts an optional free-text query plus a result category
 (`all`, `tracks`, `albums`, or `artists`), inclusive `yearFrom`/`yearTo` release
@@ -309,94 +307,96 @@ years, inclusive ISO-8601 `addedFrom`/`addedTo` library dates, and relevance,
 title, release-year, or library-addition ordering. This supports requests such
 as “show newly added tracks”, “albums added since 2026-08-01”, and “albums from
 1998”. The year is the release year stored in the media metadata; Orynivo does
-not currently store a separate composition year. Filtered remote queries need
-an Orynivo Server version that provides the authenticated structured-search
+not currently store a separate composition year. Filtered remote queries need an
+Orynivo Server version that provides the authenticated structured-search
 endpoint.
 
 The model picks the right queue tool automatically: `replace_queue` clears the
 old list and starts playing immediately when the user asks for new content;
 `queue_append` adds to the existing queue when the user wants to add more;
-`clear_queue` empties the queue without interrupting the current track.
-Library search includes configured Orynivo Server libraries as opaque
+`clear_queue` empties the queue without interrupting the current track. Library
+search includes configured Orynivo Server libraries as opaque
 `orynivo://serverId/track/trackId` references. Playback and queue tools resolve
 those references inside the app, so API keys and authenticated stream URLs are
 not exposed to the model.
 
 ### Mobile web remote
 
-The mobile web remote can be enabled under its separate
-**Settings → Integration → Mobile web remote** page. It listens on its
-own LAN port (default **49201**) and uses a dedicated generated bearer token;
-MCP permissions and its token are not reused. Open
-`http://<address-of-the-orynivo-computer>:49201/remote` on a phone, enter the
-remote token, and keep the page open for reconnecting live player updates. The
-bare address `http://<address-of-the-orynivo-computer>:49201` redirects to that
-page as well. Missing or rejected tokens are reported directly on the sign-in
-card. Tokens are held only in the open page's memory, not in browser storage;
-reloading or opening the plain URL requires entering the token again.
-The desktop stores this token in its encrypted credential container and migrates
-tokens from older plaintext settings automatically.
+The mobile web remote can be enabled under its separate **Settings → Integration
+→ Mobile web remote** page. It listens on its own LAN port (default **49201**)
+and uses a dedicated generated bearer token; MCP permissions and its token are
+not reused. Open `http://<address-of-the-orynivo-computer>:49201/remote` on a
+phone, enter the remote token, and keep the page open for reconnecting live
+player updates. The bare address
+`http://<address-of-the-orynivo-computer>:49201` redirects to that page as well.
+Missing or rejected tokens are reported directly on the sign-in card. Tokens are
+held only in the open page's memory, not in browser storage; reloading or
+opening the plain URL requires entering the token again. The desktop stores this
+token in its encrypted credential container and migrates tokens from older
+plaintext settings automatically.
 
-Settings lists the computer's active IPv4 addresses. Choose the address reachable
-from your phone and **save the settings first**, then scan the locally generated
-QR code. It includes the dedicated access token in a URL fragment for direct
-sign-in; the page immediately removes the fragment from the address bar.
+Settings lists the computer's active IPv4 addresses. Choose the address
+reachable from your phone and **save the settings first**, then scan the locally
+generated QR code. It includes the dedicated access token in a URL fragment for
+direct sign-in; the page immediately removes the fragment from the address bar.
 The fragment is not sent in HTTP requests, but the QR code itself grants access:
 do not share it or include it in screenshots. QR generation uses the bundled
-MIT-licensed QRCoder library and never contacts an external QR service.
-Use the IP address if your phone cannot resolve the computer name; both devices
-must be on a mutually reachable network. No port forwarding is needed.
+MIT-licensed QRCoder library and never contacts an external QR service. Use the
+IP address if your phone cannot resolve the computer name; both devices must be
+on a mutually reachable network. No port forwarding is needed.
 
-The responsive interface has separate **Now playing**, **Library**, **Playlists**,
-and **Up next** sections, with a bottom navigation bar on phones and a larger
-side-by-side artwork/player layout on tablets. It shows state without disclosing file
-paths or authenticated stream URLs. Previous, play/pause, next, stop, seek,
-volume, and direct queue-entry controls are available. Current artwork is
-transferred as a bounded thumbnail and retained through private browser cache
-headers. The search field queries tracks in the local library and every
-configured Orynivo Server concurrently. Results can be played immediately,
-inserted next, or appended; the browser receives only an opaque identity and
-display metadata, never a physical path, server address, or API key. LAN
-access is disabled by default. The current track can be marked as a favourite,
-configured output profiles can be selected, and queue entries can be moved or
-removed without opening the desktop window. The library section browses artists,
-their albums, and album tracks from both the local catalog and every configured
-Orynivo Server. The Playlists section uses the desktop's shared regular and smart
-playlists, including resolvable local and Orynivo Server tracks. Open a playlist
-to browse its tracks, play the entire list (replacing the queue), or append it
-without replacing the current music. Smart criteria are resolved live. Unresolved
-entries and standalone imported streams not indexed in a library are currently
-omitted by this browser; legacy server-only playlists remain outside the shared
-list, as on the desktop. Refresh reloads newly created or edited playlists.
-Provider identities remain opaque until a selected track is
-resolved inside the desktop for playback. Do not
-forward this unencrypted HTTP port to the internet; use a trusted VPN or an
-HTTPS reverse proxy for access outside the home network.
+The responsive interface has separate **Now playing**, **Library**,
+**Playlists**, and **Up next** sections, with a bottom navigation bar on phones
+and a larger side-by-side artwork/player layout on tablets. It shows state
+without disclosing file paths or authenticated stream URLs. Previous,
+play/pause, next, stop, seek, volume, and direct queue-entry controls are
+available. Current artwork is transferred as a bounded thumbnail and retained
+through private browser cache headers. The search field queries tracks in the
+local library and every configured Orynivo Server concurrently. Results can be
+played immediately, inserted next, or appended; the browser receives only an
+opaque identity and display metadata, never a physical path, server address, or
+API key. LAN access is disabled by default. The current track can be marked as a
+favourite, configured output profiles can be selected, and queue entries can be
+moved or removed without opening the desktop window. The library section browses
+artists, their albums, and album tracks from both the local catalog and every
+configured Orynivo Server. The Playlists section uses the desktop's shared
+regular and smart playlists, including resolvable local and Orynivo Server
+tracks. Open a playlist to browse its tracks, play the entire list (replacing
+the queue), or append it without replacing the current music. Smart criteria are
+resolved live. Unresolved entries and standalone imported streams not indexed in
+a library are currently omitted by this browser; legacy server-only playlists
+remain outside the shared list, as on the desktop. Refresh reloads newly created
+or edited playlists. Provider identities remain opaque until a selected track is
+resolved inside the desktop for playback. Do not forward this unencrypted HTTP
+port to the internet; use a trusted VPN or an HTTPS reverse proxy for access
+outside the home network.
 
-Remote verification: `dotnet run --project scripts/RemoteSmoke/RemoteSmoke.csproj`
-checks the production host with synthetic data. With Node.js and Playwright
-available, `node scripts/verify-mobile-remote.cjs` checks the embedded UI using a
-mock server and headless Edge; it never controls the actual player.
+Remote verification:
+`dotnet run --project scripts/RemoteSmoke/RemoteSmoke.csproj` checks the
+production host with synthetic data. With Node.js and Playwright available,
+`node scripts/verify-mobile-remote.cjs` checks the embedded UI using a mock
+server and headless Edge; it never controls the actual player.
 
 ### MCP Server
 
 The same 37 tools are available as an embedded **Model Context Protocol (MCP)**
 HTTP/SSE server for external AI assistants such as
-[Claude Desktop](https://claude.ai/download). Enable it under
-**Settings → Integration → MCP Server**, choose a port (default **49200**),
-and point your assistant at `http://localhost:49200/mcp`. It binds to
-`localhost` by default. **Allow access from the local network** is an explicit
-opt-in setting that binds MCP to all interfaces and requires a generated bearer
-token in `Authorization: Bearer <token>` on every MCP request. Use HTTPS through
-a trusted reverse proxy or a VPN when the network is not fully trusted, because
-plain HTTP does not protect the token in transit. Each of the 37 tools has an individual enable/disable toggle
-in Settings so you can limit what an external assistant is allowed to do. The
-web tools (`search_web`, `fetch_page`, `fetch_page_as_markdown`) route through
-the MCP server, not the model directly: searches use a configurable SearXNG
-instance and page fetches are hardened against SSRF (http/https only, private/
-loopback addresses blocked, response size/redirect/timeout limits, no arbitrary
-downloads, request logging). Configure the SearXNG URL and limits under
-**Settings → Integration → MCP Server → Web browsing**.
+[Claude Desktop](https://claude.ai/download). Enable it under **Settings →
+Integration → MCP Server**, choose a port (default **49200**), and point your
+assistant at `http://localhost:49200/mcp`. It binds to `localhost` by default.
+**Allow access from the local network** is an explicit opt-in setting that binds
+MCP to all interfaces and requires a generated bearer token in
+`Authorization: Bearer <token>` on every MCP request. Use HTTPS through a
+trusted reverse proxy or a VPN when the network is not fully trusted, because
+plain HTTP does not protect the token in transit. Each of the 37 tools has an
+individual enable/disable toggle in Settings so you can limit what an external
+assistant is allowed to do. The web tools (`search_web`, `fetch_page`,
+`fetch_page_as_markdown`) route through the MCP server, not the model directly:
+searches use a configurable SearXNG instance and page fetches are hardened
+against SSRF (http/https only, private/ loopback addresses blocked, response
+size/redirect/timeout limits, no arbitrary downloads, request logging).
+Configure the SearXNG URL and limits under **Settings → Integration → MCP Server
+→ Web browsing**.
 
 ## Orynivo Server
 
@@ -411,63 +411,63 @@ All endpoints except `/api/health` require a pre-shared API key sent either as
 an `X-Api-Key` header or a `?key=` query parameter. The query-parameter form
 works directly in FFmpeg and browser URLs.
 
-| Endpoint | Description |
-| --- | --- |
-| `GET /api/health` | Status — no authentication required |
-| `GET /api/info` | Server name, version, and configured library paths |
-| `GET /api/settings/library-paths` | Configured library root paths |
-| `PUT /api/settings/library-paths` | Replace configured library root paths, persist them, refresh watchers, and start a scan |
-| `GET /api/files/directories?path=` | Browse server-side directories for remote path selection |
-| `POST /api/scan` | Trigger a full library scan |
-| `POST /api/scan/metadata` | Re-read metadata from every supported file, including timestamp-unchanged files |
-| `GET /api/library/backup` | Download a versioned ZIP backup of the server library and artwork caches |
-| `GET /api/tracks/{id}/position` | Read the profile-scoped cross-device resume position of a track |
-| `PUT /api/tracks/{id}/position` | Store the profile-scoped cross-device resume position of a track |
-| `PUT /api/library/backup` | Validate and restore a server library backup (maximum 2 GiB) |
-| `GET /api/scan` | Scan status with current root, processed/total counts, current file, last result, errors, and `LibraryChangedAt` for client cache invalidation |
-| `GET /api/artists` | All artists (id, name, favorite, biography/image flags) |
-| `GET /api/artists/{id}` | Complete artist metadata, including cached biography/source fields |
-| `POST /api/artists/{id}/profile` | Store client-refreshed artist biography/source fields and optional image bytes |
-| `POST /api/artists/{id}/rename` | Rename one artist or merge it with a matching artist |
-| `GET /api/artists/{id}/albums` | Albums for one artist |
-| `GET /api/albums` | All albums (id, title, display artist, year, artwork paths) |
-| `GET /api/albums/{id}` | One album without loading the complete album catalog |
-| `GET /api/albums/{id}/tracks` | Track list for one album |
-| `GET /api/tracks` | Paginated track list (`?page=0&pageSize=500`) |
-| `GET /api/tracks/{id}` | Full metadata for one track |
-| `GET /api/tracks/{id}/waveform` | Cached compact waveform peak data for the transport progress view |
-| `GET /api/tracks/{id}/lyrics` | Cached plain/synced lyrics for one track |
-| `PUT /api/tracks/{id}/lyrics` | Store client-downloaded lyrics on the server |
-| `GET /api/tracks/facets` | Lightweight facet rows (genre, format, bitrate) for the Tracks filter |
-| `GET /api/tracks/similarity-features?page=&pageSize=` | Paginated versioned similarity vectors (maximum 2,000 per page) |
-| `POST /api/tracks/audio-features/analyze?limit=` | Start an opportunistic acoustic-descriptor batch (maximum 10 tracks) |
-| `GET /api/genres/cloud` | Compact hierarchical genre counts and bounded recommendation candidates |
-| `GET /api/library/summary` | Aggregate album, track, artist, and favorite counts without materializing library rows |
-| `GET /api/library/doctor` | Compact read-only Library Doctor folder findings; `inspectFiles=false` skips physical file reads/hashing (omitting it retains full checks) |
-| `POST /api/tracks/by-ids` | Track rows for a list of track IDs (facet-filtered results) |
-| `PUT /api/tracks/{id}/genre` | Store the library-only genre override for one track; an empty value clears it. Media files are never rewritten |
-| `GET /api/folders/tracks` | Lightweight track rows plus playback metadata for building a server library folder tree |
-| `GET /api/artwork/album/{id}?size=96` | Album artwork thumbnail or original image |
-| `PUT /api/artwork/album/{id}` | Store raw client-selected album artwork bytes on the server |
-| `GET /api/artwork/artist/{id}` | Artist image stored on the server |
-| `PUT /api/artwork/artist/{id}` | Store raw client-selected artist image bytes on the server |
-| `GET /api/playlists` | All playlists (regular and smart) |
-| `GET /api/playlists/{id}/tracks` | Resolved track list (smart playlists are evaluated live) |
-| `POST /api/playlists/{id}/resolve` | Resolve a smart playlist while applying client-side favorite track IDs; similarity references are resolved from the server's cached feature vectors |
-| `POST /api/playlists/resolve-count` | Return the match count for ad-hoc smart-playlist criteria, including similarity references |
-| `POST /api/playlists` | Create a regular playlist from server-side track IDs |
-| `POST /api/playlists/smart` | Create a smart playlist from criteria |
-| `PUT /api/playlists/{id}/smart` | Update a smart playlist name and criteria |
-| `POST /api/playlists/{id}/tracks` | Append server-side track IDs to a regular playlist |
-| `DELETE /api/playlists/{id}` | Delete a playlist on the server |
-| `DELETE /api/playlist-tracks/{id}` | Remove one entry from a server playlist |
-| `GET /api/search?q=` | Full-text search — returns matching tracks |
-| `GET /api/search/full?q=` | Category search — returns tracks, albums, and artists |
-| `GET /api/stream/{trackId}` | Byte-range HTTP streaming for regular files; FLAC transcode for CUE virtual tracks; `?ss=` seeks server-side; `?format=opus\|aac&bitrate=<64-320>` requests a validated lossy transcode (unsupported values return 400) |
-| `GET /api/stream/path?p=` | Stream by absolute file path |
-| `GET /api/artwork/album/{id}?size=` | Album artwork (`size=96` or `size=320` for thumbnails) |
-| `GET /api/artwork/track?p=` | Track artwork by file path |
-| `GET /api/artwork/track/{id}?size=` | Track artwork by track ID (`size=96` or `size=320` for thumbnails) |
+| Endpoint                                              | Description                                                                                                                                                                                                             |
+| ----------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `GET /api/health`                                     | Status — no authentication required                                                                                                                                                                                     |
+| `GET /api/info`                                       | Server name, version, and configured library paths                                                                                                                                                                      |
+| `GET /api/settings/library-paths`                     | Configured library root paths                                                                                                                                                                                           |
+| `PUT /api/settings/library-paths`                     | Replace configured library root paths, persist them, refresh watchers, and start a scan                                                                                                                                 |
+| `GET /api/files/directories?path=`                    | Browse server-side directories for remote path selection                                                                                                                                                                |
+| `POST /api/scan`                                      | Trigger a full library scan                                                                                                                                                                                             |
+| `POST /api/scan/metadata`                             | Re-read metadata from every supported file, including timestamp-unchanged files                                                                                                                                         |
+| `GET /api/library/backup`                             | Download a versioned ZIP backup of the server library and artwork caches                                                                                                                                                |
+| `GET /api/tracks/{id}/position`                       | Read the profile-scoped cross-device resume position of a track                                                                                                                                                         |
+| `PUT /api/tracks/{id}/position`                       | Store the profile-scoped cross-device resume position of a track                                                                                                                                                        |
+| `PUT /api/library/backup`                             | Validate and restore a server library backup (maximum 2 GiB)                                                                                                                                                            |
+| `GET /api/scan`                                       | Scan status with current root, processed/total counts, current file, last result, errors, and `LibraryChangedAt` for client cache invalidation                                                                          |
+| `GET /api/artists`                                    | All artists (id, name, favorite, biography/image flags)                                                                                                                                                                 |
+| `GET /api/artists/{id}`                               | Complete artist metadata, including cached biography/source fields                                                                                                                                                      |
+| `POST /api/artists/{id}/profile`                      | Store client-refreshed artist biography/source fields and optional image bytes                                                                                                                                          |
+| `POST /api/artists/{id}/rename`                       | Rename one artist or merge it with a matching artist                                                                                                                                                                    |
+| `GET /api/artists/{id}/albums`                        | Albums for one artist                                                                                                                                                                                                   |
+| `GET /api/albums`                                     | All albums (id, title, display artist, year, artwork paths)                                                                                                                                                             |
+| `GET /api/albums/{id}`                                | One album without loading the complete album catalog                                                                                                                                                                    |
+| `GET /api/albums/{id}/tracks`                         | Track list for one album                                                                                                                                                                                                |
+| `GET /api/tracks`                                     | Paginated track list (`?page=0&pageSize=500`)                                                                                                                                                                           |
+| `GET /api/tracks/{id}`                                | Full metadata for one track                                                                                                                                                                                             |
+| `GET /api/tracks/{id}/waveform`                       | Cached compact waveform peak data for the transport progress view                                                                                                                                                       |
+| `GET /api/tracks/{id}/lyrics`                         | Cached plain/synced lyrics for one track                                                                                                                                                                                |
+| `PUT /api/tracks/{id}/lyrics`                         | Store client-downloaded lyrics on the server                                                                                                                                                                            |
+| `GET /api/tracks/facets`                              | Lightweight facet rows (genre, format, bitrate) for the Tracks filter                                                                                                                                                   |
+| `GET /api/tracks/similarity-features?page=&pageSize=` | Paginated versioned similarity vectors (maximum 2,000 per page)                                                                                                                                                         |
+| `POST /api/tracks/audio-features/analyze?limit=`      | Start an opportunistic acoustic-descriptor batch (maximum 10 tracks)                                                                                                                                                    |
+| `GET /api/genres/cloud`                               | Compact hierarchical genre counts and bounded recommendation candidates                                                                                                                                                 |
+| `GET /api/library/summary`                            | Aggregate album, track, artist, and favorite counts without materializing library rows                                                                                                                                  |
+| `GET /api/library/doctor`                             | Compact read-only Library Doctor folder findings; `inspectFiles=false` skips physical file reads/hashing (omitting it retains full checks)                                                                              |
+| `POST /api/tracks/by-ids`                             | Track rows for a list of track IDs (facet-filtered results)                                                                                                                                                             |
+| `PUT /api/tracks/{id}/genre`                          | Store the library-only genre override for one track; an empty value clears it. Media files are never rewritten                                                                                                          |
+| `GET /api/folders/tracks`                             | Lightweight track rows plus playback metadata for building a server library folder tree                                                                                                                                 |
+| `GET /api/artwork/album/{id}?size=96`                 | Album artwork thumbnail or original image                                                                                                                                                                               |
+| `PUT /api/artwork/album/{id}`                         | Store raw client-selected album artwork bytes on the server                                                                                                                                                             |
+| `GET /api/artwork/artist/{id}`                        | Artist image stored on the server                                                                                                                                                                                       |
+| `PUT /api/artwork/artist/{id}`                        | Store raw client-selected artist image bytes on the server                                                                                                                                                              |
+| `GET /api/playlists`                                  | All playlists (regular and smart)                                                                                                                                                                                       |
+| `GET /api/playlists/{id}/tracks`                      | Resolved track list (smart playlists are evaluated live)                                                                                                                                                                |
+| `POST /api/playlists/{id}/resolve`                    | Resolve a smart playlist while applying client-side favorite track IDs; similarity references are resolved from the server's cached feature vectors                                                                     |
+| `POST /api/playlists/resolve-count`                   | Return the match count for ad-hoc smart-playlist criteria, including similarity references                                                                                                                              |
+| `POST /api/playlists`                                 | Create a regular playlist from server-side track IDs                                                                                                                                                                    |
+| `POST /api/playlists/smart`                           | Create a smart playlist from criteria                                                                                                                                                                                   |
+| `PUT /api/playlists/{id}/smart`                       | Update a smart playlist name and criteria                                                                                                                                                                               |
+| `POST /api/playlists/{id}/tracks`                     | Append server-side track IDs to a regular playlist                                                                                                                                                                      |
+| `DELETE /api/playlists/{id}`                          | Delete a playlist on the server                                                                                                                                                                                         |
+| `DELETE /api/playlist-tracks/{id}`                    | Remove one entry from a server playlist                                                                                                                                                                                 |
+| `GET /api/search?q=`                                  | Full-text search — returns matching tracks                                                                                                                                                                              |
+| `GET /api/search/full?q=`                             | Category search — returns tracks, albums, and artists                                                                                                                                                                   |
+| `GET /api/stream/{trackId}`                           | Byte-range HTTP streaming for regular files; FLAC transcode for CUE virtual tracks; `?ss=` seeks server-side; `?format=opus\|aac&bitrate=<64-320>` requests a validated lossy transcode (unsupported values return 400) |
+| `GET /api/stream/path?p=`                             | Stream by absolute file path                                                                                                                                                                                            |
+| `GET /api/artwork/album/{id}?size=`                   | Album artwork (`size=96` or `size=320` for thumbnails)                                                                                                                                                                  |
+| `GET /api/artwork/track?p=`                           | Track artwork by file path                                                                                                                                                                                              |
+| `GET /api/artwork/track/{id}?size=`                   | Track artwork by track ID (`size=96` or `size=320` for thumbnails)                                                                                                                                                      |
 
 ### Configuration
 
@@ -496,25 +496,25 @@ Edit `appsettings.json` before first use:
 
 `CalculateMissingReplayGainDuringScan` defaults to `false`. Embedded ReplayGain
 tags are still imported, while expensive FFmpeg analysis is skipped during
-normal discovery scans. Enabling it can substantially lengthen scans of large
-or chaptered files such as complete-concert MKA containers.
-Server ReplayGain work defaults to one FFmpeg worker thread and a cancellable
-250 ms pause between analysed tracks. Packaged Linux services also use reduced
-CPU and I/O priority so SSH and API traffic remain responsive. Set
-`ReplayGainFfmpegThreads` to `0` to restore FFmpeg's automatic thread choice;
-both limits can be overridden through `/etc/default/orynivo-server` with the
-usual `Orynivo__...` environment-variable names.
-ReplayGain maintenance keeps only compact album identifiers between its track
-and album phases and refreshes the search index in bounded batches, so memory
-usage remains proportional to a small work set rather than the complete library.
+normal discovery scans. Enabling it can substantially lengthen scans of large or
+chaptered files such as complete-concert MKA containers. Server ReplayGain work
+defaults to one FFmpeg worker thread and a cancellable 250 ms pause between
+analysed tracks. Packaged Linux services also use reduced CPU and I/O priority
+so SSH and API traffic remain responsive. Set `ReplayGainFfmpegThreads` to `0`
+to restore FFmpeg's automatic thread choice; both limits can be overridden
+through `/etc/default/orynivo-server` with the usual `Orynivo__...`
+environment-variable names. ReplayGain maintenance keeps only compact album
+identifiers between its track and album phases and refreshes the search index in
+bounded batches, so memory usage remains proportional to a small work set rather
+than the complete library.
 
 `BackupSchedule` is disabled by default. When enabled, the server writes a
-versioned library ZIP into its target folder (default: a `backups` folder below the
-server data directory) at most once per `IntervalDays` and removes archives beyond
-`RetentionCount`. The due check and the retention selection come from the same
-shared helper the desktop uses, the last run is derived from the newest archive so
-no extra state is stored, and the section holds no credentials. Audio files are
-never included.
+versioned library ZIP into its target folder (default: a `backups` folder below
+the server data directory) at most once per `IntervalDays` and removes archives
+beyond `RetentionCount`. The due check and the retention selection come from the
+same shared helper the desktop uses, the last run is derived from the newest
+archive so no extra state is stored, and the section holds no credentials. Audio
+files are never included.
 
 `AllowRemoteUpdates` is disabled by default. When enabled on a packaged Linux
 server, an authenticated Orynivo desktop client can download the matching signed
@@ -523,11 +523,11 @@ installation. The server verifies the signed manifest and package hash again;
 the unprivileged server process only stages the files. A narrowly scoped root
 systemd updater performs the package-manager operation and restarts the service.
 Automated DEB upgrades retain the existing administrator-edited
-`/etc/orynivo-server/appsettings.json` without prompting.
-Release builds normalize and validate the packaged Bash maintainer scripts so
-DEB installation cannot fail because of Windows CRLF shebang line endings.
-Portable, development, Windows, and macOS server installations currently report
-managed updates as unsupported.
+`/etc/orynivo-server/appsettings.json` without prompting. Release builds
+normalize and validate the packaged Bash maintainer scripts so DEB installation
+cannot fail because of Windows CRLF shebang line endings. Portable, development,
+Windows, and macOS server installations currently report managed updates as
+unsupported.
 
 The server binds to `http://0.0.0.0:5280` by default. Override the port in
 `appsettings.json` under `Kestrel:Endpoints:Http:Url`.
@@ -543,24 +543,22 @@ refresh is slower because it bypasses timestamp-based skipping, but it does not
 modify the audio files and retains confirmed library-only metadata corrections.
 Track favorites and artist profiles remain untouched; when corrected tags create
 a replacement album identity in the same physical directory, downloaded album
-artwork and the album favorite flag are carried forward as well.
-Inaccessible subdirectories such as Linux `lost+found` folders are skipped
-instead of aborting the complete scan.
-Configured Orynivo Server connections are merged into the main Artists, Albums,
-Tracks, and search-result library views. Rows from a server are marked with an
-optional `OS` source badge that shows the server name as a tooltip.
-The same connection dialog can download or restore a complete server-library
-backup. It includes the SQLite database, playlists, history, album artwork,
-artist images, and configured server directory list. Audio files and API keys
-are never included. Restore validates the ZIP before replacing data, rebuilds
-the search index, and leaves the original library in place if installation fails.
-The shared Folder structure view is also available with server-only
-configurations; a local library directory is not required to browse folders
-reported by an Orynivo Server.
-The Windows client probes server compatibility in Settings, reports missing
-newer endpoints explicitly, shows the last successful connection time when a
-server is unreachable, and can clear cached remote artwork, track lists, and
-folder trees per server or globally.
+artwork and the album favorite flag are carried forward as well. Inaccessible
+subdirectories such as Linux `lost+found` folders are skipped instead of
+aborting the complete scan. Configured Orynivo Server connections are merged
+into the main Artists, Albums, Tracks, and search-result library views. Rows
+from a server are marked with an optional `OS` source badge that shows the
+server name as a tooltip. The same connection dialog can download or restore a
+complete server-library backup. It includes the SQLite database, playlists,
+history, album artwork, artist images, and configured server directory list.
+Audio files and API keys are never included. Restore validates the ZIP before
+replacing data, rebuilds the search index, and leaves the original library in
+place if installation fails. The shared Folder structure view is also available
+with server-only configurations; a local library directory is not required to
+browse folders reported by an Orynivo Server. The Windows client probes server
+compatibility in Settings, reports missing newer endpoints explicitly, shows the
+last successful connection time when a server is unreachable, and can clear
+cached remote artwork, track lists, and folder trees per server or globally.
 Each Orynivo Server connection stores its own streaming quality: **Original**,
 or a lossy transcode at a chosen bitrate (`Opus` or `AAC`, 64–320 kbps). Lossy
 requests are validated server-side and rejected with HTTP 400 when the format or
@@ -616,16 +614,16 @@ byte-range streaming without FFmpeg.
   noticeably louder than PCM. The boost applies only to PCM playback paths;
   native DSD remains bit-perfect.
 - PCM playback through `ffmpeg`
-- Multiple named output profiles for quickly switching between configured
-  output devices; a quick-pick popup in the transport bar selects the active
-  profile without opening Settings. On first start, Orynivo creates and selects
-  a `Default` WASAPI profile from the Windows default multimedia output device
+- Multiple named output profiles for quickly switching between configured output
+  devices; a quick-pick popup in the transport bar selects the active profile
+  without opening Settings. On first start, Orynivo creates and selects a
+  `Default` WASAPI profile from the Windows default multimedia output device
   when no output has been configured yet.
 - A lock button beside the transport Equalizer and Output quick-pickers can
   close the active exclusive player and release its audio device for another
-  application. Orynivo preserves the source and playback position; selecting
-  the open lock reacquires the device and resumes playback without restarting
-  the application.
+  application. Orynivo preserves the source and playback position; selecting the
+  open lock reacquires the device and resumes playback without restarting the
+  application.
 - Seeking, volume control, pause, and an editable persistent **Up next** queue
   with play-next/append actions, drag-and-drop from track, album, and folder
   views, removal, reordering, complete clearing, restore-last-queue, playlist
@@ -673,18 +671,16 @@ byte-range streaming without FFmpeg.
 - Album views, Dashboard recommendations, and Recently Added displays combine
   local and Orynivo Server records with the same artist and album title into one
   source-aware logical album (`L+OS` when both contribute). When matching tags
-  occur in several physical folders
-  (for example an original release, a sampler, and a hi-res collection), the
-  detail view retains every track and presents each folder as a separate
-  edition group; similarly named tracks are never silently deduplicated.
-  Untitled or explicitly unknown albums are omitted from album-card/catalog
-  surfaces because they cannot be identified usefully; their tracks remain
-  available through Tracks, folders, playlists, and track search.
+  occur in several physical folders (for example an original release, a sampler,
+  and a hi-res collection), the detail view retains every track and presents
+  each folder as a separate edition group; similarly named tracks are never
+  silently deduplicated. Untitled or explicitly unknown albums are omitted from
+  album-card/catalog surfaces because they cannot be identified usefully; their
+  tracks remain available through Tracks, folders, playlists, and track search.
   Album database records without any remaining indexed tracks are also omitted
   from local and Orynivo Server catalogs, detail views, recent lists, and
-  aggregate counts.
-  Artwork cards show the complete album title in a tooltip when the visible
-  card label is shortened to fit.
+  aggregate counts. Artwork cards show the complete album title in a tooltip
+  when the visible card label is shortened to fit.
 - File and directory context menus in an Orynivo Server Folder structure view
   can append tracks to an existing mixed playlist or create a new shared local
   playlist. Folder descendants are stored as stable `orynivo://` references;
@@ -692,11 +688,11 @@ byte-range streaming without FFmpeg.
 - Playlists live under the Library sidebar and can contain mixed local and
   Orynivo Server tracks. Server tracks are stored in local playlists as stable
   `orynivo://` references and resolved to authenticated stream URLs only when
-  they are opened or queued, so `?key=` stream URLs are not persisted.
-  Playlist tables show the favorite heart first and the source column next to
-  it. Smart playlists resolve against the combined local and configured
-  Orynivo Server track set. Server catalogs are loaded across all pages; outdated
-  incomplete track caches are rebuilt automatically without changing favorites.
+  they are opened or queued, so `?key=` stream URLs are not persisted. Playlist
+  tables show the favorite heart first and the source column next to it. Smart
+  playlists resolve against the combined local and configured Orynivo Server
+  track set. Server catalogs are loaded across all pages; outdated incomplete
+  track caches are rebuilt automatically without changing favorites.
 - Remote Orynivo Server artists, albums, and tracks can be marked as favorites;
   those favorite flags are stored only in the Windows client's settings.
 - Remote Orynivo Server album covers and artist images can be searched from the
@@ -712,18 +708,18 @@ byte-range streaming without FFmpeg.
   client. Last.fm or Wikipedia requests run on the client; the server receives
   only the resulting biography, source URL, language, and optional image bytes
   to cache.
-- Optional Last.fm scrobbling of played tracks, configured under
-  **Settings → Artist information** with an API key, secret, and a two-step
-  browser authorization. Scrobbles are queued and flushed in the background, so
-  playback and artist-information lookups are never blocked; the session key and
-  the API secret are stored only in the encrypted per-user credential container.
+- Optional Last.fm scrobbling of played tracks, configured under **Settings →
+  Artist information** with an API key, secret, and a two-step browser
+  authorization. Scrobbles are queued and flushed in the background, so playback
+  and artist-information lookups are never blocked; the session key and the API
+  secret are stored only in the encrypted per-user credential container.
   Scrobbling applies to local and Orynivo Server library tracks, and both the
-  scrobble threshold and the pending queue survive restarts. The favourite button
-  also mirrors the current track as loved or unloved on Last.fm, which is best
-  effort and never blocks playback.
+  scrobble threshold and the pending queue survive restarts. The favourite
+  button also mirrors the current track as loved or unloved on Last.fm, which is
+  best effort and never blocks playback.
 - Windows System Media Transport Controls integration with global media keys,
-  play/pause/previous/next/stop and seek requests, system-overlay and lock-screen
-  metadata, album art, playback state, and timeline synchronization
+  play/pause/previous/next/stop and seek requests, system-overlay and
+  lock-screen metadata, album art, playback state, and timeline synchronization
 - Linux MPRIS 2 media player integration (`org.mpris.MediaPlayer2.orynivo`) for
   desktop media keys, panels, and applets, with the same transport commands,
   metadata, position, playback status, and volume; credential-bearing remote
@@ -737,9 +733,8 @@ byte-range streaming without FFmpeg.
 - Multiple named parametric PCM equalizers with one selected profile, a live
   frequency-response graph, editable preamp, dynamic filter rows, persisted
   on/off state, and Equalizer APO/AutoEQ text-profile import. Preamp, peak,
-  low/high shelf, low/high pass, and `GraphicEQ` profiles are supported;
-  changes are crossfaded during playback and native DSD output remains
-  bit-perfect
+  low/high shelf, low/high pass, and `GraphicEQ` profiles are supported; changes
+  are crossfaded during playback and native DSD output remains bit-perfect
 - Optional headphone crossfeed with light, medium, and strong strength, applied
   after ReplayGain and the equalizer in the ASIO and WASAPI PCM paths. It is off
   by default, keeps correlated (mono) content centered, resets its filter
@@ -762,17 +757,18 @@ byte-range streaming without FFmpeg.
   Completed findings are available while other sources are still loading.
   Progress shows the active phase, elapsed time and a measured estimate for that
   phase when possible. Server reports do not supply a remaining-time estimate.
-  Select a local folder, open its MusicBrainz review, edit search terms if needed,
-  and compare current/proposed tracks before applying. File names and disc numbers
-  identify tracks with missing tags. Corrections affect only the library, never
-  audio-file tags. Server findings here are read-only; use server ReplayGain
-  maintenance or album/artist views for those separate tasks. Missing files and
-  duplicate candidates require manual review, never automatic deletion.
+  Select a local folder, open its MusicBrainz review, edit search terms if
+  needed, and compare current/proposed tracks before applying. File names and
+  disc numbers identify tracks with missing tags. Corrections affect only the
+  library, never audio-file tags. Server findings here are read-only; use server
+  ReplayGain maintenance or album/artist views for those separate tasks. Missing
+  files and duplicate candidates require manual review, never automatic
+  deletion.
 - Metadata and embedded artwork extraction through TagLibSharp
 - Artist, album, track, and folder views
 - Localized interface languages: German, English, French, Spanish, Russian,
-  Simplified Chinese, and Hindi. All seven use the same complete built-in resources,
-  documented in `Orynivo/Localization/README.md`.
+  Simplified Chinese, and Hindi. All seven use the same complete built-in
+  resources, documented in `Orynivo/Localization/README.md`.
 - Resizable table columns whose widths are preserved separately for each
   library, search, playlist, Plex, radio, podcast, and history table
 - Context-sensitive column selection by right-clicking a table header, including
@@ -781,19 +777,20 @@ byte-range streaming without FFmpeg.
 - Track context menus include **Show track information**, which displays the
   physical file path first and then the complete available track metadata.
   Remote playback URLs and credentials are never shown; Orynivo Server paths
-  include the configured server name (for example, `Plex Orynivo: /u02/flac/file.flac`).
-- Drag-and-drop table-column ordering persisted independently for each table
-  and main-content view
+  include the configured server name (for example,
+  `Plex Orynivo: /u02/flac/file.flac`).
+- Drag-and-drop table-column ordering persisted independently for each table and
+  main-content view
 - Space-saving accordion sections in the main sidebar, with configurable
   visibility and persisted independent expansion for library, personal radio,
-  podcast, and playlist sections; the Internet Radio, Podcasts, and
-  **Up Next** sidebar items can each be hidden independently in Settings
+  podcast, and playlist sections; the Internet Radio, Podcasts, and **Up Next**
+  sidebar items can each be hidden independently in Settings
 - Subtle interface motion for navigation and browsing: sidebar accordion rows
   fade/collapse, Dashboard and library view changes fade in briefly, artwork
   cards expose a lightweight hover overlay, and longer content loads use a
   compact skeleton/progress state instead of a static blank/loading view.
-- Linked artist and album names for direct navigation to artist albums and
-  album tracks
+- Linked artist and album names for direct navigation to artist albums and album
+  tracks
 - Session-wide Back navigation across sidebar views, search results, dashboard
   links, artist/album drill-downs, playlists, podcasts, radio, folders, and Plex
   library views. Mixed local/Orynivo Server artist and album views remain
@@ -801,49 +798,47 @@ byte-range streaming without FFmpeg.
 - Conservative artist-name normalization for `feat.` credits and unambiguous
   case, accent, spacing, and punctuation variants, with a repair action for
   existing libraries
-- A physical-folder-based Library Doctor review catches albums fragmented by
-  bad tags, missing or duplicate numbering, inconsistent album artists,
-  missing cover or artist artwork, missing/unreadable source files, missing track
+- A physical-folder-based Library Doctor review catches albums fragmented by bad
+  tags, missing or duplicate numbering, inconsistent album artists, missing
+  cover or artist artwork, missing/unreadable source files, missing track
   ReplayGain, missing MusicBrainz recording IDs, and AcoustID duplicate
   candidates. Same-size candidates receive a streaming full-file SHA-256 check
-  that separates byte-identical copies from alternate files or editions. It can match
-  a folder from Settings > Library > Review metadata against MusicBrainz by
-  editable album/artist search terms, title similarity, and all available
-  approximate track durations, then apply a
-  confirmed release as persistent library-only metadata without rewriting files.
-  Explicit analysis runs outside the UI thread and can be cancelled. Updated
-  connected Orynivo Servers contribute compact read-only findings through the
-  authenticated API; older or unavailable servers are reported without
-  preventing local results.
+  that separates byte-identical copies from alternate files or editions. It can
+  match a folder from Settings > Library > Review metadata against MusicBrainz
+  by editable album/artist search terms, title similarity, and all available
+  approximate track durations, then apply a confirmed release as persistent
+  library-only metadata without rewriting files. Explicit analysis runs outside
+  the UI thread and can be cancelled. Updated connected Orynivo Servers
+  contribute compact read-only findings through the authenticated API; older or
+  unavailable servers are reported without preventing local results.
 - A versioned provider-neutral similarity feature foundation combines existing
   genre, BPM, mood-tag, favourite, rating, and listening-history signals in
   Core. It performs no background audio analysis and is designed for identical
-  local and Orynivo Server ranking contracts. Its deterministic nearest-neighbour
-  ranker applies artist and album diversity limits to avoid repetitive results.
-  Remote vectors are retrieved in bounded authenticated pages and are assigned
-  the configured server's stable identity without embedding its URL or API key.
-  A track's context menu exposes **Play more like this** for local and Orynivo
-  Server library tracks. Orynivo loads and ranks the compact vectors away from
-  the UI thread, creates a diverse cross-library queue, and begins with the
-  selected track. Its transient ranked profile then uses the existing Infinite
-  Mix threshold refill, so playback continues beyond the initial recommendation
-  batch. Starting another mix or stopping Infinite Mix discards that profile.
-  Servers that have not yet added the endpoint are skipped.
-  The adjacent **Mood mix** submenu offers calm, balanced, and energetic quick
-  starts. These use explicit mood tags when available and fall back to tempo
-  plus preference/familiarity signals; they also start with the selected track
-  and continue through Infinite Mix.
-  A **Play activity mix** submenu next to it offers the curated **Focus**,
-  **Workout**, and **Wind down** presets, which rank tracks against cached
-  acoustic descriptors (energy, brightness, dynamics) and tempo and continue
-  through the same Infinite Mix queue.
-  Repeated similarity and mood actions reuse a five-minute memory-only vector
-  cache. Catalog, favourite, rating, and server-configuration invalidations
-  clear it; no vectors or provider credentials are written to disk.
-  Similarity use also warms optional acoustic descriptors progressively. Each
-  provider analyzes only its own physical files and stores normalized energy,
-  brightness/transient activity, and dynamics in its SQLite library. A cold
-  similarity load schedules at most four tracks per provider; analysis is
+  local and Orynivo Server ranking contracts. Its deterministic
+  nearest-neighbour ranker applies artist and album diversity limits to avoid
+  repetitive results. Remote vectors are retrieved in bounded authenticated
+  pages and are assigned the configured server's stable identity without
+  embedding its URL or API key. A track's context menu exposes **Play more like
+  this** for local and Orynivo Server library tracks. Orynivo loads and ranks
+  the compact vectors away from the UI thread, creates a diverse cross-library
+  queue, and begins with the selected track. Its transient ranked profile then
+  uses the existing Infinite Mix threshold refill, so playback continues beyond
+  the initial recommendation batch. Starting another mix or stopping Infinite
+  Mix discards that profile. Servers that have not yet added the endpoint are
+  skipped. The adjacent **Mood mix** submenu offers calm, balanced, and
+  energetic quick starts. These use explicit mood tags when available and fall
+  back to tempo plus preference/familiarity signals; they also start with the
+  selected track and continue through Infinite Mix. A **Play activity mix**
+  submenu next to it offers the curated **Focus**, **Workout**, and **Wind
+  down** presets, which rank tracks against cached acoustic descriptors (energy,
+  brightness, dynamics) and tempo and continue through the same Infinite Mix
+  queue. Repeated similarity and mood actions reuse a five-minute memory-only
+  vector cache. Catalog, favourite, rating, and server-configuration
+  invalidations clear it; no vectors or provider credentials are written to
+  disk. Similarity use also warms optional acoustic descriptors progressively.
+  Each provider analyzes only its own physical files and stores normalized
+  energy, brightness/transient activity, and dynamics in its SQLite library. A
+  cold similarity load schedules at most four tracks per provider; analysis is
   sequential, limited to 90 seconds of 8-kHz mono audio, runs FFmpeg with one
   thread at reduced priority, and never delays playback or the current action.
   Failed sources are retried no sooner than seven days later.
@@ -852,19 +847,19 @@ byte-range streaming without FFmpeg.
 - Artist and album views with table and virtualized artwork modes, including
   Favorites-only filtering in both modes
 - Interactive count-scaled genre cloud with hierarchical drill-down and
-  listening-history-based track suggestions, aggregated across the local
-  library and every configured Orynivo Server; recommendations can be viewed
-  as playable tracks or as album artwork cards. Its curated graph supports
-  genres with multiple parents, while unknown tags remain discoverable by
-  their real names under **More genres**. Opening a suggested album uses the
-  full album detail view; Back returns to the previous cloud level and mode.
-  Cloud counts and label sizes represent tracks in Tracks mode and distinct
-  albums in Albums mode.
+  listening-history-based track suggestions, aggregated across the local library
+  and every configured Orynivo Server; recommendations can be viewed as playable
+  tracks or as album artwork cards. Its curated graph supports genres with
+  multiple parents, while unknown tags remain discoverable by their real names
+  under **More genres**. Opening a suggested album uses the full album detail
+  view; Back returns to the previous cloud level and mode. Cloud counts and
+  label sizes represent tracks in Tracks mode and distinct albums in Albums
+  mode.
 - Infinite Mix builds a continuously replenished Up Next queue from recent
   listening habits, favorites, the local library, and all reachable Orynivo
   Servers. It balances discovery with genre affinity and suppresses immediate
-  track, album, and artist repetition. Initial preparation is surfaced through
-  a progress overlay; later refills rotate through the complete matching genre
+  track, album, and artist repetition. Initial preparation is surfaced through a
+  progress overlay; later refills rotate through the complete matching genre
   population and happen automatically in the background. Batches are ordered
   harmonically: when a track's key has been estimated from a bounded audio
   analysis, Infinite Mix, similarity, mood, and activity mixes walk the Camelot
@@ -876,17 +871,16 @@ byte-range streaming without FFmpeg.
 - A Dashboard **Year in review** summary for any year with listening history:
   listened hours, active days, a monthly breakdown, and the leading genres,
   albums, and artists, exportable as a shareable PNG image or a single-page PDF
-- Dashboard with an artwork-backed greeting hero with a lightened-artwork rim, live
-  library counters (including local and configured Orynivo Server track
-  favorites), random
-  playback and queue shortcuts, parallel Recently Played/Recently Added artwork
-  strips, album links plus source and favorite state on history cards, a period-aware listening
-  seven-point labeled and smoothed listening-trend chart, compact proportional
-  genre/album/artist analytics, history-based album recommendations with
-  period and mood selectors plus a persisted List/animated cover-stage view,
-  quick access, and a
-  clickable playback calendar. Album rankings retain artwork, and linked genres
-  open the matching filtered track list.
+- Dashboard with an artwork-backed greeting hero with a lightened-artwork rim,
+  live library counters (including local and configured Orynivo Server track
+  favorites), random playback and queue shortcuts, parallel Recently
+  Played/Recently Added artwork strips, album links plus source and favorite
+  state on history cards, a period-aware listening seven-point labeled and
+  smoothed listening-trend chart, compact proportional genre/album/artist
+  analytics, history-based album recommendations with period and mood selectors
+  plus a persisted List/animated cover-stage view, quick access, and a clickable
+  playback calendar. Album rankings retain artwork, and linked genres open the
+  matching filtered track list.
 - Dashboard performance investigations can use the bounded rolling
   `logs/dashboard-performance.log` beneath the Orynivo data directory. It
   contains only phase names, elapsed times, build outcome, and server count;
@@ -898,17 +892,17 @@ byte-range streaming without FFmpeg.
   Cloud, Dashboard, AI Chat, playlists, saved radio/podcast entries, Orynivo
   Server views, and Plex libraries. Missing or removed entries fall back to
   Tracks.
-- Clickable populated calendar days with a modal daily listening history;
-  local title, album, and artist links open the corresponding library view,
-  and title links immediately start playback
+- Clickable populated calendar days with a modal daily listening history; local
+  title, album, and artist links open the corresponding library view, and title
+  links immediately start playback
 - Internet radio search through the free Radio Browser directory, direct
-  playback, persistent personal stations in the sidebar, station logos, and
-  live ICY title/artist metadata when supplied by the stream. Radio ICY updates
-  and locally cached station logos are also pushed to the Windows media overlay.
-- Multi-select genre filtering for radio search results using normalized
-  station tags, with filter options built from the complete Radio Browser tag
-  statistics rather than the first result page; selecting a genre runs a new
-  server-side station query
+  playback, persistent personal stations in the sidebar, station logos, and live
+  ICY title/artist metadata when supplied by the stream. Radio ICY updates and
+  locally cached station logos are also pushed to the Windows media overlay.
+- Multi-select genre filtering for radio search results using normalized station
+  tags, with filter options built from the complete Radio Browser tag statistics
+  rather than the first result page; selecting a genre runs a new server-side
+  station query
 - Podcast search through the public Apple Podcasts catalog, complete RSS/Atom
   episode lists sorted newest first, persistent pinned podcasts in the sidebar,
   downloadable episodes for offline playback with a size-limited local cache,
@@ -925,22 +919,22 @@ byte-range streaming without FFmpeg.
 - Favorites for tracks, albums, and artists
 - Regular playlists and live smart playlists with metadata, library-age,
   playback-history, similarity, ordering, and result-limit criteria. A track's
-  context menu offers **Save as smart playlist: similar tracks**, which keeps the
-  nearest local and Orynivo Server neighbours of that reference track
+  context menu offers **Save as smart playlist: similar tracks**, which keeps
+  the nearest local and Orynivo Server neighbours of that reference track
 - Smart playlists are created directly from active track filters and can be
   refined later through their sidebar context menu. The editor previews the live
   match count while criteria are changed, including unified local/server counts
   and server-side counts when the connected Orynivo Server supports them, and it
   shows every stored criterion — including the reference track of a similarity
-  smart playlist, whose minimum similarity score stays editable. The reference can
-  be replaced with **Choose reference track**, which searches the local library and
-  every configured Orynivo Server, or removed entirely.
+  smart playlist, whose minimum similarity score stays editable. The reference
+  can be replaced with **Choose reference track**, which searches the local
+  library and every configured Orynivo Server, or removed entirely.
 - UTF-8 M3U8 import and export for regular playlists, including relative local
   paths, retained missing-file entries, and HTTP/HTTPS streams; credentialed
   Plex URLs are excluded
 - Gapless sequential PCM playback through cwASIO, Steinberg ASIO, and exclusive
-  WASAPI: the next FFmpeg decoder is prefetched and handed to the existing output
-  session without reopening the audio device
+  WASAPI: the next FFmpeg decoder is prefetched and handed to the existing
+  output session without reopening the audio device
 - Theme-aware table highlighting follows the currently audible track across
   library, search, playlist, radio, podcast, and Plex views
 - Back navigation restores the previous selection and scroll position in album
@@ -952,30 +946,32 @@ byte-range streaming without FFmpeg.
 - Album track details provide an in-place favorite button and artist-info action
   alongside the album metadata. Album identity uses album title plus physical
   album root, so equal titles stored in different album folders have independent
-  list entries, covers, and favorites. Compilations remain together, and conventional
-  `CD1`/`CD2` or `Disc 1`/`Disc 2` subfolders appear as separate groups inside
-  one multi-disc album detail view. Disc tables expand fully without their own
-  scrollbars, and row selection does not move the outer page.
+  list entries, covers, and favorites. Compilations remain together, and
+  conventional `CD1`/`CD2` or `Disc 1`/`Disc 2` subfolders appear as separate
+  groups inside one multi-disc album detail view. Disc tables expand fully
+  without their own scrollbars, and row selection does not move the outer page.
 - Opening a compilation from an artist keeps the full album header visible,
   initially filters its tracks to that artist, and provides a switch to show
   every track across all assigned discs. Physical directory/disc headings are
   shown only when the current result contains multiple groups.
 - Playback history for local tracks, podcast episodes, and internet-radio
   sessions, including position and completion state
-- Artwork downloads through the Cover Art Archive and manual MusicBrainz
-  search, preserving stylized punctuation in the primary query and falling back
-  to punctuation-normalized variants
-- Embedded or downloaded lyrics with synchronized LRC highlighting during playback
+- Artwork downloads through the Cover Art Archive and manual MusicBrainz search,
+  preserving stylized punctuation in the primary query and falling back to
+  punctuation-normalized variants
+- Embedded or downloaded lyrics with synchronized LRC highlighting during
+  playback
 - Manual LRCLIB lyrics search with editable title and artist, result preview,
   and explicit replacement of the cached lyrics
 - Cached artist images and localized biographies from Wikipedia/Wikimedia
 - Manual Wikimedia Commons artist-image search with editable search text
-- Manually selected artist images are retained across profile refreshes, renames,
-  and artist merges
+- Manually selected artist images are retained across profile refreshes,
+  renames, and artist merges
 - Artist renaming in the artist information view, including a transactional
   merge flow with an explicit choice of which artist profile to retain
 - ZIP export and import for the managed library, playlists, personal radio
-  stations, pinned podcasts, history, artwork, and configured library directories
+  stations, pinned podcasts, history, artwork, and configured library
+  directories
 - Modern light and dark themes with neutral surfaces, a shared accent resource,
   cover-derived transport accents, and refined sidebar/table/transport styling
 - Shared vector icons for compact symbol buttons, clearer empty states for
@@ -984,9 +980,9 @@ byte-range streaming without FFmpeg.
   art, and toggling the favorite state
 - Gradient hover outlines for interactive artwork cards, source-appropriate
   vector icons throughout the main sidebar (including a matching orange vector
-  lightning icon for smart playlists), and smoothly arrow-controlled
-  20-item carousels for Recently Played and Recently Added; their arrows sit in
-  the section header beside Show all instead of covering artwork, and unavailable
+  lightning icon for smart playlists), and smoothly arrow-controlled 20-item
+  carousels for Recently Played and Recently Added; their arrows sit in the
+  section header beside Show all instead of covering artwork, and unavailable
   directions stay in place as muted controls so the header never shifts
 - Edge-aligned equal-size Dashboard overview cards and a listening chart with
   daily short-period points, readable sparse date labels, and a rounded Y-axis
@@ -998,41 +994,40 @@ byte-range streaming without FFmpeg.
 - Persistent personal 1–5-star ratings for local and Orynivo Server tracks,
   editable directly in shared track tables. An optional MusicBrainz rating
   column shows cached community scores and vote counts; lookups prefer embedded
-  recording MBIDs and conservatively match artist, title, and duration only
-  when exactly one recording remains. Personal ratings are weighted strongly
-  in Infinite Mix, with community ratings used as a smaller secondary signal.
-  Album detail pages automatically refresh missing or stale MusicBrainz track
-  ratings in the background; cached results remain valid for 30 days and the
-  requests are serialized to respect MusicBrainz service limits. A uniquely
-  resolved artist/title/duration fallback persists its recording MBID. Ratings
-  themselves use direct recording lookups: MusicBrainz supports identifier
-  searches in batches, but those search results do not reliably carry community
-  ratings and therefore cannot safely replace one lookup per recording.
-  Duplicate local and server rows with the same recording MBID nevertheless
-  share one lookup result, avoiding redundant requests for mirrored libraries.
-  A track that has not yet been queried shows the larger **Load rating** action;
-  temporary album-refresh failures are retried up to three times and then show
-  **Try again**. A completed lookup without community votes is shown as
-  **Not rated**, so transient failures are not confused with a confirmed empty
-  rating.
-  The same direct lookup also caches curated MusicBrainz genres and community
-  tags with at least two positive votes. They remain separate from embedded
-  genres but supplement Genre Cloud classification, genre filters, Infinite Mix,
-  and full-text search. Normal scans never contact MusicBrainz or rewrite files.
+  recording MBIDs and conservatively match artist, title, and duration only when
+  exactly one recording remains. Personal ratings are weighted strongly in
+  Infinite Mix, with community ratings used as a smaller secondary signal. Album
+  detail pages automatically refresh missing or stale MusicBrainz track ratings
+  in the background; cached results remain valid for 30 days and the requests
+  are serialized to respect MusicBrainz service limits. A uniquely resolved
+  artist/title/duration fallback persists its recording MBID. Ratings themselves
+  use direct recording lookups: MusicBrainz supports identifier searches in
+  batches, but those search results do not reliably carry community ratings and
+  therefore cannot safely replace one lookup per recording. Duplicate local and
+  server rows with the same recording MBID nevertheless share one lookup result,
+  avoiding redundant requests for mirrored libraries. A track that has not yet
+  been queried shows the larger **Load rating** action; temporary album-refresh
+  failures are retried up to three times and then show **Try again**. A
+  completed lookup without community votes is shown as **Not rated**, so
+  transient failures are not confused with a confirmed empty rating. The same
+  direct lookup also caches curated MusicBrainz genres and community tags with
+  at least two positive votes. They remain separate from embedded genres but
+  supplement Genre Cloud classification, genre filters, Infinite Mix, and
+  full-text search. Normal scans never contact MusicBrainz or rewrite files.
   During active music playback, Orynivo continues this enrichment in one
   rate-limited background queue for the local library and configured Orynivo
   Servers. Pausing or stopping playback pauses the queue; opening an album or
-  explicitly requesting a rating takes priority. Known recordings refresh
-  after 30 days, while unresolved artist/title matches wait 90 days before a
-  retry so ambiguous metadata does not generate repeated requests.
+  explicitly requesting a rating takes priority. Known recordings refresh after
+  30 days, while unresolved artist/title matches wait 90 days before a retry so
+  ambiguous metadata does not generate repeated requests.
 - German, English, French, Spanish, Russian, Simplified Chinese, and Hindi user
   interfaces
 - Multiple Plex Media Server configurations with protected access tokens and
   music-library discovery, artist/album/track browsing, folder navigation, and
   playback, including an A–Z root-folder index and multi-part tracks decoded as
   one logical item
-- Provider-neutral streaming interfaces with a prepared Qobuz configuration
-  page for future approved partner API access
+- Provider-neutral streaming interfaces with a prepared Qobuz configuration page
+  for future approved partner API access
 - Embedded **MCP server** (Model Context Protocol) that, when enabled under
   Settings > Integration, exposes 23 player, queue, playlist, history, library,
   and controlled web-browsing tools to any MCP-compatible AI assistant (e.g.
@@ -1041,17 +1036,17 @@ byte-range streaming without FFmpeg.
 
 ### Genre discovery and Infinite Mix
 
-Open **Genre Cloud** from the Library section to explore the genres found in
-the local library and every configured Orynivo Server. The first level groups
-the library into broad families. Selecting a label reveals its more specific
-genres and immediately updates the recommendations below the cloud. The
-breadcrumb buttons return to an earlier level. A leaf without further children
-remains visible as the large center label instead of producing an empty view.
-The **Start Infinite Mix from cloud** action opens the normal profile editor
-with the genres represented at that level already selected. After confirmation,
+Open **Genre Cloud** from the Library section to explore the genres found in the
+local library and every configured Orynivo Server. The first level groups the
+library into broad families. Selecting a label reveals its more specific genres
+and immediately updates the recommendations below the cloud. The breadcrumb
+buttons return to an earlier level. A leaf without further children remains
+visible as the large center label instead of producing an empty view. The
+**Start Infinite Mix from cloud** action opens the normal profile editor with
+the genres represented at that level already selected. After confirmation,
 Orynivo queries the selected branch and every recursive subgenre directly,
-including tracks tagged with the parent genre itself; on a leaf level, only
-that selected genre is used.
+including tracks tagged with the parent genre itself; on a leaf level, only that
+selected genre is used.
 
 The selector above the recommendations changes both the result presentation and
 the numbers in the cloud:
@@ -1082,35 +1077,34 @@ caches only the rendered mosaic for 24 hours; authenticated server artwork URLs
 are never stored in that Genre Cloud cache. The generated backgrounds can be
 cleared independently under **Settings > Appearance** without removing
 downloaded artist images or other artwork. In the same section, the background
-can be disabled entirely or switched between album covers and artist images.
-If only a few matching images are available,
-Orynivo centers that set instead of repeating it across the complete surface.
-The number of requested tiles follows the current cloud width (up to 32), while
-a perceptual image fingerprint removes duplicate pictures even when local and
-server copies use different files or encodings. Sparse sets automatically use
-larger tiles: one row receives the complete background height and divides the
-available width only among its actual images, without cropping or distortion.
-The same Appearance block stores a 0–100% image-visibility slider, defaults it
-to 50%, and provides the independent background-cache clear action.
+can be disabled entirely or switched between album covers and artist images. If
+only a few matching images are available, Orynivo centers that set instead of
+repeating it across the complete surface. The number of requested tiles follows
+the current cloud width (up to 32), while a perceptual image fingerprint removes
+duplicate pictures even when local and server copies use different files or
+encodings. Sparse sets automatically use larger tiles: one row receives the
+complete background height and divides the available width only among its actual
+images, without cropping or distortion. The same Appearance block stores a
+0–100% image-visibility slider, defaults it to 50%, and provides the independent
+background-cache clear action.
 
 **Infinite Mix** can be started from the Dashboard, **Up next**, or the current
-Genre Cloud level. Before
-starting, its compact profile editor selects a calm, balanced, or energetic
-mood; familiar-to-adventurous discovery level; 3, 7, 30, or 90-day history
-period; local and individual Orynivo Server sources; favorite and rarely-played
-weighting; and optional included or excluded genres. **Focus**, **Workout**, and
-**Wind down** presets pre-fill those fields as a starting point and can be
-adjusted afterwards. Initial creation shows a
-blocking progress overlay so the start action cannot be mistaken for an
-unresponsive button. The first 20 tracks are added to Up next; another batch is
-prepared automatically in the background when five tracks remain. Existing
-queue entries and immediate track, album, and artist repetitions are avoided.
-Selection prefers different artists and albums first, then fills the batch with
-additional eligible tracks when a narrow genre contains too few distinct albums
-to reach the normal 20-track batch size.
-Genre rules use removable chips with type-ahead suggestions gathered from the
-currently enabled local and Orynivo Server libraries; custom genre text remains
-possible when a library does not offer a matching suggestion.
+Genre Cloud level. Before starting, its compact profile editor selects a calm,
+balanced, or energetic mood; familiar-to-adventurous discovery level; 3, 7, 30,
+or 90-day history period; local and individual Orynivo Server sources; favorite
+and rarely-played weighting; and optional included or excluded genres.
+**Focus**, **Workout**, and **Wind down** presets pre-fill those fields as a
+starting point and can be adjusted afterwards. Initial creation shows a blocking
+progress overlay so the start action cannot be mistaken for an unresponsive
+button. The first 20 tracks are added to Up next; another batch is prepared
+automatically in the background when five tracks remain. Existing queue entries
+and immediate track, album, and artist repetitions are avoided. Selection
+prefers different artists and albums first, then fills the batch with additional
+eligible tracks when a narrow genre contains too few distinct albums to reach
+the normal 20-track batch size. Genre rules use removable chips with type-ahead
+suggestions gathered from the currently enabled local and Orynivo Server
+libraries; custom genre text remains possible when a library does not offer a
+matching suggestion.
 
 While the mix is active, Up next shows a persistent active/paused status and
 actions to pause or resume replenishment, adjust the profile, replace the next
@@ -1123,43 +1117,43 @@ or server track exclusions are persisted in `settings.json`.
 The user interface recognizes, among others:
 
 `DSF`, `DFF`, `FLAC`, `MP3`, `WAV`, `AIFF`, `M4A`, `MKA` (Matroska Audio),
-`AAC`, `OGG`, `Opus`, `WMA`, and CUE sheets referencing PCM source files such
-as FLAC or WAV.
+`AAC`, `OGG`, `Opus`, `WMA`, and CUE sheets referencing PCM source files such as
+FLAC or WAV.
 
 PCM formats are decoded by `ffmpeg`, which Orynivo downloads automatically on
 Windows into `%LOCALAPPDATA%\Orynivo\ffmpeg` on first start if not already
 installed. The Windows downloader resolves the current BtbN LGPL ZIP asset from
 the GitHub release API so it is not tied to one fixed archive name. Actual codec
-support depends on the build.
-MKA files containing Matroska chapters are expanded into individually
-searchable and playable library tracks. Chapter title, artist, album, album
-artist, genre, year, track number, and time boundaries are read through
-`ffprobe`; the physical MKA is not shown as an additional whole-file track. An
-MKA without usable chapters remains one ordinary library track.
-MKA chapter probing limits FFprobe's analysis window and times out after 30
-seconds per file so damaged or slow network media cannot block a complete scan.
-Library-only title corrections for virtual chapters are persisted separately in
-SQLite and survive later scans without changing the MKA container.
+support depends on the build. MKA files containing Matroska chapters are
+expanded into individually searchable and playable library tracks. Chapter
+title, artist, album, album artist, genre, year, track number, and time
+boundaries are read through `ffprobe`; the physical MKA is not shown as an
+additional whole-file track. An MKA without usable chapters remains one ordinary
+library track. MKA chapter probing limits FFprobe's analysis window and times
+out after 30 seconds per file so damaged or slow network media cannot block a
+complete scan. Library-only title corrections for virtual chapters are persisted
+separately in SQLite and survive later scans without changing the MKA container.
 For CUE sheets, Orynivo uses `INDEX 01` boundaries to seek and stop FFmpeg
-within the referenced source file; no temporary split files are created.
-When WASAPI is selected, DSD audio in DSF or DFF containers is converted to PCM
-in real time without creating a temporary file. When cwASIO or the optional
+within the referenced source file; no temporary split files are created. When
+WASAPI is selected, DSD audio in DSF or DFF containers is converted to PCM in
+real time without creating a temporary file. When cwASIO or the optional
 Steinberg ASIO backend is selected, DSF and uncompressed stereo DFF can be sent
 as native DSD when the driver reports compatible DSD support; otherwise Orynivo
 can fall back to the same FFmpeg-backed DSD-to-PCM path. On Linux, DSF and
-uncompressed stereo DFF are sent directly through ALSA as native
-`DSD_U32_BE`, with DoP as the fallback when the DAC supports it; no ASIO bridge
-is involved. PCM and converted DSD are output at the highest supported endpoint
-sample rate that does not exceed the source rate; if the endpoint exposes only
-higher rates, its lowest supported rate is used. Unsupported sample rates and
-bit depths are converted by `ffmpeg`.
+uncompressed stereo DFF are sent directly through ALSA as native `DSD_U32_BE`,
+with DoP as the fallback when the DAC supports it; no ASIO bridge is involved.
+PCM and converted DSD are output at the highest supported endpoint sample rate
+that does not exceed the source rate; if the endpoint exposes only higher rates,
+its lowest supported rate is used. Unsupported sample rates and bit depths are
+converted by `ffmpeg`.
 
 ## Requirements
 
 ### Windows player
 
 - Windows 10 or Windows 11, x64
-- [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0) (for building)
+- [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0) (for
+  building)
 - [FFmpeg](https://ffmpeg.org/) — downloaded automatically on first start if not
   already present. To use a specific build, place `ffmpeg.exe` and `ffprobe.exe`
   in `PATH`, next to `Orynivo.exe`, or in `%LOCALAPPDATA%\Orynivo\ffmpeg`.
@@ -1168,13 +1162,13 @@ bit depths are converted by `ffmpeg`.
 - Optional Steinberg bridge: Steinberg ASIO SDK 2.3
 
 The MIT-licensed cwASIO sources are included under `third_party/cwasio`, so the
-normal build provides ASIO support without the Steinberg SDK. The Steinberg
-ASIO SDK is not included in the repository. The build script accepts its
-location through `-AsioSdkDir` or the `ASIO_SDK_DIR` environment variable. It
-also checks `third_party\asiosdk`, `external\asiosdk`, and, for compatibility
-with older development environments, `C:\Dev\asiosdk_2.3`. When no SDK is
-found, only **cwASIO** is offered. When the SDK is available, Settings offers
-both **Steinberg ASIO** and **cwASIO**.
+normal build provides ASIO support without the Steinberg SDK. The Steinberg ASIO
+SDK is not included in the repository. The build script accepts its location
+through `-AsioSdkDir` or the `ASIO_SDK_DIR` environment variable. It also checks
+`third_party\asiosdk`, `external\asiosdk`, and, for compatibility with older
+development environments, `C:\Dev\asiosdk_2.3`. When no SDK is found, only
+**cwASIO** is offered. When the SDK is available, Settings offers both
+**Steinberg ASIO** and **cwASIO**.
 
 ### Linux player
 
@@ -1195,8 +1189,8 @@ the Steinberg ASIO SDK nor a platform-specific Orynivo bridge is required.
 - FFmpeg and FFprobe from `PATH`, common package-manager locations, or Orynivo's
   automatic per-user download
 - The system OpenAL framework used for PCM output
-- Avalonia OpenGL rendering with a software fallback for Macs whose Metal
-  shader compiler exceeds Skia's compilation timeout
+- Avalonia OpenGL rendering with a software fallback for Macs whose Metal shader
+  compiler exceeds Skia's compilation timeout
 - No ASIO, cwASIO, ALSA, or native DSD support
 
 Tagged releases provide self-contained PKG installers and portable app bundles,
@@ -1207,8 +1201,8 @@ architecture before opening the normal macOS Installer.
 ### Orynivo Server
 
 - Linux, macOS, or Windows; x64 or ARM64
-- [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0) (for building;
-  not required when using a self-contained release package)
+- [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0) (for
+  building; not required when using a self-contained release package)
 - [FFmpeg](https://ffmpeg.org/) — recommended for CUE-sheet track transcoding
   (Debian/Ubuntu: `apt install ffmpeg`; Fedora/Rocky: install from RPM Fusion)
 - Artwork thumbnail generation uses the bundled SkiaSharp native Linux assets;
@@ -1217,31 +1211,32 @@ architecture before opening the normal macOS Installer.
 
 ## Download
 
-Download the latest builds from [Releases](https://github.com/bschlaack/Orynivo/releases).
+Download the latest builds from
+[Releases](https://github.com/bschlaack/Orynivo/releases).
 
 ### Windows player
 
-| Package | Description |
-| --- | --- |
-| `Orynivo-{version}-win-x64-Setup.exe` | Installer — Start Menu entry and uninstaller |
+| Package                                  | Description                                       |
+| ---------------------------------------- | ------------------------------------------------- |
+| `Orynivo-{version}-win-x64-Setup.exe`    | Installer — Start Menu entry and uninstaller      |
 | `Orynivo-{version}-win-x64-Portable.zip` | Portable — extract anywhere and run `Orynivo.exe` |
 
 Both packages are self-contained (.NET 10 bundled, no prerequisites).
 
 ### Linux player
 
-| Package | Description |
-| --- | --- |
-| `Orynivo-{version}-linux-x64.tar.gz` | Portable x86-64 archive |
-| `Orynivo-{version}-linux-arm64.tar.gz` | Portable ARM64 archive |
-| `orynivo_{version}_amd64.deb` / `orynivo_{version}_arm64.deb` | Debian / Ubuntu |
-| `orynivo-{version}-1.x86_64.rpm` / `orynivo-{version}-1.aarch64.rpm` | Fedora / Rocky / RHEL |
-| `orynivo-{version}-1-x86_64.pkg.tar.zst` | Arch Linux x86-64 |
+| Package                                                              | Description             |
+| -------------------------------------------------------------------- | ----------------------- |
+| `Orynivo-{version}-linux-x64.tar.gz`                                 | Portable x86-64 archive |
+| `Orynivo-{version}-linux-arm64.tar.gz`                               | Portable ARM64 archive  |
+| `orynivo_{version}_amd64.deb` / `orynivo_{version}_arm64.deb`        | Debian / Ubuntu         |
+| `orynivo-{version}-1.x86_64.rpm` / `orynivo-{version}-1.aarch64.rpm` | Fedora / Rocky / RHEL   |
+| `orynivo-{version}-1-x86_64.pkg.tar.zst`                             | Arch Linux x86-64       |
 
 The Linux packages are self-contained with respect to .NET. FFmpeg, ALSA, and
-OpenAL remain system runtime dependencies as described above.
-Tagged release builds validate that the Arch archive contains its required
-root-level `.PKGINFO` metadata before publishing it.
+OpenAL remain system runtime dependencies as described above. Tagged release
+builds validate that the Arch archive contains its required root-level
+`.PKGINFO` metadata before publishing it.
 
 The signed desktop updater detects Debian-family, RPM-family, and Arch-family
 distributions. After verifying the selected package digest it requests
@@ -1254,37 +1249,37 @@ package-manager error leaves the update window open with a failure status.
 
 ### macOS player
 
-| Package | Description |
-| --- | --- |
-| `Orynivo-{version}-osx-arm64.pkg` | Installer for Apple Silicon Macs |
-| `Orynivo-{version}-osx-x64.pkg` | Installer for Intel Macs |
-| `Orynivo-{version}-osx-arm64-Portable.zip` | Portable app for Apple Silicon Macs |
-| `Orynivo-{version}-osx-x64-Portable.zip` | Portable app for Intel Macs |
-| `Orynivo-{version}-osx-arm64.tar.gz` | Alternative app archive for Apple Silicon |
-| `Orynivo-{version}-osx-x64.tar.gz` | Alternative app archive for Intel |
+| Package                                    | Description                               |
+| ------------------------------------------ | ----------------------------------------- |
+| `Orynivo-{version}-osx-arm64.pkg`          | Installer for Apple Silicon Macs          |
+| `Orynivo-{version}-osx-x64.pkg`            | Installer for Intel Macs                  |
+| `Orynivo-{version}-osx-arm64-Portable.zip` | Portable app for Apple Silicon Macs       |
+| `Orynivo-{version}-osx-x64-Portable.zip`   | Portable app for Intel Macs               |
+| `Orynivo-{version}-osx-arm64.tar.gz`       | Alternative app archive for Apple Silicon |
+| `Orynivo-{version}-osx-x64.tar.gz`         | Alternative app archive for Intel         |
 
 The PKG installs `Orynivo.app` under `/Applications`. The bundle includes the
-native Orynivo application icon. For portable use, extract
-the ZIP and open `Orynivo.app` from any writable directory. The builds are
-self-contained with respect to .NET; FFmpeg and FFprobe are found in common
-package-manager locations or downloaded automatically when absent. The current
-packages are not code-signed or notarized, so macOS Gatekeeper may require
-explicitly opening the app or installer from Finder's context menu.
+native Orynivo application icon. For portable use, extract the ZIP and open
+`Orynivo.app` from any writable directory. The builds are self-contained with
+respect to .NET; FFmpeg and FFprobe are found in common package-manager
+locations or downloaded automatically when absent. The current packages are not
+code-signed or notarized, so macOS Gatekeeper may require explicitly opening the
+app or installer from Finder's context menu.
 
-Orynivo's startup and About-window update checks support both Mac
-architectures. They select the matching PKG from the signed release manifest,
-verify its SHA-256 digest, and open it in the macOS Installer. Installation
-still requires the normal explicit macOS confirmation; Orynivo never invokes a
-privileged installation command itself.
+Orynivo's startup and About-window update checks support both Mac architectures.
+They select the matching PKG from the signed release manifest, verify its
+SHA-256 digest, and open it in the macOS Installer. Installation still requires
+the normal explicit macOS confirmation; Orynivo never invokes a privileged
+installation command itself.
 
 ### Linux server
 
-| Package | Architecture |
-| --- | --- |
-| `orynivo-server_{version}_amd64.deb` | Debian / Ubuntu (x86-64) |
-| `orynivo-server_{version}_arm64.deb` | Debian / Ubuntu (ARM64 / Raspberry Pi) |
-| `orynivo-server-{version}-1.x86_64.rpm` | Fedora / Rocky / RHEL (x86-64) |
-| `orynivo-server-{version}-1.aarch64.rpm` | Fedora / Rocky / RHEL (ARM64) |
+| Package                                  | Architecture                           |
+| ---------------------------------------- | -------------------------------------- |
+| `orynivo-server_{version}_amd64.deb`     | Debian / Ubuntu (x86-64)               |
+| `orynivo-server_{version}_arm64.deb`     | Debian / Ubuntu (ARM64 / Raspberry Pi) |
+| `orynivo-server-{version}-1.x86_64.rpm`  | Fedora / Rocky / RHEL (x86-64)         |
+| `orynivo-server-{version}-1.aarch64.rpm` | Fedora / Rocky / RHEL (ARM64)          |
 
 All packages are self-contained (.NET 10 bundled). See the
 [Server section](#orynivo-server) for post-install setup.
@@ -1323,11 +1318,11 @@ Paths can be supplied without modifying project files:
 For a persistent local setup, set `ASIO_SDK_DIR`. MSBuild discovery can
 similarly be overridden with `-MSBuildPath` or `MSBUILD_EXE_PATH`.
 `-RequireAsio` makes a missing Steinberg SDK fail the build. `-SkipAsio`
-disables only the Steinberg bridge; `-SkipCwAsio` disables cwASIO.
-The default build also compiles and tests the independent Qt-free
-`Native/AirPlay2Bridge` transport milestone. `-SkipAirPlay2Bridge` skips that
-native project for a focused managed/ASIO build; the incomplete bridge is not
-copied into the desktop output.
+disables only the Steinberg bridge; `-SkipCwAsio` disables cwASIO. The default
+build also compiles and tests the independent Qt-free `Native/AirPlay2Bridge`
+transport milestone. `-SkipAirPlay2Bridge` skips that native project for a
+focused managed/ASIO build; the incomplete bridge is not copied into the desktop
+output.
 
 ### Unit tests
 
@@ -1348,8 +1343,8 @@ creates its own temporary library, so the suite is safe to run in parallel and
 never touches your real library data.
 
 `scripts/verify-all.ps1` runs the same checks as CI in one command: the managed
-builds with `--warnaserror`, all three test projects, and all three parity scripts. It
-stops at the first failure and prints a compact summary.
+builds with `--warnaserror`, all three test projects, and all three parity
+scripts. It stops at the first failure and prints a compact summary.
 
 ```bash
 pwsh -NoProfile -File scripts/verify-all.ps1
@@ -1388,32 +1383,30 @@ git tag v0.14.0
 git push origin v0.14.0
 ```
 
-| Workflow | Runner | Output |
-| --- | --- | --- |
-| `release.yml` | Windows | `Orynivo-{v}-win-x64-Setup.exe`, `Orynivo-{v}-win-x64-Portable.zip` |
-| `player-macos-release.yml` | macOS | Intel/Apple-Silicon PKGs, portable ZIPs, and tar archives |
-| `server-release.yml` | Ubuntu | `amd64`/`arm64` `.deb` and `x86_64`/`aarch64` `.rpm` packages |
+| Workflow                   | Runner  | Output                                                              |
+| -------------------------- | ------- | ------------------------------------------------------------------- |
+| `release.yml`              | Windows | `Orynivo-{v}-win-x64-Setup.exe`, `Orynivo-{v}-win-x64-Portable.zip` |
+| `player-macos-release.yml` | macOS   | Intel/Apple-Silicon PKGs, portable ZIPs, and tar archives           |
+| `server-release.yml`       | Ubuntu  | `amd64`/`arm64` `.deb` and `x86_64`/`aarch64` `.rpm` packages       |
 
 All release workflows upload to the same draft GitHub Release. Release workflows
-accept only semantic `vMAJOR.MINOR.PATCH` tags whose commit is contained
-in `main`; the tag version is embedded into desktop and server assemblies at
-build time. To trigger a release
-by pushing the tag. **Workflow dispatch** may only rebuild an already existing
-tag that passes the same `main` containment check.
+accept only semantic `vMAJOR.MINOR.PATCH` tags whose commit is contained in
+`main`; the tag version is embedded into desktop and server assemblies at build
+time. To trigger a release by pushing the tag. **Workflow dispatch** may only
+rebuild an already existing tag that passes the same `main` containment check.
 
 After the draft is published, `update-manifest.yml` hashes the supported
 Windows, Linux, macOS, and server packages, creates `update-manifest.json`,
 signs it with the `UPDATE_SIGNING_PRIVATE_KEY_PEM` Actions secret, and attaches
-the manifest/signature to the release. Release builds receive the matching
-ECDSA P-256 public key through the `UPDATE_SIGNING_PUBLIC_KEY_BASE64` repository
+the manifest/signature to the release. Release builds receive the matching ECDSA
+P-256 public key through the `UPDATE_SIGNING_PUBLIC_KEY_BASE64` repository
 variable. Update functionality remains unavailable rather than accepting an
 unsigned release when those values are not configured.
 
 The manifest workflow waits for the Windows installer, every Linux and macOS
 desktop artifact, and all four supported server DEB/RPM packages. It fails
-instead of signing a partial asset list. To repair an already published
-release, run **Publish signed update manifest** manually and enter its existing
-tag.
+instead of signing a partial asset list. To repair an already published release,
+run **Publish signed update manifest** manually and enter its existing tag.
 
 Configure signing once from a trusted administrator machine (never commit the
 private PEM):
@@ -1447,36 +1440,34 @@ own build time.
 
 The About window displays the embedded version and can download, verify, and
 launch a newer Windows installer, a distribution-matching Linux package, or the
-architecture-matching macOS PKG.
-Settings > Orynivo Server offers the same signed update for supported DEB/RPM
-servers and relays the package from the desktop when the server itself cannot
-reach GitHub. Connected server rows show the version returned by their
-authenticated info endpoint, and the complete remote-cache action uses the
-standard Settings button treatment.
-Settings > Appearance > Updates controls whether the client checks the signed
-manifest in the background at startup and reports a newer matching desktop
-version. The notification offers a localized **Download and install** action
-that starts the same verified update flow as the About window; no download
-begins without that explicit choice.
-Settings > Appearance also controls whether the main window starts maximized.
-When maximized startup is disabled, Orynivo remembers the last normal window
-size and position and restores it only when that placement still intersects an
-attached screen.
-The embedded Settings view adapts to smaller window heights by scrolling the
-active section while keeping its Save and Cancel actions available.
-Server package uploads use a route-specific one-GiB safety limit so self-contained
-DEB/RPM packages are not rejected by Kestrel's smaller default request limit.
-The server also reapplies `Kestrel:Limits:MaxRequestBodySize` after loading the
-editable `/etc/orynivo-server/appsettings.json`, so that global override is
-effective despite the configuration file being layered after builder creation.
-When a desktop update is explicitly installed from About, Orynivo first relays
-the same signed release to every reachable update-enabled configured server. If
-a server update fails, its name is shown before the user chooses whether the
-platform installer should continue.
+architecture-matching macOS PKG. Settings > Orynivo Server offers the same
+signed update for supported DEB/RPM servers and relays the package from the
+desktop when the server itself cannot reach GitHub. Connected server rows show
+the version returned by their authenticated info endpoint, and the complete
+remote-cache action uses the standard Settings button treatment. Settings >
+Appearance > Updates controls whether the client checks the signed manifest in
+the background at startup and reports a newer matching desktop version. The
+notification offers a localized **Download and install** action that starts the
+same verified update flow as the About window; no download begins without that
+explicit choice. Settings > Appearance also controls whether the main window
+starts maximized. When maximized startup is disabled, Orynivo remembers the last
+normal window size and position and restores it only when that placement still
+intersects an attached screen. The embedded Settings view adapts to smaller
+window heights by scrolling the active section while keeping its Save and Cancel
+actions available. Server package uploads use a route-specific one-GiB safety
+limit so self-contained DEB/RPM packages are not rejected by Kestrel's smaller
+default request limit. The server also reapplies
+`Kestrel:Limits:MaxRequestBodySize` after loading the editable
+`/etc/orynivo-server/appsettings.json`, so that global override is effective
+despite the configuration file being layered after builder creation. When a
+desktop update is explicitly installed from About, Orynivo first relays the same
+signed release to every reachable update-enabled configured server. If a server
+update fails, its name is shown before the user chooses whether the platform
+installer should continue.
 
-Local development builds derive their base version from the newest semantic
-`v*` tag contained in `origin/main` and append `-dev+<commit>`; tags reachable
-only from the development branch are intentionally ignored.
+Local development builds derive their base version from the newest semantic `v*`
+tag contained in `origin/main` and append `-dev+<commit>`; tags reachable only
+from the development branch are intentionally ignored.
 
 ## Run
 
@@ -1499,27 +1490,26 @@ substantially slower. The first subsequent scan of each configured library root
 refreshes unchanged files once to import existing ReplayGain tags regardless of
 that option. The dedicated calculation button fills missing values later in the
 local library and on every configured Orynivo Server, reporting each server's
-progress in turn. Values already present are preserved.
-The desktop checkbox controls local scans only. Each remote server exposes its
-own equivalent checkbox in **Settings → Library → Orynivo Server**; opening the
-server dialog loads the current value from that server, and saving applies and
-persists it there without requiring a service restart.
-Configured server rows provide separate **Scan library** and **Calculate
-ReplayGain** buttons. Each action targets only that server and reports
-discovery or analysis progress, completion, and failure directly beneath the
-server entry. The server editor uses the same unambiguous library-scan label.
-Equalizer APO or AutoEQ `.txt`/`.cfg` profiles can be imported in the same
-section. `GraphicEQ` curves are translated into a log-frequency shelf cascade;
-the imported parameters are stored directly in `settings.json`, so the source
-profile file does not need to remain available. The same settings section plots
-the combined response and exposes every filter as an editable row. Rows follow
-the profile dynamically, and filters can be added or removed without
-reimporting a file. Several named equalizers can be created and retained, while
-the dropdown selects the only profile eligible for active playback. With no
-selection, the editor and import controls remain hidden. Profiles can be
-deleted after confirmation. Edits are previewed during active PCM playback.
-The DSD playback option can force DSF/DFF files through this PCM path even when
-cwASIO or Steinberg ASIO native DSD is available.
+progress in turn. Values already present are preserved. The desktop checkbox
+controls local scans only. Each remote server exposes its own equivalent
+checkbox in **Settings → Library → Orynivo Server**; opening the server dialog
+loads the current value from that server, and saving applies and persists it
+there without requiring a service restart. Configured server rows provide
+separate **Scan library** and **Calculate ReplayGain** buttons. Each action
+targets only that server and reports discovery or analysis progress, completion,
+and failure directly beneath the server entry. The server editor uses the same
+unambiguous library-scan label. Equalizer APO or AutoEQ `.txt`/`.cfg` profiles
+can be imported in the same section. `GraphicEQ` curves are translated into a
+log-frequency shelf cascade; the imported parameters are stored directly in
+`settings.json`, so the source profile file does not need to remain available.
+The same settings section plots the combined response and exposes every filter
+as an editable row. Rows follow the profile dynamically, and filters can be
+added or removed without reimporting a file. Several named equalizers can be
+created and retained, while the dropdown selects the only profile eligible for
+active playback. With no selection, the editor and import controls remain
+hidden. Profiles can be deleted after confirmation. Edits are previewed during
+active PCM playback. The DSD playback option can force DSF/DFF files through
+this PCM path even when cwASIO or Steinberg ASIO native DSD is available.
 Available library roots are monitored automatically after configuration.
 File-system events are debounced before updating the database and search index;
 periodic full scans reconcile changes that a watcher may have missed. On the
@@ -1531,21 +1521,20 @@ column headers. Formatted numeric, date, duration, source, favorite, and rating
 columns sort by their underlying values rather than their rendered labels.
 Right-clicking the artist-detail track table header opens the same complete
 track-column chooser used by the main track views; its selection, order, and
-widths are stored independently for that detail table.
-Each local directory also offers **Re-read metadata** in Settings. This explicit
-maintenance scan processes timestamp-unchanged files again and is useful when a
-database contains stale tags from an older scan. It preserves track favorites
-and artist profiles, and carries downloaded album artwork plus album favorites
-to a corrected album identity within the same physical directory. Transient
-metadata-read failures are retried and reported as failed files; they never
-replace an existing track's tags with empty values.
-The Library Doctor also highlights conservatively matched artist-name variants
-across the local library. These are review hints only: Orynivo does not merge
-artists automatically because punctuation or spelling differences can still
-identify distinct performers.
-Guided MusicBrainz correction displays the current and proposed album identity
-and a track-by-track title/artist preview. Nothing is written until the user
-selects a release and explicitly applies that correction.
+widths are stored independently for that detail table. Each local directory also
+offers **Re-read metadata** in Settings. This explicit maintenance scan
+processes timestamp-unchanged files again and is useful when a database contains
+stale tags from an older scan. It preserves track favorites and artist profiles,
+and carries downloaded album artwork plus album favorites to a corrected album
+identity within the same physical directory. Transient metadata-read failures
+are retried and reported as failed files; they never replace an existing track's
+tags with empty values. The Library Doctor also highlights conservatively
+matched artist-name variants across the local library. These are review hints
+only: Orynivo does not merge artists automatically because punctuation or
+spelling differences can still identify distinct performers. Guided MusicBrainz
+correction displays the current and proposed album identity and a track-by-track
+title/artist preview. Nothing is written until the user selects a release and
+explicitly applies that correction.
 
 ## Project Structure
 
@@ -1632,7 +1621,8 @@ override that root; packaged Linux servers use `/var/lib/orynivo-server`.
   Servers
 - `search-index\`: Lucene.NET search index
 - `waveforms\`: compact cached peak data for the transport waveform
-- `catalog-filter-cache.json`: cached radio genres and podcast categories/languages
+- `catalog-filter-cache.json`: cached radio genres and podcast
+  categories/languages
 - `radio-logos\`: cached internet-radio station logos used for robust Windows
   media-overlay artwork updates
 
@@ -1647,20 +1637,20 @@ view using the current playback position. The refresh button performs a new
 lookup, and a missing result is shown directly in the lyrics view. The
 **Karaoke** action opens a fullscreen view of the synchronized lyrics with the
 active line centered and emphasized while neighbouring lines fade out, using the
-current cover as a dimmed backdrop. Enhanced LRC files that carry word timestamps
-additionally highlight the active word and keep already-sung words in the accent
-colour. It exits with Esc or a click and explains when a track only has plain
-lyrics.
-For WASAPI, buffered but not yet audible frames are excluded from the playback
-position so synchronized lyrics follow the actual output timing.
+current cover as a dimmed backdrop. Enhanced LRC files that carry word
+timestamps additionally highlight the active word and keep already-sung words in
+the accent colour. It exits with Esc or a click and explains when a track only
+has plain lyrics. For WASAPI, buffered but not yet audible frames are excluded
+from the playback position so synchronized lyrics follow the actual output
+timing.
 
 The Artists page supports the same table/artwork modes as Albums. Profiles for
 visible artists are loaded lazily in the selected UI language and cached in the
-database and `artist-images\`. The stylized information button beside the
-lyrics button opens the current artist profile in the main content area, with a
-large image, biography, refresh action, and a link to the Wikipedia source.
-Opening an album from an artist drill-down initially shows only that artist's
-tracks. The album header provides a switch to show every track on the album.
+database and `artist-images\`. The stylized information button beside the lyrics
+button opens the current artist profile in the main content area, with a large
+image, biography, refresh action, and a link to the Wikipedia source. Opening an
+album from an artist drill-down initially shows only that artist's tracks. The
+album header provides a switch to show every track on the album.
 
 The Settings library page can export this managed library data as a ZIP archive
 and import it again. Audio files are intentionally not included; their existing
@@ -1685,95 +1675,106 @@ archive in place.
 
 ## Visualizer
 
-Milkdrop compatibility is currently partial: loading or compiling a `.milk` preset
-does not guarantee the original appearance. The OpenGL path now honors sampler
-filter/wrap modes, custom-wave state, real shape keys, warp speed/scale, blur ranges,
-and display-only gamma/echo. The comp shader now samples `GetPixel(uv)` in normalized
-coordinates; the comp main and blur samplers read the preceding feedback frame as in the
-MilkDrop 2.25c source. Preset-facing bass, mid and treble now use MilkDrop's separate
-576-sample, eight-bit custom-sound FFT; a matched 440 Hz Winamp capture verifies the
-three relative band responses. Custom-wave line colours and alpha now interpolate between
-vertices, and thick custom-wave dots cover the reference's 2×2 pixels at normal texture
-sizes. Centre darkening now matches MilkDrop's small, faint centre fan rather than
-darkening the whole image, and `fShader=0` leaves the legacy composite untinted.
-Textured shapes, default-wave geometry, exact audio
-alignment, some legacy hue shading and CPU fallback behavior still differ. See the
-[current verification report](VISUALIZER-FIDELITY-RECHECK.md) for fixes, tests and
-remaining limits. The Royal Mashup comparison against Winamp is now substantially brighter,
-but its full-frame geometry still differs. The analyzer
+Milkdrop compatibility is currently partial: loading or compiling a `.milk`
+preset does not guarantee the original appearance. The OpenGL path now honors
+sampler filter/wrap modes, custom-wave state, real shape keys, warp speed/scale,
+blur ranges, and display-only gamma/echo. The comp shader now samples
+`GetPixel(uv)` in normalized coordinates; the comp main and blur samplers read
+the preceding feedback frame as in the MilkDrop 2.25c source. Preset-facing
+bass, mid and treble now use MilkDrop's separate 576-sample, eight-bit
+custom-sound FFT; a matched 440 Hz Winamp capture verifies the three relative
+band responses. Custom-wave line colours and alpha now interpolate between
+vertices, and thick custom-wave dots cover the reference's 2×2 pixels at normal
+texture sizes. Centre darkening now matches MilkDrop's small, faint centre fan
+rather than darkening the whole image, and `fShader=0` leaves the legacy
+composite untinted. Textured shapes, default-wave geometry, exact audio
+alignment, some legacy hue shading and CPU fallback behavior still differ. See
+the [current verification report](VISUALIZER-FIDELITY-RECHECK.md) for fixes,
+tests and remaining limits. The Royal Mashup comparison against Winamp is now
+substantially brighter, but its full-frame geometry still differs. The analyzer
 uses the reference's one-sample pre-emphasis, raised-sine window period and
 multi-octave waveform alignment.
 
-**Visualisierung** in the sidebar opens a fullscreen music visualizer. It renders the playing
-audio through a Milkdrop-style preset engine at 640 x 360 and scales the frame up. Escape
-closes it, a click or Space switches the preset, the arrow keys step through them, and R
-resets the picture; the **Reduce motion** preference draws a static spectrum instead of
-animating. The frame is presented through OpenGL, and the warp, the blur, and the full-frame
-passes run on the GPU for a preset that builds a mesh; a per-pixel block that writes the sample
-position keeps the CPU warp, because an interpolated position has no meaning. A platform whose
-GL context is unavailable falls back to the bitmap presentation, and setting
-`ORYNIVO_VISUALIZER_OPENGL=0` forces it.
+**Visualisierung** in the sidebar opens a fullscreen music visualizer. It
+renders the playing audio through a Milkdrop-style preset engine at 640 x 360
+and scales the frame up. Escape closes it, a click or Space switches the preset,
+the arrow keys step through them, and R resets the picture; the **Reduce
+motion** preference draws a static spectrum instead of animating. The frame is
+presented through OpenGL, and the warp, the blur, and the full-frame passes run
+on the GPU for a preset that builds a mesh; a per-pixel block that writes the
+sample position keeps the CPU warp, because an interpolated position has no
+meaning. A platform whose GL context is unavailable falls back to the bitmap
+presentation, and setting `ORYNIVO_VISUALIZER_OPENGL=0` forces it.
 
-A preset switch continues from the previous preset's feedback instead of restarting from black, and
-a configurable **Preset switch cross-fade duration** (Settings > Playback > Visualizer, default 0 =
-hard switch) eases the switch like MilkDrop: the outgoing preset keeps running and its non-motion
-per-frame variables (`decay`, the wave colours and position, both border bands, the motion-vector
-display, the video echo, `gamma`, and the blur range keys) are blended into the incoming preset with
-MilkDrop's cosine curve, while the motion variables that drive the warp stay on the incoming preset.
-On the OpenGL path the warp's sampling coordinate also morphs from the outgoing preset's captured
+A preset switch continues from the previous preset's feedback instead of
+restarting from black, and a configurable **Preset switch cross-fade duration**
+(Settings > Playback > Visualizer, default 0 = hard switch) eases the switch
+like MilkDrop: the outgoing preset keeps running and its non-motion per-frame
+variables (`decay`, the wave colours and position, both border bands, the
+motion-vector display, the video echo, `gamma`, and the blur range keys) are
+blended into the incoming preset with MilkDrop's cosine curve, while the motion
+variables that drive the warp stay on the incoming preset. On the OpenGL path
+the warp's sampling coordinate also morphs from the outgoing preset's captured
 mesh to the incoming one, so the geometry eases over the blend as well.
 
-Presets are INI-style text with `per_frame_init`, `per_frame`, and `per_pixel` expression
-blocks plus `decay`, `zoom`, `warp`, `blur_level`, `wave_alpha`, and `wave_scale`. A
-`per_point` block may move every waveform point, and `shape_N_*` keys (`sides`, `x`, `y`,
-`rad`, `ang`, fill and border colours, `additive`) add regular polygons with their own
-`per_frame` and `per_point` programs. The
-supported expression subset is arithmetic, comparisons, logical operators, the ternary
-operator, `if(...)`, the usual math functions, `pi`, `rand(n)`, the compound assignments
-`+=`, `-=`, `*=`, `/=`, and `%=`, `loop(count, statements)`, the shared `megabuf`/`gmegabuf`
-tables, and `//` comments; unknown
-keys are ignored so third-party presets degrade instead of failing. Milkdrop's
-`warp_N`/`comp_N` HLSL shader blocks run when they parse, with the per-pixel comp pass drawn on
-a reduced-resolution grid and left out for the rest of the frame when it would exceed the
-frame budget. Own presets go into the
-folder configured under **Preset folder** as `.oryvis` or `.milk` files (default: a
-`visualizer-presets` folder below the per-user data directory); a file that cannot be parsed
-is skipped and counted in the on-screen label. Nine presets ship with the application.
+Presets are INI-style text with `per_frame_init`, `per_frame`, and `per_pixel`
+expression blocks plus `decay`, `zoom`, `warp`, `blur_level`, `wave_alpha`, and
+`wave_scale`. A `per_point` block may move every waveform point, and `shape_N_*`
+keys (`sides`, `x`, `y`, `rad`, `ang`, fill and border colours, `additive`) add
+regular polygons with their own `per_frame` and `per_point` programs. The
+supported expression subset is arithmetic, comparisons, logical operators, the
+ternary operator, `if(...)`, the usual math functions, `pi`, `rand(n)`, the
+compound assignments `+=`, `-=`, `*=`, `/=`, and `%=`,
+`loop(count, statements)`, the shared `megabuf`/`gmegabuf` tables, and `//`
+comments; unknown keys are ignored so third-party presets degrade instead of
+failing. Milkdrop's `warp_N`/`comp_N` HLSL shader blocks run when they parse,
+with the per-pixel comp pass drawn on a reduced-resolution grid and left out for
+the rest of the frame when it would exceed the frame budget. Own presets go into
+the folder configured under **Preset folder** as `.oryvis` or `.milk` files
+(default: a `visualizer-presets` folder below the per-user data directory); a
+file that cannot be parsed is skipped and counted in the on-screen label. Nine
+presets ship with the application.
 
-A shader may also declare its own texture, such as `sampler sampler_seaweed;`. Orynivo resolves it
-to an image file of that name (`.jpg`, `.png`, `.bmp`, `.gif`, `.webp`, or `.tga`) in a `textures`
-folder beside the presets, the same convention MilkDrop uses; no third-party texture is bundled.
+A shader may also declare its own texture, such as `sampler sampler_seaweed;`.
+Orynivo resolves it to an image file of that name (`.jpg`, `.png`, `.bmp`,
+`.gif`, `.webp`, or `.tga`) in a `textures` folder beside the presets, the same
+convention MilkDrop uses; no third-party texture is bundled.
 
-Orynivo ships no third-party presets, but MilkDrop 2 preset collections can be downloaded and
-placed in the **Preset folder** (or any subfolder). A well-known free collection is
+Orynivo ships no third-party presets, but MilkDrop 2 preset collections can be
+downloaded and placed in the **Preset folder** (or any subfolder). A well-known
+free collection is
 [projectM's presets-cream-of-the-crop](https://github.com/projectM-visualizer/presets-cream-of-the-crop);
-its presets are the user's own files and are neither bundled with nor licensed by Orynivo. Settings >
-Playback > Visualizer offers a **Download presets…** action that opens that page.
+its presets are the user's own files and are neither bundled with nor licensed
+by Orynivo. Settings > Playback > Visualizer offers a **Download presets…**
+action that opens that page.
 
-Settings > Visualisierung also offers **Select presets…**, which opens a dialog listing every
-available preset — the built-ins and every discovered preset file — with a checkbox each.
-Deactivated presets are skipped when the visualizer opens, steps forward or back, advances
-automatically, or responds to a mouse click. The choice is stored by a stable key (the built-in
-name or the file's preset-relative path) and the dialog provides **All** and **None** actions plus
-an active-count summary. The list is built without reading the preset files, so a large collection
-opens instantly.
+Settings > Visualisierung also offers **Select presets…**, which opens a dialog
+listing every available preset — the built-ins and every discovered preset file
+— with a checkbox each. Deactivated presets are skipped when the visualizer
+opens, steps forward or back, advances automatically, or responds to a mouse
+click. The choice is stored by a stable key (the built-in name or the file's
+preset-relative path) and the dialog provides **All** and **None** actions plus
+an active-count summary. The list is built without reading the preset files, so
+a large collection opens instantly.
 
 ## Maximum output sample rate
 
-Playback offers a **Maximum output sample rate** option (Automatic by default) that caps
-the PCM output rate for exclusive WASAPI and ASIO/cwASIO. Automatic keeps the previous
-behaviour of using the highest rate the device offers; a cap is useful when a driver
-advertises a rate it cannot reproduce cleanly, such as a Sound BlasterX AE-5 in Direct
-Mode reporting 384 kHz. A cap only reorders the candidates, so playback still falls back
-to a higher rate when the device supports nothing at or below the cap.
+Playback offers a **Maximum output sample rate** option (Automatic by default)
+that caps the PCM output rate for exclusive WASAPI and ASIO/cwASIO. Automatic
+keeps the previous behaviour of using the highest rate the device offers; a cap
+is useful when a driver advertises a rate it cannot reproduce cleanly, such as a
+Sound BlasterX AE-5 in Direct Mode reporting 384 kHz. A cap only reorders the
+candidates, so playback still falls back to a higher rate when the device
+supports nothing at or below the cap.
 
 ## Cross-device resume
 
-Remote Orynivo Server tracks remember where you stopped. The client publishes the
-audible position at most every 20 seconds to the authenticated, profile-scoped
-`/api/tracks/{id}/position` endpoint, and starting that track on another device
-offers a **Resume** transport action when the stored position is meaningfully
-ahead. Only a position and timestamp are stored, never a stream URL or API key.
+Remote Orynivo Server tracks remember where you stopped. The client publishes
+the audible position at most every 20 seconds to the authenticated,
+profile-scoped `/api/tracks/{id}/position` endpoint, and starting that track on
+another device offers a **Resume** transport action when the stored position is
+meaningfully ahead. Only a position and timestamp are stored, never a stream URL
+or API key.
 
 ## Accessibility
 
@@ -1785,9 +1786,9 @@ ahead. Only a position and timestamp are stored, never a stream URL or API key.
 
 ## Dependency migration
 
-`.github/dependabot.yml` deliberately ignores major upgrades that need a reviewed
-migration instead of an automatic bump. The triggers, steps, and required checks
-for each held-back line are recorded in
+`.github/dependabot.yml` deliberately ignores major upgrades that need a
+reviewed migration instead of an automatic bump. The triggers, steps, and
+required checks for each held-back line are recorded in
 [`DEPENDENCY-MIGRATION.md`](DEPENDENCY-MIGRATION.md).
 
 ## Current Limitations
@@ -1800,9 +1801,8 @@ for each held-back line are recorded in
 - Linux output profiles include direct ALSA `hw:` endpoints and endpoints
   exposed by OpenAL. A direct ALSA profile opens the DAC at the track's PCM
   sample rate with ALSA software resampling disabled; it fails explicitly when
-  the device is busy or cannot accept that exact rate. The OpenAL
-  system/default route may still be mixed or resampled by PipeWire, PulseAudio,
-  or OpenAL.
+  the device is busy or cannot accept that exact rate. The OpenAL system/default
+  route may still be mixed or resampled by PipeWire, PulseAudio, or OpenAL.
 - Linux supports stereo DSF and uncompressed stereo DFF/DSDIFF as native,
   bit-perfect `DSD_U32_BE` through a compatible direct ALSA endpoint, including
   authenticated Orynivo Server streams, with DoP as the fallback. DST-compressed
@@ -1825,17 +1825,17 @@ for each held-back line are recorded in
   required.
 - Plex browsing is paginated to keep very large libraries responsive. Playback
   availability depends on every selected Plex media part being directly
-  accessible and decodable by the installed FFmpeg build. Unexpected HTTP
-  stream termination is retried from the last decoded position before Orynivo
-  advances to the next queue item.
+  accessible and decodable by the installed FFmpeg build. Unexpected HTTP stream
+  termination is retried from the last decoded position before Orynivo advances
+  to the next queue item.
 - Renaming or merging artists updates Orynivo's internal library, album
   assignments, and search index. It does not modify tags in the audio files.
 - ASIO devices may be unavailable for inspection or playback while another
   application holds them exclusively.
 - Internet radio availability, metadata, and stream formats depend on the
   external station and the Radio Browser directory.
-- Podcast search depends on the Apple Podcasts catalog. Episode availability
-  and audio compatibility depend on each publisher's RSS/Atom feed and media
+- Podcast search depends on the Apple Podcasts catalog. Episode availability and
+  audio compatibility depend on each publisher's RSS/Atom feed and media
   enclosure.
 - The Steinberg ASIO SDK must be obtained separately and supplied to the build
   script; it cannot be distributed with this repository.
@@ -1859,10 +1859,10 @@ provided in [`licenses/`](licenses/) and are copied into build and publish
 outputs.
 
 FFmpeg is run as a separate executable. If it is not installed, Orynivo
-downloads the BtbN LGPL essentials build into `%LOCALAPPDATA%\Orynivo\ffmpeg`
-on Windows by resolving the current release asset through the GitHub API. On
-macOS, the matching `eugeneware/ffmpeg-static` FFmpeg and FFprobe release assets
-are downloaded into Orynivo's per-user cache. FFmpeg remains subject to its own
+downloads the BtbN LGPL essentials build into `%LOCALAPPDATA%\Orynivo\ffmpeg` on
+Windows by resolving the current release asset through the GitHub API. On macOS,
+the matching `eugeneware/ffmpeg-static` FFmpeg and FFprobe release assets are
+downloaded into Orynivo's per-user cache. FFmpeg remains subject to its own
 license and is not covered by the Orynivo license.
 
 ASIO is a trademark and software of Steinberg Media Technologies GmbH. The

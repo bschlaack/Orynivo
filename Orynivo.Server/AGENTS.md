@@ -11,14 +11,15 @@ This file applies to `Orynivo.Server/` and supplements `../AGENTS.md`.
 
 ## Server Invariants
 
-- Keep the server cross-platform `net10.0` and free of Windows-only dependencies.
+- Keep the server cross-platform `net10.0` and free of Windows-only
+  dependencies.
 - Every endpoint except `/api/health` requires the configured API key through
   `X-Api-Key` or `?key=`. Do not log or expose the key.
 - `ApiKeyMiddleware` and `ProfileContextMiddleware` must stay independently
-  unit-testable without starting the web host; `Orynivo.Server.Tests` covers
-  the health bypass, header/query key acceptance, missing/wrong/empty key
-  rejection, case-sensitive comparison, profile scoping, the `standard`
-  default, query-based profile selection, and the unknown-profile 403.
+  unit-testable without starting the web host; `Orynivo.Server.Tests` covers the
+  health bypass, header/query key acceptance, missing/wrong/empty key rejection,
+  case-sensitive comparison, profile scoping, the `standard` default,
+  query-based profile selection, and the unknown-profile 403.
 - `/api/health` and `/api/info` are mapped through
   `Endpoints.CoreEndpoints.MapCoreEndpoints` so they can be exercised with an
   in-memory `TestServer` through the real middleware pipeline. Keep new
@@ -29,16 +30,16 @@ This file applies to `Orynivo.Server/` and supplements `../AGENTS.md`.
   profile IDs are rejected and the profile context is async-local so concurrent
   clients cannot leak favorites or history.
 - Authenticated `/api/profiles` GET/POST/PUT/DELETE manages the server profile
-  registry. The `standard` profile is always retained; profile names and IDs
-  are persisted in the editable configuration without storing API credentials.
+  registry. The `standard` profile is always retained; profile names and IDs are
+  persisted in the editable configuration without storing API credentials.
 - Use only the public `Orynivo.Core` surface.
 - Materialize SQLite-backed endpoint results before disposing their connection.
 - Preserve byte-range streaming and cancellation of FFmpeg/transcode processes
   when clients disconnect.
 - `GET /api/stream/{id}` accepts an optional validated lossy transcode
-  (`?format=opus|aac&bitrate=<64-320>` via `StreamTranscodeOptions`); unsupported
-  requests return 400. The parameters are optional so older clients are
-  unaffected, and the same FFmpeg pipe/cancellation path is reused.
+  (`?format=opus|aac&bitrate=<64-320>` via `StreamTranscodeOptions`);
+  unsupported requests return 400. The parameters are optional so older clients
+  are unaffected, and the same FFmpeg pipe/cancellation path is reused.
 - `cue://` tracks and `mka://chapter/` tracks are virtual source segments and
   are transcoded from their stored physical source and time boundaries.
 - Normal full scans and watcher updates use
@@ -46,8 +47,8 @@ This file applies to `Orynivo.Server/` and supplements `../AGENTS.md`.
   reintroduce unconditional FFmpeg ReplayGain analysis into library discovery.
 - Startup, manual, and forced-metadata scans suspend watcher operations across
   the complete multi-root pass. Never release that suspension between roots;
-  otherwise periodic reconciliation can interleave and make `/api/scan`
-  report a root that is not actually being processed.
+  otherwise periodic reconciliation can interleave and make `/api/scan` report a
+  root that is not actually being processed.
 - `POST /api/replaygain` is the explicit authenticated maintenance path for
   calculating only missing track and album ReplayGain values. It shares scan
   serialization and `/api/scan` progress reporting, invalidates library caches
@@ -57,10 +58,10 @@ This file applies to `Orynivo.Server/` and supplements `../AGENTS.md`.
   (default 250 ms). Packaged Linux services additionally run below normal CPU
   priority with best-effort low I/O priority. Preserve these defaults so long
   maintenance does not starve SSH or Kestrel traffic; administrators may
-  override them through `/etc/default/orynivo-server`.
-  The Core maintenance implementation retains only album IDs across its track
-  pass and indexes completed rows in bounded batches; do not reintroduce a
-  complete-library `TrackRecord` collection in the server process.
+  override them through `/etc/default/orynivo-server`. The Core maintenance
+  implementation retains only album IDs across its track pass and indexes
+  completed rows in bounded batches; do not reintroduce a complete-library
+  `TrackRecord` collection in the server process.
 - Authenticated `GET`/`PUT /api/settings/replaygain` expose the server-owned
   `CalculateMissingReplayGainDuringScan` preference. PUT updates the live
   watcher immediately and persists the value to the editable configuration;
@@ -75,19 +76,19 @@ This file applies to `Orynivo.Server/` and supplements `../AGENTS.md`.
 - `PUT /api/tracks/{id}/rating` stores personal stars and client-resolved
   MusicBrainz recording/rating metadata. The server never contacts MusicBrainz;
   all track DTOs and genre-cloud candidates return cached values so desktop
-  recommendation scoring works identically for local and remote libraries.
-  The request also accepts a fetch timestamp without a recording MBID to persist
-  an unsuccessful client-side resolution and prevent immediate retries.
-  The same request accepts bounded supplemental genre/tag JSON generated by the
-  client, stores it separately, and incrementally refreshes the server Lucene
-  document; effective DTO/facet genres combine it with embedded genre text.
-  Profile-scoped favorite writes are exposed consistently at
-  `PUT /api/tracks/{id}/favorite`, `PUT /api/albums/{id}/favorite`, and
-  `PUT /api/artists/{id}/favorite`; all are protected by the active profile
-  context and must remain backward-compatible for older clients.
-  The authenticated `/api/history/sync` GET/POST routes exchange bounded,
-  deduplicated playback-history rows for the active profile only. They must
-  never expose API keys, credentials, or unrestricted filesystem data.
+  recommendation scoring works identically for local and remote libraries. The
+  request also accepts a fetch timestamp without a recording MBID to persist an
+  unsuccessful client-side resolution and prevent immediate retries. The same
+  request accepts bounded supplemental genre/tag JSON generated by the client,
+  stores it separately, and incrementally refreshes the server Lucene document;
+  effective DTO/facet genres combine it with embedded genre text. Profile-scoped
+  favorite writes are exposed consistently at `PUT /api/tracks/{id}/favorite`,
+  `PUT /api/albums/{id}/favorite`, and `PUT /api/artists/{id}/favorite`; all are
+  protected by the active profile context and must remain backward-compatible
+  for older clients. The authenticated `/api/history/sync` GET/POST routes
+  exchange bounded, deduplicated playback-history rows for the active profile
+  only. They must never expose API keys, credentials, or unrestricted filesystem
+  data.
 - `PUT /api/tracks/{id}/genre` stores a library-only genre override through
   `AudioDatabase.SetTrackGenres` and refreshes that track's Lucene document. An
   empty or missing value clears the override so the next scan restores the
@@ -97,16 +98,17 @@ This file applies to `Orynivo.Server/` and supplements `../AGENTS.md`.
   runtime dependency.
 - Linux service data belongs under `ORYNIVO_DATA_DIR=/var/lib/orynivo-server`.
   Do not fall back to the service user's non-writable home directory.
-- `GET`/`PUT /api/tracks/{id}/position` store the cross-device resume position of a
-  track. They are profile-scoped through `AudioDatabase.ActiveProfileId` (set by
-  `ProfileContextMiddleware`), reject invalid positions with 400, and store only a
-  position and timestamp - never a stream URL, API key, or any other credential.
-- `BackupScheduleService` is the optional automatic server-side library backup. It
-  must reuse the shared `Orynivo.Library.BackupRetention` decisions, derive its last
-  run from the newest archive in the target folder (never persist extra state),
-  write through `LibraryBackupService.ExportAsync` with the server data root, prune
-  only names that match `BackupNaming`, and hold no credentials. It is disabled by
-  default and never blocks scans or requests.
+- `GET`/`PUT /api/tracks/{id}/position` store the cross-device resume position
+  of a track. They are profile-scoped through `AudioDatabase.ActiveProfileId`
+  (set by `ProfileContextMiddleware`), reject invalid positions with 400, and
+  store only a position and timestamp - never a stream URL, API key, or any
+  other credential.
+- `BackupScheduleService` is the optional automatic server-side library backup.
+  It must reuse the shared `Orynivo.Library.BackupRetention` decisions, derive
+  its last run from the newest archive in the target folder (never persist extra
+  state), write through `LibraryBackupService.ExportAsync` with the server data
+  root, prune only names that match `BackupNaming`, and hold no credentials. It
+  is disabled by default and never blocks scans or requests.
 - Authenticated `GET`/`PUT /api/library/backup` transfer the Core versioned
   library ZIP. Transfers are bounded to 2 GiB, serialized against server scans,
   staged beneath the data root, exclude credentials/audio files, and restore
@@ -114,42 +116,40 @@ This file applies to `Orynivo.Server/` and supplements `../AGENTS.md`.
 - Editable Linux configuration belongs under `/etc/orynivo-server`; packaged
   defaults under `/usr/lib/orynivo-server` are read-only and replaceable.
   Managed DEB upgrades must invoke `dpkg` non-interactively while retaining the
-  administrator-edited configuration; a conffile prompt would abort the
-  systemd updater and can leave the package partially configured.
-  The release workflow must normalize and validate the maintainer scripts and
-  updater as LF-only Bash before publishing a DEB.
-  Because this editable file is layered after `WebApplication.CreateBuilder`,
-  `Program.cs` explicitly reapplies its configured Kestrel maximum request-body
-  size to the web host.
+  administrator-edited configuration; a conffile prompt would abort the systemd
+  updater and can leave the package partially configured. The release workflow
+  must normalize and validate the maintainer scripts and updater as LF-only Bash
+  before publishing a DEB. Because this editable file is layered after
+  `WebApplication.CreateBuilder`, `Program.cs` explicitly reapplies its
+  configured Kestrel maximum request-body size to the web host.
 - API additions must consider older clients/servers and the existing capability
   probing behavior.
 - Authenticated `GET /api/search/structured` mirrors the MCP/AI Chat structured
   search contract for result category, release-year range, library-added Unix
   range, and ordering. It uses compact candidates, limits complete DTO
   materialization to at most 50 results per category, and returns no playback
-  credentials beyond the existing authenticated DTO contract. Older servers
-  may return 404; the desktop must report that structured search requires a
-  server update rather than treating it as an empty result.
+  credentials beyond the existing authenticated DTO contract. Older servers may
+  return 404; the desktop must report that structured search requires a server
+  update rather than treating it as an empty result.
 - `GET /api/library/summary` returns `DashboardLibrarySummary` directly from an
-  aggregate database query so dashboard counters never require complete track
-  or album payloads.
+  aggregate database query so dashboard counters never require complete track or
+  album payloads.
 - Authenticated `GET /api/library/doctor` runs Core analysis on the server and
-  returns compact folder counts and typed findings only. Do not expose API
-  keys or complete track rows, and keep older-server failure non-fatal on the
-  desktop client.
-  The optional `inspectFiles=false` query requests index-only analysis; omitted
-  or true preserves full physical-file checks for existing clients. This route
-  does not currently expose live per-phase progress or an ETA.
+  returns compact folder counts and typed findings only. Do not expose API keys
+  or complete track rows, and keep older-server failure non-fatal on the desktop
+  client. The optional `inspectFiles=false` query requests index-only analysis;
+  omitted or true preserves full physical-file checks for existing clients. This
+  route does not currently expose live per-phase progress or an ETA.
 - Authenticated `GET /api/tracks/similarity-features` returns deterministic
   versioned vectors in ID-ordered pages of at most 2,000 rows. Keep the payload
   free of paths, URLs, credentials, artwork, and full track metadata.
 - Authenticated `POST /api/tracks/audio-features/analyze` schedules at most ten
   provider-local acoustic analyses and returns immediately. It must decline
-  overlapping scans or batches, serialize through the library gate, use the
-  Core one-thread/low-priority analyzer, and never return physical paths.
-  Track list DTOs also carry the cached Camelot wheel label (`CamelotKey`) so
-  remote clients can show the estimated musical key; it stays a cached value and
-  the server never derives keys on request.
+  overlapping scans or batches, serialize through the library gate, use the Core
+  one-thread/low-priority analyzer, and never return physical paths. Track list
+  DTOs also carry the cached Camelot wheel label (`CamelotKey`) so remote
+  clients can show the estimated musical key; it stays a cached value and the
+  server never derives keys on request.
 - Smart-playlist resolution goes through
   `Services/SmartPlaylistResolver.Resolve`, which supplies the cached similarity
   feature vectors whenever the criteria carries a similarity reference. Calling
@@ -164,17 +164,18 @@ This file applies to `Orynivo.Server/` and supplements `../AGENTS.md`.
 - `GET /api/albums/{id}` returns one album for detail navigation. The paged
   `GET /api/tracks` route must page in SQLite through `GetTrackListPage`, not
   materialize all server tracks before applying the requested page.
-- `GET /api/genres/cloud` returns one compact `GenreCloudService` taxonomy
-  level plus bounded provider-local track candidates; it must not return file
-  paths or credentials. Its optional non-negative `offset` rotates the stable
-  candidate order so long-running clients do not repeatedly receive only the
-  same bounded prefix.
+- `GET /api/genres/cloud` returns one compact `GenreCloudService` taxonomy level
+  plus bounded provider-local track candidates; it must not return file paths or
+  credentials. Its optional non-negative `offset` rotates the stable candidate
+  order so long-running clients do not repeatedly receive only the same bounded
+  prefix.
 - Remote package updates remain disabled by default. The server process may only
-  stage a signed, matching DEB/RPM bundle beneath its data directory; installation
-  belongs to the fixed-command root systemd helper, which independently verifies
-  the manifest and hash and never accepts client-provided commands or paths.
-  The package endpoint disables Kestrel's smaller default request limit only for
-  that route and retains its own bounded one-GiB streaming limit.
+  stage a signed, matching DEB/RPM bundle beneath its data directory;
+  installation belongs to the fixed-command root systemd helper, which
+  independently verifies the manifest and hash and never accepts client-provided
+  commands or paths. The package endpoint disables Kestrel's smaller default
+  request limit only for that route and retains its own bounded one-GiB
+  streaming limit.
 
 Consult the detailed endpoint, configuration, scan, cache, and package rules in
 the root `AGENTS.md` before changing those areas.
