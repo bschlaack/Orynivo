@@ -394,7 +394,11 @@ This file applies to `Orynivo.Core/` and supplements `../AGENTS.md`.
   preset's `ob_size`/`ib_size` (default 0.01), `[1 - ob_size, 1]` and
   `[1 - ob_size - ib_size, 1 - ob_size]`, blended with `SRCALPHA`/`INVSRCALPHA`. Never reintroduce
   fixed band values; a wrong border changes the feedback of a preset whose only content is its
-  border, such as Royal Mashup (13). `SkiaShaderRunner.Warp` is the GPU geometric warp and must
+  border, such as Royal Mashup (13). A border channel is converted the way MilkDrop's
+  `D3DCOLOR_RGBA_01` macro does: an in-range value is kept, an out-of-range value is truncated to a
+  byte and therefore wraps (`ib_a = 1 - mytime + bass` reaching 1.5 draws at 126/255, not at full
+  opacity). `PresetRenderer.BorderChannel` is the single place for that conversion, used by both the
+  CPU ring and `ReadFrameParameters`. `SkiaShaderRunner.Warp` is the GPU geometric warp and must
   keep the CPU motion transform and the black-outside-the-frame rule. `PresetExpressionTranspiler`
   emits the preset's per-pixel expression language as SkSL from the same `PresetSyntaxNode` tree the
   interpreter compiles, so the GPU and the CPU cannot disagree about a block; it reports the uniforms

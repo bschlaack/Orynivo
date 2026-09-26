@@ -4151,10 +4151,22 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
         new(
             inset,
             thickness,
-            Math.Clamp(Read(prefix + "r", 1f), 0f, 1f),
-            Math.Clamp(Read(prefix + "g", 1f), 0f, 1f),
-            Math.Clamp(Read(prefix + "b", 1f), 0f, 1f),
-            Math.Clamp(Read(prefix + "a", 0f), 0f, 1f));
+            BorderChannel(Read(prefix + "r", 1f)),
+            BorderChannel(Read(prefix + "g", 1f)),
+            BorderChannel(Read(prefix + "b", 1f)),
+            BorderChannel(Read(prefix + "a", 0f)));
+
+    /// <summary>
+    /// Converts a border channel the way Milkdrop's <c>D3DCOLOR_RGBA_01</c> macro does for an
+    /// out-of-range value: the byte truncation makes a value above one wrap instead of clamping. A
+    /// preset that computes <c>ib_a = 1 - mytime + bass</c> reaches 1.5, which Milkdrop renders at
+    /// 126/255; clamping it to one made Orynivo's border about twice as opaque as the reference. A
+    /// value already in the zero-to-one range is kept exactly.
+    /// </summary>
+    /// <param name="value">Raw channel value.</param>
+    /// <returns>The value as an eight-bit channel in the range zero to one.</returns>
+    private static float BorderChannel(float value) =>
+        value is >= 0f and <= 1f ? value : ((int)(value * 255f) & 0xFF) / 255f;
 
     /// <summary>Draws one border band as Milkdrop's clip-space ring.</summary>
     /// <param name="innerRadius">Inner ring radius in clip space, where one is the frame edge.</param>
@@ -4162,13 +4174,18 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
     /// <param name="prefix">Key prefix, <c>ob_</c> or <c>ib_</c>.</param>
     private void DrawBorderRing(float innerRadius, float thickness, string prefix)
     {
-        var alpha = Math.Clamp(Read(prefix + "a", 0f), 0f, 1f);
-        if (alpha <= 0f || thickness <= 0f)
+        // Milkdrop tests the raw alpha, then truncates every channel to a byte (D3DCOLOR_RGBA_01).
+        var alphaRaw = Read(prefix + "a", 0f);
+        if (alphaRaw <= 0.001f || thickness <= 0f)
             return;
 
-        var red = Math.Clamp(Read(prefix + "r", 1f), 0f, 1f);
-        var green = Math.Clamp(Read(prefix + "g", 1f), 0f, 1f);
-        var blue = Math.Clamp(Read(prefix + "b", 1f), 0f, 1f);
+        var alpha = BorderChannel(alphaRaw);
+        if (alpha <= 0f)
+            return;
+
+        var red = BorderChannel(Read(prefix + "r", 1f));
+        var green = BorderChannel(Read(prefix + "g", 1f));
+        var blue = BorderChannel(Read(prefix + "b", 1f));
         var outerRadius = innerRadius + thickness;
         var width = _warped.Width;
         var height = _warped.Height;

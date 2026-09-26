@@ -7,6 +7,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Fixed
+- A preset's border colour channels are now truncated to a byte like Milkdrop's
+  `D3DCOLOR_RGBA_01` macro instead of being clamped to zero-to-one. A preset such as `suksma - frust`
+  computes `ib_a = 1 - mytime + bass`, which reaches 1.5 and is drawn by Milkdrop at 126/255; clamping
+  it to one made Orynivo's inner border roughly twice as opaque as the reference. In-range values
+  keep their exact value.
 - The visualizer could still show a deactivated preset at startup: the initial selection was made
   against the built-ins only, and a preset deactivated after the selection (or a user file that only
   appeared once the folder was discovered) was not skipped. It now re-resolves to the first enabled
