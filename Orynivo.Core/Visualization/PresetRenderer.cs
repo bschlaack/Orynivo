@@ -3153,7 +3153,7 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
         if (left.Length < 2 || right.Length < 2)
             return;
 
-        var smoothing = Math.Clamp(Read("wave_smoothing", 0f), 0f, 1f);
+        var smoothing = Math.Clamp(Preset.Defaults.GetValueOrDefault("wave_smoothing", 0f), 0f, 1f);
         MilkdropWaveform.Prepare(left, _wavePcmLeft, Preset.WaveScale, smoothing, out var sampleCount);
         MilkdropWaveform.Prepare(right, _wavePcmRight, Preset.WaveScale, smoothing, out _);
 
@@ -3190,6 +3190,10 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
         var thick = Read("wave_thick", 0f) >= 0.5f;
         var additive = Read("wave_additive", 1f) >= 0.5f;
         var loop = MilkdropWaveform.IsLoop(mode);
+        // The reference tones the explosive-hash mode down by a resolution-dependent factor, so a
+        // dense hash does not swamp the frame; it is the only mode that does this.
+        if (mode == MilkdropWaveform.Mode.ExplosiveHash)
+            alpha *= ExplosiveHashAlphaScale(width);
 
         ApplyDefaultWavePerPoint(count, _wavePointX, _wavePointY);
         DrawDefaultWaveVertices(count, _wavePointX, _wavePointY, red, green, blue, alpha, dots, thick, additive, loop);
@@ -3200,6 +3204,27 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
             // block is honoured, and only for the first trace.
             DrawDefaultWaveVertices(secondCount, _waveSecondX, _waveSecondY, red, green, blue, alpha, dots, thick, additive, loop: false);
         }
+    }
+
+    /// <summary>
+    /// The reference's resolution-dependent alpha scale for the explosive-hash wave mode
+    /// (<c>milkdropfs.cpp</c>). It uses the render texture's size, which MilkDrop rounds up to a power
+    /// of two, and is the only mode that tones its alpha down.
+    /// </summary>
+    /// <param name="width">Render frame width in pixels.</param>
+    /// <returns>The alpha multiplier.</returns>
+    private static float ExplosiveHashAlphaScale(int width)
+    {
+        var size = 256;
+        while (size < width && size < 2048)
+            size *= 2;
+        return size switch
+        {
+            256 => 0.07f,
+            512 => 0.09f,
+            1024 => 0.11f,
+            _ => 0.13f
+        };
     }
 
     /// <summary>Runs the legacy global <c>per_point</c> block over one trace of the default wave.</summary>

@@ -40,7 +40,7 @@ public sealed class PresetVariableLayout
         "blur2_min", "blur2_max", "blur2_edge_darken",
         "blur3_min", "blur3_max", "blur3_edge_darken",
         "wave_mode", "wave_r", "wave_g", "wave_b", "wave_a", "wave_x", "wave_y",
-        "wave_mystery", "wave_dots", "wave_thick", "wave_additive", "wave_brighten",
+        "wave_mystery", "wave_smoothing", "wave_dots", "wave_thick", "wave_additive", "wave_brighten",
         "ob_size", "ob_r", "ob_g", "ob_b", "ob_a", "ib_size", "ib_r", "ib_g", "ib_b", "ib_a",
         "mv_x", "mv_y", "mv_dx", "mv_dy", "mv_l", "mv_enabled",
         "echo_zoom", "echo_alpha", "echo_orient",

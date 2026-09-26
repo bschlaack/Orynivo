@@ -159,7 +159,14 @@ This file applies to `Orynivo.Core/` and supplements `../AGENTS.md`.
   reference's edge clipping, closed-loop modes and four-tap polyline smoothing; `DrawDefaultWave`
   only prepares the PCM, applies the legacy global `per_point` block, and draws the result. Never
   reintroduce a line/circle approximation, and keep the geometry's sample count following the
-  source so a short buffer cannot read an empty tail.
+  source so a short buffer cannot read an empty tail. `wave_smoothing` is a registered variable
+  (`fWaveSmoothing` aliases it) and `DrawDefaultWave` reads it from `Preset.Defaults`; it was
+  missing from the layout, so a preset such as `suksma - frust` had its `fWaveSmoothing=0.9`
+  ignored and its explosive hash stayed unsmoothed. The explosive-hash mode is the only mode that
+  tones its alpha down, by the reference's resolution factor (`milkdropfs.cpp`: `alpha *= 0.07` at
+  256 through `0.13` at 2048); `ExplosiveHashAlphaScale` maps the rounded-up power-of-two frame
+  width onto the same table, because skipping it made that mode roughly an order of magnitude too
+  bright.
   The default waveform and the four custom waveforms are separate: the default one uses the global
   `wave_*` settings and the global `per_point` block, while each `VisualizerWave` carries its own
   `wavecode_N_*` state and `wave_N_*` blocks. `PresetRenderer.DrawCustomWave` builds the sample data

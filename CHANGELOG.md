@@ -7,6 +7,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Fixed
+- Corrected the visualizer's default-waveform explosive-hash mode and smoothing. The
+  `wave_smoothing` variable was never registered, so a preset's `fWaveSmoothing` (for example
+  `suksma - frust`, which sets `0.9`) was ignored and the hash stayed unsmoothed, and the mode-5
+  alpha was not reduced by the reference's resolution factor (`milkdropfs.cpp` multiples it by
+  `0.07` at 256 through `0.13` at 2048), which made the wave roughly an order of magnitude too
+  bright. `DrawDefaultWave` now reads the smoothing from the preset defaults and applies
+  `ExplosiveHashAlphaScale`.
 - Bound the shader sampler-size uniforms. MilkDrop exposes each generated texture's size as
   `texsize_noise_lq`/`texsize_noise_mq`/`texsize_noise_hq` and the volume pair, but Orynivo declared
   the GLSL spellings as a single `float4` the scalar-only GL uniform setter could never fill, and the
