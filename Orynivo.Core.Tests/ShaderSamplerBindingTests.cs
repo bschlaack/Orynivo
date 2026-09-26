@@ -30,6 +30,29 @@ public sealed class ShaderSamplerBindingTests
         Assert.True(MeanDifference(noise, random) > 0.0005f);
     }
 
+    /// <summary>
+    /// A preset that declares its own texture, as Royal Mashup (142) does with <c>sampler_cells</c>,
+    /// must be declared with the type each backend needs: GLSL spells a sampler <c>sampler2D</c>
+    /// while SkSL spells it <c>shader</c>, and the wrong one fails the whole shader.
+    /// </summary>
+    [Fact]
+    public void Transpile_DeclaresAPresetSamplerForTheBackend()
+    {
+        var program = ShaderParser.Parse(
+            "sampler sampler_cells;\n"
+            + "float4 main(float2 uv : TEXCOORD0) : COLOR { return tex2D(sampler_cells, uv); }");
+
+        var glsl = ShaderTranspiler.TranspileGlsl(program, out var samplers);
+
+        Assert.Contains("sampler_cells", samplers);
+        Assert.Contains("uniform sampler2D sampler_cells;", glsl);
+        Assert.DoesNotContain("uniform shader sampler_cells;", glsl);
+
+        var sksl = ShaderTranspiler.Transpile(program, out _);
+
+        Assert.Contains("uniform shader sampler_cells;", sksl);
+    }
+
     /// <summary>Renders a preset whose comp shader samples the named sampler.</summary>
     /// <param name="sampler">Sampler name to sample.</param>
     /// <returns>The rendered pixels.</returns>

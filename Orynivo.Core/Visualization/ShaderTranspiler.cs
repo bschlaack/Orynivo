@@ -651,7 +651,12 @@ public static class ShaderTranspiler
             builder.Append(glsl ? GlslWarpUniforms : WarpUniforms);
         var extras = samplerNames.Where(name => !SamplerSet.Contains(name)).ToList();
         foreach (var name in extras)
-            builder.Append("uniform shader ").Append(name).Append(";\n");
+        {
+            // A preset may name its own texture (for example "sampler sampler_cells;"). SkSL spells a
+            // sampler type "shader" while GLSL needs "sampler2D", and the wrong one is a compile error
+            // on the other backend.
+            builder.Append(glsl ? "uniform sampler2D " : "uniform shader ").Append(name).Append(";\n");
+        }
 
         // The type table has to stand before the helpers are emitted, because their parameter types
         // are recorded as they are written out.

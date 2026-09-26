@@ -178,6 +178,12 @@ This file applies to `Orynivo.Core/` and supplements `../AGENTS.md`.
   stripped before the generated noise and random textures are resolved. Keep the interpreter, the Skia
   passes, and the OpenGL pipeline on that one parser and one sampling rule.
   The Milkdrop format has no per-preset texture block, so unknown `tex_*` keys stay ignored.
+  A preset may still declare its own texture in the shader source, such as
+  `sampler sampler_cells;` in Royal Mashup (142). `ShaderTranspiler` collects every sampler a shader
+  names beyond its built-in set and declares it with the type the dialect needs: `sampler2D` in GLSL,
+  `shader` in SkSL. Emitting the SkSL spelling on both back ends failed the complete GLSL warp shader
+  because `uniform shader` is not GLSL; a texture the engine cannot provide falls back to the previous
+  feedback, which is what the binding already did.
   The shader runtime is built in three steps: `ShaderLexer` is the tokenizer and stays a pure,
   allocation-bounded function over the source, `ShaderParser` builds the tagged-union
   `ShaderNode` tree from it, and `ShaderInterpreter` evaluates that tree,

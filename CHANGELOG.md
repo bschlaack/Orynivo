@@ -55,6 +55,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   even though it already runs inside the warp stage, so the sum of the stages could exceed the
   measured frame and `RenderTimingDiagnosticTests` failed. The shader stage now reports only the comp
   pass, matching its documented meaning.
+- Fixed a GLSL compile failure for a preset that declares its own texture. A shader such as Royal
+  Mashup (142), which writes `sampler sampler_cells;`, emitted `uniform shader sampler_cells;` on both
+  back ends, but GLSL spells a sampler `sampler2D` and rejected the whole warp shader. The declaration
+  now follows the dialect, so the shader compiles; the unknown texture falls back to the previous
+  feedback it already did on the SkSL path.
 
 ### Changed
 - Rebuilt the built-in visualizer presets as structured warp-shader effects instead of a flat
