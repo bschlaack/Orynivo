@@ -955,6 +955,7 @@
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
             </Grid.RowDefinitions>
 
             <!-- App title -->
@@ -3865,6 +3866,22 @@
                                   Height="17"
                                   Stretch="Uniform"
                                   Data="{StaticResource IconLockOpen}"
+                                  Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                                  StrokeThickness="1.8"
+                                  StrokeLineCap="Round"
+                                  StrokeJoin="Round"
+                                  Fill="Transparent"/>
+                        </Button>
+                        <Button x:Name="VisualizerButton"
+                                AutomationProperties.Name="{DynamicResource L_Visualizer}"
+                                Theme="{StaticResource TransportBtnTheme}"
+                                Margin="4,0,0,0"
+                                ToolTip.Tip="{DynamicResource L_Visualizer}"
+                                Click="VisualizerButton_OnClick">
+                            <Path Width="17"
+                                  Height="17"
+                                  Stretch="Uniform"
+                                  Data="{StaticResource IconVisualizer}"
                                   Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
                                   StrokeThickness="1.8"
                                   StrokeLineCap="Round"

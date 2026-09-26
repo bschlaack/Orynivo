@@ -1,11 +1,12 @@
 # Cover search verification
 
-`dotnet run --project scripts/CoverSearchSmoke` runs offline transport regression
-checks against the production source: preview-only requests, concurrency,
-incremental delivery, partial failures, retry limits, cancellation, response size
-bounds, explicit original downloads and punctuation fallbacks.
+`dotnet run --project scripts/CoverSearchSmoke` runs offline transport
+regression checks against the production source: preview-only requests,
+concurrency, incremental delivery, partial failures, retry limits, cancellation,
+response size bounds, explicit original downloads and punctuation fallbacks.
 
-Opt-in live checks contact MusicBrainz and Cover Art Archive for Sade / Lovers Rock:
+Opt-in live checks contact MusicBrainz and Cover Art Archive for Sade / Lovers
+Rock:
 
 ```powershell
 dotnet run --project scripts/CoverSearchSmoke -- --live

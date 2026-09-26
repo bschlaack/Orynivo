@@ -15,19 +15,19 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
   French, Spanish, Russian, Simplified Chinese, and Hindi.
 - `ApplicationCredentialStore` is the only persistent client credential
   container. It uses current-user DPAPI on Windows and AES-GCM plus a
-  current-user-only random key file on Linux/macOS. Last.fm, Fanart.tv,
-  AI Chat, Orynivo Server, Plex, and generic streaming secrets must remain
-  `[JsonIgnore]` in JSON settings models and must not appear in caches, logs,
-  server payloads, diagnostics, documentation examples, or model context.
+  current-user-only random key file on Linux/macOS. Last.fm, Fanart.tv, AI Chat,
+  Orynivo Server, Plex, and generic streaming secrets must remain `[JsonIgnore]`
+  in JSON settings models and must not appear in caches, logs, server payloads,
+  diagnostics, documentation examples, or model context.
 - Fanart.tv artist artwork uses the encrypted Settings value or the
-  `FANART_TV_API_KEY` environment variable. The environment variable remains
-  an optional runtime override and is never copied into persistent settings.
+  `FANART_TV_API_KEY` environment variable. The environment variable remains an
+  optional runtime override and is never copied into persistent settings.
 - The Artist information Settings action for missing artist images combines the
   local library and every configured Orynivo Server, runs strictly sequentially,
   skips every manually selected image, tries Fanart.tv first only when a key is
-  available, then falls back to Wikimedia Commons, and remains cancellable.
-  When an API key is configured, the preview may enable automatic acceptance
-  for Fanart.tv results for the current run only. This must never automatically
+  available, then falls back to Wikimedia Commons, and remains cancellable. When
+  an API key is configured, the preview may enable automatic acceptance for
+  Fanart.tv results for the current run only. This must never automatically
   accept Wikimedia results. Other candidates stay in memory until the user
   accepts or rejects their preview, and cancelling the preview cancels the
   complete run; accepted remote images are uploaded only to their owning server.
@@ -38,6 +38,82 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
 - Add or update English XML documentation for affected public/internal members.
 
 ## Client Invariants
+
+- The fixed GL post pass applies MilkDrop's centre-darkening sprite only within
+  a small diamond around the centre (3/32 peak alpha, radius 0.025 of the
+  smaller dimension). The legacy display pass mixes its animated hue shade with
+  white by `VisualizerFrameParameters.ShaderAmount`; `fShader=0` must not tint
+  the image.
+
+- Every uniform passed to the fixed GL `Set` helper must first have its location
+  resolved. Resolve the mesh vertex uniforms for custom warp programs when
+  linking them as well as the fixed warp's decay/time/scale inputs. The fixed
+  warp samples bottom-up feedback without an extra Y flip. Decay is applied by
+  the fixed warp only; custom warp shaders own their fade. Re-check these
+  contracts with a constant-output shader after changing them. Remaining
+  compatibility defects are recorded in `VISUALIZER-FIDELITY-RECHECK.md`;
+  previous "corrected" notes are not fidelity proof.
+
+- Blur generation changes the active GL framebuffer and viewport. The custom
+  warp pass must rebind its full-resolution ping target after
+  `BuildShaderBlurLevels` and before drawing. A constant-output shader at two
+  sizes checks that the real GPU pipeline fills its target. See
+  `VISUALIZER-FIDELITY-AUDIT.md` for outstanding Milkdrop compatibility issues.
+- The fixed GL warp transforms the texture coordinate in its vertex shader and
+  interpolates the resulting coordinate, so `WarpVertexSource` computes the
+  reference warp arithmetic (including the time-dependent displacement, whose
+  `uWarpTime` comes from `VisualizerFrameParameters.WarpTime`) and the fragment
+  shader only samples it. The mesh vertex layout is position plus the ten
+  `PresetRenderer.MeshValues` motion values, mapped across four attributes; keep
+  the attribute pointers and `PackVertices` in step when the value set changes.
+  When a per-pixel block writes both position (`x`/`y`) and motion (`dx`/`dy`,
+  rotation, zoom, etc.), the GL path must draw the CPU-evaluated motion mesh. A
+  fullscreen per-pixel fragment warp discards that motion and freezes presets
+  such as Royal Mashup (13). The custom warp draws the same mesh with the same
+  vertex shader: its fragment stage comes from
+  `ShaderTranspiler.TranspileGlslWarpMesh`, which reads the interpolated
+  coordinate from the vertex stage and does not re-emit the per-pixel block,
+  because the mesh already ran it. Keep the two warp programs on the mesh vertex
+  shader, and never draw the custom warp as a full-screen quad again.
+- GL sampler qualifiers select independent native sampler objects resolved
+  through `GlInterface.GetProcAddress`; bind each active sampler to its own unit
+  and clear sampler bindings before fixed passes and before returning to
+  Avalonia. Fixed warp uses `bTexWrap`. Custom comp frame/blur reads convert
+  top-down UVs to bottom-up GL texture coordinates; generated noise coordinates
+  are not flipped. When a shader sampler is bound, make its unit active
+  **before** resolving the texture. A preset texture (`sampler_<name>`) is
+  uploaded lazily during binding, and an upload binds its new texture to the
+  active unit, so resolving before selecting the unit let a user texture
+  overwrite the previous sampler's binding — the unused samplers are skipped,
+  which made the previous unit `sampler_main` and displayed the texture as the
+  previous frame. `verify-fidelity.ps1` check 6 pins this.
+- Legacy gamma/echo use a separate display target and must never enter feedback.
+  Gamma is a linear brightness gain. The overlay's alpha is coverage, not forced
+  opacity; non-additive elements cover feedback. The shader blur chain is built
+  after the warp from the feedback the warp just sampled and **retained** for
+  the next warp; because the reference swaps its frame buffers at the end of the
+  frame, the next warp's `sampler_main` is one generation newer than its
+  `sampler_blur1`-`GetBlur3` chain. This is intentional in `milkdropfs.cpp`
+  ("when sampling the blurred textures in the warp shader, they are one frame
+  old"), so a shader that compares the two (for example
+  `GetBlur1(uv_orig) - GetPixel(uv_orig)`) oscillates on every path; do not
+  "fix" it by building the chain before the warp. The GL pipeline, the CPU
+  interpreter, and the Skia warp pass must all read that retained chain, so the
+  Skia pass binds the renderer's retained blur levels instead of rebuilding them
+  from the frame it samples. Comp reads the same freshly built chain. A freshly
+  allocated retained chain is black and marked ready, so the first warp reads
+  retained black rather than a same-frame blur. The comp main samplers also bind
+  VS[0], not the current warp-and-overlay target VS[1]. Apply progressive range
+  compression, GetBlur decoding and first-level edge darkening. Composite GLSL
+  `rad` and `ang` follow MilkDrop's aspect-corrected `UvToMathSpace`
+  coordinates; hue corner indices follow the reference's bottom-right,
+  bottom-left, top-right, top-left vertex order. Textured custom shapes sample
+  the previous feedback texture (`VS[0]`) with linear repeat, while their output
+  is drawn into the current frame (`VS[1]`).
+- `VisualizerAudioHub` keeps a 1024-frame rolling PCM window for each analysis;
+  render ticks between audio writes reuse the most recent spectrum for at most
+  100 ms rather than injecting silence. Clear this window on reset or
+  sample-rate changes.
 
 - Dashboard and its Show all pages share DashboardScrollViewer. Album artwork
   assignment must update the bound ContentRow in place, never call
@@ -57,45 +133,44 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
   server profile authentication must use this context; never duplicate or
   partition shared audio metadata/artwork.
 
-- `MainWindow` remains one partial Avalonia class; use the existing
-  domain-sized partials instead of creating competing window state or navigation
-  models. `MainWindow.xaml.cs` is intentionally reduced to shared state (fields,
-  nested types/records, and the constructor). Domain partials cover dashboard,
-  history, radio, podcasts, playlists, genre cloud, Infinite Mix, similarity,
-  AirPlay, mobile remote, MusicBrainz, metadata repair, artwork
-  synchronization, library view cache, queue/Up Next (`MainWindow.Queue.cs`),
-  the A-Z index (`MainWindow.AlphabetIndex.cs`), artwork
-  (`MainWindow.Artwork.cs`), search (`MainWindow.Search.cs`), track filters and
-  smart playlists (`MainWindow.TrackFilters.cs`), settings/output/EQ and PCM
-  volume/ReplayGain (`MainWindow.Settings.cs`), folder trees
-  (`MainWindow.FolderTree.cs`), album detail (`MainWindow.AlbumDetail.cs`),
-  artist detail (`MainWindow.ArtistInfo.cs`), sidebar (`MainWindow.Sidebar.cs`),
-  navigation (`MainWindow.Navigation.cs`), playback/transport
-  (`MainWindow.Playback.cs`), cover search (`MainWindow.CoverSearch.cs`),
-  favorites, Plex, remote Orynivo Server view/caches, unified library views
-  (`MainWindow.LibraryViews.cs`), table rendering (`MainWindow.TableRendering.cs`),
-  startup, content loading, entity favorites, navigation links, Orynivo
-  navigation, context menus, helpers, rating columns, artist albums, and the app
-  shell. The largest domains are split into sub-partials
+- `MainWindow` remains one partial Avalonia class; use the existing domain-sized
+  partials instead of creating competing window state or navigation models.
+  `MainWindow.xaml.cs` is intentionally reduced to shared state (fields, nested
+  types/records, and the constructor). Domain partials cover dashboard, history,
+  radio, podcasts, playlists, genre cloud, Infinite Mix, similarity, AirPlay,
+  mobile remote, MusicBrainz, metadata repair, artwork synchronization, library
+  view cache, queue/Up Next (`MainWindow.Queue.cs`), the A-Z index
+  (`MainWindow.AlphabetIndex.cs`), artwork (`MainWindow.Artwork.cs`), search
+  (`MainWindow.Search.cs`), track filters and smart playlists
+  (`MainWindow.TrackFilters.cs`), settings/output/EQ and PCM volume/ReplayGain
+  (`MainWindow.Settings.cs`), folder trees (`MainWindow.FolderTree.cs`), album
+  detail (`MainWindow.AlbumDetail.cs`), artist detail
+  (`MainWindow.ArtistInfo.cs`), sidebar (`MainWindow.Sidebar.cs`), navigation
+  (`MainWindow.Navigation.cs`), playback/transport (`MainWindow.Playback.cs`),
+  cover search (`MainWindow.CoverSearch.cs`), favorites, Plex, remote Orynivo
+  Server view/caches, unified library views (`MainWindow.LibraryViews.cs`),
+  table rendering (`MainWindow.TableRendering.cs`), startup, content loading,
+  entity favorites, navigation links, Orynivo navigation, context menus,
+  helpers, rating columns, artist albums, and the app shell. The largest domains
+  are split into sub-partials
   (`MainWindow.Dashboard.{Recommendations,Media,Stats}.cs`,
   `MainWindow.PlaybackState.cs`/`MainWindow.Transport.cs`,
   `MainWindow.ArtistInfo.{Rename,Albums,Profile}.cs`, and
-  `MainWindow.Playlists.DragDrop.cs`).
-  Generic visual helpers (`FindResource`, `ResolveFontSize`,
-  `FindAncestor`, `FindVisualChild`, `FindVisualChildren`) and the shared
-  table-column factories live in their dedicated helper/rendering partials.
-  Credential-free queue path persistence is decided by the
-  shared, tested `Orynivo.Library.QueuePathPolicy` in Core; never duplicate that
-  URL policy in the desktop. Pure, UI-free desktop helpers must be extracted
-  into standalone testable types (for example
-  `Orynivo.Controls.ArtworkAccentColor` or
-  `Orynivo.Controls.ListeningTrendGeometry`, covered by `Orynivo.Tests`) instead of
-  remaining private `MainWindow` members. Extract further domains as new
-  partials rather than letting `MainWindow.xaml.cs` grow again.
-  Build with `dotnet build Orynivo/Orynivo.csproj` and run
+  `MainWindow.Playlists.DragDrop.cs`). Generic visual helpers (`FindResource`,
+  `ResolveFontSize`, `FindAncestor`, `FindVisualChild`, `FindVisualChildren`)
+  and the shared table-column factories live in their dedicated helper/rendering
+  partials. Credential-free queue path persistence is decided by the shared,
+  tested `Orynivo.Library.QueuePathPolicy` in Core; never duplicate that URL
+  policy in the desktop. Pure, UI-free desktop helpers must be extracted into
+  standalone testable types (for example `Orynivo.Controls.ArtworkAccentColor`
+  or `Orynivo.Controls.ListeningTrendGeometry`, covered by `Orynivo.Tests`)
+  instead of remaining private `MainWindow` members. Extract further domains as
+  new partials rather than letting `MainWindow.xaml.cs` grow again. Build with
+  `dotnet build Orynivo/Orynivo.csproj` and run
   `dotnet test Orynivo.Tests/Orynivo.Tests.csproj` after client changes.
 - Do not block the UI thread with database access, network requests, FFmpeg,
-  device enumeration, player disposal, large cache I/O, or large row composition.
+  device enumeration, player disposal, large cache I/O, or large row
+  composition.
 - AI chat and the embedded MCP server expose one permission-gated tool surface.
   Keep `McpTools`, `AiToolDefinitions`, `AiToolExecutor`, and the Settings tool
   checklist in exact parity through `scripts/verify-mcp-tool-parity.ps1`.
@@ -108,43 +183,43 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
 - The mobile web remote is a separate opt-in LAN endpoint with its own port and
   generated bearer token; never reuse MCP enablement, permissions, or tokens.
   Its public page may be loaded without authentication so a user can enter the
-  token, but every `/remote/api` request must authenticate in constant time.
-  Do not browser-cache the embedded HTML across upgrades, reject oversized API
+  token, but every `/remote/api` request must authenticate in constant time. Do
+  not browser-cache the embedded HTML across upgrades, reject oversized API
   request bodies before endpoint binding, and stop automatic reconnect after a
-  401 until the user supplies a new token.
-  Remote state and queue DTOs must omit physical paths, authenticated stream
-  URLs, credentials, and private provider settings. Live updates send compact
-  state changes only and reconnect without reloading the complete library.
-  Current artwork must be decoded off the UI thread, bounded to a 640-pixel
-  JPEG, served only through the authenticated API, and carry private cache
-  validators. Queue selection accepts only a validated zero-based index.
-  Mobile search combines local and configured Orynivo Server tracks away from
-  the UI thread. Results expose only display metadata and opaque local/server
-  identities; resolve those identities inside the desktop immediately before
-  a validated play-now, play-next, or append action.
-  Artist/album browsing must remain provider-bound: expose an opaque provider
-  identity, resolve it internally for the next drill-down, and never return a
-  server address, API key, stream URL, or physical path to the browser.
+  401 until the user supplies a new token. Remote state and queue DTOs must omit
+  physical paths, authenticated stream URLs, credentials, and private provider
+  settings. Live updates send compact state changes only and reconnect without
+  reloading the complete library. Current artwork must be decoded off the UI
+  thread, bounded to a 640-pixel JPEG, served only through the authenticated
+  API, and carry private cache validators. Queue selection accepts only a
+  validated zero-based index. Mobile search combines local and configured
+  Orynivo Server tracks away from the UI thread. Results expose only display
+  metadata and opaque local/server identities; resolve those identities inside
+  the desktop immediately before a validated play-now, play-next, or append
+  action. Artist/album browsing must remain provider-bound: expose an opaque
+  provider identity, resolve it internally for the next drill-down, and never
+  return a server address, API key, stream URL, or physical path to the browser.
   Favourite changes and output selection must reuse the existing MainWindow
   callbacks. Queue edits must validate indices and pass through the established
   move/remove/clear persistence, gapless-refresh, and Infinite Mix lifecycle.
   Settings enumerates active non-loopback IPv4 addresses off the UI thread and
-  generates QR codes locally through QRCoder's portable PNG renderer. QR payloads
-  carry the token only in the URL fragment, never in a query string or persisted
-  image. The browser consumes/removes that fragment on initial load or hash
-  navigation; credentials live only in page memory. Plain-URL visits and reloads
-  require token entry. Settings changes must be saved before using their QR code.
-  The desktop token is JsonIgnored and overlaid from ApplicationCredentialStore;
-  loading a legacy plaintext mobile token migrates it and removes it from settings.
-  The remote document, script, and localized JSON are embedded resources.
-  Preserve blob artwork in the CSP, native keyboard-accessible controls, bounded
-  artist search, stale-response guards, and separate playback/library/playlist/
-  queue navigation. Shared regular and smart playlists reuse desktop resolution,
-  but background browsing must suppress registration into UI-owned remote-track
-  dictionaries; only playback registers resolved rows on the UI thread.
-  Mobile playlist DTOs omit paths and filter internals. Unresolved entries and
-  standalone imported streams are intentionally omitted; do not expose raw
-  playlist paths or authenticated URLs as an alternative.
+  generates QR codes locally through QRCoder's portable PNG renderer. QR
+  payloads carry the token only in the URL fragment, never in a query string or
+  persisted image. The browser consumes/removes that fragment on initial load or
+  hash navigation; credentials live only in page memory. Plain-URL visits and
+  reloads require token entry. Settings changes must be saved before using their
+  QR code. The desktop token is JsonIgnored and overlaid from
+  ApplicationCredentialStore; loading a legacy plaintext mobile token migrates
+  it and removes it from settings. The remote document, script, and localized
+  JSON are embedded resources. Preserve blob artwork in the CSP, native
+  keyboard-accessible controls, bounded artist search, stale-response guards,
+  and separate playback/library/playlist/ queue navigation. Shared regular and
+  smart playlists reuse desktop resolution, but background browsing must
+  suppress registration into UI-owned remote-track dictionaries; only playback
+  registers resolved rows on the UI thread. Mobile playlist DTOs omit paths and
+  filter internals. Unresolved entries and standalone imported streams are
+  intentionally omitted; do not expose raw playlist paths or authenticated URLs
+  as an alternative.
 - AI endpoint discovery and testing use `AiEndpointService` and the unsaved
   values currently visible in Settings. Query only the credential-free
   OpenAI-compatible `/models` URL, accept standard and Ollama model-list shapes,
@@ -152,10 +227,10 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
   response bodies, endpoint URLs, or API keys in status messages or logs.
 - The explicit ReplayGain maintenance action processes the local library and
   each configured Orynivo Server sequentially. It polls the shared remote scan
-  status for progress, stops client-side polling when Settings closes,
-  preserves all existing track/album values, and reports servers that do not
-  support or cannot complete the authenticated maintenance request. An already
-  accepted server calculation continues independently on that server.
+  status for progress, stops client-side polling when Settings closes, preserves
+  all existing track/album values, and reports servers that do not support or
+  cannot complete the authenticated maintenance request. An already accepted
+  server calculation continues independently on that server.
 - The desktop scan-time ReplayGain checkbox is local-only and says so. Each
   Orynivo Server dialog loads its server-owned scan-time preference through the
   authenticated settings API, disables the control for older servers, and
@@ -165,7 +240,8 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
   **Calculate ReplayGain** actions. Each targets only that row's server,
   disables itself while polling `/api/scan`, renders operation-appropriate
   progress in a dedicated detail line without replacing connection/capability
-  details, and cancels client polling when the list is rebuilt or Settings closes.
+  details, and cancels client polling when the list is rebuilt or Settings
+  closes.
 - The embedded Settings host must span the complete bounded main-content grid.
   Its active section scrolls inside that bound while the bottom Save and Cancel
   action row remains visible; do not place the host only in auto-sized rows.
@@ -176,62 +252,61 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
   and permits one-click reacquisition/resume. Ordinary playback clears that
   snapshot. Pausing alone must never be presented as releasing an exclusive
   WASAPI, ASIO, cwASIO, or direct ALSA device.
-- AirPlay output is a cross-platform `OutputBackend.AirPlay` profile.
-  Discover `_raop._tcp.local.` receivers away from the UI thread, persist only
-  their stable service ID/display name/last endpoint and refresh the endpoint
-  before playback. Prefer the bundled native AirPlay 2 bridge when available;
-  retain the separately installed `raop_play` helper as a classic fallback.
-  Never persist passwords or transient pairing material.
-- The AirPlay 2 sender lives in the independent Qt-free
-  `Native/AirPlay2Bridge` CMake project. Keep its public boundary as a stable C
-  ABI with opaque session handles; it must not depend on Avalonia or Orynivo.
-  Fail-closed transient pairing, encrypted control, session SETUP, NTP timing,
-  RECORD, and audio-stream SETUP are implemented and Sonos-verified. ALAC
-  encoding, encrypted realtime RTP packetization, NTP/RTP sync anchors,
-  retransmit handling, rate-aware prefill/pacing, and best-effort teardown are
-  implemented behind the ABI and clean playback is verified on a Sonos stereo
-  pair. `AirPlay2NativeSession` is the only managed interop boundary;
+- AirPlay output is a cross-platform `OutputBackend.AirPlay` profile. Discover
+  `_raop._tcp.local.` receivers away from the UI thread, persist only their
+  stable service ID/display name/last endpoint and refresh the endpoint before
+  playback. Prefer the bundled native AirPlay 2 bridge when available; retain
+  the separately installed `raop_play` helper as a classic fallback. Never
+  persist passwords or transient pairing material.
+- The AirPlay 2 sender lives in the independent Qt-free `Native/AirPlay2Bridge`
+  CMake project. Keep its public boundary as a stable C ABI with opaque session
+  handles; it must not depend on Avalonia or Orynivo. Fail-closed transient
+  pairing, encrypted control, session SETUP, NTP timing, RECORD, and
+  audio-stream SETUP are implemented and Sonos-verified. ALAC encoding,
+  encrypted realtime RTP packetization, NTP/RTP sync anchors, retransmit
+  handling, rate-aware prefill/pacing, and best-effort teardown are implemented
+  behind the ABI and clean playback is verified on a Sonos stereo pair.
+  `AirPlay2NativeSession` is the only managed interop boundary;
   `AirPlayAudioPlayer` owns it and feeds 44.1 kHz signed 16-bit stereo PCM.
   AirPlay user volume uses a cubic normalized-to-linear PCM curve so normal
   listening levels occupy a useful portion of the transport slider; ReplayGain
   is multiplied after that mapping. Other output backends retain their existing
-  volume behavior.
-  Session creation also carries title, artist, album, and optional bounded
-  JPEG/PNG artwork resolved by `MainWindow.AirPlay`; the native bridge copies
-  all values before returning from creation. Receiver artwork rejection is
-  best-effort and must never prevent audio playback.
-  Authenticated receiver Play, Pause, Next, and Previous events cross the native
-  callback into `MainWindow.AirPlay` and must dispatch through the same shared
-  transport methods as the desktop controls so player state, SMTC, history, and
-  UI remain synchronized. A receiver-originated Play after Pause must rebuild
-  the AirPlay pipeline at the player's current position before clearing its
-  paused state; Sonos does not reliably resume media consumption on the old
-  stream. Ignore callbacks from a session that is no longer the active AirPlay
-  player. Receiver-originated timeline seeking is not available
-  on this reverse event channel and remains unsupported until a bounded DACP
-  endpoint is implemented.
+  volume behavior. Session creation also carries title, artist, album, and
+  optional bounded JPEG/PNG artwork resolved by `MainWindow.AirPlay`; the native
+  bridge copies all values before returning from creation. Receiver artwork
+  rejection is best-effort and must never prevent audio playback. Authenticated
+  receiver Play, Pause, Next, and Previous events cross the native callback into
+  `MainWindow.AirPlay` and must dispatch through the same shared transport
+  methods as the desktop controls so player state, SMTC, history, and UI remain
+  synchronized. A receiver-originated Play after Pause must rebuild the AirPlay
+  pipeline at the player's current position before clearing its paused state;
+  Sonos does not reliably resume media consumption on the old stream. Ignore
+  callbacks from a session that is no longer the active AirPlay player.
+  Receiver-originated timeline seeking is not available on this reverse event
+  channel and remains unsupported until a bounded DACP endpoint is implemented.
   Keep pause, seek, stop, output release, and fallback RAOP lifecycle behavior
   behind that existing player abstraction.
 - Preserve source identity on mixed rows. Remote rows must carry their
   `OrynivoServer`, server-side IDs, and authenticated playback metadata; never
   persist credential-bearing URLs.
-- Playlist context actions for local and Orynivo Server rows use the shared local
-  mixed-playlist list. Remote selections retain playable URLs only for queue
-  actions and persist stable `orynivo://serverId/track/trackId` references;
-  hidden legacy server playlists must not be offered by these menus.
+- Playlist context actions for local and Orynivo Server rows use the shared
+  local mixed-playlist list. Remote selections retain playable URLs only for
+  queue actions and persist stable `orynivo://serverId/track/trackId`
+  references; hidden legacy server playlists must not be offered by these menus.
 - Shared local/remote Artists, Albums, and Tracks views use the common column
-  masks and catalog abstractions. Do not create parallel remote-only UI surfaces.
+  masks and catalog abstractions. Do not create parallel remote-only UI
+  surfaces.
 - Album overview rows are logically coalesced across the local library and all
   Orynivo Server providers when normalized artist and trimmed album title match.
   Mixed rows show `L+OS` and retain every source-aware provider-local album ID;
-  opening one loads all of those records and uses
-  the shared album folder-group surface to keep physical releases/directories
-  separate. Never discard duplicate track titles because they may be different
-  masterings. Conventional CD/disc directory labels include their parent folder
-  for context, while other groups display the leaf directory rather than a full
-  private path. Dashboard recommendations and Recently Added album displays use
-  the same cross-provider logical identity and carry the complete album-ID set
-  into the shared card navigation.
+  opening one loads all of those records and uses the shared album folder-group
+  surface to keep physical releases/directories separate. Never discard
+  duplicate track titles because they may be different masterings. Conventional
+  CD/disc directory labels include their parent folder for context, while other
+  groups display the leaf directory rather than a full private path. Dashboard
+  recommendations and Recently Added album displays use the same cross-provider
+  logical identity and carry the complete album-ID set into the shared card
+  navigation.
 - Album catalog/card surfaces, Dashboard album sections, Genre Cloud album
   recommendations, and album search results omit blank or localized explicit
   unknown album titles. This is presentation filtering only: never remove or
@@ -256,45 +331,45 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
 - Settings places the `Metadata` section as **Review metadata** in the
   **LIBRARY** navigation group. It analyzes physical folders rather than
   existing album rows, because incorrect tags may already have fragmented one
-  release. Double-click
-  opens `MetadataRepairDialog`; local directory nodes additionally expose
-  **Identify folder as album**. The dialog pre-fills but permits editing its album
-  and artist search terms before each MusicBrainz query, while track count and
-  durations remain match evidence. Only a user-confirmed match may be applied,
-  and media files remain unchanged.
-  Opening uses index-only analysis (`inspectFiles: false`); physical readability
-  checks and full duplicate hashes require the explicit checkbox and refresh.
-  Publish local findings before awaiting server reports, then append completed
-  server results without clearing selection. Server reports remain read-only.
-  `MetadataReviewActivity` coalesces progress for a UI timer, reports elapsed time
-  and phase-local estimates only for measured work, and never invents a remote
-  ETA. Settings deactivation cancels analysis; dialog close cancels MusicBrainz.
-  Repeated searches must clear selection and preview before loading. Analysis,
-  dialog and correction use Core `OrderTracks`; never silently zip a partial match.
-  Successful corrections invalidate shared library views and refresh analysis.
-  The same section exposes a **Duplicate files** action that opens
-  `DuplicateResolutionDialog` over `LibraryMetadataRepairService.FindDuplicateGroups`
-  and `LibraryScanner.RemoveTracksByPaths`. The first file of each group is kept
-  by default, removal requires explicit confirmation, and deleting files from
-  disk is a separate opt-in. Never remove anything without that confirmation, and
+  release. Double-click opens `MetadataRepairDialog`; local directory nodes
+  additionally expose **Identify folder as album**. The dialog pre-fills but
+  permits editing its album and artist search terms before each MusicBrainz
+  query, while track count and durations remain match evidence. Only a
+  user-confirmed match may be applied, and media files remain unchanged. Opening
+  uses index-only analysis (`inspectFiles: false`); physical readability checks
+  and full duplicate hashes require the explicit checkbox and refresh. Publish
+  local findings before awaiting server reports, then append completed server
+  results without clearing selection. Server reports remain read-only.
+  `MetadataReviewActivity` coalesces progress for a UI timer, reports elapsed
+  time and phase-local estimates only for measured work, and never invents a
+  remote ETA. Settings deactivation cancels analysis; dialog close cancels
+  MusicBrainz. Repeated searches must clear selection and preview before
+  loading. Analysis, dialog and correction use Core `OrderTracks`; never
+  silently zip a partial match. Successful corrections invalidate shared library
+  views and refresh analysis. The same section exposes a **Duplicate files**
+  action that opens `DuplicateResolutionDialog` over
+  `LibraryMetadataRepairService.FindDuplicateGroups` and
+  `LibraryScanner.RemoveTracksByPaths`. The first file of each group is kept by
+  default, removal requires explicit confirmation, and deleting files from disk
+  is a separate opt-in. Never remove anything without that confirmation, and
   invalidate the shared library view cache after a successful removal.
-- The shared Folder structure sidebar item is visible when either local media
-  or at least one Orynivo Server is configured. Server-only setups must be able
-  to open `ShowUnifiedFolderTreeAsync` without configuring a local directory.
-- The Genre Cloud item follows the same unified-library visibility. It loads
-  the local snapshot and every configured Orynivo Server concurrently, merges
-  counts by stable taxonomy key, applies client-side remote favorites and
-  cross-source listening-history affinity, and resolves recommendations to
-  ordinary source-aware `ContentRow` track rows. Recommendation scoring lives in
-  the pure, tested `Orynivo.GenreRecommendationScore`; its tie-break variation
-  must stay deterministic (stable hash, never `HashCode.Combine` or
-  `Random`), and the perceptual background fingerprint lives in
+- The shared Folder structure sidebar item is visible when either local media or
+  at least one Orynivo Server is configured. Server-only setups must be able to
+  open `ShowUnifiedFolderTreeAsync` without configuring a local directory.
+- The Genre Cloud item follows the same unified-library visibility. It loads the
+  local snapshot and every configured Orynivo Server concurrently, merges counts
+  by stable taxonomy key, applies client-side remote favorites and cross-source
+  listening-history affinity, and resolves recommendations to ordinary
+  source-aware `ContentRow` track rows. Recommendation scoring lives in the
+  pure, tested `Orynivo.GenreRecommendationScore`; its tie-break variation must
+  stay deterministic (stable hash, never `HashCode.Combine` or `Random`), and
+  the perceptual background fingerprint lives in
   `Orynivo.Controls.GenreCloudImageFingerprint`. Its explanatory hero remains
   separate from the elliptical cloud surface below it; drill-down transitions
   cross-fade the old level and stagger the new count-scaled nodes. Cloud nodes
   use measured, centered rows with explicit horizontal/vertical gaps and must
-  never overlap; excess rows scroll vertically. The recommendation mode uses
-  the same segmented `ViewModeRadioTheme` controls as the Artists/Albums view
+  never overlap; excess rows scroll vertically. The recommendation mode uses the
+  same segmented `ViewModeRadioTheme` controls as the Artists/Albums view
   selector and switches between the shared track table and source-aware album
   artwork cards. The cloud surface owns a dedicated Auto-sized main-content row
   between the intro hero and the shared star-sized result row; never overlay it
@@ -305,54 +380,52 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
   taxonomy key and Tracks/Albums mode so Back restores the same cloud context,
   selection, and scroll offset. Node labels and font scaling use track counts in
   Tracks mode and distinct provider-local album counts in Albums mode; changing
-  the mode must rebuild the existing nodes without reloading the libraries.
-  A remote snapshot whose `ParentKey` differs from the requested key is stale
+  the mode must rebuild the existing nodes without reloading the libraries. A
+  remote snapshot whose `ParentKey` differs from the requested key is stale
   taxonomy data and must be rebuilt from that server's track facets. A selected
-  leaf with candidates but no child nodes displays its own name centrally; it
-  is not an empty-library state. The virtual `more-genres` node is localized
-  while its dynamic children retain the actual unmapped library tag names.
-  Each taxonomy level may render up to sixteen recommendation-ranked local and
-  remote artist images as a non-interactive grayscale tile background. Keep it
-  faded beneath a dark veil so node labels retain priority. Scale each image
+  leaf with candidates but no child nodes displays its own name centrally; it is
+  not an empty-library state. The virtual `more-genres` node is localized while
+  its dynamic children retain the actual unmapped library tag names. Each
+  taxonomy level may render up to sixteen recommendation-ranked local and remote
+  artist images as a non-interactive grayscale tile background. Keep it faded
+  beneath a dark veil so node labels retain priority. Scale each image
   proportionally to fit completely inside its tile instead of center-cropping
   away substantial parts. Cache only the rendered mosaic for 24 hours under the
   data root; authenticated remote artwork URLs and API keys must never be
-  written to that cache.
-  The expensive merged nodes plus resolved track/album recommendations are
-  retained separately in a bounded in-memory LRU cache keyed
-  by taxonomy level, configured server identities, and a catalog generation.
-  The key may contain a process-local hash of a server URL for configuration
-  invalidation, but never the URL or API key itself; the cache is never persisted.
-  Reopening a cached level must only rebuild its controls and bind its existing
-  rows; it must not repeat local facet queries, remote ID resolution, or remote
-  album-catalog loads. Local watcher changes and changed remote
-  `LibraryChangedAt` values increment the generation and clear completed
+  written to that cache. The expensive merged nodes plus resolved track/album
+  recommendations are retained separately in a bounded in-memory LRU cache keyed
+  by taxonomy level, configured server identities, and a catalog generation. The
+  key may contain a process-local hash of a server URL for configuration
+  invalidation, but never the URL or API key itself; the cache is never
+  persisted. Reopening a cached level must only rebuild its controls and bind
+  its existing rows; it must not repeat local facet queries, remote ID
+  resolution, or remote album-catalog loads. Local watcher changes and changed
+  remote `LibraryChangedAt` values increment the generation and clear completed
   entries. An in-flight load is shared and may finish after its original
-  navigation is cancelled so an immediate return can reuse it.
-  Settings > Appearance exposes an independent clear action for these rendered
-  mosaics. It must not remove source artist images or any other remote artwork
-  cache. The same section persists a background mode of
-  None, Albums, or Artists (default). None must skip image resolution, network
-  downloads, and rendering completely. Albums use the source-aware resolved
-  recommendation album rows. Derive the column count and requested image count
-  from the measured cloud-surface width, capped at 32 images. Dedupe decoded
-  images by perceptual fingerprint so copies reached through different local or
-  server identities are not repeated. Center sparse sets as one balanced row or
-  two balanced rows; never repeat them merely to fill the available slots. A
-  single row uses the complete mosaic height and derives tile width from its
-  actual column count; two rows divide the height evenly. Preserve proportional
-  fitting so this adaptive enlargement never crops or distorts an image. Keep
-  the independent cache-clear action beside the mode selector in Appearance,
-  and persist a zero-to-one opacity setting exposed as a 0–100% slider with a
-  50% default. Disable that slider while the None mode is selected.
-  The cloud footer starts Infinite Mix from the genres represented by the
-  current level. Below the root, store the selected parent branch in
+  navigation is cancelled so an immediate return can reuse it. Settings >
+  Appearance exposes an independent clear action for these rendered mosaics. It
+  must not remove source artist images or any other remote artwork cache. The
+  same section persists a background mode of None, Albums, or Artists (default).
+  None must skip image resolution, network downloads, and rendering completely.
+  Albums use the source-aware resolved recommendation album rows. Derive the
+  column count and requested image count from the measured cloud-surface width,
+  capped at 32 images. Dedupe decoded images by perceptual fingerprint so copies
+  reached through different local or server identities are not repeated. Center
+  sparse sets as one balanced row or two balanced rows; never repeat them merely
+  to fill the available slots. A single row uses the complete mosaic height and
+  derives tile width from its actual column count; two rows divide the height
+  evenly. Preserve proportional fitting so this adaptive enlargement never crops
+  or distorts an image. Keep the independent cache-clear action beside the mode
+  selector in Appearance, and persist a zero-to-one opacity setting exposed as a
+  0–100% slider with a 50% default. Disable that slider while the None mode is
+  selected. The cloud footer starts Infinite Mix from the genres represented by
+  the current level. Below the root, store the selected parent branch in
   `InfiniteMix.IncludedGenres`; at the root, store every visible root branch.
   Candidate loading must expand each branch to itself plus every recursive
   descendant so directly tagged parent tracks and all subgenres participate.
   Open the normal profile dialog with these includes prefilled, then load those
-  branch snapshots instead of relying on a bounded root snapshot. Reuse the normal
-  initial-mix queue, progress overlay, active-playback preservation, and
+  branch snapshots instead of relying on a bounded root snapshot. Reuse the
+  normal initial-mix queue, progress overlay, active-playback preservation, and
   persistence path.
 - Matching local and Orynivo Server artists use
   `ArtistNameNormalizer.CreateComparisonKey` and one `UnifiedArtist` row. Its
@@ -360,21 +433,20 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
   source context. Opening one of those albums must pass the album row's
   provider-local artist ID into the shared album detail so its tracks initially
   remain scoped to the selected artist and the show-all-tracks checkbox remains
-  available. Every non-Plex artist navigation entry point must use that
-  unified drill-down even when the clicked track or row came from only one
-  source. The unified row selects available biography and artwork from any
-  matching identity. Profile downloads and manual image selections propagate to
-  every matching local and reachable Orynivo Server identity; automatic profile
-  images must never overwrite a manually selected image. Manual artist-image
-  uploads and deletions propagate through the same identity set. Renaming a
-  local or remote identity likewise renames every normalized matching artist in
-  the local library and on reachable Orynivo Servers; target-name collisions
-  remain unresolved until the user explicitly chooses a merge. A local merge's
-  survivor choice must be mapped by identity role (current versus existing
-  target) to equivalent collisions on every matching server. Album and
-  artist detail upload/delete actions route through the owning local or remote
-  artwork provider and use localized labels/tooltips. Plex identities remain
-  separate.
+  available. Every non-Plex artist navigation entry point must use that unified
+  drill-down even when the clicked track or row came from only one source. The
+  unified row selects available biography and artwork from any matching
+  identity. Profile downloads and manual image selections propagate to every
+  matching local and reachable Orynivo Server identity; automatic profile images
+  must never overwrite a manually selected image. Manual artist-image uploads
+  and deletions propagate through the same identity set. Renaming a local or
+  remote identity likewise renames every normalized matching artist in the local
+  library and on reachable Orynivo Servers; target-name collisions remain
+  unresolved until the user explicitly chooses a merge. A local merge's survivor
+  choice must be mapped by identity role (current versus existing target) to
+  equivalent collisions on every matching server. Album and artist detail
+  upload/delete actions route through the owning local or remote artwork
+  provider and use localized labels/tooltips. Plex identities remain separate.
 - Unified artist and logical-album details reconcile artwork for equivalent
   local/server identities with a bounded best-effort request. Copy only into
   missing destinations, preserve manual artist images, invalidate unified and
@@ -386,15 +458,16 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
   the artist image at the left and the title, bounded scrollable biography,
   source link, rename, image search/upload/delete, and profile-refresh actions
   at the right without overlap. Its favorite button synchronizes all normalized
-  matching local and Orynivo Server identities. The album strip below combines matching local and Orynivo Server
-  identities and de-duplicates equivalent title/year cards while retaining the
-  chosen card's source-aware navigation. Album cards open on double-click and
-  pass their provider-local artist ID/name into the album detail so its initial
-  track list remains artist-scoped and its show-all checkbox is available. The
-  artist detail stays visible until loading finishes, and Back restores that
-  same detail. Refreshing the profile must restore
-  that unified album strip. The normal Back action returns to the originating
-  view in one step; the transport info overlay remains independently closable.
+  matching local and Orynivo Server identities. The album strip below combines
+  matching local and Orynivo Server identities and de-duplicates equivalent
+  title/year cards while retaining the chosen card's source-aware navigation.
+  Album cards open on double-click and pass their provider-local artist ID/name
+  into the album detail so its initial track list remains artist-scoped and its
+  show-all checkbox is available. The artist detail stays visible until loading
+  finishes, and Back restores that same detail. Refreshing the profile must
+  restore that unified album strip. The normal Back action returns to the
+  originating view in one step; the transport info overlay remains independently
+  closable.
 - Artist detail reuse must reset all profile-bound controls and owning IDs
   before resolving the next artist, so a missing or slow profile can never show
   the previous artist's image/biography or mutate the previous identity. The
@@ -413,26 +486,27 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
 - Artist-detail album cards expose the same missing-artwork cover-search,
   favorite, and source-badge controls as the shared Albums artwork cards.
   Equivalent local/server albums show `L+OS`, apply favorite changes to every
-  represented identity, and open their combined logical album detail. Below the album strip, the detail page
-  shows one source-aware local/Orynivo Server track table ordered by album,
-  disc, and track number. Its rows reuse the normal favorite, source, album-link,
-  context-menu, and double-click playback behavior; track loading must not block
-  profile rendering or discard already loaded album cards when one source fails.
-  That embedded table uses the complete shared Tracks column set and a dedicated
-  `ArtistInfoTracks` column-settings key, so header right-click selection,
-  display order, and widths persist independently from the main Tracks table.
+  represented identity, and open their combined logical album detail. Below the
+  album strip, the detail page shows one source-aware local/Orynivo Server track
+  table ordered by album, disc, and track number. Its rows reuse the normal
+  favorite, source, album-link, context-menu, and double-click playback
+  behavior; track loading must not block profile rendering or discard already
+  loaded album cards when one source fails. That embedded table uses the
+  complete shared Tracks column set and a dedicated `ArtistInfoTracks`
+  column-settings key, so header right-click selection, display order, and
+  widths persist independently from the main Tracks table.
 - `ShowUnifiedArtistAlbumsAsync` renders local albums before remote/profile
   work, loads server album sets concurrently, yields the dispatcher so cards
   paint, and starts profile/image resolution last. Its load version discards
   superseded results. Synchronous local provider calls and bitmap decoding must
   run through `Task.Run`; `ShowArtistInfoAsync` must never reset albums while a
   unified artist context is active.
-- Navigation state must distinguish local, remote, Plex, and unified drill-downs;
-  numeric IDs from different sources can collide. Back restoration of the
-  top-level Artists and Albums views must use the normal unified loader rather
-  than binding `QueryRows` directly, and saved row selection must include its
-  stable source key. Search navigation also saves the selected result's source
-  and the outer result-page offset.
+- Navigation state must distinguish local, remote, Plex, and unified
+  drill-downs; numeric IDs from different sources can collide. Back restoration
+  of the top-level Artists and Albums views must use the normal unified loader
+  rather than binding `QueryRows` directly, and saved row selection must include
+  its stable source key. Search navigation also saves the selected result's
+  source and the outer result-page offset.
 - Keep long mixed-library row composition off the visible `DataGrid` until the
   result is complete, unless a proven virtualized/paged strategy is used.
 - Use shared typography, brushes, vector icons, control themes, loading helpers,
@@ -440,8 +514,8 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
 - The bulk action bar also offers a genre field. Local rows go through
   `AudioDatabase.SetTrackGenres`; Orynivo Server rows go through
   `OrynivoServerClient.UpdateTrackGenreAsync` to that server's
-  `PUT /api/tracks/{id}/genre`. Both are library-only overrides that never rewrite
-  media files, and failures are reported per selection.
+  `PUT /api/tracks/{id}/genre`. Both are library-only overrides that never
+  rewrite media files, and failures are reported per selection.
 - The shared content table supports multi-selection for track rows. Selecting
   more than one local or Orynivo Server track in a Tracks view reveals the bulk
   action bar (`BulkEditBar`) with **Mark as favorite**, **Remove favorite**, and
@@ -450,65 +524,330 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
   the profile-scoped `OrynivoServerFavorites` container and the server rating
   API. The bar stays hidden for every other entity type or view and must never
   persist an authenticated playback URL.
-- Automatic library backups are driven by `AppSettings.ScheduledBackup`
-  (enable, interval days, retention count, folder, last-run timestamp) and the
-  pure, tested `Orynivo.Library.BackupRetention` decisions. The low-frequency
-  timer only checks; the actual export reuses `LibraryBackupService` and prunes
+- Automatic library backups are driven by `AppSettings.ScheduledBackup` (enable,
+  interval days, retention count, folder, last-run timestamp) and the pure,
+  tested `Orynivo.Library.BackupRetention` decisions. The low-frequency timer
+  only checks; the actual export reuses `LibraryBackupService` and prunes
   archives beyond the retention count. Backups must never include audio files or
   credentials, only one run may be in flight at a time, and the backup folder is
   created on demand. Settings exposes the enable toggle, interval, retention,
   folder picker, **Back up now**, and the last successful run.
-- Completed backup archives can additionally be uploaded to a WebDAV
-  collection. `AppSettings.BackupTarget` holds the enable flag, URL, optional
-  sub-folder, and user name; the password is overlaid from
-  `ApplicationCredentialStore` and stays `[JsonIgnore]`. Only plain
-  `http`/`https` URLs without embedded credentials are accepted
-  (`Orynivo.Library.BackupTargets`), the upload itself is best effort and never
-  removes the local archive, and credentials must never appear in a URL, a log,
-  or an error message (`Orynivo.Library.BackupUploader`). The scheduled and
-  **Back up now** paths share `MainWindow.TryUploadBackupAsync`; the explicit
-  **Export library** action still writes only the user-chosen local ZIP.
-- `AppSettings.MaxOutputSampleRateHz` caps the PCM output rate for exclusive WASAPI and
-  ASIO/cwASIO; zero means automatic. Both players must honour it, the WASAPI cap only
-  reorders the candidates (never removes them) so a device that supports nothing at or
-  below the cap still plays, and the Settings control lists automatic plus the standard
-  rates.
-- A DSD source reports its 1-bit rate (352800 for DSD64), so its PCM conversion target
-  must stay an exact division of that rate. `WasapiAudioPlayer.OrderCandidateSampleRates`
-  prefers such a division that does not exceed the conversion hint, and both probes report
-  the same 176400 Hz hint for DSD. Never let the exclusive-format chooser fall back to the
-  device's maximum rate for DSD: a fractional ratio resampled DSD into pure noise on a
-  Sound BlasterX AE-5. The device's reported exclusive-format set is not stable between
-  queries: the same AE-5 reported 192 kHz and 384 kHz as supported in one run and neither
-  in another, under .NET 8 and .NET 10 alike. Never make the DSD conversion depend on that
-  answer alone.
-- The desktop runs on Avalonia 12.1.2 with **compiled bindings enabled by default**;
-  do not add `AvaloniaUseCompiledBindingsByDefault=false` back. Every `DataTemplate`
-  and every item-binding scope needs an explicit `x:DataType`:
-  - Put the item type on the **column or template**, never on the `DataGrid` itself.
-    A grid-level directive also applies to the grid's own bindings (`ItemsSource`,
-    `IsVisible`), which then fail against the item type. `DataGridTemplateColumn` cell
-    templates do not inherit a grid-level directive, so they need their own.
-  - A view model that XAML binds must be a **top-level type**; a nested or private
-    type cannot be named in `x:DataType`. That is why `RadioStationViewModel`,
-    `PodcastViewModel`, `PodcastEpisodeViewModel`, `LyricLineViewModel`,
-    `DailyHistoryRow`, `MetadataProblemRow`, `MetadataRepairHeaderViewModel`,
-    `MetadataRepairPreviewRow`, `TrackInfoEntry`, and the three search-window result
-    view models live in their own files, and why the metadata dialog uses a named
-    header record instead of an anonymous type.
+- Completed backup archives can additionally be uploaded to a WebDAV collection.
+  `AppSettings.BackupTarget` holds the enable flag, URL, optional sub-folder,
+  and user name; the password is overlaid from `ApplicationCredentialStore` and
+  stays `[JsonIgnore]`. Only plain `http`/`https` URLs without embedded
+  credentials are accepted (`Orynivo.Library.BackupTargets`), the upload itself
+  is best effort and never removes the local archive, and credentials must never
+  appear in a URL, a log, or an error message
+  (`Orynivo.Library.BackupUploader`). The scheduled and **Back up now** paths
+  share `MainWindow.TryUploadBackupAsync`; the explicit **Export library**
+  action still writes only the user-chosen local ZIP.
+- `AppSettings.MaxOutputSampleRateHz` caps the PCM output rate for exclusive
+  WASAPI and ASIO/cwASIO; zero means automatic. Both players must honour it, the
+  WASAPI cap only reorders the candidates (never removes them) so a device that
+  supports nothing at or below the cap still plays, and the Settings control
+  lists automatic plus the standard rates.
+- A DSD source reports its 1-bit rate (352800 for DSD64), so its PCM conversion
+  target must stay an exact division of that rate.
+  `WasapiAudioPlayer.OrderCandidateSampleRates` prefers such a division that
+  does not exceed the conversion hint, and both probes report the same 176400 Hz
+  hint for DSD. Never let the exclusive-format chooser fall back to the device's
+  maximum rate for DSD: a fractional ratio resampled DSD into pure noise on a
+  Sound BlasterX AE-5. The device's reported exclusive-format set is not stable
+  between queries: the same AE-5 reported 192 kHz and 384 kHz as supported in
+  one run and neither in another, under .NET 8 and .NET 10 alike. Never make the
+  DSD conversion depend on that answer alone.
+- The visualizer renders through `PresetRenderer` into a low-resolution
+  `PixelBuffer` and presents it through a `WriteableBitmap` that the image
+  control scales up. Both renderer creations enable
+  `PresetRenderer.UseSkiaPasses`, so the comp shader and a warp shader run as
+  Skia runtime effects and the interpreter stays the per-pass fallback; the
+  full-frame passes stay on the interpreter, and their effects are cached for
+  the process because their SkSL is constant. A per-pixel warp program prefers
+  the **parallel interpreter** over the Skia warp pass, because Skia rasterises
+  a runtime effect on one thread while the interpreter splits the rows across
+  every core: measured at 960 x 540, a parallelizable program costs about 18 ms
+  through the interpreter against 65 ms through Skia. The Skia warp pass
+  therefore only runs for a program the interpreter cannot split, which is why
+  the built-in presets keep their per-pixel angle in their own temporary
+  (`spin`, `wedge`, `s`) instead of a standard name like `a2`. Be clear about
+  what that is: `SkiaShaderRunner` builds its surfaces with
+  `SKSurface.Create(Info, pixels, rowBytes)`, which is Skia's **raster**
+  constructor, so those "Skia" passes are Skia's CPU runtime-effect JIT and **no
+  part of the preset pipeline runs on the GPU**. The finished frame is copied
+  into a `WriteableBitmap`, and the GPU only blits that bitmap. A comp shader
+  that samples more than one blur level therefore costs tens to hundreds of
+  milliseconds and needs the budget adaptation described below; do not describe
+  the Skia passes as a GPU path, and do not remove the interpreter fallback on
+  the assumption that Skia is hardware-accelerated. Roadmap 40f moves the
+  pipeline onto OpenGL: `Avalonia` 12 already ships `Avalonia.OpenGL` with
+  `OpenGlControlBase`, and the context is confirmed as OpenGL ES 3.0 through
+  ANGLE on Windows. `Orynivo.Controls.VisualizerGlPresenter` presents the frame
+  and owns the GPU pipeline; it is the default, and
+  `ORYNIVO_VISUALIZER_OPENGL=0` forces the bitmap presentation. The GPU owns the
+  frame only for a preset that builds a mesh, which excludes a per-pixel block
+  that writes the sample position `x` or `y` unless it can be emitted as a warp
+  fragment shader; a block that cannot be emitted keeps the CPU warp and the
+  presenter then uploads the finished CPU frame. A Milkdrop shape fill runs on
+  the GPU too: `PresetRenderer.CollectShapeFills` publishes `ShapeFills`, and
+  `VisualizerGlPipeline.DrawShapeFills` draws the fans into the post's source
+  with premultiplied `ONE, ONE_MINUS_SRC_ALPHA` (and `ONE, ONE` with the alpha
+  channel masked for an additive fill), which is the same "over" `PaintPixel`
+  applies. The fan repeats its first rim vertex because `GL_TRIANGLE_FAN` does
+  not wrap, its position is y-flipped into OpenGL's space, and a textured fill
+  samples the blurred frame with a flipped v. The fixed-function MilkDrop
+  texture stage modulates sampled RGB by the interpolated shape RGB and selects
+  the shape's diffuse alpha; do not use the sampled frame's alpha as fill
+  opacity. A Milkdrop shape's own space is Direct3D's y-up space, so
+  `BuildVertices` negates a `MilkdropCoordinates` shape's y as it leaves the
+  preset's expression space, and the fan centre is converted the same way; the
+  overlay rasterizer itself is y-down, which is why the waveform paths flip
+  explicitly instead. Keep those two conventions apart: the reference measures
+  `shape_y` from the top but `wave_y` from the bottom. `CollectShapeFills` must
+  only be set while `VisualizerGlPresenter.ShapeFillsSupported` is true, because
+  the renderer then skips its own fill. The custom waveforms are drawn on the
+  GPU the same way: `PresetRenderer.CollectWaveGeometry` publishes
+  `WaveGeometry` triangle lists and `VisualizerGlPipeline.DrawWaveGeometry`
+  draws them with the shape program untextured and the same blend, so the CPU
+  overlay no longer rasterizes the thick lines per pixel (that cost about 250 ms
+  per frame for a 512-sample wave at 1920x1080). `CollectWaveGeometry` must only
+  be set while `VisualizerGlPresenter.WaveGeometrySupported` is true, because
+  the renderer then skips its own draw. The borders and the default waveform
+  stay on the CPU. Such a block is emitted by default as a warp fragment shader
+  that computes the coordinate per pixel (`ShaderTranspiler.TranspileGlslWarp`
+  with a null body, drawn over a full-screen quad with the `_orynivo_*` motion
+  uniforms seeded from the mesh's first vertex, and the decay moved to the post
+  pass); `ORYNIVO_VISUALIZER_PIXELWARP=0` forces the CPU warp.
+  `ShaderTranspiler` must not fail the mesh path over such a block: the mesh
+  runs it and the shader never emits it, so only its uniforms are lost, while
+  the comp and Skia paths keep failing. A whole-frame CPU comparison cannot see
+  the warp, so its check draws the overlay only for the first frames and follows
+  the brightness centroid of the remaining warped feedback, with a control
+  preset without the block as the negative control. When the preset has no
+  shaders, `Orynivo.Controls.VisualizerGlPipeline` owns the whole frame: the
+  warp as a mesh draw whose fragment shader is a translation of
+  `WarpSampling.SamplePosition`, the blur as the same nine-tap clamped box
+  filter with ping-pong targets, and decay, video echo, centre darkening, both
+  border bands, gamma, and the additive overlay composite in one post pass. The
+  post pass draws the border bands as the same clip-space Chebyshev rings the
+  CPU uses, reading `VisualizerFrameParameters.OuterBorder`/`InnerBorder` (Inset
+  is the inner clip radius and Thickness the clip width); it must not fall back
+  to a min-dimension inset. `PresetRenderer.ExpressionsOnly` is the CPU half:
+  the per-frame block, the mesh, and the overlay, with no pixel pass. Keep the
+  bitmap path as the fallback for a platform whose GL context never arrives: the
+  window confirms the presenter once it has drawn a frame and otherwise switches
+  back within `GlPresenterGraceSeconds`, re-enabling the complete CPU frame.
+  Keep a shader, context, or pipeline failure logged and non-fatal (a failed
+  pipeline hands the frame back to the CPU), and remember two `GlInterface`
+  limits: it exposes only scalar uniforms, so a vector uniform is set component
+  by component, and it exposes no `TexSubImage2D`, so a texture update
+  re-specifies it through `TexImage2D` or goes through `GetProcAddress`. Every
+  GL texture holds the frame bottom-up, which is OpenGL's natural orientation,
+  so the overlay upload and the warp shader convert between that and the
+  engine's top-down coordinates; do not mix the two. The presenter must draw on
+  **every** refresh and re-present the texture it drew last when the render
+  thread published nothing new: Avalonia's GL surface is double buffered, so a
+  refresh that draws nothing swaps to the buffer two presentations old and the
+  picture appears to jump backwards. The render loop publishes at the configured
+  frame rate while the control refreshes at the display rate, so an undrawn
+  refresh is the normal case. **Every** pass clamps its colour output to
+  zero-to-one. When publishing a GPU frame, snapshot the overlay, mesh, shape
+  fills, and uniforms together: the render thread reuses its buffers
+  immediately, while Avalonia's GL callback consumes the published frame later.
+  `VisualizerPresetLibrary.At` logs the exact selected external section and
+  SHA-256 digest on first parse; the window logs the first frame's wave mode and
+  whether the GPU pipeline or CPU frame was actually handed to the presenter.
+  The GL callback also logs the applied preset index, linked shader stages, and
+  GLSL digests; inspect this event when the selected label and displayed picture
+  disagree. Mouse navigation advances only on the first primary-button press and
+  must exclude the transport button itself as well as its descendants. The clamp
+  is what gives a preset that amplifies its own feedback a stable fixed point,
+  so a float format without it diverges exponentially, becomes an infinity and
+  then a NaN, and paints the frame white. The float format buys precision, not
+  range. For `RGBA16F` render textures, `TexImage2D` must use `GL_HALF_FLOAT` as
+  its data type even with null initial data; ANGLE rejects `GL_UNSIGNED_BYTE`
+  with 0x502 and forces the pipeline's eight-bit fallback. A preset with shaders
+  now uses the GL pipeline too when its comp and warp shaders emit GLSL:
+  `ShaderTranspiler`'s GLSL dialect (`TranspileGlsl`, `TranspileGlslComp`,
+  `TranspileGlslWarp`) produces a `void main()` writing `orynivoColor`,
+  `VisualizerGlPipeline` runs the warp shader in place of the fixed mesh warp
+  and the comp shader after the post pass into its own display target, and the
+  feedback stays the pre-comp frame. The GLSL samples with normalised
+  coordinates while Skia's `eval` takes pixels, so the emitter branches on the
+  dialect; the vector uniforms are declared as scalars with a reconstructing
+  macro because `GlInterface` only exposes scalar uniform setters; and
+  `PresetRenderer.WriteShaderUniforms` seeds the same values the interpreter
+  binds. A shader the dialect cannot express leaves that stage on the fixed
+  pipeline, and a preset whose shaders do not emit keeps the CPU frame path.
+  `VisualizerWindow` owns `VisualizerAudioHub.IsActive`: while it is false the
+  players skip the tap entirely, so a closed visualizer costs nothing. Never
+  render, analyse, or evaluate preset expressions on the audio thread. A preset
+  switch must retain the audio analyzer's long-term loudness history; clearing
+  it on every selection can produce an extreme first-frame warp in MilkDrop
+  presets. Keep the window's `ReduceMotion` path on
+  `PresetRenderer.RenderOverlayOnly` so the reduce-motion preference is
+  honoured. The window renders with a silent audio source when nothing is
+  playing, so it never stays black, and `PixelBuffer.SampleBilinear` returns
+  transparent black outside the frame: clamping to the edge smeared the border
+  colour into long gradients when a preset warped outwards. Writing the frame
+  into the bitmap is not enough to make it visible: `Present()` must also call
+  `InvalidateVisual()` on the image, otherwise the window stays black even
+  though every frame renders correctly. The transport button **Visualisierung**
+  opens the window (there is no sidebar entry); it overlays the current title
+  and artist at the top and previous, play/pause, and next buttons at the bottom
+  left, wired through `VisualizerTransport` to the normal transport methods so
+  playback can be driven from the fullscreen window. Its overlay buttons copy
+  the transport bar's own geometry and sizes (36 px skip buttons with the
+  transport's 16 px glyphs, a 50 px play button with its 20 px glyph) instead of
+  scaling a generic path, because a stretched glyph does not sit optically
+  centred in its circle. The overlay buttons are deliberately not focusable: the
+  arrow keys switch presets, and a focusable button would keep a focus ring
+  after the key press. `AppSettings` stores the render size
+  (`VisualizerRenderWidth`/`VisualizerRenderHeight`), the target
+  `VisualizerFrameRate`, and the user preset folder; the **Visualisierung**
+  settings section edits all three, and the window clamps them to a sane range
+  (160-7680 wide, 5-240 fps). The resolution choices run from 320 x 180 up to
+  3840 x 2160; keep the list ordered from the largest down, and resolve a
+  missing selection through a named default rather than an index, because an
+  index silently changes meaning when an entry is added.
+  `VisualizerAutoAdvanceEnabled` and `VisualizerAutoAdvanceSeconds` (default 15)
+  let the render loop advance to the next preset after the dwell time; the
+  window only sets `_presetIndex` and lets the next frame apply the switch, so
+  the change stays a render-thread request like the key and mouse navigation.
+  `AppSettings.VisualizerPresetBlendSeconds` (default 0 = hard switch) makes the
+  window capture the outgoing preset's live slots with
+  `PresetRenderer.CaptureFrameState` before the old renderer is disposed and
+  call `SetBlend` each frame with the eased progress, so a switch eases its
+  non-motion parameters instead of snapping; the blend is cleared on reset, on
+  the next switch, and when the progress reaches one. The window additionally
+  snapshots the outgoing preset's GPU mesh and passes it with the eased mix to
+  `VisualizerGlPresenter.SetPipeline`, whose warp morphs the sampling coordinate
+  from that mesh to the incoming one through the second per-vertex motion block
+  and `uBlend`. The defaults are 640 x 360 at 60 frames per second, which the
+  parallel frame passes made affordable. The built-in presets are structured
+  warp-shader effects (see `VisualizerPresets`), and
+  `RenderTimingDiagnosticTests` documents their cost profile at two resolutions.
+  `VisualizerAlwaysShowOverlay` decides whether the overlay is permanent or
+  appears on pointer activity for three seconds; the reveal is driven by the
+  window's own `PointerMoved`, which only fires while the pointer is over it, so
+  a mouse move on another monitor must never reveal the overlay. Never replace
+  that with a global pointer hook. The window's once-per-second diagnostic line
+  also carries the averaged `RenderTimings` per stage (render, warp, blur, post,
+  overlay, composite, comp shader) plus the render size, the frame's mean
+  brightness and its **saturated share**, the frame's brightness **per stage**,
+  the presenter's source and destination brightness (`presentBrightness`), the
+  shader grid state, whether the per-pixel program is suspended, and any shader,
+  render, preset, or presentation error, so render cost is measured rather than
+  guessed. Keep the saturated share: a white window is either a genuinely
+  saturated frame or a frame that never reaches the screen, and only that number
+  tells the two apart, because a presentation fault leaves the rendered frame's
+  brightness and saturation untouched. Keep the line bounded and free of media
+  names and paths. The per-stage brightness must stay truthful: `PresetRenderer`
+  invokes its `StageBrightnessLogger` once per stage on **every** frame with the
+  mean brightness of the buffer that stage reads, and `PresetRenderer.Output` is
+  the post-comp display frame while `MeshSource` is the pre-comp feedback.
+  Sampling `Output` at a stage boundary instead reported the previous frame,
+  which made every stage look identical and pointed a white frame at the wrong
+  stage; a stale diagnostic is worse than none. The `presentBrightness` pair
+  samples the presentation buffer under `_presentLock` before and after the copy
+  plus the destination bytes, so a copy or bitmap fault is told apart from a
+  genuinely white source frame in one run. The render loop runs on a background
+  thread (`RenderLoop`, `RenderOneFrame`) because a frame can cost tens of
+  milliseconds; never move it back onto the Avalonia dispatcher. The UI thread
+  only ever reads the presentation buffer, never the renderer's live buffers,
+  and the short copy under `_presentLock` is the only shared state between the
+  two threads: keep it that way, and keep `PostPresent` coalescing to one queued
+  present so a busy UI thread cannot build a backlog. Preset switching
+  (`_presetIndex`), the reset key (`_resetRequested`), and shutdown
+  (`_renderRunning`, `_closed`) travel as flags that the render thread applies,
+  so UI event handlers must never touch the renderer directly. A completed
+  presentation snapshot carries the preset index, name, shader sources, mesh,
+  overlay, and uniforms together. The label follows
+  `GlPresenter.DrawnPresetIndex` on the GPU path, or the copied frame index on
+  the bitmap path; never advance it from `_presetIndex` or
+  `_renderedPresetIndex` before the frame reaches the presenter. A preset switch
+  must **not** clear the feedback: like Milkdrop, the new preset continues from
+  the last frame of the previous one, so `VisualizerGlPresenter` clears the
+  feedback only when its size changes (a freshly allocated texture holds
+  undefined content), and the CPU path seeds the new renderer with the previous
+  `MeshSource` through `PresetRenderer.SeedFeedback`. Frame pacing lives in the
+  pure, tested `Orynivo.Visualization.FramePacing`. `VisualizerPresetLibrary`
+  loads the built-in presets plus `.oryvis` and `.milk` files from
+  `AppSettings.VisualizerPresetDirectory` (default: a `visualizer-presets`
+  folder below the data root, including its subfolders, because preset
+  collections are sorted into directories; every `[presetNN]` section of a
+  `.milk` file becomes its own preset, a file that fails to parse is skipped and
+  reported with its reason through `RejectedReasons`, never fatal, and preset
+  files stay user data like equalizer profiles. User presets are discovered
+  eagerly but parsed lazily in `At`, one at a time, because compiling a preset
+  builds and JIT-compiles its expression trees; a collection of several hundred
+  presets must never be compiled when the window opens. Keep the discovered
+  count (`Count`) separate from the parsed presets, report a failure on first
+  use through `RejectedReasons`, and fall back to the first built-in so one
+  broken file can never stop the visualizer.
+  `AppSettings.DisabledVisualizerPresets` stores the stable keys the user
+  deactivated (`builtin:<name>` for a built-in,
+  `file:<path relative to the preset folder>` for a user file, so every section
+  of one file shares the file's key). `VisualizerPresetLibrary.Describe` lists
+  the built-ins and every discovered file without reading them for the **Select
+  presets…** dialog, and `SetDisabledKeys`/`ResolveEnabledIndex` make the
+  window's open, step, auto-advance, and mouse navigation skip a deactivated
+  preset in the requested direction; when every preset is deactivated the
+  requested index is kept so the visualizer never stops rendering. The window
+  must also re-check `IsDisabled` before every preset switch and once discovery
+  finishes, because the initial index is resolved against the built-ins only and
+  the deactivated set (or a user file) can arrive later; a deactivated preset
+  must never reach the renderer. `LoadBuiltIns` is the only thing the window
+  constructor may call: it touches no disk, so the window opens and renders
+  while `Discover` enumerates the folder on a worker thread. Discovery records
+  file paths only, never file contents, because a real collection holds
+  thousands of files and reading them up front froze the whole application; a
+  file is read the first time one of its presets is shown, and a multi-section
+  file exposes its remaining sections then. Never move discovery back onto the
+  UI thread, and keep `Count` and `At` usable while it runs.
+  `VisualizerPresets.BuiltIn` holds nine hand-written warp-shader presets
+  (`Spiral`, `Kaleidoscope`, `Fractal`, `Ripple`, `Vortex`, `Bloom`,
+  `Spectrum Bars`, `Starfield`, `Orbit`): each carries a small `warp_N` shader
+  that reads the previous feedback, so a first run shows structure instead of a
+  flat full-screen smear. Keep them on the documented expression and shader
+  subset, because they double as authoring examples; a procedural background
+  that accumulates through the feedback must be bounded (for example with `max`)
+  so it cannot blow out to white.
+  `VisualizerPresetsTests.BuiltIn_ContainsAWarpingPreset` accepts either a
+  per-pixel program or a warp shader. Preset stages share one slot layout, so a
+  stage-local built-in such as `x` or `rad` is one slot that each stage seeds
+  and reads back for itself: the per-pixel stage seeds it per pixel, a shape
+  seeds it per shape and per vertex. Never let a stage assume another stage's
+  value is still in place.
+- The desktop runs on Avalonia 12.1.2 with **compiled bindings enabled by
+  default**; do not add `AvaloniaUseCompiledBindingsByDefault=false` back. Every
+  `DataTemplate` and every item-binding scope needs an explicit `x:DataType`:
+  - Put the item type on the **column or template**, never on the `DataGrid`
+    itself. A grid-level directive also applies to the grid's own bindings
+    (`ItemsSource`, `IsVisible`), which then fail against the item type.
+    `DataGridTemplateColumn` cell templates do not inherit a grid-level
+    directive, so they need their own.
+  - A view model that XAML binds must be a **top-level type**; a nested or
+    private type cannot be named in `x:DataType`. That is why
+    `RadioStationViewModel`, `PodcastViewModel`, `PodcastEpisodeViewModel`,
+    `LyricLineViewModel`, `DailyHistoryRow`, `MetadataProblemRow`,
+    `MetadataRepairHeaderViewModel`, `MetadataRepairPreviewRow`,
+    `TrackInfoEntry`, and the three search-window result view models live in
+    their own files, and why the metadata dialog uses a named header record
+    instead of an anonymous type.
   - `ContentRow` and `LogicalAlbumPart` are top-level types too; there is no
-    `{ReflectionBinding}` left in the views. Keep it that way: a row model bound from
-    XAML must never move back into `MainWindow`.
-  SkiaSharp moves with Avalonia: use `SKSamplingOptions`/`SKFont` instead of the
-  removed 2.88 text and sampling APIs on `SKPaint`.
+    `{ReflectionBinding}` left in the views. Keep it that way: a row model bound
+    from XAML must never move back into `MainWindow`. SkiaSharp moves with
+    Avalonia: use `SKSamplingOptions`/`SKFont` instead of the removed 2.88 text
+    and sampling APIs on `SKPaint`.
 - Cross-device resume for remote Orynivo Server tracks lives in
   `MainWindow.CrossDeviceResume.cs`. The last audible position is published at
   most every 20 seconds and only through the authenticated, profile-scoped
-  `SaveTrackPositionAsync`, and the **Resume** transport action appears only when
-  the pure, tested `Orynivo.Library.CrossDeviceResume.ShouldOffer` accepts the
-  stored position. Never persist a credential-bearing stream URL for this, never
-  block playback on a publish or fetch failure, and clear the prompt when the
-  now-playing remote row changes.
+  `SaveTrackPositionAsync`, and the **Resume** transport action appears only
+  when the pure, tested `Orynivo.Library.CrossDeviceResume.ShouldOffer` accepts
+  the stored position. Never persist a credential-bearing stream URL for this,
+  never block playback on a publish or fetch failure, and clear the prompt when
+  the now-playing remote row changes.
 - Optional UI motion is governed by `AppSettings.ReduceMotion` through the pure,
   tested `Orynivo.Controls.MotionPreferences` helper. The Genre Cloud, the
   Dashboard cover stage, and `KaraokeWindow` must ask that helper instead of
@@ -519,72 +858,75 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
   `AutomationProperties.Name` that matches their localized tooltip.
 - Enhanced-LRC word timestamps (`<mm:ss.xx>`) are parsed by
   `LyricsService.ParseLrc` into `TimedLyricLine.Words`, which also strips the
-  markers from the line text. `KaraokeWindow` renders such a line as one `Run` per
-  word and repaints only the active slot when the word changes, so the surrounding
-  opacity/font-size transitions keep animating. Plain synchronized lines keep the
-  line-level highlight through `LyricLineSelector`, which is also the word-level
-  selector.
-- The lyrics view's **Karaoke** action opens `KaraokeWindow` fullscreen. It shows
-  a fixed window of synchronized lines around the active one, emphasizes the
-  active line, and animates opacity and font size through `Transitions`; the
-  main window pushes positions from its existing transport timer and never adds a
-  second polling loop. Karaoke requires synchronized lines, closes on Esc, a
-  click, or whenever the lyrics are cleared, and the active-line lookup must stay
-  in the pure, tested `Orynivo.Library.LyricLineSelector`.
+  markers from the line text. `KaraokeWindow` renders such a line as one `Run`
+  per word and repaints only the active slot when the word changes, so the
+  surrounding opacity/font-size transitions keep animating. Plain synchronized
+  lines keep the line-level highlight through `LyricLineSelector`, which is also
+  the word-level selector.
+- The lyrics view's **Karaoke** action opens `KaraokeWindow` fullscreen. It
+  shows a fixed window of synchronized lines around the active one, emphasizes
+  the active line, and animates opacity and font size through `Transitions`; the
+  main window pushes positions from its existing transport timer and never adds
+  a second polling loop. Karaoke requires synchronized lines, closes on Esc, a
+  click, or whenever the lyrics are cleared, and the active-line lookup must
+  stay in the pure, tested `Orynivo.Library.LyricLineSelector`.
 - The Dashboard **Year in review** action lives in the Listening stats card
   directly below its period selector, so both share one context. It opens
-  `YearInReviewDialog`, which
-  renders the existing year aggregates from `AudioDatabase.GetYearInReview` and
-  exports the visible card through `RenderTargetBitmap`. It must only read
-  playback history, must load each year off the UI thread, and must keep the
-  export bounded to the rendered card. A past year must never include later
-  listening: the shared top-genre, album, and artist queries take an optional
-  exclusive upper time bound for that reason.
+  `YearInReviewDialog`, which renders the existing year aggregates from
+  `AudioDatabase.GetYearInReview` and exports the visible card through
+  `RenderTargetBitmap`. It must only read playback history, must load each year
+  off the UI thread, and must keep the export bounded to the rendered card. A
+  past year must never include later listening: the shared top-genre, album, and
+  artist queries take an optional exclusive upper time bound for that reason.
 - The estimated musical key travels with the compact track data:
   `TrackListInfo.CamelotKey` feeds `ContentRow.CamelotKey` (local and remote
-  providers), the shared track-column set exposes it as the optional `camelotKey`
-  column for Tracks, Up Next, and playlists, and **Show track information** lists
-  it. Never recompute the key in the UI, and never persist a key that did not
-  come from the cached analysis. Settings > Playback owns the explicit
-  **Analyze audio features** action; it runs the local library through
+  providers), the shared track-column set exposes it as the optional
+  `camelotKey` column for Tracks, Up Next, and playlists, and **Show track
+  information** lists it. Never recompute the key in the UI, and never persist a
+  key that did not come from the cached analysis. Settings > Playback owns the
+  explicit **Analyze audio features** action; it runs the local library through
   `AudioFeatureMaintenanceService` and requests bounded batches from each
   configured server, stays cancellable, and cancels on Settings deactivation.
 - Last.fm scrobbling mirrors the transport favourite button through
   `LastFmScrobblingService.SetTrackLoved` and `LastFmClient.SetTrackLovedAsync`
   (`track.love`/`track.unlove`, artist and track only). The call is best effort:
-  it never blocks playback, is skipped for items without an artist and title, and
-  is not queued while offline. `BuildLastFmTrack` is the single place that builds
-  the metadata for both now-playing and love, so an untagged item never produces
-  a request Last.fm rejects.- The year-in-review export shares one pure content model,
-  `Orynivo.Controls.YearInReviewLayout` (title, headline, monthly bar ratios, and
-  the leading sections). The Avalonia dialog renders it as controls; the PDF
-  export draws it through SkiaSharp in `YearInReviewPdfExporter`, which must stay
-  bounded to one A4 page, offline, and free of new data collection. SkiaSharp is
-  used through Avalonia.Skia's pinned 2.88.9 reference, so do not add a separate
-  SkiaSharp package reference to the desktop project.- The Infinite Mix profile editor offers Focus/Workout/Wind down presets through
-  the pure `Orynivo.InfiniteMixPresets.Apply`, which only pre-fills the mood,
-  discovery level, history period, and weighting and must preserve the server
-  selection, genre filters, feedback, and exclusions. Descriptor-based preset
-  scoring stays in the context-menu activity mix (`SimilarityFeatureService.RankPreset`);
-  the Infinite Mix profile itself remains metadata-based because the genre-cloud
-  candidate payload carries no acoustic descriptors.- Podcast downloads live in `PodcastDownloadService` beneath the per-user
-  `podcast-downloads` cache. `PodcastDownloadCache.BuildCacheFileName` derives a
-  stable hashed name per podcast and episode key, playback prefers the cached file
-  and marks it used, and `EnforceLimit` evicts through the pure
+  it never blocks playback, is skipped for items without an artist and title,
+  and is not queued while offline. `BuildLastFmTrack` is the single place that
+  builds the metadata for both now-playing and love, so an untagged item never
+  produces a request Last.fm rejects.- The year-in-review export shares one pure
+  content model, `Orynivo.Controls.YearInReviewLayout` (title, headline, monthly
+  bar ratios, and the leading sections). The Avalonia dialog renders it as
+  controls; the PDF export draws it through SkiaSharp in
+  `YearInReviewPdfExporter`, which must stay bounded to one A4 page, offline,
+  and free of new data collection. SkiaSharp is used through Avalonia.Skia's
+  pinned 2.88.9 reference, so do not add a separate SkiaSharp package reference
+  to the desktop project.- The Infinite Mix profile editor offers
+  Focus/Workout/Wind down presets through the pure
+  `Orynivo.InfiniteMixPresets.Apply`, which only pre-fills the mood, discovery
+  level, history period, and weighting and must preserve the server selection,
+  genre filters, feedback, and exclusions. Descriptor-based preset scoring stays
+  in the context-menu activity mix (`SimilarityFeatureService.RankPreset`); the
+  Infinite Mix profile itself remains metadata-based because the genre-cloud
+  candidate payload carries no acoustic descriptors.- Podcast downloads live in
+  `PodcastDownloadService` beneath the per-user `podcast-downloads` cache.
+  `PodcastDownloadCache.BuildCacheFileName` derives a stable hashed name per
+  podcast and episode key, playback prefers the cached file and marks it used,
+  and `EnforceLimit` evicts through the pure
   `PodcastDownloadCache.SelectForEviction` (least recently used first, newest
   always kept). The limit is `AppSettings.PodcastDownloadLimitMb`. Episode rows
   carry a download marker and their own context flyout, attached from
   `TrackDataGrid_OnLoadingRow` when the row data context is an episode.
-- `ReferenceTrackPickerDialog` is the shared search dialog for picking a similarity
-  reference track. It never touches the database or the network itself: the caller
-  supplies the search through `Search` (the editor receives it via
-  `ReferenceTrackPicker`), and `MainWindow.SearchReferenceTracksAsync` queries the
-  local index plus every configured Orynivo Server, returning only credential-free
-  `local`/`server:<id>` identities.- The smart-playlist editor (`SmartPlaylistDialog`) must show every stored
-  criterion and must never drop a criterion it cannot rebuild from its own input
-  fields. The similarity reference is displayed with a readable track label
-  (track title and artist for local references, server name for remote ones) and
-  is carried across a save through the pure, tested
+- `ReferenceTrackPickerDialog` is the shared search dialog for picking a
+  similarity reference track. It never touches the database or the network
+  itself: the caller supplies the search through `Search` (the editor receives
+  it via `ReferenceTrackPicker`), and `MainWindow.SearchReferenceTracksAsync`
+  queries the local index plus every configured Orynivo Server, returning only
+  credential-free `local`/`server:<id>` identities.- The smart-playlist editor
+  (`SmartPlaylistDialog`) must show every stored criterion and must never drop a
+  criterion it cannot rebuild from its own input fields. The similarity
+  reference is displayed with a readable track label (track title and artist for
+  local references, server name for remote ones) and is carried across a save
+  through the pure, tested
   `SmartPlaylistCriteriaEditing.ResolveSimilarityReference`; it is removed only
   through the explicit **Remove reference** action. The reference label lookup
   runs off the UI thread.
@@ -605,10 +947,10 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
 - Main-window placement is persisted only from the normal state. When maximized
   startup is disabled, validate the saved rectangle against current screens and
   center the window if its previous monitor is no longer attached.
-- Full server track catalogs must request at most 5,000 tracks per page, matching
-  the server cap; requesting more falsely signals the end of pagination. Track
-  cache schema version 1 rejects legacy potentially truncated caches. Reapply
-  current client favorites after loading cached tracks.
+- Full server track catalogs must request at most 5,000 tracks per page,
+  matching the server cap; requesting more falsely signals the end of
+  pagination. Track cache schema version 1 rejects legacy potentially truncated
+  caches. Reapply current client favorites after loading cached tracks.
 - Interactive cards use the shared cyan-violet gradient hover border. Main
   sidebar entries carry a source-appropriate shared vector icon; smart playlists
   use the shared 13-px icon footprint and spacing but retain a dedicated orange
@@ -632,27 +974,27 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
   The startup update notification offers that explicit action and then reuses
   the About window's verified download, server-relay, and installer flow.
   Server-update HTTP rejections must expose their status code in Settings rather
-  than being collapsed into the "no update" state.
-  Starting a desktop update from About first relays the matching signed release
-  to every reachable update-enabled configured server. Failed servers are named
-  and require an explicit choice before the platform installer continues.
-- Linux desktop updates map Arch-family distributions (including CachyOS) to
-  the signed `arch` package, Debian-family distributions to `deb`, and
-  RPM-family distributions to `rpm`. After digest verification, installation
-  must run through `/usr/bin/pkexec` and the distribution package manager; a
-  downloaded package must never be launched as an executable. The client must
-  await the privileged package-manager exit and shut down only after exit code
-  zero; authentication cancellation and package-manager failures keep Orynivo
-  open and are logged.
-- Tagged macOS releases publish architecture-specific `osx-arm64` and
-  `osx-x64` application bundles as installable PKGs, portable ZIPs, and tar
-  archives. The PKG installs `Orynivo.app` beneath `/Applications`; all package
-  variants must remain required inputs to the signed release manifest. Each
-  bundle must contain `Contents/Resources/Orynivo.icns` generated from
-  `Logo/icon.png` and referenced by `CFBundleIconFile` in `Info.plist`. macOS
-  automatic updates select the current architecture's signed PKG, verify its
-  digest through `ReleaseUpdateService`, and open the verified file through
-  `/usr/bin/open`; do not invoke `installer` or request privileges directly.
+  than being collapsed into the "no update" state. Starting a desktop update
+  from About first relays the matching signed release to every reachable
+  update-enabled configured server. Failed servers are named and require an
+  explicit choice before the platform installer continues.
+- Linux desktop updates map Arch-family distributions (including CachyOS) to the
+  signed `arch` package, Debian-family distributions to `deb`, and RPM-family
+  distributions to `rpm`. After digest verification, installation must run
+  through `/usr/bin/pkexec` and the distribution package manager; a downloaded
+  package must never be launched as an executable. The client must await the
+  privileged package-manager exit and shut down only after exit code zero;
+  authentication cancellation and package-manager failures keep Orynivo open and
+  are logged.
+- Tagged macOS releases publish architecture-specific `osx-arm64` and `osx-x64`
+  application bundles as installable PKGs, portable ZIPs, and tar archives. The
+  PKG installs `Orynivo.app` beneath `/Applications`; all package variants must
+  remain required inputs to the signed release manifest. Each bundle must
+  contain `Contents/Resources/Orynivo.icns` generated from `Logo/icon.png` and
+  referenced by `CFBundleIconFile` in `Info.plist`. macOS automatic updates
+  select the current architecture's signed PKG, verify its digest through
+  `ReleaseUpdateService`, and open the verified file through `/usr/bin/open`; do
+  not invoke `installer` or request privileges directly.
 - Settings must hide Steinberg ASIO and cwASIO subsystem badges on non-Windows
   platforms. FFmpeg and other genuinely cross-platform subsystem badges remain
   visible.
@@ -660,30 +1002,29 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
   from Settings > Appearance, defaults to visible, and is applied with the
   existing Internet Radio, Podcasts, and Up Next item toggles.
 - `RefreshQueueRows` must copy a registered remote track's `OrynivoServer`
-  context together with its display metadata. Otherwise the shared source
-  column mislabels that queue row as local. Keep this context memory-only and
-  never persist its authenticated playback URL or API key.
+  context together with its display metadata. Otherwise the shared source column
+  mislabels that queue row as local. Keep this context memory-only and never
+  persist its authenticated playback URL or API key.
 - The Up Next table uses the same selectable track-column set as the Tracks
   view. Album and artist cells remain navigation links, and queue refreshes
   during track transitions must restore the prior pixel scroll offset.
 - Interface languages include German, English, French, Spanish, Russian, and
-  Simplified Chinese (`zh-CN`), and Hindi (`hi-IN`). New visible strings must be added to every
-  complete built-in language resource in LocalizationManager.cs. All seven
-  languages use the same constructor/property schema; do not add overlays
-  or inherit English text for untranslated entries.
-  Dynamic navigation headers and the open Dashboard must be rebuilt after a
-  runtime language change so they cannot retain labels from the previous
-  language.
-  Keep format placeholders intact. Run scripts/verify-localization-parity.ps1
-  from the repository root to check all seven resource sets and the website.
-- Track context menus, including Up Next, expose **Show track information**;
-  the modal lists the physical file path first and then every selectable track
+  Simplified Chinese (`zh-CN`), and Hindi (`hi-IN`). New visible strings must be
+  added to every complete built-in language resource in LocalizationManager.cs.
+  All seven languages use the same constructor/property schema; do not add
+  overlays or inherit English text for untranslated entries. Dynamic navigation
+  headers and the open Dashboard must be rebuilt after a runtime language change
+  so they cannot retain labels from the previous language. Keep format
+  placeholders intact. Run scripts/verify-localization-parity.ps1 from the
+  repository root to check all seven resource sets and the website.
+- Track context menus, including Up Next, expose **Show track information**; the
+  modal lists the physical file path first and then every selectable track
   metadata field without exposing authenticated remote playback URLs. Remote
   Orynivo Server paths use the configured server name as a prefix.
 - Persisted Up Next entries from Orynivo Server must use stable
   `orynivo://serverId/track/trackId` references rather than credential-bearing
-  stream URLs. Restore those references asynchronously after startup and
-  resolve them only when playback or metadata requires it. Build and parse these
+  stream URLs. Restore those references asynchronously after startup and resolve
+  them only when playback or metadata requires it. Build and parse these
   references (and the `orynivo-album:serverId:albumId` drag references) only
   through the tested `Orynivo.PlaylistReferences`; never inline the format.
 - The single-track **Play more like this** action may combine local and Orynivo
@@ -693,12 +1034,12 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
   ranked candidates refill through the normal Infinite Mix threshold; stopping
   or starting a regular mix must clear that transient profile. Quick mood mixes
   use the same transient continuation path and must begin with the track whose
-  context menu launched the action.
-  Compact vectors use one coalesced five-minute memory cache; unified catalog
-  invalidation must also invalidate this cache, and diagnostics may log only
-  aggregate vector counts and elapsed time, never library metadata.
-  After a similarity or mood mix is queued, navigation must switch to the
-  Up Next view so the generated queue is immediately visible.
+  context menu launched the action. Compact vectors use one coalesced
+  five-minute memory cache; unified catalog invalidation must also invalidate
+  this cache, and diagnostics may log only aggregate vector counts and elapsed
+  time, never library metadata. After a similarity or mood mix is queued,
+  navigation must switch to the Up Next view so the generated queue is
+  immediately visible.
 - Infinite Mix (`MainWindow.InfiniteMix.cs`) uses the persisted
   `AppSettings.InfiniteMix` profile: calm/balanced/energetic mood,
   familiar-to-adventurous discovery, 3/7/30/90-day history, local and selected
@@ -712,51 +1053,52 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
   `server:<serverId>:<trackId>`. Normal explicit queue replacement and Clear
   Queue stop automatic refill. Initial generation must show
   `InfiniteMixLoadingOverlay` with staged progress and block duplicate
-  interaction; threshold refills remain unobtrusive in the background.
-  Starting a mix during active playback must retain the audible item at queue
-  position zero and append recommendations behind it. Initial refill must not
-  refresh the active gapless session while the blocking overlay is visible;
-  after the overlay closes, refresh through `StartPlaybackAsync` with its
-  `initialPosition` argument so no audio from position zero is replayed.
-  The profile dialog is resizable with a bounded minimum size, and its scroll
-  content reserves a right-side gutter so overlay scrollbars never cover text
-  or inputs at any supported display scale. Included and excluded genres use
+  interaction; threshold refills remain unobtrusive in the background. Starting
+  a mix during active playback must retain the audible item at queue position
+  zero and append recommendations behind it. Initial refill must not refresh the
+  active gapless session while the blocking overlay is visible; after the
+  overlay closes, refresh through `StartPlaybackAsync` with its
+  `initialPosition` argument so no audio from position zero is replayed. The
+  profile dialog is resizable with a bounded minimum size, and its scroll
+  content reserves a right-side gutter so overlay scrollbars never cover text or
+  inputs at any supported display scale. Included and excluded genres use
   removable chips. Their type-ahead suggestions load asynchronously from the
-  currently checked local/server sources; unavailable servers must not block
-  the dialog, and arbitrary custom genre values remain valid.
-  Batch diversity is progressive: first avoid recent artists and repeated
-  albums, then permit artist repetition, and finally permit further eligible
-  tracks from represented albums. Narrow genres with only a few albums must
-  still fill the requested batch from their remaining candidates. Repeated
-  refills rotate through the stable provider candidate order instead of
-  querying the same bounded prefix forever; active playback also performs a
-  throttled lightweight threshold check so refill is not dependent on queue-view
-  events and an empty/error refill does not create a tight request loop.
+  currently checked local/server sources; unavailable servers must not block the
+  dialog, and arbitrary custom genre values remain valid. Batch diversity is
+  progressive: first avoid recent artists and repeated albums, then permit
+  artist repetition, and finally permit further eligible tracks from represented
+  albums. Narrow genres with only a few albums must still fill the requested
+  batch from their remaining candidates. Repeated refills rotate through the
+  stable provider candidate order instead of querying the same bounded prefix
+  forever; active playback also performs a throttled lightweight threshold check
+  so refill is not dependent on queue-view events and an empty/error refill does
+  not create a tight request loop.
 - Remote album lists are cached by `LibraryChangedAt`, but artwork mutations do
   not advance that scan timestamp. Every successful remote album artwork upload,
-  reassignment, or deletion must therefore call `DeleteOrynivoAlbumListCache`
-  so Genre Cloud and other later album views reload current artwork metadata.
+  reassignment, or deletion must therefore call `DeleteOrynivoAlbumListCache` so
+  Genre Cloud and other later album views reload current artwork metadata.
 - Local album artwork writes generate cache files and Skia thumbnails and must
   run off the UI thread through `LocalLibraryCatalogProvider`. After assignment,
   update the bound `ContentRow` in place; do not rebuild the complete unified
   Albums view merely to display the new bitmap. Album detail may reload only its
   compact header row.
-- macOS must configure `AvaloniaNativePlatformOptions.RenderingMode` with
-  OpenGL first and software second. Do not re-enable Metal without verifying
-  Orynivo's gradient and rounded-surface shaders on both Intel and Apple
-  Silicon Macs; Skia's Metal compiler can reject them after its 300-ms timeout.
+- macOS must configure `AvaloniaNativePlatformOptions.RenderingMode` with OpenGL
+  first and software second. Do not re-enable Metal without verifying Orynivo's
+  gradient and rounded-surface shaders on both Intel and Apple Silicon Macs;
+  Skia's Metal compiler can reject them after its 300-ms timeout.
 - FFmpeg discovery on macOS must not rely only on the inherited `PATH`, because
   Finder-launched bundles omit common package-manager prefixes. Probe the
   application and per-user cache plus conventional Homebrew, MacPorts, pkgsrc,
-  Fink, and per-user binary directories. When absent, download current-architecture
-  FFmpeg and FFprobe release assets into the per-user cache and restore executable
-  Unix permissions before prepending that cache to the process `PATH`.
-- Dashboard Recently Played and Recently Added use 20-item horizontal
-  carousels with smoothly animated vector previous/next controls placed in the
-  header immediately before Show all; controls must never overlay the cards or
-  change visibility. At either end they remain reserved, disabled, and visually
-  muted so the header layout cannot shift. Keep a clear gap before Show all.
-  Their Show all views contain up to 100 items.
+  Fink, and per-user binary directories. When absent, download
+  current-architecture FFmpeg and FFprobe release assets into the per-user cache
+  and restore executable Unix permissions before prepending that cache to the
+  process `PATH`.
+- Dashboard Recently Played and Recently Added use 20-item horizontal carousels
+  with smoothly animated vector previous/next controls placed in the header
+  immediately before Show all; controls must never overlay the cards or change
+  visibility. At either end they remain reserved, disabled, and visually muted
+  so the header layout cannot shift. Keep a clear gap before Show all. Their
+  Show all views contain up to 100 items.
 - Dashboard builds write one sanitized phase summary to the bounded rolling
   `logs/dashboard-performance.log`. Keep this persistence off the UI thread and
   never add media names, paths, server URLs, API keys, or other credentials to
@@ -770,32 +1112,33 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
   three-entry LRU session cache. Configured-server identity and a generation
   form the key; library-version, watcher, favorite, and artwork changes advance
   the generation. Independent remote servers load concurrently, and local
-  provider database work must not run synchronously on the Avalonia UI thread.
-  A manual local scan launched from Settings must raise
+  provider database work must not run synchronously on the Avalonia UI thread. A
+  manual local scan launched from Settings must raise
   `SettingsView.LocalLibraryChanged` after a successful catalog mutation so the
   same Dashboard, Genre Cloud, and unified-library caches are invalidated as for
   watcher-driven changes; never require an application restart to see new rows.
 - A cached Genre Cloud level renders immediately and must not retain the
   first-load branch-transition delay.
 - `AppSettings.LastMainView` persists every selectable sidebar leaf tag, not a
-  hard-coded view subset. Section and library-group containers, empty hints,
-  and disabled Plex server headings are never persisted. Synchronously built
-  dynamic rows restore normally; a Plex library tag remains pending while Plex
+  hard-coded view subset. Section and library-group containers, empty hints, and
+  disabled Plex server headings are never persisted. Synchronously built dynamic
+  rows restore normally; a Plex library tag remains pending while Plex
   navigation loads asynchronously, with Tracks as the temporary/safe fallback.
 - Dashboard Recently Played cards show the persisted album below the artist.
   When the history identity can resolve a local, Orynivo Server, or Plex album,
-  the album name opens that source's album detail without triggering card playback.
-  The full Recently Played view must batch-resolve missing local history IDs so
-  older entries expose the same artist and album links as newer entries.
+  the album name opens that source's album detail without triggering card
+  playback. The full Recently Played view must batch-resolve missing local
+  history IDs so older entries expose the same artist and album links as newer
+  entries.
 - A title action in `DailyHistoryDialog` starts the selected history entry
   directly through `PlayHistoryEntryInPlaceAsync`. It must never navigate to,
   bind, or `ScrollIntoView` the complete unified Tracks table first; that path
   can block Avalonia's UI thread for large mixed libraries. Album and artist
   actions retain their source-aware navigation behavior.
 - Shared local and Orynivo Server track rows carry a personal zero-to-five
-  rating plus cached MusicBrainz recording rating metadata. The interactive
-  star column persists through the owning database/API. MusicBrainz lookup runs
-  on the client, prefers the recording MBID, and accepts an artist/title fallback
+  rating plus cached MusicBrainz recording rating metadata. The interactive star
+  column persists through the owning database/API. MusicBrainz lookup runs on
+  the client, prefers the recording MBID, and accepts an artist/title fallback
   only when optional duration filtering leaves one exact result. Server scans
   must preserve client-resolved recording MBIDs and all rating fields. Album
   detail rendering starts a cancellable refresh only after track rows are bound;
@@ -805,31 +1148,31 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
   are not reliable enough to cache. De-duplicate known MBIDs across mirrored
   local/server album rows before issuing direct lookups; use the tested
   `Orynivo.MusicBrainzRatingGrouping.Partition` for that case-insensitive
-  grouping instead of ad-hoc `GroupBy`/`Guid.TryParse` filters.
-  The rating cell displays a localized **Load rating** action before its first
-  lookup, a loading state while active, and **Try again** after a temporary
-  failure. Album-detail foreground refresh retries temporary failures up to
-  three times. A successful direct lookup without a community score displays
-  the distinct localized not-rated state and must not be retried continuously.
-  Direct lookups request supplemental MusicBrainz genres and tags. Persist them
-  through the owning local database or remote rating API, then incrementally
-  update the local/server Lucene document; never replace the row's embedded
-  genre or contact MusicBrainz from a normal library scan.
-  A single client-side background enrichment worker starts on first playback,
-  covers the local library and every configured Orynivo Server, and advances
-  only while playback is active and not paused. Album-detail and explicit
-  rating requests increment the foreground gate so the worker yields between
-  requests; all calls still share the MusicBrainz service throttle. Known
-  recording lookups use the 30-day cache lifetime. An unresolved conservative
-  metadata lookup persists its attempt timestamp and is retried after 90 days.
-  The worker must never block the UI thread or run from a normal library scan.
+  grouping instead of ad-hoc `GroupBy`/`Guid.TryParse` filters. The rating cell
+  displays a localized **Load rating** action before its first lookup, a loading
+  state while active, and **Try again** after a temporary failure. Album-detail
+  foreground refresh retries temporary failures up to three times. A successful
+  direct lookup without a community score displays the distinct localized
+  not-rated state and must not be retried continuously. Direct lookups request
+  supplemental MusicBrainz genres and tags. Persist them through the owning
+  local database or remote rating API, then incrementally update the
+  local/server Lucene document; never replace the row's embedded genre or
+  contact MusicBrainz from a normal library scan. A single client-side
+  background enrichment worker starts on first playback, covers the local
+  library and every configured Orynivo Server, and advances only while playback
+  is active and not paused. Album-detail and explicit rating requests increment
+  the foreground gate so the worker yields between requests; all calls still
+  share the MusicBrainz service throttle. Known recording lookups use the 30-day
+  cache lifetime. An unresolved conservative metadata lookup persists its
+  attempt timestamp and is retried after 90 days. The worker must never block
+  the UI thread or run from a normal library scan.
 - Dashboard album recommendations rank compact local and Orynivo Server album
   candidates against genre listening time from the selected history period.
   Already-heard albums are de-emphasized, and the optional mood selector applies
   a genre/BPM preference rather than excluding all non-matching candidates.
   Recommendation cards retain their source context and use the shared album-card
-  navigation. Their default presentation is the taller circular cover stage:
-  the centered album is full-size, neighboring albums are progressively scaled,
+  navigation. Their default presentation is the taller circular cover stage: the
+  centered album is full-size, neighboring albums are progressively scaled,
   angled, and faded, and navigation crossfades translated/rotated stage frames.
   `AppSettings.DashboardRecommendationStageView` persists the List/Stage switch
   immediately and defaults to Stage.
@@ -853,8 +1196,8 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
   Bézier control points to each segment's endpoint range to prevent overshoot.
   Recently Played cards must use the centralized `motionCard` border styles and
   must not replace the gradient through pointer-event assignments.
-- Audio routing invariants remain: native ASIO/cwASIO DSD is bit-perfect; volume,
-  ReplayGain, PCM boost, and equalization affect PCM paths only.
+- Audio routing invariants remain: native ASIO/cwASIO DSD is bit-perfect;
+  volume, ReplayGain, PCM boost, and equalization affect PCM paths only.
 - The persisted DoP preference and forced DSD-to-PCM conversion are mutually
   exclusive. DoP is bit-perfect encapsulation and must bypass PCM gain and
   equalizer processing. Linux local and HTTP-range-streamed stereo DSF DoP uses
@@ -862,11 +1205,11 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
   `Compatibility/Linux/RemoteDsfDopAudioPlayer` with direct ALSA only; preserve
   their alternating marker bytes and DSD-rate/16 carrier-rate calculation.
   Seeking must serialize ALSA `drop`/`prepare` against writes, discard blocks
-  read before the seek generation changed, and restart markers with `0x05`.
-  ALSA `S32_LE` DoP frames place low padding first, then two DSD bytes, and the
+  read before the seek generation changed, and restart markers with `0x05`. ALSA
+  `S32_LE` DoP frames place low padding first, then two DSD bytes, and the
   marker in the most-significant byte. Prefer ALSA `DSD_U32_BE` at DSD-rate/32
-  when the selected hardware endpoint supports it; use DoP as the fallback.
-  DSF files whose format chunk declares `bitsPerSample == 1` store each DSD byte
+  when the selected hardware endpoint supports it; use DoP as the fallback. DSF
+  files whose format chunk declares `bitsPerSample == 1` store each DSD byte
   LSB-first; reverse every payload byte before either native ALSA or DoP output.
   Files declaring `bitsPerSample == 8` are already MSB-first.
   `Compatibility/Linux/DffDopAudioPlayer` handles local and HTTP-range-streamed
@@ -879,49 +1222,48 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
   Linux and macOS targets in `Orynivo.csproj`. The compatibility types currently
   live under `Compatibility/Linux`; shared non-Windows PCM playback uses OpenAL,
   loading `libopenal.so.1` on Linux and the system OpenAL framework on macOS.
-  Linux additionally enumerates direct ALSA `hw:` devices
-  through `libasound.so.2` and selectable OpenAL devices through
-  `libopenal.so.1`. The output-profile dialog presents these as separate output
-  types and classifies persisted profiles by their device ID (`alsa:` means
-  direct ALSA); never mix direct ALSA hardware into the OpenAL device list.
-  Direct ALSA uses stereo signed 32-bit PCM, the source rate,
-  and `soft_resample=0`; failure to open that exact format/rate must be reported
-  rather than silently falling back to resampling. An `EBUSY` open failure must
-  identify PipeWire/other-process ownership and explain that changing the
-  desktop default does not release the card. The shared device-information
-  window must use ALSA/OpenAL terminology on Linux and must not expose its
-  historical WASAPI labels there. OpenAL requests the source rate when
-  creating the context, then queries the negotiated OpenAL mixer rate and uses
-  that value for FFmpeg decoding and transport output-rate reporting. Compatibility
-  types must not persist
-  credentials in plaintext or claim unavailable WASAPI, ASIO, endpoint-volume,
-  or SMTC capabilities.
+  Linux additionally enumerates direct ALSA `hw:` devices through
+  `libasound.so.2` and selectable OpenAL devices through `libopenal.so.1`. The
+  output-profile dialog presents these as separate output types and classifies
+  persisted profiles by their device ID (`alsa:` means direct ALSA); never mix
+  direct ALSA hardware into the OpenAL device list. Direct ALSA uses stereo
+  signed 32-bit PCM, the source rate, and `soft_resample=0`; failure to open
+  that exact format/rate must be reported rather than silently falling back to
+  resampling. An `EBUSY` open failure must identify PipeWire/other-process
+  ownership and explain that changing the desktop default does not release the
+  card. The shared device-information window must use ALSA/OpenAL terminology on
+  Linux and must not expose its historical WASAPI labels there. OpenAL requests
+  the source rate when creating the context, then queries the negotiated OpenAL
+  mixer rate and uses that value for FFmpeg decoding and transport output-rate
+  reporting. Compatibility types must not persist credentials in plaintext or
+  claim unavailable WASAPI, ASIO, endpoint-volume, or SMTC capabilities.
   Cross-platform behavior shared with the server belongs in `Orynivo.Core`.
-- The Linux target exposes system-media control through MPRIS 2 instead of
-  SMTC. `Orynivo/Compatibility/Linux/MprisMediaTransport.cs` registers
+- The Linux target exposes system-media control through MPRIS 2 instead of SMTC.
+  `Orynivo/Compatibility/Linux/MprisMediaTransport.cs` registers
   `org.mpris.MediaPlayer2.orynivo` on the session bus and is compiled only under
   the `ORYNIVO_LINUX` define, because `Tmds.DBus.Protocol` is referenced on
   Linux only. It connects asynchronously and must stay inert (never throw into
   playback) when the session bus is unavailable. The non-Windows
   `WindowsMediaTransportService` forwards to it so the shared transport methods
-  remain the single source of playback state. MPRIS volume changes route
-  through the existing `VolumeSlider`/`ApplySystemVolume` path and are echoed
-  back with `SetVolume`. Never publish a credential-bearing artwork URL
-  (`?key=`, Plex token, user info) through `mpris:artUrl`; gate remote artwork
-  URLs through the shared `QueuePathPolicy.CanPersist`. Remote Orynivo Server
-  covers must instead use the locally cached
-  `remote-artworks/track-art-<server>-<track>.img` file, and the now-playing
-  media metadata must be refreshed after the asynchronous artwork download
-  completes so the credential-free local file is published. Keep the
-  `VolumeChangeRequested`/`SetVolume` members on the Windows implementation as
-  no-ops so the shared `MainWindow` code compiles for every target.
-- The Windows installer shortcuts must carry the same
-  `Orynivo.AudioPlayer` application user model ID that `App.xaml.cs` assigns to
-  the process. Windows uses that identity to attribute the SMTC media session
-  to Orynivo instead of showing an unknown application.
+  remain the single source of playback state. MPRIS volume changes route through
+  the existing `VolumeSlider`/`ApplySystemVolume` path and are echoed back with
+  `SetVolume`. Never publish a credential-bearing artwork URL (`?key=`, Plex
+  token, user info) through `mpris:artUrl`; gate remote artwork URLs through the
+  shared `QueuePathPolicy.CanPersist`. Remote Orynivo Server covers must instead
+  use the locally cached `remote-artworks/track-art-<server>-<track>.img` file,
+  and the now-playing media metadata must be refreshed after the asynchronous
+  artwork download completes so the credential-free local file is published.
+  Keep the `VolumeChangeRequested`/`SetVolume` members on the Windows
+  implementation as no-ops so the shared `MainWindow` code compiles for every
+  target.
+- The Windows installer shortcuts must carry the same `Orynivo.AudioPlayer`
+  application user model ID that `App.xaml.cs` assigns to the process. Windows
+  uses that identity to attribute the SMTC media session to Orynivo instead of
+  showing an unknown application.
 - Keep the Linux-only direct `Tmds.DBus.Protocol` dependency at 0.92.0 or newer
   within the compatible package line: its non-blocking observer dispatch avoids
   a shutdown race with Avalonia's stopped UI dispatcher.
 
 Consult the detailed matching sections in the root `AGENTS.md` before changing
-audio, queue, Dashboard, playlists, remote libraries, settings, or table/tree UI.
+audio, queue, Dashboard, playlists, remote libraries, settings, or table/tree
+UI.

@@ -1,0 +1,142 @@
+<Window x:Class="Orynivo.VisualizerPresetSelectionDialog"
+        xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:local="using:Orynivo"
+        Title="{DynamicResource L_VisualizerPresetSelectionTitle}"
+        Icon="avares://Orynivo/Assets/Orynivo.ico"
+        Width="480"
+        Height="600"
+        MinWidth="380"
+        MinHeight="420"
+        WindowStartupLocation="CenterOwner"
+        Background="{DynamicResource AppContentBrush}"
+        Foreground="{DynamicResource AppPrimaryTextBrush}">
+    <Window.Resources>
+        <ControlTheme x:Key="DialogButtonTheme" TargetType="Button">
+            <Setter Property="Background" Value="{DynamicResource AppButtonBrush}"/>
+            <Setter Property="Foreground" Value="{DynamicResource AppButtonTextBrush}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource AppButtonBorderBrush}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="HorizontalContentAlignment" Value="Center"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+            <Setter Property="Template">
+                <ControlTemplate>
+                    <Border x:Name="ButtonBorder"
+                            Background="{TemplateBinding Background}"
+                            BorderBrush="{TemplateBinding BorderBrush}"
+                            BorderThickness="{TemplateBinding BorderThickness}"
+                            CornerRadius="5">
+                        <ContentPresenter Content="{TemplateBinding Content}"
+                                          HorizontalAlignment="Center"
+                                          VerticalAlignment="Center"
+                                          TextBlock.Foreground="{TemplateBinding Foreground}"/>
+                    </Border>
+                </ControlTemplate>
+            </Setter>
+            <Style Selector="^:pointerover /template/ Border#ButtonBorder">
+                <Setter Property="Background" Value="{DynamicResource AppButtonHoverBrush}"/>
+            </Style>
+            <Style Selector="^:pressed /template/ Border#ButtonBorder">
+                <Setter Property="Background" Value="{DynamicResource AppButtonPressedBrush}"/>
+            </Style>
+        </ControlTheme>
+        <ControlTheme x:Key="DialogPrimaryButtonTheme"
+                      TargetType="Button"
+                      BasedOn="{StaticResource DialogButtonTheme}">
+            <Setter Property="Background" Value="{DynamicResource AppTransportPlayBrush}"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Style Selector="^:pointerover /template/ Border#ButtonBorder">
+                <Setter Property="Background" Value="{DynamicResource AppTransportPlayHoverBrush}"/>
+            </Style>
+            <Style Selector="^:pressed /template/ Border#ButtonBorder">
+                <Setter Property="Background" Value="{DynamicResource AppTransportPlayBrush}"/>
+            </Style>
+        </ControlTheme>
+    </Window.Resources>
+    <Grid Margin="24,20,24,20" RowDefinitions="Auto,Auto,*,Auto,Auto">
+        <TextBlock Grid.Row="0"
+                   Text="{DynamicResource L_VisualizerPresetSelectionTitle}"
+                   FontSize="{DynamicResource FontSizeTitle}"
+                   FontWeight="SemiBold"
+                   TextWrapping="Wrap"/>
+        <TextBlock Grid.Row="1"
+                   Text="{DynamicResource L_VisualizerPresetSelectionHint}"
+                   Margin="0,8,0,10"
+                   FontSize="{DynamicResource FontSizeCaption}"
+                   Foreground="{DynamicResource AppSecondaryTextBrush}"
+                   TextWrapping="Wrap"/>
+
+        <Border Grid.Row="2"
+                BorderBrush="{DynamicResource AppInputBorderBrush}"
+                BorderThickness="1"
+                CornerRadius="6"
+                Padding="4">
+            <Grid>
+                <ListBox x:Name="PresetListBox"
+                         Background="Transparent"
+                         BorderThickness="0"
+                         ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                         ScrollViewer.VerticalScrollBarVisibility="Auto">
+                    <ListBox.ItemTemplate>
+                        <DataTemplate x:DataType="local:VisualizerPresetOption">
+                            <CheckBox Content="{Binding Name}"
+                                      IsChecked="{Binding IsEnabled}"
+                                      Foreground="{DynamicResource AppPrimaryTextBrush}"/>
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
+                <TextBlock x:Name="StatusTextBlock"
+                           HorizontalAlignment="Center"
+                           VerticalAlignment="Center"
+                           Foreground="{DynamicResource AppMutedTextBrush}"
+                           FontSize="{DynamicResource FontSizeBody}"
+                           TextWrapping="Wrap"
+                           TextAlignment="Center"
+                           Margin="16"/>
+            </Grid>
+        </Border>
+
+        <Grid Grid.Row="3" Margin="0,12,0,0" ColumnDefinitions="Auto,Auto,*">
+            <Button x:Name="SelectAllButton"
+                    MinWidth="90"
+                    Height="32"
+                    Padding="14,0"
+                    Theme="{StaticResource DialogButtonTheme}"
+                    Content="{DynamicResource L_VisualizerPresetSelectionAll}"
+                    Click="SelectAllButton_OnClick"/>
+            <Button x:Name="SelectNoneButton"
+                    Grid.Column="1"
+                    MinWidth="90"
+                    Height="32"
+                    Margin="8,0,0,0"
+                    Padding="14,0"
+                    Theme="{StaticResource DialogButtonTheme}"
+                    Content="{DynamicResource L_VisualizerPresetSelectionNone}"
+                    Click="SelectNoneButton_OnClick"/>
+            <TextBlock x:Name="ActiveCountTextBlock"
+                       Grid.Column="2"
+                       VerticalAlignment="Center"
+                       HorizontalAlignment="Right"
+                       Foreground="{DynamicResource AppMutedTextBrush}"
+                       FontSize="{DynamicResource FontSizeMeta}"/>
+        </Grid>
+
+        <StackPanel Grid.Row="4"
+                    Orientation="Horizontal"
+                    HorizontalAlignment="Right"
+                    Margin="0,14,0,0">
+            <Button Content="{DynamicResource L_Cancel}"
+                    Width="96" Height="34"
+                    Margin="0,0,8,0"
+                    Theme="{StaticResource DialogButtonTheme}"
+                    Click="CancelButton_OnClick"/>
+            <Button x:Name="SaveButton"
+                    Content="{DynamicResource L_Save}"
+                    Width="96" Height="34"
+                    Theme="{StaticResource DialogPrimaryButtonTheme}"
+                    Click="SaveButton_OnClick"/>
+        </StackPanel>
+    </Grid>
+</Window>

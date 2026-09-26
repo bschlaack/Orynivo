@@ -5,6 +5,8 @@ using System.Text.Json;
 using NAudio.CoreAudioApi;
 using NAudio.Wave;
 
+using Orynivo.Visualization;
+
 namespace Orynivo.Audio;
 
 /// <summary>
@@ -603,6 +605,8 @@ public sealed class WasapiAudioPlayer : IGaplessAudioPlayer, IEqualizerAudioPlay
     private void ProcessPcm(Span<byte> bytes, float trackReplayGain)
     {
         ApplyPendingEqualizerChanges();
+        // The visualizer only sees audio while its window is open.
+        VisualizerAudioHub.Shared.PushPcm(bytes, _selectedFormat.FfmpegSampleFormat, _selectedFormat.Format.SampleRate);
         if (_selectedFormat.FfmpegSampleFormat == "f32le")
         {
             var samples = MemoryMarshal.Cast<byte, float>(bytes);

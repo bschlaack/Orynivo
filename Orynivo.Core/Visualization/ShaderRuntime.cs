@@ -1,0 +1,988 @@
+namespace Orynivo.Visualization;
+
+/// <summary>
+/// The operations a shader is built from, shared by the interpreter and the compiled shader path so
+/// both produce identical results. Every operation lives here exactly once, takes its arguments
+/// already evaluated, and is allocation-free: the compiled path calls these helpers per pixel, so
+/// an allocation here would become garbage in the middle of a frame.
+/// </summary>
+internal static class ShaderRuntime
+{
+    /// <summary>
+    /// The operations a call can be, as numbers. The compiler knows the function at compile time,
+    /// so the compiled path dispatches on an integer instead of comparing names for every pixel.
+    /// </summary>
+    public enum Opcode
+    {
+        /// <summary>Not a known operation.</summary>
+        Unknown = 0,
+
+        /// <summary>A scalar or vector cast.</summary>
+        Cast,
+
+        /// <summary>A two, three, or four component constructor.</summary>
+        Construct2,
+        Construct3,
+        Construct4,
+
+        /// <summary>Component-wise intrinsics.</summary>
+        Abs,
+        Ceil,
+        Cos,
+        Exp,
+        Floor,
+        Frac,
+        Log,
+        Saturate,
+        Sign,
+        Sin,
+        Sqrt,
+        Tan,
+        Pow,
+    Atan2,
+    Volume,
+        Min,
+        Max,
+        Step,
+        Mul,
+
+        /// <summary>Whole-value intrinsics.</summary>
+        Length,
+        Normalize,
+        Dot,
+        Lerp,
+        Clamp,
+        Smoothstep,
+
+        /// <summary>Intrinsics the SkSL emitter already carries; the CPU has to match them.</summary>
+        Acos,
+        Asin,
+        Atan,
+        Log2,
+        Exp2,
+        Rsqrt,
+        Cross,
+        Degrees,
+        Radians,
+        Distance,
+        Reflect,
+        Refract,
+        Lum,
+
+        /// <summary>Texture reads.</summary>
+        Sample,
+        SampleBlur1,
+        SampleBlur2,
+        SampleBlur3,
+        SamplePixel
+    }
+
+    /// <summary>Maps the function names a shader may use to their opcodes.</summary>
+    private static readonly Dictionary<string, Opcode> Opcodes = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["float"] = Opcode.Cast,
+        ["float1"] = Opcode.Cast,
+        ["half"] = Opcode.Cast,
+        ["half1"] = Opcode.Cast,
+        ["int"] = Opcode.Cast,
+        ["uint"] = Opcode.Cast,
+        ["bool"] = Opcode.Cast,
+        ["float2"] = Opcode.Construct2,
+        ["half2"] = Opcode.Construct2,
+        ["float3"] = Opcode.Construct3,
+        ["half3"] = Opcode.Construct3,
+        ["float4"] = Opcode.Construct4,
+        ["half4"] = Opcode.Construct4,
+        ["abs"] = Opcode.Abs,
+        ["ceil"] = Opcode.Ceil,
+        ["cos"] = Opcode.Cos,
+        ["exp"] = Opcode.Exp,
+        ["floor"] = Opcode.Floor,
+        ["frac"] = Opcode.Frac,
+        ["log"] = Opcode.Log,
+        ["saturate"] = Opcode.Saturate,
+        ["sign"] = Opcode.Sign,
+        ["sin"] = Opcode.Sin,
+        ["sqrt"] = Opcode.Sqrt,
+        ["tan"] = Opcode.Tan,
+        ["pow"] = Opcode.Pow,
+        ["atan2"] = Opcode.Atan2,
+        ["tex3D"] = Opcode.Volume,
+        ["min"] = Opcode.Min,
+        ["max"] = Opcode.Max,
+        ["step"] = Opcode.Step,
+        ["mul"] = Opcode.Mul,
+        ["length"] = Opcode.Length,
+        ["normalize"] = Opcode.Normalize,
+        ["dot"] = Opcode.Dot,
+        ["lerp"] = Opcode.Lerp,
+        ["mix"] = Opcode.Lerp,
+        ["clamp"] = Opcode.Clamp,
+        ["smoothstep"] = Opcode.Smoothstep,
+        ["acos"] = Opcode.Acos,
+        ["asin"] = Opcode.Asin,
+        ["atan"] = Opcode.Atan,
+        ["log2"] = Opcode.Log2,
+        ["exp2"] = Opcode.Exp2,
+        ["rsqrt"] = Opcode.Rsqrt,
+        ["cross"] = Opcode.Cross,
+        ["degrees"] = Opcode.Degrees,
+        ["radians"] = Opcode.Radians,
+        ["distance"] = Opcode.Distance,
+        ["reflect"] = Opcode.Reflect,
+        ["refract"] = Opcode.Refract,
+        ["lum"] = Opcode.Lum,
+        ["tex2D"] = Opcode.Sample,
+        ["tex2Dlod"] = Opcode.Sample,
+        ["GetBlur1"] = Opcode.SampleBlur1,
+        ["GetBlur2"] = Opcode.SampleBlur2,
+        ["GetBlur3"] = Opcode.SampleBlur3,
+        ["GetPixel"] = Opcode.SamplePixel
+    };
+
+    /// <summary>Returns the opcode of a function name.</summary>
+    /// <param name="name">Function name.</param>
+    /// <returns>The opcode, or <see cref="Opcode.Unknown"/> when the name is not known.</returns>
+    public static Opcode OpcodeOf(string name) =>
+        Opcodes.TryGetValue(name, out var opcode) ? opcode : Opcode.Unknown;
+
+    /// <summary>Applies a call by name, which is what the interpreter uses.</summary>
+    /// <param name="name">Function name.</param>
+    /// <param name="samplerName">Sampler a texture call reads, or an empty string.</param>
+    /// <param name="position">Source position, for error messages.</param>
+    /// <param name="sampler">Bound sampler, or <see langword="null"/>.</param>
+    /// <param name="a">First evaluated argument.</param>
+    /// <param name="b">Second evaluated argument.</param>
+    /// <param name="c">Third evaluated argument.</param>
+    /// <param name="d">Fourth evaluated argument.</param>
+    /// <param name="count">Number of evaluated arguments.</param>
+    /// <returns>The resulting value.</returns>
+    public static ShaderValue Call(
+        string name,
+        string samplerName,
+        int position,
+        IShaderSampler? sampler,
+        ShaderValue a,
+        ShaderValue b,
+        ShaderValue c,
+        ShaderValue d,
+        int count)
+    {
+        var opcode = OpcodeOf(name);
+        if (opcode == Opcode.Unknown)
+            throw new PresetExpressionException($"Unknown shader function '{name}'.", position);
+
+        return Call(opcode, samplerName, position, sampler, a, b, c, d, count);
+    }
+
+    /// <summary>Applies a call by opcode, which is what a compiled shader uses.</summary>
+    /// <param name="opcode">Operation to apply.</param>
+    /// <param name="samplerName">Sampler a texture call reads, or an empty string.</param>
+    /// <param name="position">Source position, for error messages.</param>
+    /// <param name="sampler">Bound sampler, or <see langword="null"/>.</param>
+    /// <param name="a">First evaluated argument.</param>
+    /// <param name="b">Second evaluated argument.</param>
+    /// <param name="c">Third evaluated argument.</param>
+    /// <param name="d">Fourth evaluated argument.</param>
+    /// <param name="count">Number of evaluated arguments.</param>
+    /// <returns>The resulting value.</returns>
+    public static ShaderValue Call(
+        Opcode opcode,
+        string samplerName,
+        int position,
+        IShaderSampler? sampler,
+        ShaderValue a,
+        ShaderValue b,
+        ShaderValue c,
+        ShaderValue d,
+        int count)
+    {
+        switch (opcode)
+        {
+            case Opcode.Cast:
+                return ShaderValue.Scalar(count > 0 ? a.X : 0f);
+            case Opcode.Construct2:
+                return Construct(2, a, b, c, d, count);
+            case Opcode.Construct3:
+                return Construct(3, a, b, c, d, count);
+            case Opcode.Construct4:
+                return Construct(4, a, b, c, d, count);
+            case Opcode.Abs:
+                return Unary(count, a, MathF.Abs);
+            case Opcode.Ceil:
+                return Unary(count, a, MathF.Ceiling);
+            case Opcode.Cos:
+                return Unary(count, a, MathF.Cos);
+            case Opcode.Exp:
+                return Unary(count, a, MathF.Exp);
+            case Opcode.Floor:
+                return Unary(count, a, MathF.Floor);
+            case Opcode.Frac:
+                return Unary(count, a, value => value - MathF.Floor(value));
+            case Opcode.Log:
+                return Unary(count, a, value => value <= 0f ? 0f : MathF.Log(value));
+            case Opcode.Saturate:
+                return Unary(count, a, value => Math.Clamp(value, 0f, 1f));
+            case Opcode.Sign:
+                return Unary(count, a, value => MathF.Sign(value));
+            case Opcode.Sin:
+                return Unary(count, a, MathF.Sin);
+            case Opcode.Sqrt:
+                return Unary(count, a, value => value <= 0f ? 0f : MathF.Sqrt(value));
+            case Opcode.Tan:
+                return Unary(count, a, MathF.Tan);
+            case Opcode.Pow:
+                return ComponentWise(a, b, (left, right) => MathF.Pow(left, right));
+            case Opcode.Atan2:
+                // Milkdrop shaders use atan2(y, x) for their polar coordinates.
+                return ComponentWise(a, b, (y, x) => MathF.Atan2(y, x));
+            case Opcode.Min:
+                return ComponentWise(a, b, MathF.Min);
+            case Opcode.Max:
+                return ComponentWise(a, b, MathF.Max);
+            case Opcode.Step:
+                return ComponentWise(b, a, (edge, value) => value >= edge ? 1f : 0f);
+            case Opcode.Mul:
+                return HlslMultiply(a, b, count);
+            case Opcode.Length:
+                return ShaderValue.Scalar(Length(count > 0 ? a : ShaderValue.Scalar(0f)));
+            case Opcode.Normalize:
+                return Normalize(count > 0 ? a : ShaderValue.Scalar(0f));
+            case Opcode.Dot:
+                return ShaderValue.Scalar(Dot(a, b));
+            case Opcode.Lerp:
+                return Lerp(a, b, c);
+            case Opcode.Clamp:
+                return ComponentWise(ComponentWise(a, b, MathF.Max), c, MathF.Min);
+            case Opcode.Smoothstep:
+                return Smoothstep(a, b, c);
+            case Opcode.Acos:
+                return Unary(count, a, MathF.Acos);
+            case Opcode.Asin:
+                return Unary(count, a, MathF.Asin);
+            case Opcode.Atan:
+                return Unary(count, a, MathF.Atan);
+            case Opcode.Log2:
+                return Unary(count, a, value => value <= 0f ? 0f : MathF.Log2(value));
+            case Opcode.Exp2:
+                return Unary(count, a, value => MathF.Pow(2f, value));
+            case Opcode.Rsqrt:
+                return Unary(count, a, value => value <= 0f ? 0f : 1f / MathF.Sqrt(value));
+            case Opcode.Cross:
+                return Cross(a, b);
+            case Opcode.Degrees:
+                return Unary(count, a, value => value * (180f / MathF.PI));
+            case Opcode.Radians:
+                return Unary(count, a, value => value * (MathF.PI / 180f));
+            case Opcode.Distance:
+                return ShaderValue.Scalar(Length(ComponentWise(a, b, (left, right) => left - right)));
+            case Opcode.Reflect:
+                return Reflect(a, b);
+            case Opcode.Refract:
+                return Refract(a, b, c);
+            case Opcode.Lum:
+                // Milkdrop's luminance helper; the weights are the conventional Rec. 601 ones.
+                return ShaderValue.Scalar(Dot(ToFloat3(a), LumWeights));
+            case Opcode.Volume:
+                {
+                    // Milkdrop samples a 3D noise volume here. Both execution paths read the same
+                    // generated volume through the sampler, because a procedural hash cannot be
+                    // reproduced bit-exactly on the GPU.
+                    if (sampler is null || count < 1)
+                        throw new PresetExpressionException("The shader sampled a volume without a sampler.", position);
+
+                    var volume = count >= 2 ? b : a;
+                    return sampler.SampleVolume(
+                        samplerName.Length == 0 ? "sampler_noisevol_lq" : samplerName,
+                        volume.X,
+                        volume.Y,
+                        volume.Z);
+                }
+            case Opcode.Sample:
+                return Sample(samplerName, count, a, b, c, sampler, position);
+            case Opcode.SampleBlur1:
+                return SampleBlur(1, count, a, sampler, position);
+            case Opcode.SampleBlur2:
+                return SampleBlur(2, count, a, sampler, position);
+            case Opcode.SampleBlur3:
+                return SampleBlur(3, count, a, sampler, position);
+            case Opcode.SamplePixel:
+                return SamplePixel(count, a, b, sampler, position);
+            default:
+                throw new PresetExpressionException("Unknown shader operation.", position);
+        }
+    }
+
+    /// <summary>Applies a swizzle to a value.</summary>
+    /// <param name="value">Value to swizzle.</param>
+    /// <param name="components">Swizzle letters.</param>
+    /// <param name="position">Source position for the error message.</param>
+    /// <returns>The swizzled value.</returns>
+    public static ShaderValue Swizzle(ShaderValue value, string components, int position)
+    {
+        Span<int> indices = stackalloc int[4];
+        var count = ComponentIndices(components, position, indices);
+        Span<float> result = stackalloc float[4];
+        for (var index = 0; index < count; index++)
+            result[index] = value.Get(indices[index]);
+
+        return new ShaderValue(result[0], result[1], result[2], result[3], count);
+    }
+
+    /// <summary>Adds two values component by component.</summary>
+    /// <param name="left">Left operand.</param>
+    /// <param name="right">Right operand.</param>
+    /// <returns>The sum.</returns>
+    public static ShaderValue Add(ShaderValue left, ShaderValue right) =>
+        ComponentWise(left, right, (a, b) => a + b);
+
+    /// <summary>Subtracts two values component by component.</summary>
+    /// <param name="left">Left operand.</param>
+    /// <param name="right">Right operand.</param>
+    /// <returns>The difference.</returns>
+    public static ShaderValue Subtract(ShaderValue left, ShaderValue right) =>
+        ComponentWise(left, right, (a, b) => a - b);
+
+    /// <summary>Multiplies two values component by component.</summary>
+    /// <param name="left">Left operand.</param>
+    /// <param name="right">Right operand.</param>
+    /// <returns>The product.</returns>
+    public static ShaderValue Multiply(ShaderValue left, ShaderValue right) =>
+        ComponentWise(left, right, (a, b) => a * b);
+
+    /// <summary>Divides two values component by component, treating a zero divisor as zero.</summary>
+    /// <param name="left">Left operand.</param>
+    /// <param name="right">Right operand.</param>
+    /// <returns>The quotient.</returns>
+    public static ShaderValue Divide(ShaderValue left, ShaderValue right) =>
+        ComponentWise(left, right, SafeDivide);
+
+    /// <summary>Takes the remainder of two values component by component.</summary>
+    /// <param name="left">Left operand.</param>
+    /// <param name="right">Right operand.</param>
+    /// <returns>The remainder.</returns>
+    public static ShaderValue Modulo(ShaderValue left, ShaderValue right) =>
+        ComponentWise(left, right, (a, b) => b == 0f ? 0f : a % b);
+
+    /// <summary>Compares two values component by component, yielding one or zero.</summary>
+    /// <param name="left">Left operand.</param>
+    /// <param name="right">Right operand.</param>
+    /// <param name="comparison">
+    /// Zero equals, one not equal, two less, three greater, four less-or-equal, five greater-or-equal.
+    /// </param>
+    /// <returns>The comparison result per component.</returns>
+    public static ShaderValue Compare(ShaderValue left, ShaderValue right, int comparison) =>
+        ComponentWise(left, right, (a, b) => comparison switch
+        {
+            0 => a == b ? 1f : 0f,
+            1 => a != b ? 1f : 0f,
+            2 => a < b ? 1f : 0f,
+            3 => a > b ? 1f : 0f,
+            4 => a <= b ? 1f : 0f,
+            _ => a >= b ? 1f : 0f
+        });
+
+    /// <summary>Negates a truth value, yielding one or zero.</summary>
+    /// <param name="value">Value to negate.</param>
+    /// <returns>Zero when the value is true, otherwise one.</returns>
+    public static ShaderValue Not(ShaderValue value) => ShaderValue.Scalar(value.IsTrue ? 0f : 1f);
+
+    /// <summary>Maps swizzle letters to component indices.</summary>
+    /// <param name="components">Swizzle letters.</param>
+    /// <param name="position">Source position for the error message.</param>
+    /// <param name="destination">Destination for at most four indices.</param>
+    /// <returns>How many indices were written.</returns>
+    public static int ComponentIndices(string components, int position, Span<int> destination)
+    {
+        var count = 0;
+        foreach (var letter in components)
+        {
+            var index = letter switch
+            {
+                'x' or 'r' => 0,
+                'y' or 'g' => 1,
+                'z' or 'b' => 2,
+                'w' or 'a' => 3,
+                _ => -1
+            };
+            if (index < 0)
+                throw new PresetExpressionException($"Invalid swizzle '{components}'.", position);
+            if (count < destination.Length)
+                destination[count] = index;
+            count++;
+        }
+
+        return Math.Min(count, destination.Length);
+    }
+
+    /// <summary>Applies one function to every component of a value.</summary>
+    /// <param name="value">Value to map.</param>
+    /// <param name="map">Function to apply.</param>
+    /// <returns>The mapped value.</returns>
+    public static ShaderValue Map(ShaderValue value, Func<float, float> map) =>
+        new(map(value.X), map(value.Y), map(value.Z), map(value.W), value.Count);
+
+    /// <summary>Combines two values component by component.</summary>
+    /// <param name="left">Left operand.</param>
+    /// <param name="right">Right operand.</param>
+    /// <param name="combine">Function to apply per component.</param>
+    /// <returns>The combined value.</returns>
+    public static ShaderValue ComponentWise(
+        ShaderValue left,
+        ShaderValue right,
+        Func<float, float, float> combine)
+    {
+        var count = Math.Max(left.Count, right.Count);
+        // A scalar produced by a swizzle stores its value only in X. HLSL broadcasts that value
+        // for every vector component; reading its unused Y/Z/W fields instead corrupts expressions
+        // such as (1 - uv.y) * hue_shader.
+        return new ShaderValue(
+            combine(left.Get(0), right.Get(0)),
+            combine(left.Count == 1 ? left.X : left.Get(1), right.Count == 1 ? right.X : right.Get(1)),
+            combine(left.Count == 1 ? left.X : left.Get(2), right.Count == 1 ? right.X : right.Get(2)),
+            combine(left.Count == 1 ? left.X : left.Get(3), right.Count == 1 ? right.X : right.Get(3)),
+            count);
+    }
+
+    /// <summary>Divides, treating a zero divisor as zero instead of producing an infinity.</summary>
+    /// <param name="numerator">Numerator.</param>
+    /// <param name="denominator">Denominator.</param>
+    /// <returns>The quotient, or zero.</returns>
+    public static float SafeDivide(float numerator, float denominator) =>
+        denominator == 0f ? 0f : numerator / denominator;
+
+    /// <summary>Returns the default value of a declared type.</summary>
+    /// <param name="type">Type name.</param>
+    /// <returns>The default value.</returns>
+    public static ShaderValue DefaultFor(string type)
+    {
+        var dimension = MatrixDimensionFor(type);
+        if (dimension > 0)
+            return StoreMatrix(dimension, default);
+
+        return type switch
+        {
+            "float2" or "half2" => ShaderValue.Vector(0f, 0f, 0f, 0f, 2),
+            "float3" or "half3" => ShaderValue.Vector(0f, 0f, 0f, 0f, 3),
+            "float4" or "half4" => ShaderValue.Vector(0f, 0f, 0f, 0f, 4),
+            _ => ShaderValue.Scalar(0f)
+        };
+    }
+
+    /// <summary>The number of matrices one pixel may build before the pool reuses the last slot.</summary>
+    private const int MatrixPoolCapacity = 256;
+
+    /// <summary>Row-major matrix storage for the current pixel, one sixteen-float block per matrix.</summary>
+    [ThreadStatic]
+    private static float[]? _matrixPool;
+
+    /// <summary>Dimension of each pooled matrix, or zero when the slot is unused.</summary>
+    [ThreadStatic]
+    private static int[]? _matrixDimensions;
+
+    /// <summary>How many pool slots the current pixel has used.</summary>
+    [ThreadStatic]
+    private static int _matrixCount;
+
+    /// <summary>
+    /// Clears the per-pixel matrix pool. The shader entry points call it before evaluating a pixel, so
+    /// a matrix built by one pixel cannot be mistaken for one the next pixel never built.
+    /// </summary>
+    public static void ResetMatrixPool() => _matrixCount = 0;
+
+    /// <summary>
+    /// Stores a row-major matrix and returns the value that refers to it. A matrix needs nine or
+    /// sixteen components, so it lives in the pool instead of inside <see cref="ShaderValue"/>, which
+    /// keeps every value small enough for the per-pixel shader path to stay fast.
+    /// </summary>
+    /// <param name="dimension">Matrix dimension, two to four.</param>
+    /// <param name="values">Row-major components, padded with zeros when short.</param>
+    /// <returns>The matrix handle.</returns>
+    public static ShaderValue StoreMatrix(int dimension, ReadOnlySpan<float> values)
+    {
+        _matrixPool ??= new float[MatrixPoolCapacity * 16];
+        _matrixDimensions ??= new int[MatrixPoolCapacity];
+        var index = _matrixCount < MatrixPoolCapacity ? _matrixCount++ : MatrixPoolCapacity - 1;
+        _matrixDimensions[index] = dimension;
+        var offset = index * 16;
+        var limit = Math.Min(dimension * dimension, 16);
+        for (var component = 0; component < limit; component++)
+            _matrixPool[offset + component] = component < values.Length ? values[component] : 0f;
+        return ShaderValue.MatrixHandle(index, dimension);
+    }
+
+    /// <summary>Reads one component of a matrix value, row-major.</summary>
+    /// <param name="matrix">Matrix handle.</param>
+    /// <param name="row">Row index.</param>
+    /// <param name="column">Column index.</param>
+    /// <returns>The component value.</returns>
+    private static float MatrixComponent(ShaderValue matrix, int row, int column)
+    {
+        var dimension = matrix.MatrixDimension;
+        var offset = (matrix.MatrixIndex * 16) + (row * dimension) + column;
+        return _matrixPool is not null && offset >= 0 && offset < _matrixPool.Length ? _matrixPool[offset] : 0f;
+    }
+
+    /// <summary>Reports whether a declared type name is a matrix.</summary>
+    /// <param name="type">Type name.</param>
+    /// <returns><see langword="true"/> when the type is a matrix.</returns>
+    public static bool IsMatrixType(string type) => MatrixDimensionFor(type) > 0;
+
+    /// <summary>
+    /// Gets the dimension of a matrix type name, or zero when the name is not a square matrix.
+    /// </summary>
+    /// <param name="type">Type name.</param>
+    /// <returns>The dimension, or zero.</returns>
+    public static int MatrixDimensionFor(string type) => type switch
+    {
+        "float2x2" or "half2x2" or "double2x2" => 2,
+        "float3x3" or "half3x3" or "double3x3" => 3,
+        "float4x4" or "half4x4" or "double4x4" => 4,
+        _ => 0
+    };
+
+    /// <summary>Returns the component count a declared type has.</summary>
+    /// <param name="type">Type name.</param>
+    /// <returns>The component count.</returns>
+    public static int CountFor(string type)
+    {
+        // A matrix is stored row-major but described by its dimension, not by a component count, so
+        // the coercion below leaves it alone whatever number is reported here.
+        if (MatrixDimensionFor(type) > 0)
+            return 4;
+
+        return type switch
+        {
+            "float2" or "half2" or "int2" or "uint2" or "bool2" => 2,
+            "float3" or "half3" or "int3" or "uint3" or "bool3" => 3,
+            "float4" or "half4" or "int4" or "uint4" or "bool4" => 4,
+            _ => 1
+        };
+    }
+
+    /// <summary>
+    /// Coerces a value to a declared type the way HLSL does: a scalar broadcasts, a shorter vector
+    /// pads with zeros, and a narrower type takes the leading components. The SkSL emitter performs
+    /// the same conversion, so the interpreter and the GPU produce the same value. A matrix keeps its
+    /// row-major components instead of being collapsed to a vector.
+    /// </summary>
+    /// <param name="value">Value to coerce.</param>
+    /// <param name="type">Declared type name.</param>
+    /// <returns>The coerced value.</returns>
+    public static ShaderValue Coerce(ShaderValue value, string type)
+    {
+        var dimension = MatrixDimensionFor(type);
+        return dimension > 0 ? ToMatrix(value, dimension) : Coerce(value, CountFor(type));
+    }
+
+    /// <summary>Coerces a value to a component count.</summary>
+    /// <param name="value">Value to coerce.</param>
+    /// <param name="count">Target component count.</param>
+    /// <returns>The coerced value.</returns>
+    public static ShaderValue Coerce(ShaderValue value, int count)
+    {
+        // A matrix is not a vector: collapsing it to the declared component count would drop the
+        // row-major flag and turn every later mul into a component-wise product.
+        if (value.IsMatrix)
+            return value;
+
+        if (count <= 0 || count == value.Count)
+            return value;
+
+        var broadcast = count > value.Count && value.Count == 1;
+        Span<float> components = stackalloc float[4];
+        for (var index = 0; index < 4; index++)
+            components[index] = broadcast ? value.X : value.Get(index);
+
+        return new ShaderValue(components[0], components[1], components[2], components[3], count);
+    }
+
+    /// <summary>Applies one function to the first argument.</summary>
+    private static ShaderValue Unary(int count, ShaderValue value, Func<float, float> map) =>
+        count > 0 ? Map(value, map) : ShaderValue.Scalar(0f);
+
+    /// <summary>Interpolates between two values.</summary>
+    private static ShaderValue Lerp(ShaderValue from, ShaderValue to, ShaderValue amount)
+    {
+        var difference = ComponentWise(from, to, (a, b) => b - a);
+        var scaled = ComponentWise(difference, amount, (delta, t) => delta * t);
+        return ComponentWise(from, scaled, (a, b) => a + b);
+    }
+
+    /// <summary>Evaluates the smooth Hermite interpolation between two edges.</summary>
+    private static ShaderValue Smoothstep(ShaderValue edge0, ShaderValue edge1, ShaderValue value)
+    {
+        var ratio = ComponentWise(
+            ComponentWise(value, edge0, (a, b) => a - b),
+            ComponentWise(edge1, edge0, (a, b) => a - b),
+            SafeDivide);
+        return ComponentWise(ratio, ratio, (t, _) => t * t * (3f - (2f * t)));
+    }
+
+    /// <summary>Computes the length of the first components of a value.</summary>
+    private static float Length(ShaderValue value)
+    {
+        var total = 0f;
+        for (var index = 0; index < value.Count; index++)
+            total += value.Get(index) * value.Get(index);
+        return MathF.Sqrt(total);
+    }
+
+    /// <summary>Normalizes a value, leaving a zero vector alone.</summary>
+    private static ShaderValue Normalize(ShaderValue value)
+    {
+        var length = Length(value);
+        return length <= 0f ? value : Map(value, component => component / length);
+    }
+
+    /// <summary>Computes the dot product of two values.</summary>
+    private static float Dot(ShaderValue left, ShaderValue right)
+    {
+        var total = 0f;
+        for (var index = 0; index < Math.Max(left.Count, right.Count); index++)
+            total += left.Get(index) * right.Get(index);
+        return total;
+    }
+
+    /// <summary>The per-channel weights Milkdrop's <c>lum(x) = dot(x, float3(0.32, 0.49, 0.29))</c> uses.</summary>
+    private static readonly ShaderValue LumWeights = ShaderValue.Vector(0.32f, 0.49f, 0.29f, 0f, 3);
+
+    /// <summary>
+    /// Widens a value to a <c>float3</c> the way the SkSL emitter does: a scalar broadcasts, a
+    /// <c>float2</c> pads with a zero, and a <c>float4</c> drops its last component.
+    /// </summary>
+    /// <param name="value">Value to widen.</param>
+    /// <returns>The value as three components.</returns>
+    private static ShaderValue ToFloat3(ShaderValue value) => value.Count switch
+    {
+        1 => ShaderValue.Vector(value.X, value.X, value.X, 0f, 3),
+        2 => ShaderValue.Vector(value.X, value.Y, 0f, 0f, 3),
+        _ => ShaderValue.Vector(value.X, value.Y, value.Z, 0f, 3)
+    };
+
+    /// <summary>Reflects an incident vector around a normal.</summary>
+    /// <param name="incident">Incident vector.</param>
+    /// <param name="normal">Normal vector.</param>
+    /// <returns>The reflected vector.</returns>
+    private static ShaderValue Reflect(ShaderValue incident, ShaderValue normal)
+    {
+        var i = ToFloat3(incident);
+        var n = ToFloat3(normal);
+        var scale = 2f * Dot(n, i);
+        return ComponentWise(i, n, (left, right) => left - (scale * right));
+    }
+
+    /// <summary>Refracts an incident vector through a surface, yielding zero on total reflection.</summary>
+    /// <param name="incident">Incident vector.</param>
+    /// <param name="normal">Normal vector.</param>
+    /// <param name="eta">Ratio of the two indices of refraction.</param>
+    /// <returns>The refracted vector, or zero.</returns>
+    private static ShaderValue Refract(ShaderValue incident, ShaderValue normal, ShaderValue eta)
+    {
+        var i = ToFloat3(incident);
+        var n = ToFloat3(normal);
+        var ratio = eta.X;
+        var cosine = Dot(n, i);
+        var k = 1f - (ratio * ratio * (1f - (cosine * cosine)));
+        if (k < 0f)
+            return ShaderValue.Vector(0f, 0f, 0f, 0f, 3);
+
+        var factor = (ratio * cosine) + MathF.Sqrt(k);
+        return ComponentWise(Map(i, value => value * ratio), n, (left, right) => left - (factor * right));
+    }
+
+    /// <summary>Computes the cross product of two vectors.</summary>
+    /// <param name="left">Left vector.</param>
+    /// <param name="right">Right vector.</param>
+    /// <returns>The cross product.</returns>
+    private static ShaderValue Cross(ShaderValue left, ShaderValue right)
+    {
+        var a = ToFloat3(left);
+        var b = ToFloat3(right);
+        return ShaderValue.Vector(
+            (a.Y * b.Z) - (a.Z * b.Y),
+            (a.Z * b.X) - (a.X * b.Z),
+            (a.X * b.Y) - (a.Y * b.X),
+            0f,
+            3);
+    }
+
+    /// <summary>Samples a texture through the bound sampler.</summary>
+    private static ShaderValue Sample(
+        string samplerName,
+        int count,
+        ShaderValue a,
+        ShaderValue b,
+        ShaderValue c,
+        IShaderSampler? sampler,
+        int position)
+    {
+        if (sampler is null || count < 2)
+            throw new PresetExpressionException("The shader sampled a texture without a sampler.", position);
+
+        var u = b.X;
+        var v = count >= 3 ? c.X : b.Y;
+        return sampler.Sample(samplerName.Length == 0 ? "sampler_main" : samplerName, u, v);
+    }
+
+    /// <summary>Samples a blurred copy of the frame.</summary>
+    private static ShaderValue SampleBlur(
+        int level,
+        int count,
+        ShaderValue a,
+        IShaderSampler? sampler,
+        int position)
+    {
+        if (sampler is null || count < 1)
+            throw new PresetExpressionException("The shader sampled a texture without a sampler.", position);
+
+        return sampler.SampleBlur(level, a.X, a.Y);
+    }
+
+    /// <summary>Reads one frame pixel by integer coordinate.</summary>
+    private static ShaderValue SamplePixel(
+        int count,
+        ShaderValue a,
+        ShaderValue b,
+        IShaderSampler? sampler,
+        int position)
+    {
+        if (sampler is null || count < 1)
+            throw new PresetExpressionException("The shader sampled a texture without a sampler.", position);
+
+        // The shader header defines GetPixel(uv) as tex2D(sampler_main, uv). Its one-vector
+        // form therefore uses normalised UVs, not integer texel coordinates.
+        if (count == 1)
+            return sampler.Sample("sampler_main", a.X, a.Y);
+
+        // Keep the earlier two-scalar extension for presets that use integer pixel coordinates.
+        var x = a.X;
+        return sampler.SamplePixel((int)x, (int)b.X);
+    }
+
+    /// <summary>Builds a vector from a constructor call.</summary>
+    private static ShaderValue Construct(
+        int size,
+        ShaderValue a,
+        ShaderValue b,
+        ShaderValue c,
+        ShaderValue d,
+        int count)
+    {
+        if (count == 0)
+            return ShaderValue.Scalar(0f);
+
+        Span<float> flattened = stackalloc float[4];
+        if (count == 1)
+        {
+            // One argument broadcasts, repeating its last component.
+            for (var index = 0; index < 4; index++)
+                flattened[index] = a.Get(Math.Min(index, a.Count - 1));
+        }
+        else
+        {
+            var filled = 0;
+            if (count > 0)
+                Append(flattened, ref filled, size, a);
+            if (count > 1)
+                Append(flattened, ref filled, size, b);
+            if (count > 2)
+                Append(flattened, ref filled, size, c);
+            if (count > 3)
+                Append(flattened, ref filled, size, d);
+        }
+
+        return new ShaderValue(flattened[0], flattened[1], flattened[2], flattened[3], size);
+    }
+
+    /// <summary>Appends the components of one argument to a flattened vector.</summary>
+    /// <param name="target">Destination components.</param>
+    /// <param name="filled">Number of components written so far.</param>
+    /// <param name="limit">Component count of the constructed vector.</param>
+    /// <param name="value">Argument to append.</param>
+    private static void Append(Span<float> target, ref int filled, int limit, ShaderValue value)
+    {
+        for (var index = 0; index < value.Count && filled < limit; index++)
+            target[filled++] = value.Get(index);
+    }
+
+    /// <summary>
+    /// Applies HLSL's <c>mul</c> for the shapes Milkdrop presets use: a matrix operand multiplies,
+    /// and everything else keeps the component-wise product the runtime used before. The matrix forms
+    /// are what <c>float2x2</c> constructors feed, and they are the only ones the SkSL emitter's
+    /// <c>a * b</c> does not already match.
+    /// </summary>
+    /// <param name="left">Left operand.</param>
+    /// <param name="right">Right operand.</param>
+    /// <param name="count">Number of evaluated arguments.</param>
+    /// <returns>The product.</returns>
+    private static ShaderValue HlslMultiply(ShaderValue left, ShaderValue right, int count)
+    {
+        if (count < 2)
+            return left;
+
+        if (left.IsMatrix && right.IsMatrix)
+            return MultiplyMatrices(left, right);
+        if (left.IsMatrix)
+            return MultiplyMatrixVector(left, right);
+        if (right.IsMatrix)
+            return MultiplyVectorMatrix(left, right);
+
+        return ComponentWise(left, right, (a, b) => a * b);
+    }
+
+    /// <summary>Multiplies a matrix by a vector.</summary>
+    /// <param name="matrix">Left matrix.</param>
+    /// <param name="vector">Right vector.</param>
+    /// <returns>The resulting vector.</returns>
+    private static ShaderValue MultiplyMatrixVector(ShaderValue matrix, ShaderValue vector)
+    {
+        var dimension = matrix.MatrixDimension;
+        Span<float> result = stackalloc float[4];
+        for (var row = 0; row < dimension; row++)
+        {
+            var sum = 0f;
+            for (var column = 0; column < dimension; column++)
+                sum += MatrixComponent(matrix, row, column) * vector.Get(column);
+            result[row] = sum;
+        }
+
+        return new ShaderValue(result[0], result[1], result[2], result[3], dimension);
+    }
+
+    /// <summary>Multiplies a vector by a matrix.</summary>
+    /// <param name="vector">Left vector.</param>
+    /// <param name="matrix">Right matrix.</param>
+    /// <returns>The resulting vector.</returns>
+    private static ShaderValue MultiplyVectorMatrix(ShaderValue vector, ShaderValue matrix)
+    {
+        var dimension = matrix.MatrixDimension;
+        Span<float> result = stackalloc float[4];
+        for (var column = 0; column < dimension; column++)
+        {
+            var sum = 0f;
+            for (var row = 0; row < dimension; row++)
+                sum += vector.Get(row) * MatrixComponent(matrix, row, column);
+            result[column] = sum;
+        }
+
+        return new ShaderValue(result[0], result[1], result[2], result[3], dimension);
+    }
+
+    /// <summary>Multiplies two matrices of the same dimension.</summary>
+    /// <param name="left">Left matrix.</param>
+    /// <param name="right">Right matrix.</param>
+    /// <returns>The resulting matrix.</returns>
+    private static ShaderValue MultiplyMatrices(ShaderValue left, ShaderValue right)
+    {
+        var dimension = left.MatrixDimension;
+        Span<float> result = stackalloc float[16];
+        for (var row = 0; row < dimension; row++)
+        {
+            for (var column = 0; column < dimension; column++)
+            {
+                var sum = 0f;
+                for (var index = 0; index < dimension; index++)
+                    sum += MatrixComponent(left, row, index) * MatrixComponent(right, index, column);
+                result[(row * dimension) + column] = sum;
+            }
+        }
+
+        return StoreMatrix(dimension, result);
+    }
+
+    /// <summary>
+    /// Builds a square matrix from a constructor call. The arguments fill it row-major, matching the
+    /// <c>floatNxN(...)</c> spelling Milkdrop shaders use; a single scalar fills the diagonal. The
+    /// sixteen values are passed individually so the compiled path can call it without an array.
+    /// </summary>
+    /// <param name="dimension">Matrix dimension, two to four.</param>
+    /// <param name="count">Number of evaluated arguments.</param>
+    /// <param name="a">First argument.</param>
+    /// <param name="b">Second argument.</param>
+    /// <param name="c">Third argument.</param>
+    /// <param name="d">Fourth argument.</param>
+    /// <param name="e">Fifth argument.</param>
+    /// <param name="f">Sixth argument.</param>
+    /// <param name="g">Seventh argument.</param>
+    /// <param name="h">Eighth argument.</param>
+    /// <param name="i">Ninth argument.</param>
+    /// <param name="j">Tenth argument.</param>
+    /// <param name="k">Eleventh argument.</param>
+    /// <param name="l">Twelfth argument.</param>
+    /// <param name="m">Thirteenth argument.</param>
+    /// <param name="n">Fourteenth argument.</param>
+    /// <param name="o">Fifteenth argument.</param>
+    /// <param name="p">Sixteenth argument.</param>
+    /// <returns>The matrix value.</returns>
+    public static ShaderValue ConstructMatrix(
+        int dimension,
+        int count,
+        ShaderValue a,
+        ShaderValue b,
+        ShaderValue c,
+        ShaderValue d,
+        ShaderValue e,
+        ShaderValue f,
+        ShaderValue g,
+        ShaderValue h,
+        ShaderValue i,
+        ShaderValue j,
+        ShaderValue k,
+        ShaderValue l,
+        ShaderValue m,
+        ShaderValue n,
+        ShaderValue o,
+        ShaderValue p)
+    {
+        var limit = dimension * dimension;
+        if (count == 1 && a.Count == 1)
+        {
+            // floatNxN(s) fills the diagonal, matching HLSL.
+            Span<float> diagonal = stackalloc float[16];
+            for (var index = 0; index < dimension; index++)
+                diagonal[(index * dimension) + index] = a.X;
+            return StoreMatrix(dimension, diagonal);
+        }
+
+        Span<ShaderValue> arguments = stackalloc ShaderValue[16];
+        arguments[0] = a;
+        arguments[1] = b;
+        arguments[2] = c;
+        arguments[3] = d;
+        arguments[4] = e;
+        arguments[5] = f;
+        arguments[6] = g;
+        arguments[7] = h;
+        arguments[8] = i;
+        arguments[9] = j;
+        arguments[10] = k;
+        arguments[11] = l;
+        arguments[12] = m;
+        arguments[13] = n;
+        arguments[14] = o;
+        arguments[15] = p;
+        Span<float> flat = stackalloc float[16];
+        var filled = 0;
+        for (var index = 0; index < count && index < 16; index++)
+            Append(flat, ref filled, limit, arguments[index]);
+
+        return StoreMatrix(dimension, flat);
+    }
+
+    /// <summary>Reads a value as a square matrix, keeping an existing matrix of the same dimension.</summary>
+    /// <param name="value">Value to read.</param>
+    /// <param name="dimension">Target dimension.</param>
+    /// <returns>The matrix value.</returns>
+    private static ShaderValue ToMatrix(ShaderValue value, int dimension)
+    {
+        if (value.IsMatrix && value.MatrixDimension == dimension)
+            return value;
+
+        Span<float> flat = stackalloc float[16];
+        var limit = dimension * dimension;
+        for (var index = 0; index < limit; index++)
+            flat[index] = index < value.Count ? value.Get(index) : 0f;
+        return StoreMatrix(dimension, flat);
+    }
+}

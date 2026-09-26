@@ -33,6 +33,7 @@ using Orynivo.Audio;
 using Orynivo.Controls;
 using Orynivo.Library;
 using Orynivo.Localization;
+using Orynivo.Visualization;
 using Orynivo.Streaming;
 using Windows.Media;
 
@@ -83,7 +84,36 @@ public partial class MainWindow : Window
         _searchTimer.Stop();
         _libraryWatcher?.Dispose();
         _libraryWatcher = null;
+        _visualizerWindow?.Close();
+        _visualizerWindow = null;
         StopPlayback();
+    }
+
+    private void VisualizerButton_OnClick(object? sender, RoutedEventArgs e)
+    {
+        // Non-modal like the karaoke window: playback keeps running behind it.
+        var window = new VisualizerWindow(
+            0,
+            new VisualizerRenderOptions(
+                _settings.VisualizerRenderWidth,
+                _settings.VisualizerRenderHeight,
+                _settings.VisualizerFrameRate,
+                _settings.ReduceMotion,
+                _settings.VisualizerAlwaysShowOverlay,
+                _settings.VisualizerPresetDirectory,
+                _settings.VisualizerAutoAdvanceEnabled,
+                _settings.VisualizerAutoAdvanceSeconds,
+                _settings.DisabledVisualizerPresets,
+                _settings.VisualizerPresetBlendSeconds),
+            new VisualizerTransport(
+                Previous: () => PreviousButton_OnClick(this, new RoutedEventArgs()),
+                PlayPause: () => PlayButton_OnClick(this, new RoutedEventArgs()),
+                Next: () => NextButton_OnClick(this, new RoutedEventArgs()),
+                IsPlaying: () => _isPlaying,
+                NowPlaying: () => (NowPlayingTitleBlock.Text, NowPlayingArtistBlock.Text)));
+        window.Closed += (_, _) => _visualizerWindow = null;
+        _visualizerWindow = window;
+        window.Show(this);
     }
 
     private async void AboutButton_OnClick(object? sender, RoutedEventArgs e)

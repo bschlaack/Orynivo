@@ -1,0 +1,157 @@
+<Window x:Class="Orynivo.VisualizerWindow"
+        xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:controls="using:Orynivo.Controls"
+        Title="{DynamicResource L_Visualizer}"
+        Icon="avares://Orynivo/Assets/Orynivo.ico"
+        Width="960"
+        Height="540"
+        WindowState="FullScreen"
+        Background="Black"
+        Foreground="White">
+    <Window.Styles>
+        <Style Selector="Button.visualizerControl">
+            <Setter Property="Width" Value="36"/>
+            <Setter Property="Height" Value="36"/>
+            <Setter Property="CornerRadius" Value="18"/>
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="Background" Value="#59000000"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="HorizontalContentAlignment" Value="Center"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+        </Style>
+        <Style Selector="Button.visualizerControl:pointerover /template/ ContentPresenter">
+            <Setter Property="Background" Value="#8C000000"/>
+        </Style>
+        <Style Selector="Button.visualizerControl:pressed /template/ ContentPresenter">
+            <Setter Property="Background" Value="#B3000000"/>
+        </Style>
+        <Style Selector="Button.visualizerControlPlay">
+            <Setter Property="Width" Value="50"/>
+            <Setter Property="Height" Value="50"/>
+            <Setter Property="CornerRadius" Value="25"/>
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="Background" Value="#8C000000"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="HorizontalContentAlignment" Value="Center"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+        </Style>
+        <Style Selector="Button.visualizerControlPlay:pointerover /template/ ContentPresenter">
+            <Setter Property="Background" Value="#B3000000"/>
+        </Style>
+    </Window.Styles>
+    <Grid>
+        <Image x:Name="VisualizerImage"
+               Stretch="Fill"
+               RenderOptions.BitmapInterpolationMode="HighQuality"/>
+
+        <controls:VisualizerGlPresenter x:Name="GlPresenter"
+                                        IsVisible="False"/>
+
+        <Grid x:Name="OverlayRoot">
+            <Border HorizontalAlignment="Left"
+                    VerticalAlignment="Top"
+                    Margin="24"
+                    Padding="16,10"
+                    CornerRadius="12"
+                    Background="#66000000">
+                <StackPanel Spacing="2">
+                    <TextBlock x:Name="NowPlayingTitleTextBlock"
+                               FontSize="{DynamicResource FontSizeBodyStrong}"
+                               FontWeight="SemiBold"
+                               TextTrimming="CharacterEllipsis"
+                               MaxWidth="560"/>
+                    <TextBlock x:Name="NowPlayingArtistTextBlock"
+                               FontSize="{DynamicResource FontSizeMeta}"
+                               Opacity="0.8"
+                               TextTrimming="CharacterEllipsis"
+                               MaxWidth="560"/>
+                </StackPanel>
+            </Border>
+
+            <Border x:Name="PresetBadge"
+                    HorizontalAlignment="Right"
+                    VerticalAlignment="Top"
+                    Margin="24"
+                    Padding="12,6"
+                    CornerRadius="10"
+                    Background="#66000000">
+                <TextBlock x:Name="PresetTextBlock"
+                           FontSize="{DynamicResource FontSizeBody}"/>
+            </Border>
+
+            <StackPanel Orientation="Horizontal"
+                        Spacing="8"
+                        HorizontalAlignment="Left"
+                        VerticalAlignment="Bottom"
+                        Margin="24">
+                <Button x:Name="PreviousTrackButton"
+                        Focusable="False"
+                        Classes="visualizerControl"
+                        AutomationProperties.Name="{DynamicResource L_TransportPrevious}"
+                        ToolTip.Tip="{DynamicResource L_TransportPrevious}"
+                        Click="PreviousTrackButton_OnClick">
+                    <Grid Width="16"
+                          Height="16"
+                          HorizontalAlignment="Center"
+                          VerticalAlignment="Center">
+                        <Rectangle Width="2"
+                                   Height="12"
+                                   HorizontalAlignment="Left"
+                                   VerticalAlignment="Center"
+                                   Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/>
+                        <Path Data="M 14 2 L 8 8 L 14 14 Z M 8 2 L 2 8 L 8 14 Z"
+                              HorizontalAlignment="Center"
+                              VerticalAlignment="Center"
+                              Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/>
+                    </Grid>
+                </Button>
+                <Button x:Name="PlayPauseButton"
+                        Focusable="False"
+                        Classes="visualizerControlPlay"
+                        AutomationProperties.Name="{DynamicResource L_TransportPlayPause}"
+                        ToolTip.Tip="{DynamicResource L_TransportPlayPause}"
+                        Click="PlayPauseButton_OnClick">
+                    <Canvas Width="20"
+                            Height="20"
+                            HorizontalAlignment="Center"
+                            VerticalAlignment="Center">
+                        <Path x:Name="PlayPauseIconPath"
+                              Data="{StaticResource IconPlayGlyph}"
+                              Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/>
+                    </Canvas>
+                </Button>
+                <Button x:Name="NextTrackButton"
+                        Focusable="False"
+                        Classes="visualizerControl"
+                        AutomationProperties.Name="{DynamicResource L_TransportNext}"
+                        ToolTip.Tip="{DynamicResource L_TransportNext}"
+                        Click="NextTrackButton_OnClick">
+                    <Grid Width="16"
+                          Height="16"
+                          HorizontalAlignment="Center"
+                          VerticalAlignment="Center">
+                        <Path Data="M 2 2 L 8 8 L 2 14 Z M 8 2 L 14 8 L 8 14 Z"
+                              HorizontalAlignment="Center"
+                              VerticalAlignment="Center"
+                              Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/>
+                        <Rectangle Width="2"
+                                   Height="12"
+                                   HorizontalAlignment="Right"
+                                   VerticalAlignment="Center"
+                                   Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/>
+                    </Grid>
+                </Button>
+            </StackPanel>
+
+            <TextBlock x:Name="HintTextBlock"
+                       HorizontalAlignment="Right"
+                       VerticalAlignment="Bottom"
+                       Margin="24,0,24,30"
+                       Opacity="0.65"
+                       FontSize="{DynamicResource FontSizeMeta}"/>
+        </Grid>
+    </Grid>
+</Window>

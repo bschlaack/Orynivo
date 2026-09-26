@@ -68,6 +68,7 @@ public partial class MainWindow : Window
 
     private void SetPlayPauseIcon(bool isPlaying)
     {
+        _isPlaying = isPlaying;
         PlayPauseIcon.Data = Geometry.Parse(isPlaying
             ? "M 6 4 H 9 V 16 H 6 Z M 11 4 H 14 V 16 H 11 Z"
             : "M 8 4 L 17 10 L 8 16 Z");

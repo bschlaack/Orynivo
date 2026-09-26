@@ -1,0 +1,320 @@
+using System.Text.Json;
+using Orynivo.Visualization;
+using SkiaSharp;
+using Xunit;
+using Xunit.Abstractions;
+
+namespace Orynivo.Tests;
+
+/// <summary>
+/// Measures how the shaders of a real preset collection fare on the GPU path: how many translate to
+/// SkSL and are accepted by Skia, and which constructs the rest fail on. It is the gate for the GPU
+/// visualizer, because a shader that cannot be translated stays on the CPU interpreter and keeps its
+/// cost, so the share that translates decides whether Skia carries the collection.
+/// </summary>
+public sealed class PresetTranspileDiagnosticTests
+{
+    private const int FileCount = 500;
+    private const int MaxReported = 12;
+
+    private readonly ITestOutputHelper _output;
+
+    /// <summary>Creates the diagnostic test.</summary>
+    /// <param name="output">Test output writer.</param>
+    public PresetTranspileDiagnosticTests(ITestOutputHelper output) => _output = output;
+
+    /// <summary>Translates every shader of a sample of the configured folder and reports the failures.</summary>
+    [Fact]
+    public void Report_ShaderTranslationOverARealCollection()
+    {
+        var folder = ResolveFolder();
+        if (folder is null)
+        {
+            _output.WriteLine("no preset folder configured; nothing to report");
+            return;
+        }
+
+        var sections = 0;
+        var withShaderKeys = 0;
+        var shaders = 0;
+        var compiled = 0;
+        var failures = new Dictionary<string, int>(StringComparer.Ordinal);
+        var examples = new Dictionary<string, List<string>>(StringComparer.Ordinal);
+        foreach (var file in Directory
+            .EnumerateFiles(folder, "*.milk", SearchOption.AllDirectories)
+            .OrderBy(path => path, StringComparer.Ordinal)
+            .Take(FileCount))
+        {
+            foreach (var section in VisualizerPreset.ParseSections(File.ReadAllText(file)))
+            {
+                // Counting the sections that mention a shader key separates "this collection has few
+                // shaders" from "the reader loses them", which are very different answers.
+                sections++;
+                if (section.Contains("warp_", StringComparison.Ordinal) ||
+                    section.Contains("comp_", StringComparison.Ordinal))
+                {
+                    withShaderKeys++;
+                }
+
+                VisualizerPreset preset;
+                try
+                {
+                    preset = VisualizerPreset.Parse(section, Path.GetFileNameWithoutExtension(file));
+                }
+                catch (PresetExpressionException)
+                {
+                    continue;
+                }
+
+                foreach (var shader in preset.WarpShaders.Concat(preset.CompShaders))
+                {
+                    shaders++;
+                    var (reason, detail) = TryTranslate(shader);
+                    if (reason is null)
+                    {
+                        compiled++;
+                        continue;
+                    }
+
+                    var key = Normalize(reason);
+                    failures[key] = failures.TryGetValue(key, out var count) ? count + 1 : 1;
+                    if (!examples.TryGetValue(key, out var list))
+                    {
+                        list = [];
+                        examples[key] = list;
+                    }
+
+                    if (list.Count < 3)
+                        list.Add($"{Path.GetFileName(file)} :: {detail}");
+                }
+            }
+        }
+
+        _output.WriteLine($"sections: {sections}   sections containing shader keys: {withShaderKeys}");
+        _output.WriteLine($"shaders sampled: {shaders}");
+        _output.WriteLine($"translated and accepted by Skia: {compiled}");
+        _output.WriteLine($"failures: {shaders - compiled}");
+        _output.WriteLine("top reasons:");
+        foreach (var (reason, count) in failures.OrderByDescending(pair => pair.Value).Take(MaxReported))
+        {
+            _output.WriteLine($"{count,6}  {reason}");
+            if (examples.TryGetValue(reason, out var list))
+                _output.WriteLine($"        e.g. {string.Join(", ", list)}");
+        }
+    }
+
+    /// <summary>
+    /// Measures how the per-pixel expression blocks of a real collection fare on the GPU path. A
+    /// block that cannot be emitted keeps its preset's warp on the interpreter, so the share that
+    /// translates is what decides whether the GPU warp pass carries the collection.
+    /// </summary>
+    [Fact]
+    public void Report_PerPixelTranslationOverARealCollection()
+    {
+        var folder = ResolveFolder();
+        if (folder is null)
+        {
+            _output.WriteLine("no preset folder configured; nothing to report");
+            return;
+        }
+
+        var globalBlocks = 0;
+        var globalEligible = 0;
+        var globalTranslated = 0;
+        var shaderBlocks = 0;
+        var shaderTranslated = 0;
+        var warpPerFrameBlocks = 0;
+        var warpPerFrameShared = 0;
+        var failures = new Dictionary<string, int>(StringComparer.Ordinal);
+        foreach (var file in Directory
+            .EnumerateFiles(folder, "*.milk", SearchOption.AllDirectories)
+            .OrderBy(path => path, StringComparer.Ordinal)
+            .Take(FileCount))
+        {
+            foreach (var section in VisualizerPreset.ParseSections(File.ReadAllText(file)))
+            {
+                VisualizerPreset preset;
+                try
+                {
+                    preset = VisualizerPreset.Parse(section, Path.GetFileNameWithoutExtension(file));
+                }
+                catch (PresetExpressionException)
+                {
+                    continue;
+                }
+
+                if (!preset.PerPixel.IsEmpty)
+                {
+                    globalBlocks++;
+                    // The renderer only uses the GPU warp for a block that writes nothing another
+                    // pixel could read; a block that carries a value stays on the interpreter.
+                    if (IsGpuEligible(preset.PerPixel))
+                    {
+                        globalEligible++;
+                        if (TryTranspileBlock(preset.PerPixel, failures))
+                            globalTranslated++;
+                    }
+                }
+
+                foreach (var shader in preset.WarpShaders.Concat(preset.CompShaders))
+                {
+                    if (shader.PerPixel.IsEmpty)
+                        continue;
+
+                    shaderBlocks++;
+                    if (TryTranspileBlock(shader.PerPixel, failures))
+                        shaderTranslated++;
+                }
+
+                foreach (var shader in preset.WarpShaders)
+                {
+                    if (shader.PerFrame.IsEmpty)
+                        continue;
+
+                    warpPerFrameBlocks++;
+                    // A warp per-frame block needs the same value the global per-pixel block writes,
+                    // which the GPU pass has to share rather than keep in separate locals.
+                    if (shader.PerFrame.ReferencedVariables.Intersect(preset.PerPixel.WrittenVariables).Any())
+                        warpPerFrameShared++;
+                }
+            }
+        }
+
+        _output.WriteLine(
+            $"global per-pixel blocks: {globalBlocks}   GPU-eligible: {globalEligible}   translated+accepted: {globalTranslated}");
+        _output.WriteLine($"shader per-pixel blocks: {shaderBlocks}   translated: {shaderTranslated}");
+        _output.WriteLine($"warp per-frame blocks: {warpPerFrameBlocks}   sharing a global write: {warpPerFrameShared}");
+        _output.WriteLine("top reasons:");
+        foreach (var (reason, count) in failures.OrderByDescending(pair => pair.Value).Take(MaxReported))
+            _output.WriteLine($"{count,6}  {reason}");
+    }
+
+    /// <summary>Reports whether the renderer would run a per-pixel block on the GPU warp pass.</summary>
+    /// <param name="program">Block to test.</param>
+    /// <returns><see langword="true"/> when the block never reads a carried value.</returns>
+    private static bool IsGpuEligible(PresetProgram program) =>
+        PresetExpressionTranspiler.CanRunInParallel(program);
+
+    /// <summary>Transpiles one per-pixel block and records the failure reason.</summary>
+    /// <param name="program">Block to transpile.</param>
+    /// <param name="failures">Failure counts, keyed by reason.</param>
+    /// <returns><see langword="true"/> when the block translated and Skia accepted it.</returns>
+    private static bool TryTranspileBlock(PresetProgram program, Dictionary<string, int> failures)
+    {
+        try
+        {
+            // The whole warp entry point is compiled, so the result also covers the emitted helper
+            // and the uniform declarations Skia has to accept.
+            var sksl = ShaderTranspiler.TranspileWarp(null, program, out _, out _);
+            using var effect = SKRuntimeEffect.CreateShader(sksl, out var errors);
+            if (effect is not null)
+                return true;
+
+            Record(failures, "SkSL rejected: " + FirstError(errors));
+            return false;
+        }
+        catch (PresetExpressionException exception)
+        {
+            Record(failures, Normalize(exception.Message));
+            return false;
+        }
+    }
+
+    /// <summary>Adds one failure to the reason counts.</summary>
+    /// <param name="failures">Failure counts.</param>
+    /// <param name="reason">Reason to count.</param>
+    private static void Record(Dictionary<string, int> failures, string reason) =>
+        failures[reason] = failures.TryGetValue(reason, out var count) ? count + 1 : 1;
+
+    /// <summary>Translates one shader and reports why it failed, or nothing when it worked.</summary>
+
+    /// <param name="shader">Shader to translate.</param>
+    /// <returns>The failure reason, or <see langword="null"/>.</returns>
+    private static (string? Reason, string? Detail) TryTranslate(VisualizerShader shader)
+    {
+        try
+        {
+            var sksl = ShaderTranspiler.Transpile(shader.Program);
+            using var effect = SKRuntimeEffect.CreateShader(sksl, out var errors);
+            if (effect is not null)
+                return (null, null);
+
+            // The offending SkSL line is what turns a Skia message into something actionable, so it
+            // travels with the failure instead of the file name.
+            var error = FirstError(errors);
+            return ("SkSL rejected: " + error, DescribeLine(sksl, error));
+        }
+        catch (PresetExpressionException exception)
+        {
+            return (exception.Message, null);
+        }
+    }
+
+    /// <summary>Returns the generated SkSL line a Skia error points at.</summary>
+    /// <param name="sksl">Generated source.</param>
+    /// <param name="error">Skia error text.</param>
+    /// <returns>The line with its number, or <see langword="null"/>.</returns>
+    private static string? DescribeLine(string sksl, string error)
+    {
+        var colon = error.IndexOf(':');
+        if (colon <= 0 || !int.TryParse(error[(error.IndexOf("error: ", StringComparison.Ordinal) + 7)..].Split(':')[0], out var number))
+            return null;
+
+        var lines = sksl.Split('\n');
+        return number >= 1 && number <= lines.Length ? $"{number}: {lines[number - 1].Trim()}" : null;
+    }
+
+    /// <summary>Keeps the first Skia error line, which carries the reason.</summary>
+    /// <param name="errors">Skia error text.</param>
+    /// <returns>The first line, or an empty string.</returns>
+    private static string FirstError(string? errors)
+    {
+        if (string.IsNullOrWhiteSpace(errors))
+            return string.Empty;
+
+        var line = errors.Split('\n').FirstOrDefault(text => text.Contains("error:", StringComparison.Ordinal));
+        return (line ?? errors).Trim();
+    }
+
+    /// <summary>Trims a message to its stable part so equal failures group together.</summary>
+    /// <param name="message">Failure message.</param>
+    /// <returns>The normalized message.</returns>
+    private static string Normalize(string message)
+    {
+        var index = message.IndexOf(" (at position", StringComparison.Ordinal);
+        return index > 0 ? message[..index] : message;
+    }
+
+    /// <summary>Reads the configured preset folder, or returns nothing when none is set.</summary>
+    /// <returns>The folder path, or <see langword="null"/>.</returns>
+    private static string? ResolveFolder()
+    {
+        var configured = Environment.GetEnvironmentVariable("ORYNIVO_PRESET_FOLDER");
+        if (!string.IsNullOrWhiteSpace(configured) && Directory.Exists(configured))
+            return configured;
+
+        var settings = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "Orynivo",
+            "settings.json");
+        if (!File.Exists(settings))
+            return null;
+
+        try
+        {
+            using var document = JsonDocument.Parse(File.ReadAllText(settings));
+            if (document.RootElement.TryGetProperty("VisualizerPresetDirectory", out var element) &&
+                element.ValueKind == JsonValueKind.String)
+            {
+                var path = element.GetString();
+                if (!string.IsNullOrWhiteSpace(path) && Directory.Exists(path))
+                    return path;
+            }
+        }
+        catch (JsonException)
+        {
+        }
+
+        return null;
+    }
+}

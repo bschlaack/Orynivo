@@ -69,6 +69,49 @@ public sealed class AppSettings
     /// reproduce cleanly.
     /// </summary>
     public int MaxOutputSampleRateHz { get; set; }
+
+    /// <summary>
+    /// Gets or sets the folder the visualizer loads user presets from. An empty value uses
+    /// the per-user default folder.
+    /// </summary>
+    public string VisualizerPresetDirectory { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Gets or sets a value indicating whether the visualizer always shows its title, hint,
+    /// and playback buttons. When <see langword="false"/> they appear only while the mouse
+    /// moves over the visualizer window.
+    /// </summary>
+    public bool VisualizerAlwaysShowOverlay { get; set; } = true;
+
+    /// <summary>Gets or sets the width in pixels the visualizer renders at before scaling up.</summary>
+    public int VisualizerRenderWidth { get; set; } = 640;
+
+    /// <summary>Gets or sets the height in pixels the visualizer renders at before scaling up.</summary>
+    public int VisualizerRenderHeight { get; set; } = 360;
+
+    /// <summary>Gets or sets the visualizer target frame rate.</summary>
+    public int VisualizerFrameRate { get; set; } = 60;
+
+    /// <summary>Gets or sets a value indicating whether the visualizer advances to the next preset automatically.</summary>
+    public bool VisualizerAutoAdvanceEnabled { get; set; }
+
+    /// <summary>Gets or sets how many seconds the visualizer shows one preset before advancing.</summary>
+    public int VisualizerAutoAdvanceSeconds { get; set; } = 15;
+
+    /// <summary>
+    /// Gets or sets how many seconds a visualizer preset switch cross-fades over. Zero switches
+    /// hard, which is the default; a positive value eases the outgoing preset's per-frame variables
+    /// into the incoming one like MilkDrop.
+    /// </summary>
+    public double VisualizerPresetBlendSeconds { get; set; }
+
+    /// <summary>
+    /// Gets or sets the stable keys of the visualizer presets the user deactivated. The visualizer
+    /// skips them while browsing and during automatic advance. A built-in preset uses the key
+    /// <c>builtin:&lt;name&gt;</c>; a user preset file uses <c>file:&lt;path relative to the preset
+    /// folder&gt;</c>, so deactivating a file deactivates every section it contains.
+    /// </summary>
+    public List<string> DisabledVisualizerPresets { get; set; } = [];
     public bool PcmOutputBoostEnabled { get; set; }
     /// <summary>Gets or sets the fade duration used when advancing non-gapless queues, in seconds.</summary>
     public double NonGaplessCrossfadeSeconds { get; set; }

@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics;
 using System.Globalization;
 using System.IO;
 using Avalonia;
@@ -15,6 +16,7 @@ using Orynivo.Audio;
 using Orynivo.Controls;
 using Orynivo.Library;
 using Orynivo.Localization;
+using Orynivo.Visualization;
 using Orynivo.Streaming;
 using Orynivo.Web;
 using Orynivo.Updates;
@@ -55,6 +57,8 @@ internal partial class SettingsView : UserControl
     private readonly SettingsStore _settingsStore = new();
     private readonly List<string> _libraryPaths = [];
     private string _scheduledBackupDirectory = string.Empty;
+    private string _visualizerPresetDirectory = string.Empty;
+    private readonly List<string> _disabledVisualizerPresets = [];
     private long _scheduledBackupLastRunUnix;
     private readonly List<PlexServerSettings> _plexServers = [];
     private readonly Dictionary<string, string> _plexTokens = [];
@@ -208,6 +212,49 @@ internal partial class SettingsView : UserControl
         DsdOverPcmCheckBox.IsChecked = settings.DsdOverPcmEnabled;
         AlwaysConvertDsdToPcmCheckBox.IsCheckedChanged += AlwaysConvertDsdToPcmCheckBox_OnIsCheckedChanged;
         PcmOutputBoostCheckBox.IsChecked = settings.PcmOutputBoostEnabled;
+        _visualizerPresetDirectory = settings.VisualizerPresetDirectory ?? string.Empty;
+        _disabledVisualizerPresets.Clear();
+        _disabledVisualizerPresets.AddRange(settings.DisabledVisualizerPresets ?? []);
+        UpdateVisualizerPresetFolder();
+        VisualizerAlwaysShowOverlayCheckBox.IsChecked = settings.VisualizerAlwaysShowOverlay;
+        VisualizerAutoAdvanceCheckBox.IsChecked = settings.VisualizerAutoAdvanceEnabled;
+        VisualizerAutoAdvanceSecondsNumericUpDown.Value = (decimal)Math.Clamp(
+            settings.VisualizerAutoAdvanceSeconds,
+            1,
+            600);
+        VisualizerPresetBlendSecondsNumericUpDown.Value = (decimal)Math.Clamp(
+            settings.VisualizerPresetBlendSeconds,
+            0d,
+            10d);
+        var visualizerResolutionChoices = new[]
+        {
+            new SettingChoice<VisualizerResolution>(new VisualizerResolution(3840, 2160), "3840 × 2160"),
+            new SettingChoice<VisualizerResolution>(new VisualizerResolution(2560, 1440), "2560 × 1440"),
+            new SettingChoice<VisualizerResolution>(new VisualizerResolution(1920, 1080), "1920 × 1080"),
+            new SettingChoice<VisualizerResolution>(new VisualizerResolution(1280, 720), "1280 × 720"),
+            new SettingChoice<VisualizerResolution>(new VisualizerResolution(960, 540), "960 × 540"),
+            new SettingChoice<VisualizerResolution>(new VisualizerResolution(640, 360), "640 × 360"),
+            new SettingChoice<VisualizerResolution>(new VisualizerResolution(480, 270), "480 × 270"),
+            new SettingChoice<VisualizerResolution>(new VisualizerResolution(320, 180), "320 × 180")
+        };
+        VisualizerResolutionComboBox.ItemsSource = visualizerResolutionChoices;
+        VisualizerResolutionComboBox.SelectedItem = visualizerResolutionChoices
+            .FirstOrDefault(choice => choice.Value.Width == settings.VisualizerRenderWidth &&
+                                      choice.Value.Height == settings.VisualizerRenderHeight)
+            ?? visualizerResolutionChoices
+                .FirstOrDefault(choice => choice.Value.Width == 640 && choice.Value.Height == 360)
+            ?? visualizerResolutionChoices[0];
+        var visualizerFrameRateChoices = new[]
+        {
+            new SettingChoice<int>(120, "120"),
+            new SettingChoice<int>(60, "60"),
+            new SettingChoice<int>(30, "30"),
+            new SettingChoice<int>(24, "24")
+        };
+        VisualizerFrameRateComboBox.ItemsSource = visualizerFrameRateChoices;
+        VisualizerFrameRateComboBox.SelectedItem = visualizerFrameRateChoices
+            .FirstOrDefault(choice => choice.Value == Math.Clamp(settings.VisualizerFrameRate, 5, 240))
+            ?? visualizerFrameRateChoices[1];
         MaxOutputSampleRateComboBox.ItemsSource = maxOutputSampleRateChoices;
         MaxOutputSampleRateComboBox.SelectedItem = maxOutputSampleRateChoices
             .FirstOrDefault(choice => choice.Value == Math.Clamp(settings.MaxOutputSampleRateHz, 0, 768_000))
@@ -491,6 +538,56 @@ internal partial class SettingsView : UserControl
                 : LocalizationManager.Current.ScheduledBackupNever);
     }
 
+    private void UpdateVisualizerPresetFolder() =>
+        VisualizerPresetFolderTextBlock.Text = string.IsNullOrWhiteSpace(_visualizerPresetDirectory)
+            ? VisualizerPresetLibrary.DefaultDirectory
+            : _visualizerPresetDirectory;
+
+    private async void VisualizerPresetFolderButton_OnClick(object? sender, RoutedEventArgs e)
+    {
+        if (TopLevel.GetTopLevel(this) is not { } topLevel)
+            return;
+        var folders = await topLevel.StorageProvider.OpenFolderPickerAsync(new FolderPickerOpenOptions
+        {
+            Title = LocalizationManager.Current.VisualizerPresetFolder,
+            AllowMultiple = false
+        });
+        if (folders.Count == 0 || folders[0].TryGetLocalPath() is not { Length: > 0 } path)
+            return;
+        _visualizerPresetDirectory = path;
+        UpdateVisualizerPresetFolder();
+    }
+
+    private async void VisualizerSelectPresetsButton_OnClick(object? sender, RoutedEventArgs e)
+    {
+        var dialog = new VisualizerPresetSelectionDialog(_visualizerPresetDirectory, _disabledVisualizerPresets);
+        await dialog.ShowDialog(GetHostWindow());
+        if (!dialog.Confirmed)
+            return;
+
+        _disabledVisualizerPresets.Clear();
+        _disabledVisualizerPresets.AddRange(dialog.DisabledKeys);
+    }
+
+    /// <summary>Opens the MilkDrop 2 preset collection page in the default browser.</summary>
+    /// <param name="sender">Button that raised the event.</param>
+    /// <param name="e">Event arguments.</param>
+    private void VisualizerDownloadPresetsButton_OnClick(object? sender, RoutedEventArgs e)
+    {
+        // Orynivo bundles no third-party presets; this only points at a public collection so a user
+        // can download their own.
+        try
+        {
+            Process.Start(new ProcessStartInfo("https://github.com/projectM-visualizer/presets-cream-of-the-crop")
+            {
+                UseShellExecute = true
+            });
+        }
+        catch (Exception exception) when (exception is System.ComponentModel.Win32Exception or InvalidOperationException)
+        {
+        }
+    }
+
     private async void ScheduledBackupFolderButton_OnClick(object? sender, RoutedEventArgs e)
     {
         if (TopLevel.GetTopLevel(this) is not { } topLevel)
@@ -530,6 +627,42 @@ internal partial class SettingsView : UserControl
     public bool DsdOverPcmEnabled => DsdOverPcmCheckBox.IsChecked == true;
     /// <summary>Gets a value indicating whether PCM playback should receive the additional output boost.</summary>
     public bool PcmOutputBoostEnabled => PcmOutputBoostCheckBox.IsChecked == true;
+
+    /// <summary>Gets the configured visualizer preset folder, or an empty string for the default.</summary>
+    public string VisualizerPresetDirectoryValue => _visualizerPresetDirectory;
+
+    /// <summary>Gets the stable keys of the visualizer presets the user deactivated.</summary>
+    public IReadOnlyList<string> DisabledVisualizerPresets => _disabledVisualizerPresets;
+
+    /// <summary>Gets a value indicating whether the visualizer always shows its overlay.</summary>
+    public bool VisualizerAlwaysShowOverlay => VisualizerAlwaysShowOverlayCheckBox.IsChecked == true;
+
+    /// <summary>Gets the configured visualizer frame width in pixels.</summary>
+    public int VisualizerRenderWidthValue =>
+        VisualizerResolutionComboBox.SelectedItem is SettingChoice<VisualizerResolution> choice
+            ? choice.Value.Width
+            : 640;
+
+    /// <summary>Gets the configured visualizer frame height in pixels.</summary>
+    public int VisualizerRenderHeightValue =>
+        VisualizerResolutionComboBox.SelectedItem is SettingChoice<VisualizerResolution> choice
+            ? choice.Value.Height
+            : 360;
+
+    /// <summary>Gets the configured visualizer target frame rate.</summary>
+    public int VisualizerFrameRateValue =>
+        VisualizerFrameRateComboBox.SelectedItem is SettingChoice<int> choice ? choice.Value : 60;
+
+    /// <summary>Gets a value indicating whether the visualizer advances to the next preset automatically.</summary>
+    public bool VisualizerAutoAdvanceEnabled => VisualizerAutoAdvanceCheckBox.IsChecked == true;
+
+    /// <summary>Gets the seconds the visualizer shows one preset before advancing.</summary>
+    public int VisualizerAutoAdvanceSeconds =>
+        (int)Math.Clamp(VisualizerAutoAdvanceSecondsNumericUpDown.Value ?? 15m, 1m, 600m);
+
+    /// <summary>Gets the seconds a visualizer preset switch cross-fades over, or zero to switch hard.</summary>
+    public double VisualizerPresetBlendSeconds =>
+        (double)Math.Clamp(VisualizerPresetBlendSecondsNumericUpDown.Value ?? 0m, 0m, 10m);
 
     /// <summary>Gets the configured maximum PCM output sample rate in hertz, or zero for automatic.</summary>
     public int MaxOutputSampleRateHz =>
@@ -1425,6 +1558,7 @@ internal partial class SettingsView : UserControl
         if (NavListBox.SelectedItem is not ListBoxItem { Tag: string tag })
             return;
         AudioDevicePanel.IsVisible             = tag == "AudioDevice";
+        VisualizerPanel.IsVisible              = tag == "Visualizer";
         LibraryPanel.IsVisible                 = tag == "Library";
         OrynivoServersSettingsPanel.IsVisible  = tag == "OrynivoServers";
         MetadataPanel.IsVisible                = tag == "Metadata";
