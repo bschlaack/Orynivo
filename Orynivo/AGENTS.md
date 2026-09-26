@@ -80,8 +80,13 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
   texture coordinates; generated noise coordinates are not flipped.
 - Legacy gamma/echo use a separate display target and must never enter feedback.
   Gamma is a linear brightness gain. The overlay's alpha is coverage, not forced
-  opacity; non-additive elements cover feedback. The shader blur chain is retained
-  for warp, updated after warp from the previous feedback (VS[0]), then read by comp. The comp
+  opacity; non-additive elements cover feedback. The shader blur chain is built
+  from the feedback the warp is about to sample **before** the warp runs, so the warp's
+  `GetBlur1`-`GetBlur3` and its `GetPixel`/`sampler_main` read the same frame; the comp shader
+  reads that same chain for the same pre-comp feedback. Building it after the warp left the warp
+  one generation behind its own `GetPixel`, so a shader that compares the two (for example
+  `GetBlur1(uv_orig) - GetPixel(uv_orig)`) oscillated between frames instead of matching the CPU.
+  The comp
   main samplers also bind VS[0], not the current warp-and-overlay target VS[1].
   Apply progressive range compression, GetBlur decoding and first-level edge darkening.
   Composite GLSL `rad` and `ang` follow MilkDrop's aspect-corrected

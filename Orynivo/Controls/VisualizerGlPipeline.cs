@@ -951,6 +951,14 @@ internal sealed class VisualizerGlPipeline
             UploadOverlay(gl, overlayBgra, frameWidth, frameHeight);
             PackVertices(mesh, meshX, meshY);
 
+            // Build the shader blur chain from the feedback frame the warp and comp shaders are
+            // about to sample, so their GetBlur1-GetBlur3 and their GetPixel/sampler_main read the
+            // same frame. Building it after the warp left the warp reading the previous generation:
+            // for a shader computing GetBlur1 - GetPixel the two terms then came from different
+            // frames and the output oscillated between frames instead of matching the CPU path.
+            if (_warpShaderProgram != 0 || _compShaderProgram != 0)
+                BuildShaderBlurLevels(gl, _feedbackTexture, frameWidth, frameHeight, uniforms);
+
             // Warp the feedback into ping zero, with the emitted warp shader when the preset has one.
             gl.BindFramebuffer(GlFramebuffer, _pingFramebuffer[0]);
             gl.Viewport(0, 0, frameWidth, frameHeight);
@@ -958,7 +966,8 @@ internal sealed class VisualizerGlPipeline
             gl.Clear(GlColorBufferBit);
             if (_warpShaderProgram != 0)
             {
-                // Warp reads the retained blur chain. Draw into the full-resolution target.
+                // Warp reads the blur chain built from this frame's feedback above. Draw into the
+                // full-resolution target.
                 gl.BindFramebuffer(GlFramebuffer, _pingFramebuffer[0]);
                 gl.Viewport(0, 0, frameWidth, frameHeight);
                 gl.UseProgram(_warpShaderProgram);
@@ -1002,11 +1011,6 @@ internal sealed class VisualizerGlPipeline
             }
 
             ClearSamplerBindings();
-            // MilkDrop's BlurPasses binds VS[0], the previous feedback, even though its comment
-            // calls this the current post-warp frame. The warp sees the retained chain; comp sees
-            // the newly blurred previous frame.
-            if (_warpShaderProgram != 0 || _compShaderProgram != 0)
-                BuildShaderBlurLevels(gl, _feedbackTexture, frameWidth, frameHeight, uniforms);
 
             // Remember the previous pre-comp frame for the comp shader before the post pass overwrites it.
             if (_compShaderProgram != 0)

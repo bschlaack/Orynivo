@@ -7,6 +7,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Fixed
+- Fixed the visualizer's OpenGL warp shader reading a one-generation-old blur chain. The shader
+  blur levels were built after the warp, so `GetBlur1`-`GetBlur3` referred to the frame before the
+  one the same shader read through `GetPixel`/`sampler_main`. A preset such as
+  `GetBlur1(uv_orig) - GetPixel(uv_orig)` oscillated between two brightness values on the GPU while
+  the CPU settled to a constant; the chain is now built from the feedback before the warp, the GL
+  and CPU frames agree, and the GL fidelity regression pins the case.
 - Corrected the MilkDrop preset variables `aspectx`/`aspecty`: the reference binds them to the *inverse* aspect factors (`var_pf_aspectx = m_fInvAspectX`, so a landscape frame is `(1, width/height)`), while Orynivo bound the non-inverse pair. Per-pixel code that multiplies its position delta by `aspecty` (for example Royal Mashup (13)) therefore applied the aspect correction twice. The shader `aspect` float4 keeps the reference layout `(aspectX, aspectY, 1/aspectX, 1/aspectY)`.
 - Corrected MilkDrop `bDarkenCenter`: Winamp draws only a small, faint centre fan, while
   Orynivo previously darkened almost the entire frame. Royal Mashup (10)'s isolated

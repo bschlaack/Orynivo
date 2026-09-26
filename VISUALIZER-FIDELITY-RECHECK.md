@@ -85,9 +85,13 @@ contracts are now implemented and covered by targeted tests:
 - **Warp constants:** `fWarpAnimSpeed` and `fWarpScale` reach CPU, Skia and GL warp
   inputs; time is multiplied by speed and displacement uses reciprocal scale.
 - **GL blur:** progressive min/max scale and bias, first-level edge darkening,
-  and GetBlur decoding. Warp reads the retained chain; the chain is then updated
-  from the previous feedback before overlay compositing and read by comp, matching
-  the supplied projectM render order. Equal/reversed ranges are widened to 0.1;
+  and GetBlur decoding. The chain is built from the feedback frame the warp is
+  about to sample before the warp runs, so the warp's GetBlur and its
+  GetPixel/sampler_main read the same generation; comp reads the same chain for
+  the same pre-comp feedback. Building it after the warp left the warp one
+  generation behind its own GetPixel, so a `GetBlur1 - GetPixel` shader
+  oscillated between frames while the CPU settled. Equal/reversed ranges are
+  widened to 0.1;
   the local projectM source contains a zero-width typo in this safeguard, which
   is deliberately not copied. Newly allocated retained blur targets start black.
 - **Overlay compositing:** RGB carries accumulated premultiplied colour and alpha
@@ -109,7 +113,9 @@ contracts are now implemented and covered by targeted tests:
   and portrait custom radius, shader-owned fade.
 - `the GL fidelity regression`: simultaneous point/linear and
   clamp/repeat reads, compressed and decoded blur ranges, multi-frame legacy
-  gamma without feedback accumulation, asymmetric shape orientation and alpha.
+  gamma without feedback accumulation, asymmetric shape orientation and alpha, and
+  that a warp `GetBlur1 - GetPixel` shader settles to the CPU value (the blur chain is
+  built from the feedback before the warp).
 - `the GL warp-target regression`: full-size custom warp target.
 - `MilkdropFidelityRegressionTests`: real key spellings, enabled/sparse shapes,
   isolated wave state, once-per-frame execution, init T restoration, PCM scaling,
