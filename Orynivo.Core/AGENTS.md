@@ -433,7 +433,12 @@ This file applies to `Orynivo.Core/` and supplements `../AGENTS.md`.
   reference derives from the position. `WarpSamplingTests` is the reference the translation is
   checked against.
   A shader's blur levels each keep their own buffer (`_blurLevels`) and build on one another, and a
-  level asked for first builds the ones below it. Do not collapse them back into one cached level: a
+  level asked for first builds the ones below it. Each level is **one** pair of passes from its
+  downscaled source — the reference's blur loop advances the level only every second pass
+  (`fscale_now = fscale[i/2]` in `milkdropfs.cpp`), and the OpenGL chain's `BuildShaderBlurLevels`
+  builds exactly that. Never run N pairs for level N: that over-blurred `GetBlur2`/`GetBlur3` on the
+  CPU alone, so a comp shader sampling them rendered differently on the two paths.
+  Do not collapse them back into one cached level: a
   comp shader that samples `GetBlur1` and `GetBlur3` in the same pixel otherwise invalidates the
   cache on every sample and rebuilds a full-frame blur each time, which cost seconds per frame.
   The Skia comp pass runs on the same adaptive grid as the interpreter and hands the preset to the

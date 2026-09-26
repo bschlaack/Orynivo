@@ -2760,13 +2760,13 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
                     continue;
 
                 _blurLevels[build - 1].ResampleFrom(build == 1 ? _previous : _blurLevels[build - 2]);
-                // The reference runs two passes per level: a long horizontal one and a short vertical
-                // one, so level N is N such pairs from its downscaled source.
-                for (var pass = 0; pass < build; pass++)
-                {
-                    _blurLevels[build - 1].BlurReference(horizontal: true);
-                    _blurLevels[build - 1].BlurReference(horizontal: false);
-                }
+                // Each level is exactly one pair of passes: the reference's blur loop advances the
+                // level only every second pass (`fscale_now = fscale[i/2]`), so level N is one long
+                // horizontal and one short vertical pass from its downscaled source, never N pairs.
+                // The OpenGL chain builds the same one pair; running N pairs here over-blurred the
+                // higher levels on the CPU alone, which a comp shader sampling `GetBlur3` would see.
+                _blurLevels[build - 1].BlurReference(horizontal: true);
+                _blurLevels[build - 1].BlurReference(horizontal: false);
 
                 _blurLevelReady[build - 1] = true;
             }

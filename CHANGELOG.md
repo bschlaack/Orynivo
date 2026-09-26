@@ -66,6 +66,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   top-down like the reference's capture, so the OpenGL fragment stage's single bottom-up flip is the
   only one needed. `PresetShapeTests.RenderFrame_TexturedShapeUsesTheReferenceTextureCoordinate`
   pins the sign.
+- Corrected the CPU blur chain's pass count. Each level is one long horizontal and one short vertical
+  pass from its downscaled source; the reference advances the level only every second pass
+  (`fscale_now = fscale[i/2]`), but Orynivo's interpreter ran N pairs for level N. Levels two and
+  three were therefore over-blurred on the CPU while the OpenGL chain built the correct one pair, so a
+  comp shader sampling `GetBlur2`/`GetBlur3` rendered differently on the two paths.
 
 ### Changed
 - Rebuilt the built-in visualizer presets as structured warp-shader effects instead of a flat
