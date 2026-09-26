@@ -1731,6 +1731,10 @@ folder configured under **Preset folder** as `.oryvis` or `.milk` files (default
 `visualizer-presets` folder below the per-user data directory); a file that cannot be parsed
 is skipped and counted in the on-screen label. Nine presets ship with the application.
 
+A shader may also declare its own texture, such as `sampler sampler_seaweed;`. Orynivo resolves it
+to an image file of that name (`.jpg`, `.png`, `.bmp`, `.gif`, `.webp`, or `.tga`) in a `textures`
+folder beside the presets, the same convention MilkDrop uses; no third-party texture is bundled.
+
 Settings > Visualisierung also offers **Select presets…**, which opens a dialog listing every
 available preset — the built-ins and every discovered preset file — with a checkbox each.
 Deactivated presets are skipped when the visualizer opens, steps forward or back, advances

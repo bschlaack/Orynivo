@@ -1638,7 +1638,7 @@ internal sealed class VisualizerGlPipeline
                 "blur1" => _shaderBlurTexture[0],
                 "blur2" => _shaderBlurTexture[1],
                 "blur3" => _shaderBlurTexture[2],
-                _ => _samplerTextures.TryGetValue(name, out var generated) || _samplerTextures.TryGetValue("sampler_" + parsed.BaseName, out generated) ? generated : main
+                _ => ResolveGeneratedOrUserSampler(gl, name, parsed.BaseName, parsed, main)
             };
             var unit = nextUnit++;
             gl.ActiveTexture(GlTexture0 + unit);
@@ -1648,6 +1648,37 @@ internal sealed class VisualizerGlPipeline
             _bindSampler?.Invoke(unit, _samplerStates[mode]);
             gl.Uniform1i(location, unit);
         }
+    }
+
+    /// <summary>
+    /// Resolves a shader sampler that is neither a main frame nor a blur level: a generated noise or
+    /// volume texture, a preset texture file loaded from the textures folder (as MilkDrop loads
+    /// <c>textures/&lt;name&gt;.jpg</c>), or the frame fallback.
+    /// </summary>
+    /// <param name="gl">GL interface.</param>
+    /// <param name="name">Sampler name as the shader declares it.</param>
+    /// <param name="baseName">Sampler name without its filtering/wrap qualifier.</param>
+    /// <param name="parsed">Parsed sampler qualifier.</param>
+    /// <param name="main">The stage's main frame texture.</param>
+    /// <returns>The texture handle to bind.</returns>
+    private int ResolveGeneratedOrUserSampler(
+        GlInterface gl, string name, string baseName, ShaderSamplerName parsed, int main)
+    {
+        if (_samplerTextures.TryGetValue(name, out var generated) ||
+            _samplerTextures.TryGetValue("sampler_" + baseName, out generated))
+            return generated;
+
+        if (VisualizerUserTextures.TryGet(baseName, out var user))
+        {
+            var buffer = user.Buffer;
+            var texture = UploadTexture(
+                gl, buffer.Pixels, buffer.Width, buffer.Height,
+                parsed.Wrap == VisualizerTextureWrap.Clamp, parsed.Nearest);
+            _samplerTextures[name] = texture;
+            return texture;
+        }
+
+        return main;
     }
 
     /// <summary>Sets the scalar and vector uniforms an emitted shader declares.</summary>

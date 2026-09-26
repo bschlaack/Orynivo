@@ -2827,6 +2827,14 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
             return ShaderValue.Vector(_sample[0], _sample[1], _sample[2], _sample[3], 4);
         }
 
+        // A preset may name its own texture file (for example sampler_seaweed in suksma - frust),
+        // which MilkDrop loads from its textures folder.
+        if (VisualizerUserTextures.TryGet(parsed.BaseName, out var userTexture))
+        {
+            userTexture.Buffer.SampleShader(u, v, parsed.Wrap, parsed.Nearest, _sample);
+            return ShaderValue.Vector(_sample[0], _sample[1], _sample[2], _sample[3], 4);
+        }
+
         // MilkDrop binds VS[0] to main samplers in both stages. VS[1], the current warp and
         // overlay, only becomes the next frame's VS[0] after presentation.
         var source = _previous;

@@ -303,6 +303,12 @@ public partial class VisualizerWindow : Window
         // walk over thousands of files and must never run while the window is being constructed,
         // because that would block the interface for as long as it takes.
         _presetDirectory = options.PresetDirectory;
+        // Preset texture files (sampler_<name> in a shader) live in a textures folder beside the
+        // presets, matching MilkDrop; load them before the first frame is parsed.
+        var presetFolder = string.IsNullOrWhiteSpace(_presetDirectory)
+            ? VisualizerPresetLibrary.DefaultDirectory
+            : _presetDirectory.Trim();
+        VisualizerUserTextures.SetDirectories([presetFolder, Path.Combine(presetFolder, "textures")]);
         _library.LoadBuiltIns();
         _library.SetDisabledKeys(options.DisabledPresetKeys);
         // Deactivated presets are skipped from the first frame on, so opening the visualizer never

@@ -191,7 +191,11 @@ This file applies to `Orynivo.Core/` and supplements `../AGENTS.md`.
   noises (`sampler_noisevol_lq`/`hq`) that `tex3D` samples, quantised to eight bits and laid out
   as a slice atlas (`VolumeAtlasColumns`/`VolumeAtlasRows`); the CPU interpreter and the GPU
   helper must read that one volume with the identical trilinear math, because a procedural hash
-  cannot be reproduced bit-exactly on the GPU. The `sampler_main`,
+  cannot be reproduced bit-exactly on the GPU. `VisualizerUserTextures` loads a preset's own image
+  textures by name (`sampler sampler_seaweed;` resolves to `textures/seaweed.jpg|.png|.bmp|.gif|.webp|.tga`
+  beside the presets, like MilkDrop) with SkiaSharp, caches them per name, and is configured by the
+  window and the harness; an unresolved name keeps the frame fallback. It ships no third-party asset.
+  The `sampler_main`,
   `sampler_pc_main`, `sampler_fc_main`, `GetBlur1`-`GetBlur3`, and `GetPixel` constructs are
   HLSL shader features and belong to the shader runtime in phase 38d, not to the texture bank.
   A sampler's `fc_`/`fw_`/`pc_`/`pw_` (or swapped) qualifier selects its wrap and filter mode, not a

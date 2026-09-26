@@ -108,6 +108,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   verified to light up by `VisualizerBrightnessDiagnosticTests`.
 
 ### Added
+- Added preset texture files to the visualizer. A shader that declares its own texture, such as
+  `sampler sampler_seaweed;`, now resolves to `textures/seaweed.jpg` (or `.png`, `.bmp`, `.gif`,
+  `.webp`, `.tga`) beside the presets, matching MilkDrop's convention; previously an unknown sampler
+  fell back to the frame, so a preset such as `suksma - frust` looked nothing like MilkDrop. Both the
+  CPU interpreter and the OpenGL pipeline load and bind the same decoded image, and no third-party
+  texture is bundled.
 - Added visualizer preset activation. Settings > Visualisierung gains a **Select presets…** action
   that opens a themed dialog listing every available preset — the nine built-ins and every `.oryvis`
   or `.milk` file in the preset folder — each with a checkbox. Deactivated presets are persisted by a
