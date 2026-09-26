@@ -644,7 +644,17 @@ public sealed class VisualizerPreset
         ["bWaveThick"] = "wave_thick",
         ["bAdditiveWaves"] = "wave_additive",
         ["bWaveBrighten"] = "wave_brighten",
+        ["bMaximizeWaveColor"] = "wave_brighten",
         ["bDarkenCenter"] = "darken_center",
+        // The legacy display filters and the volume-modulated wave alpha.
+        ["bModWaveAlphaByVolume"] = "mod_wave_alpha_by_volume",
+        ["fModWaveAlphaStart"] = "mod_wave_alpha_start",
+        ["fModWaveAlphaEnd"] = "mod_wave_alpha_end",
+        ["bRedBlueStereo"] = "red_blue_stereo",
+        ["bBrighten"] = "brighten",
+        ["bDarken"] = "darken",
+        ["bSolarize"] = "solarize",
+        ["bInvert"] = "invert",
         // Milkdrop 2 spells the scalar parameters with an f-prefixed key. Without these the engine
         // read the built-in default for every preset that only carries the Milkdrop 2 spelling, so a
         // preset that set fWaveAlpha to 0.001 still drew a full overlay and one that set fDecay to

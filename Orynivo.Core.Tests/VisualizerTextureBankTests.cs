@@ -14,9 +14,10 @@ public sealed class VisualizerTextureBankTests
     [Fact]
     public void GetSize_MatchesTheMilkdropSizes()
     {
-        Assert.Equal(32, VisualizerTextureBank.GetSize(VisualizerTexture.NoiseLow));
+        Assert.Equal(256, VisualizerTextureBank.GetSize(VisualizerTexture.NoiseLow));
+        Assert.Equal(32, VisualizerTextureBank.GetSize(VisualizerTexture.NoiseLowLite));
         Assert.Equal(256, VisualizerTextureBank.GetSize(VisualizerTexture.NoiseMedium));
-        Assert.Equal(512, VisualizerTextureBank.GetSize(VisualizerTexture.NoiseHigh));
+        Assert.Equal(256, VisualizerTextureBank.GetSize(VisualizerTexture.NoiseHigh));
         Assert.Equal(32, VisualizerTextureBank.GetSize(VisualizerTexture.Random00));
         Assert.Equal(32, VisualizerTextureBank.GetSize(VisualizerTexture.Random15));
         Assert.Equal(32, VisualizerTextureBank.GetSize(VisualizerTexture.NoiseVolumeLow));

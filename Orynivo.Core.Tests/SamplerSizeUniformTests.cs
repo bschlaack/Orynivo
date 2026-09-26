@@ -34,7 +34,7 @@ public sealed class SamplerSizeUniformTests
 
         renderer.RenderFrame(new SilentAudio(), 1d / 60d);
 
-        Assert.Equal(1f / VisualizerTextureBank.SmallSize, renderer.Output.GetPixel(16, 16, 0), 4);
+        Assert.Equal(1f / VisualizerTextureBank.MediumSize, renderer.Output.GetPixel(16, 16, 0), 4);
         Assert.Equal(1f / VisualizerTextureBank.MediumSize, renderer.Output.GetPixel(16, 16, 1), 4);
         Assert.Equal(1f / VisualizerTextureBank.VolumeSize, renderer.Output.GetPixel(16, 16, 2), 4);
     }
@@ -48,9 +48,9 @@ public sealed class SamplerSizeUniformTests
 
         renderer.WriteShaderUniforms(uniforms);
 
-        Assert.Equal(1f / VisualizerTextureBank.SmallSize, uniforms["texsize_noise_lq"].Get(2), 4);
+        Assert.Equal(1f / VisualizerTextureBank.MediumSize, uniforms["texsize_noise_lq"].Get(2), 4);
         Assert.Equal(1f / VisualizerTextureBank.MediumSize, uniforms["texsize_noise_mq"].Get(2), 4);
-        Assert.Equal(1f / VisualizerTextureBank.LargeSize, uniforms["texsize_noise_hq"].Get(2), 4);
+        Assert.Equal(1f / VisualizerTextureBank.MediumSize, uniforms["texsize_noise_hq"].Get(2), 4);
         Assert.Equal(1f / VisualizerTextureBank.VolumeSize, uniforms["texsize_noisevol_lq"].Get(2), 4);
         Assert.Equal(40f, uniforms["texsize_main"].Get(0), 4);
         Assert.Equal(24f, uniforms["texsize_main"].Get(1), 4);

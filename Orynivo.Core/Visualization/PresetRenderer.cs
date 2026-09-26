@@ -761,6 +761,10 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
             ShaderAmount = Math.Clamp(Read("shader", 1f), 0f, 1f),
             HueTime = (float)_elapsed * 30f,
             HueOffsets = (_hueOffsets[0], _hueOffsets[1], _hueOffsets[2], _hueOffsets[3]),
+            Brighten = Read("brighten", 0f) >= 0.5f,
+            Darken = Read("darken", 0f) >= 0.5f,
+            Solarize = Read("solarize", 0f) >= 0.5f,
+            Invert = Read("invert", 0f) >= 0.5f,
         };
     }
 
@@ -2153,9 +2157,9 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
         values[16] = ShaderValue.Vector(width, height, 1f / Math.Max(1, width), 1f / Math.Max(1, height), 4);
         values[17] = values[16];
         values[18] = values[16];
-        values[19] = SamplerSize(VisualizerTextureBank.SmallSize);
+        values[19] = SamplerSize(VisualizerTextureBank.MediumSize);
         values[20] = SamplerSize(VisualizerTextureBank.MediumSize);
-        values[21] = SamplerSize(VisualizerTextureBank.LargeSize);
+        values[21] = SamplerSize(VisualizerTextureBank.MediumSize);
         values[22] = SamplerSize(VisualizerTextureBank.VolumeSize);
         values[23] = values[22];
         foreach (var compiled in _compiledWarp)
@@ -2494,9 +2498,9 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
         destination["texsize_main"] = mainSize;
         destination["texsize_fc_main"] = mainSize;
         destination["texsize_pc_main"] = mainSize;
-        destination["texsize_noise_lq"] = SamplerSize(VisualizerTextureBank.SmallSize);
+        destination["texsize_noise_lq"] = SamplerSize(VisualizerTextureBank.MediumSize);
         destination["texsize_noise_mq"] = SamplerSize(VisualizerTextureBank.MediumSize);
-        destination["texsize_noise_hq"] = SamplerSize(VisualizerTextureBank.LargeSize);
+        destination["texsize_noise_hq"] = SamplerSize(VisualizerTextureBank.MediumSize);
         destination["texsize_noisevol_lq"] = SamplerSize(VisualizerTextureBank.VolumeSize);
         destination["texsize_noisevol_hq"] = SamplerSize(VisualizerTextureBank.VolumeSize);
         destination["time"] = ShaderValue.Scalar(Read("time", 0f));
@@ -2641,9 +2645,9 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
         interpreter.SetVariable("texsize_main", mainSize);
         interpreter.SetVariable("texsize_fc_main", mainSize);
         interpreter.SetVariable("texsize_pc_main", mainSize);
-        interpreter.SetVariable("texsize_noise_lq", SamplerSize(VisualizerTextureBank.SmallSize));
+        interpreter.SetVariable("texsize_noise_lq", SamplerSize(VisualizerTextureBank.MediumSize));
         interpreter.SetVariable("texsize_noise_mq", SamplerSize(VisualizerTextureBank.MediumSize));
-        interpreter.SetVariable("texsize_noise_hq", SamplerSize(VisualizerTextureBank.LargeSize));
+        interpreter.SetVariable("texsize_noise_hq", SamplerSize(VisualizerTextureBank.MediumSize));
         interpreter.SetVariable("texsize_noisevol_lq", SamplerSize(VisualizerTextureBank.VolumeSize));
         interpreter.SetVariable("texsize_noisevol_hq", SamplerSize(VisualizerTextureBank.VolumeSize));
         interpreter.SetVariable("time", Read("time", 0f));
@@ -3078,6 +3082,12 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
         // zero value leaves the frame untinted (milkdropfs.cpp, ShowToUser_NoShaders). The preset key
         // is fShader, which the parser aliases onto the shader variable.
         var shaderAmount = Math.Clamp(Read("shader", 1f), 0f, 1f);
+        // The legacy display filters, applied after the gamma and hue tint in the reference's order
+        // (GenCompPShaderText): brighten, darken, solarize, invert.
+        var brighten = Read("brighten", 0f) >= 0.5f;
+        var darken = Read("darken", 0f) >= 0.5f;
+        var solarize = Read("solarize", 0f) >= 0.5f;
+        var invert = Read("invert", 0f) >= 0.5f;
         var width = _warped.Width;
         var height = _warped.Height;
         ComputeHueShades();
@@ -3104,9 +3114,40 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
                     greenShade = (greenShade * shaderAmount) + (1f - shaderAmount);
                     blueShade = (blueShade * shaderAmount) + (1f - shaderAmount);
                     var index = rowStart + (x * 4);
-                    pixels[index] = Math.Clamp(pixels[index] * redShade * gamma, 0f, 1f);
-                    pixels[index + 1] = Math.Clamp(pixels[index + 1] * greenShade * gamma, 0f, 1f);
-                    pixels[index + 2] = Math.Clamp(pixels[index + 2] * blueShade * gamma, 0f, 1f);
+                    var red = Math.Clamp(pixels[index] * redShade * gamma, 0f, 1f);
+                    var green = Math.Clamp(pixels[index + 1] * greenShade * gamma, 0f, 1f);
+                    var blue = Math.Clamp(pixels[index + 2] * blueShade * gamma, 0f, 1f);
+                    if (brighten)
+                    {
+                        red = MathF.Sqrt(red);
+                        green = MathF.Sqrt(green);
+                        blue = MathF.Sqrt(blue);
+                    }
+
+                    if (darken)
+                    {
+                        red *= red;
+                        green *= green;
+                        blue *= blue;
+                    }
+
+                    if (solarize)
+                    {
+                        red = red * (1f - red) * 4f;
+                        green = green * (1f - green) * 4f;
+                        blue = blue * (1f - blue) * 4f;
+                    }
+
+                    if (invert)
+                    {
+                        red = 1f - red;
+                        green = 1f - green;
+                        blue = 1f - blue;
+                    }
+
+                    pixels[index] = Math.Clamp(red, 0f, 1f);
+                    pixels[index + 1] = Math.Clamp(green, 0f, 1f);
+                    pixels[index + 2] = Math.Clamp(blue, 0f, 1f);
                 }
             }
         });
@@ -3194,14 +3235,24 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
         var red = Math.Clamp(Read("wave_r", 1f), 0f, 1f);
         var green = Math.Clamp(Read("wave_g", 1f), 0f, 1f);
         var blue = Math.Clamp(Read("wave_b", 1f), 0f, 1f);
+        // Milkdrop's bMaximizeWaveColor (wave_brighten) scales the wave colour so its brightest
+        // channel reaches one.
+        if (Read("wave_brighten", 0f) >= 0.5f)
+        {
+            var brightest = Math.Max(red, Math.Max(green, blue));
+            if (brightest > 0.01f)
+            {
+                red /= brightest;
+                green /= brightest;
+                blue /= brightest;
+            }
+        }
+
         var dots = Read("wave_dots", 0f) >= 0.5f;
         var thick = Read("wave_thick", 0f) >= 0.5f;
         var additive = Read("wave_additive", 1f) >= 0.5f;
         var loop = MilkdropWaveform.IsLoop(mode);
-        // The reference tones the explosive-hash mode down by a resolution-dependent factor, so a
-        // dense hash does not swamp the frame; it is the only mode that does this.
-        if (mode == MilkdropWaveform.Mode.ExplosiveHash)
-            alpha *= ExplosiveHashAlphaScale(width);
+        alpha = ApplyWaveAlphaScale(mode, alpha, width);
 
         ApplyDefaultWavePerPoint(count, _wavePointX, _wavePointY);
         DrawDefaultWaveVertices(count, _wavePointX, _wavePointY, red, green, blue, alpha, dots, thick, additive, loop);
@@ -3215,23 +3266,72 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
     }
 
     /// <summary>
-    /// The reference's resolution-dependent alpha scale for the explosive-hash wave mode
-    /// (<c>milkdropfs.cpp</c>). It uses the render texture's size, which MilkDrop rounds up to a power
-    /// of two, and is the only mode that tones its alpha down.
+    /// Applies the reference's per-mode alpha rules and the volume modulation to the default wave's
+    /// alpha. Modes 1-5 scale their alpha (by a constant, by a resolution factor, or by the treble),
+    /// and <c>bModWaveAlphaByVolume</c> then maps the overall level through
+    /// <c>fModWaveAlphaStart</c>-<c>fModWaveAlphaEnd</c>.
+    /// </summary>
+    /// <param name="mode">Wave mode.</param>
+    /// <param name="alpha">Alpha from <c>wave_a</c>.</param>
+    /// <param name="width">Render frame width in pixels.</param>
+    /// <returns>The scaled alpha, clamped to zero through one.</returns>
+    private float ApplyWaveAlphaScale(MilkdropWaveform.Mode mode, float alpha, int width)
+    {
+        switch (mode)
+        {
+            case MilkdropWaveform.Mode.XyOscillationSpiral:
+                alpha *= 1.25f;
+                break;
+            case MilkdropWaveform.Mode.CenteredSpiro:
+                alpha *= WaveSizeAlphaFactor(width, 0.07f, 0.09f, 0.11f, 0.13f);
+                break;
+            case MilkdropWaveform.Mode.CenteredSpiroVolume:
+                alpha = WaveSizeAlphaFactor(width, 0.075f, 0.15f, 0.22f, 0.33f) * 1.3f * TrebleRelative * TrebleRelative;
+                break;
+            case MilkdropWaveform.Mode.DerivativeLine:
+                alpha *= 0.2f;
+                break;
+            case MilkdropWaveform.Mode.ExplosiveHash:
+                alpha *= WaveSizeAlphaFactor(width, 0.07f, 0.09f, 0.11f, 0.13f);
+                break;
+        }
+
+        if (Read("mod_wave_alpha_by_volume", 0f) >= 0.5f)
+        {
+            var start = Read("mod_wave_alpha_start", 0f);
+            var end = Read("mod_wave_alpha_end", 0f);
+            var range = end - start;
+            if (Math.Abs(range) > 1e-6f)
+            {
+                var volume = (BassRelative + MidRelative + TrebleRelative) * 0.333f;
+                alpha *= (volume - start) / range;
+            }
+        }
+
+        return Math.Clamp(alpha, 0f, 1f);
+    }
+
+    /// <summary>
+    /// The reference's resolution-dependent alpha factor, which uses the render texture's size rounded
+    /// up to a power of two (<c>milkdropfs.cpp</c>).
     /// </summary>
     /// <param name="width">Render frame width in pixels.</param>
-    /// <returns>The alpha multiplier.</returns>
-    private static float ExplosiveHashAlphaScale(int width)
+    /// <param name="at256">Factor for a 256-wide texture.</param>
+    /// <param name="at512">Factor for a 512-wide texture.</param>
+    /// <param name="at1024">Factor for a 1024-wide texture.</param>
+    /// <param name="at2048">Factor for a 2048-wide texture.</param>
+    /// <returns>The alpha factor.</returns>
+    private static float WaveSizeAlphaFactor(int width, float at256, float at512, float at1024, float at2048)
     {
         var size = 256;
         while (size < width && size < 2048)
             size *= 2;
         return size switch
         {
-            256 => 0.07f,
-            512 => 0.09f,
-            1024 => 0.11f,
-            _ => 0.13f
+            256 => at256,
+            512 => at512,
+            1024 => at1024,
+            _ => at2048
         };
     }
 

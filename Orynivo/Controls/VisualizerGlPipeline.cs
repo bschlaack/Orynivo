@@ -329,6 +329,10 @@ internal sealed class VisualizerGlPipeline
         uniform float uDarken;
         uniform float uGamma;
         uniform float uShaderAmount;
+        uniform float uPostBrighten;
+        uniform float uPostDarken;
+        uniform float uPostSolarize;
+        uniform float uPostInvert;
         uniform float uOuterInset;
         uniform float uOuterThickness;
         uniform float uOuterR;
@@ -411,10 +415,13 @@ internal sealed class VisualizerGlPipeline
                 vec3 shade = mix(mix(hueShade(3.0), hueShade(2.0), vUv.x),
                                  mix(hueShade(1.0), hueShade(0.0), vUv.x), 1.0 - vUv.y);
                 colour.rgb *= mix(vec3(1.0), shade, uShaderAmount);
-            }
-
-            if (uGamma != 1.0)
                 colour.rgb *= uGamma;
+                // The legacy display filters, in the reference's order (GenCompPShaderText).
+                if (uPostBrighten > 0.5) colour.rgb = sqrt(colour.rgb);
+                if (uPostDarken > 0.5) colour.rgb *= colour.rgb;
+                if (uPostSolarize > 0.5) colour.rgb = colour.rgb * (1.0 - colour.rgb) * 4.0;
+                if (uPostInvert > 0.5) colour.rgb = 1.0 - colour.rgb;
+            }
 
             fragColor = clamp(colour, 0.0, 1.0);
         }
@@ -738,7 +745,7 @@ internal sealed class VisualizerGlPipeline
                 [
                     "uSource", "uOverlay", "uDecay", "uDisplayOnly", "uHueTime", "uHue0", "uHue1", "uHue2", "uHue3",
                     "uEchoZoom", "uEchoAlpha", "uEchoOrientation",
-                    "uDarken", "uGamma", "uShaderAmount", "uOuterInset", "uOuterThickness", "uOuterR", "uOuterG",
+                    "uDarken", "uGamma", "uShaderAmount", "uPostBrighten", "uPostDarken", "uPostSolarize", "uPostInvert", "uOuterInset", "uOuterThickness", "uOuterR", "uOuterG",
                     "uOuterB", "uOuterA", "uInnerInset", "uInnerThickness", "uInnerR", "uInnerG",
                     "uInnerB", "uInnerA", "uFrameWidth", "uFrameHeight", "uSmaller"
                 ]);
@@ -1105,6 +1112,10 @@ internal sealed class VisualizerGlPipeline
                 Set(gl, _postUniforms, "uEchoAlpha", parameters.EchoAlpha);
                 Set(gl, _postUniforms, "uGamma", parameters.Gamma);
                 Set(gl, _postUniforms, "uShaderAmount", parameters.ShaderAmount);
+                Set(gl, _postUniforms, "uPostBrighten", parameters.Brighten ? 1f : 0f);
+                Set(gl, _postUniforms, "uPostDarken", parameters.Darken ? 1f : 0f);
+                Set(gl, _postUniforms, "uPostSolarize", parameters.Solarize ? 1f : 0f);
+                Set(gl, _postUniforms, "uPostInvert", parameters.Invert ? 1f : 0f);
                 Set(gl, _postUniforms, "uHueTime", parameters.HueTime);
                 Set(gl, _postUniforms, "uHue0", parameters.HueOffsets.X);
                 Set(gl, _postUniforms, "uHue1", parameters.HueOffsets.Y);

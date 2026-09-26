@@ -3,13 +3,16 @@ namespace Orynivo.Visualization;
 /// <summary>The textures a Milkdrop preset can sample.</summary>
 public enum VisualizerTexture
 {
-    /// <summary>The small 32 x 32 noise texture, <c>noise_lq</c>.</summary>
+    /// <summary>The 256 x 256 noise texture, <c>noise_lq</c> (Milkdrop's low-quality noise).</summary>
     NoiseLow,
 
-    /// <summary>The medium 256 x 256 noise texture, <c>noise_mq</c>.</summary>
+    /// <summary>The small 32 x 32 noise texture, <c>noise_lq_lite</c>.</summary>
+    NoiseLowLite,
+
+    /// <summary>The 256 x 256 noise texture, <c>noise_mq</c>.</summary>
     NoiseMedium,
 
-    /// <summary>The large 512 x 512 noise texture, <c>noise_hq</c>.</summary>
+    /// <summary>The 256 x 256 noise texture, <c>noise_hq</c>.</summary>
     NoiseHigh,
 
     /// <summary>The first of the sixteen 32 x 32 random textures, <c>rand00</c>.</summary>
@@ -46,14 +49,14 @@ public enum VisualizerTextureWrap
 /// </summary>
 public sealed class VisualizerTextureBank
 {
-    /// <summary>Edge length of the small and random textures.</summary>
+    /// <summary>Edge length of the small random and <c>noise_lq_lite</c> textures.</summary>
     public const int SmallSize = 32;
 
-    /// <summary>Edge length of the medium noise texture.</summary>
+    /// <summary>
+    /// Edge length of the noise textures Milkdrop generates: <c>noise_lq</c>, <c>noise_mq</c>, and
+    /// <c>noise_hq</c> are all 256 (only <c>noise_lq_lite</c> is 32).
+    /// </summary>
     public const int MediumSize = 256;
-
-    /// <summary>Edge length of the large noise texture.</summary>
-    public const int LargeSize = 512;
 
     /// <summary>Edge length of every axis of the cubic volume noise textures.</summary>
     public const int VolumeSize = 32;
@@ -86,6 +89,9 @@ public sealed class VisualizerTextureBank
             case "sampler_noise_lq":
                 texture = VisualizerTexture.NoiseLow;
                 return true;
+            case "sampler_noise_lq_lite":
+                texture = VisualizerTexture.NoiseLowLite;
+                return true;
             case "sampler_noise_mq":
                 texture = VisualizerTexture.NoiseMedium;
                 return true;
@@ -117,10 +123,10 @@ public sealed class VisualizerTextureBank
     /// <returns>The edge length in pixels.</returns>
     public static int GetSize(VisualizerTexture texture) => texture switch
     {
-        VisualizerTexture.NoiseMedium => MediumSize,
-        VisualizerTexture.NoiseHigh => LargeSize,
+        VisualizerTexture.NoiseLowLite => SmallSize,
+        >= VisualizerTexture.Random00 and <= VisualizerTexture.Random15 => SmallSize,
         VisualizerTexture.NoiseVolumeLow or VisualizerTexture.NoiseVolumeHigh => VolumeSize,
-        _ => SmallSize
+        _ => MediumSize
     };
 
     /// <summary>Reports whether a texture is one of the cubic volume noises.</summary>

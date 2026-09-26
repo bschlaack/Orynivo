@@ -246,9 +246,9 @@ public static class SkiaShaderRunner
         uniforms["texsize_main"] = TexSize(width, height);
         uniforms["texsize_fc_main"] = TexSize(width, height);
         uniforms["texsize_pc_main"] = TexSize(width, height);
-        uniforms["texsize_noise_lq"] = TexSize(VisualizerTextureBank.SmallSize, VisualizerTextureBank.SmallSize);
+        uniforms["texsize_noise_lq"] = TexSize(VisualizerTextureBank.MediumSize, VisualizerTextureBank.MediumSize);
         uniforms["texsize_noise_mq"] = TexSize(VisualizerTextureBank.MediumSize, VisualizerTextureBank.MediumSize);
-        uniforms["texsize_noise_hq"] = TexSize(VisualizerTextureBank.LargeSize, VisualizerTextureBank.LargeSize);
+        uniforms["texsize_noise_hq"] = TexSize(VisualizerTextureBank.MediumSize, VisualizerTextureBank.MediumSize);
         uniforms["texsize_noisevol_lq"] = TexSize(VisualizerTextureBank.VolumeSize, VisualizerTextureBank.VolumeSize);
         uniforms["texsize_noisevol_hq"] = TexSize(VisualizerTextureBank.VolumeSize, VisualizerTextureBank.VolumeSize);
     }

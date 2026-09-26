@@ -167,9 +167,13 @@ This file applies to `Orynivo.Core/` and supplements `../AGENTS.md`.
   missing from the layout, so a preset such as `suksma - frust` had its `fWaveSmoothing=0.9`
   ignored and its explosive hash stayed unsmoothed. The explosive-hash mode is the only mode that
   tones its alpha down, by the reference's resolution factor (`milkdropfs.cpp`: `alpha *= 0.07` at
-  256 through `0.13` at 2048); `ExplosiveHashAlphaScale` maps the rounded-up power-of-two frame
-  width onto the same table, because skipping it made that mode roughly an order of magnitude too
-  bright.
+  256 through `0.13` at 2048); `WaveSizeAlphaFactor` maps the rounded-up power-of-two frame width
+  onto that table. Every mode's alpha rule is in `ApplyWaveAlphaScale` (mode 1 `*1.25`, mode 3
+  `factor*1.3*treble²`, mode 4 `*0.2`), followed by the `bModWaveAlphaByVolume` modulation through
+  `fModWaveAlphaStart`/`fModWaveAlphaEnd`. `bMaximizeWaveColor` (`wave_brighten`) normalises the
+  wave colour so its brightest channel is one. The legacy display filters `bBrighten` (`sqrt`),
+  `bDarken` (square), `bSolarize`, and `bInvert` are applied after the hue tint and gamma in
+  `ApplyHueShadeAndGamma` and in the GL display pass, in the reference's `GenCompPShaderText` order.
   The default waveform and the four custom waveforms are separate: the default one uses the global
   `wave_*` settings and the global `per_point` block, while each `VisualizerWave` carries its own
   `wavecode_N_*` state and `wave_N_*` blocks. `PresetRenderer.DrawCustomWave` builds the sample data
@@ -186,8 +190,10 @@ This file applies to `Orynivo.Core/` and supplements `../AGENTS.md`.
   fallback for a caller that does not collect the geometry; `CollectWaveGeometry` must only be set
   while the pipeline reports it can draw the geometry, because the renderer then skips its own draw.
   `VisualizerTextureBank` generates the Milkdrop noise and random textures from fixed seeds
-  instead of bundling third party images: keep generation deterministic and lazy, and keep the
-  sizes (32, 256, 512) so shader sampling stays comparable. It also generates the two 32³ volume
+  instead of bundling third party images: keep generation deterministic and lazy. Use MilkDrop's own
+  sizes, not arbitrary ones: `noise_lq`, `noise_mq`, and `noise_hq` are 256×256, `noise_lq_lite` and
+  the random textures are 32×32, and the volume noises are 32³, because `texsize_noise_*` and every
+  shader that scales sampling by it must match the reference. It also generates the two 32³ volume
   noises (`sampler_noisevol_lq`/`hq`) that `tex3D` samples, quantised to eight bits and laid out
   as a slice atlas (`VolumeAtlasColumns`/`VolumeAtlasRows`); the CPU interpreter and the GPU
   helper must read that one volume with the identical trilinear math, because a procedural hash

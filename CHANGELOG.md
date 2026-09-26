@@ -7,6 +7,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Fixed
+- Caught the visualizer's preset handling up to MilkDrop 2 in several reference areas that were
+  missing or wrong:
+  - The default waveform now applies the reference's per-mode alpha rules (mode 1 `*1.25`, modes 2
+    and 5 the resolution factor, mode 3 the resolution factor then `*1.3*treble²`, mode 4 `*0.2`)
+    and the `bModWaveAlphaByVolume`/`fModWaveAlphaStart`/`fModWaveAlphaEnd` modulation, plus
+    `bMaximizeWaveColor` (`wave_brighten`), which normalises the wave colour to full brightness.
+  - The legacy display filters `bBrighten` (`sqrt`), `bDarken` (square), `bSolarize` and `bInvert`
+    are applied after the hue tint and gamma on both the CPU and OpenGL paths, matching
+    `GenCompPShaderText`.
+  - The generated noise textures use MilkDrop's sizes: `noise_lq`, `noise_mq`, and `noise_hq` are
+    256×256 and `noise_lq_lite` is 32×32 (previously `noise_lq` was 32 and `noise_hq` 512), so
+    `texsize_noise_*` and every shader that scales its sampling by them agree with the reference.
 - Corrected the visualizer's default-waveform explosive-hash mode and smoothing. The
   `wave_smoothing` variable was never registered, so a preset's `fWaveSmoothing` (for example
   `suksma - frust`, which sets `0.9`) was ignored and the hash stayed unsmoothed, and the mode-5

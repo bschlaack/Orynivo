@@ -52,4 +52,16 @@ public readonly record struct VisualizerFrameParameters(
     public (float X, float Y, float Z, float W) HueOffsets { get; init; }
     /// <summary>Gets the legacy hue-shading blend amount, zero to one.</summary>
     public float ShaderAmount { get; init; }
+
+    /// <summary>Gets whether the legacy display applies the brighten filter (<c>sqrt</c>).</summary>
+    public bool Brighten { get; init; }
+
+    /// <summary>Gets whether the legacy display applies the darken filter (square).</summary>
+    public bool Darken { get; init; }
+
+    /// <summary>Gets whether the legacy display applies the solarize filter.</summary>
+    public bool Solarize { get; init; }
+
+    /// <summary>Gets whether the legacy display inverts the frame.</summary>
+    public bool Invert { get; init; }
 }
