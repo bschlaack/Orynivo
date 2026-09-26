@@ -749,7 +749,10 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
   them for the **Select presets…** dialog, and `SetDisabledKeys`/`ResolveEnabledIndex` make the
   window's open, step, auto-advance, and mouse navigation skip a deactivated preset in the
   requested direction; when every preset is deactivated the requested index is kept so the
-  visualizer never stops rendering. `LoadBuiltIns` is the only thing the window
+  visualizer never stops rendering. The window must also re-check `IsDisabled` before every
+  preset switch and once discovery finishes, because the initial index is resolved against the
+  built-ins only and the deactivated set (or a user file) can arrive later; a deactivated preset
+  must never reach the renderer. `LoadBuiltIns` is the only thing the window
   constructor may call: it touches no disk, so the window opens and renders while `Discover`
   enumerates the folder on a worker thread. Discovery records file paths only, never file
   contents, because a real collection holds thousands of files and reading them up front froze

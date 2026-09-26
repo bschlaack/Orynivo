@@ -890,6 +890,20 @@
                                Foreground="{DynamicResource AppMutedTextBrush}"
                                TextWrapping="Wrap"
                                Margin="0,6,0,0"/>
+
+                    <TextBlock Text="{DynamicResource L_VisualizerPresetDownloadHint}"
+                               FontSize="{DynamicResource FontSizeMeta}"
+                               Foreground="{DynamicResource AppMutedTextBrush}"
+                               TextWrapping="Wrap"
+                               Margin="0,12,0,0"/>
+                    <Button x:Name="VisualizerDownloadPresetsButton"
+                            Height="30"
+                            Padding="14,0"
+                            Margin="0,6,0,0"
+                            HorizontalAlignment="Left"
+                            Theme="{StaticResource SettingsButtonTheme}"
+                            Content="{DynamicResource L_VisualizerDownloadPresets}"
+                            Click="VisualizerDownloadPresetsButton_OnClick"/>
                 </StackPanel>
                 <StackPanel x:Name="LibraryPanel"
                             IsVisible="False">

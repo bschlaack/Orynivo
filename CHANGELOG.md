@@ -7,6 +7,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Fixed
+- The visualizer could still show a deactivated preset at startup: the initial selection was made
+  against the built-ins only, and a preset deactivated after the selection (or a user file that only
+  appeared once the folder was discovered) was not skipped. It now re-resolves to the first enabled
+  preset before every switch and once discovery finishes.
 - Fixed a preset texture being bound to the wrong OpenGL sampler. `VisualizerGlPipeline` resolved a
   shader sampler before making its texture unit active, and a lazily uploaded preset texture
   (`sampler sampler_seaweed;` in `suksma - frust`) bound itself to the previously active unit. The
@@ -132,6 +136,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   verified to light up by `VisualizerBrightnessDiagnosticTests`.
 
 ### Added
+- Settings > Playback > Visualizer now explains that Orynivo ships no third-party presets and offers
+  a **Download presets…** action that opens the projectM `presets-cream-of-the-crop` collection, so a
+  user can add MilkDrop 2 presets to the **Preset folder**.
 - Added MilkDrop-style preset blending to the visualizer. A preset switch now cross-fades over a
   configurable **Preset switch cross-fade duration** (Settings > Playback > Visualizer,
   default 0 = hard switch). The outgoing preset keeps running and the reference's non-motion

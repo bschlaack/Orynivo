@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics;
 using System.Globalization;
 using System.IO;
 using Avalonia;
@@ -566,6 +567,25 @@ internal partial class SettingsView : UserControl
 
         _disabledVisualizerPresets.Clear();
         _disabledVisualizerPresets.AddRange(dialog.DisabledKeys);
+    }
+
+    /// <summary>Opens the MilkDrop 2 preset collection page in the default browser.</summary>
+    /// <param name="sender">Button that raised the event.</param>
+    /// <param name="e">Event arguments.</param>
+    private void VisualizerDownloadPresetsButton_OnClick(object? sender, RoutedEventArgs e)
+    {
+        // Orynivo bundles no third-party presets; this only points at a public collection so a user
+        // can download their own.
+        try
+        {
+            Process.Start(new ProcessStartInfo("https://github.com/projectM-visualizer/presets-cream-of-the-crop")
+            {
+                UseShellExecute = true
+            });
+        }
+        catch (Exception exception) when (exception is System.ComponentModel.Win32Exception or InvalidOperationException)
+        {
+        }
     }
 
     private async void ScheduledBackupFolderButton_OnClick(object? sender, RoutedEventArgs e)

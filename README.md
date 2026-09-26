@@ -1744,6 +1744,12 @@ A shader may also declare its own texture, such as `sampler sampler_seaweed;`. O
 to an image file of that name (`.jpg`, `.png`, `.bmp`, `.gif`, `.webp`, or `.tga`) in a `textures`
 folder beside the presets, the same convention MilkDrop uses; no third-party texture is bundled.
 
+Orynivo ships no third-party presets, but MilkDrop 2 preset collections can be downloaded and
+placed in the **Preset folder** (or any subfolder). A well-known free collection is
+[projectM's presets-cream-of-the-crop](https://github.com/projectM-visualizer/presets-cream-of-the-crop);
+its presets are the user's own files and are neither bundled with nor licensed by Orynivo. Settings >
+Playback > Visualizer offers a **Download presets…** action that opens that page.
+
 Settings > Visualisierung also offers **Select presets…**, which opens a dialog listing every
 available preset — the built-ins and every discovered preset file — with a checkbox each.
 Deactivated presets are skipped when the visualizer opens, steps forward or back, advances

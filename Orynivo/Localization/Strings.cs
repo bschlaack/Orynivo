@@ -1457,6 +1457,10 @@ public sealed record LocalizedStrings(
     public string VisualizerSelectPresets { get; init; } = "";
     /// <summary>Gets the explanatory text below the preset selection action.</summary>
     public string VisualizerSelectPresetsHint { get; init; } = "";
+    /// <summary>Gets the hint that explains where MilkDrop 2 preset collections can be obtained.</summary>
+    public string VisualizerPresetDownloadHint { get; init; } = "";
+    /// <summary>Gets the action label that opens the preset collection download page.</summary>
+    public string VisualizerDownloadPresets { get; init; } = "";
     /// <summary>Gets the title of the preset selection dialog.</summary>
     public string VisualizerPresetSelectionTitle { get; init; } = "";
     /// <summary>Gets the hint of the preset selection dialog.</summary>

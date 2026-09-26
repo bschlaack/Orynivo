@@ -599,6 +599,11 @@ public partial class VisualizerWindow : Window
         if (_renderedPresetIndex != _presetIndex)
         {
             var switchClock = System.Diagnostics.Stopwatch.StartNew();
+            // A preset that was deactivated after the selection was made, or one whose file only
+            // appeared once discovery finished, must never be shown; advance to the first enabled
+            // preset in the requested direction instead.
+            if (_library.IsDisabled(_presetIndex))
+                _presetIndex = _library.ResolveEnabledIndex(_presetIndex, 1);
             _renderedPresetIndex = _presetIndex;
             var preset = _library.At(_presetIndex);
             var loadMs = switchClock.ElapsedMilliseconds;
@@ -753,6 +758,11 @@ public partial class VisualizerWindow : Window
             {
                 var elapsed = _library.Discover(folder);
                 Interlocked.Exchange(ref _discoveryMilliseconds, (int)elapsed.TotalMilliseconds);
+                // The selection was made against the built-ins only; if discovery revealed that the
+                // current preset is deactivated (or that every built-in was), move to the first
+                // enabled preset of the complete list.
+                if (_library.IsDisabled(_presetIndex))
+                    _presetIndex = _library.ResolveEnabledIndex(_presetIndex, 1);
             });
         }
 
