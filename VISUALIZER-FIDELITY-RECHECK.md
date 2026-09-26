@@ -305,3 +305,48 @@ bug, but the CPU path builds its own levels from `_previous` as well
 The `blur=0` in the GL first-frame line is correct: 138 sets no `blur_level`,
 and the `b1x` alias maps to `blur1_max`, not to `blur1`, so both renderers
 run zero frame-blur passes.
+
+
+## MilkDrop 2 feature-parity checklist (2026-09-26)
+
+Compared against the MilkDrop 3 sources under `%TEMP%\opencode\milkdrop3` (the
+`milkdropfs.cpp`, `state.cpp`, and `plugin.cpp` implementations for MilkDrop 2
+presets). No code was copied; only behaviour was reproduced.
+
+### Covered (checked against the reference)
+
+- Preset key aliases and expression blocks: `per_frame_init`, `per_frame`,
+  `per_pixel`, `per_point`; shapes (`shapecode_N_*`) and custom waves
+  (`wavecode_N_*`), including spectra, dots, thick lines, additive, separation.
+- Motion/geometry keys: `zoom`/`zoomexp`/`rot`/`cx`/`cy`/`dx`/`dy`/`warp`/`sx`/`sy`,
+  `fWarpAnimSpeed`/`fWarpScale`, `fZoomExponent`, borders (`ob_*`/`ib_*`),
+  `bDarkenCenter`, `fVideoEcho*`/`echo_*`, `fShader`, `gamma` (`fGammaAdj`).
+- Default waveform modes 0-8 with the reference geometry, `fWaveScale`,
+  `fWaveSmoothing`, `fWaveParam` (`wave_mystery`), `bWaveDots` (`wave_usedots`),
+  `bWaveThick`, `bAdditiveWaves`, `bMaximizeWaveColor` (`wave_brighten`), the
+  per-mode alpha rules, and `bModWaveAlphaByVolume`.
+- Legacy display filters `bBrighten`/`bDarken`/`bSolarize`/`bInvert`, and the
+  video-echo/gamma/hue composite.
+- Shaders: HLSL parsing, preprocessor (`#define`/`#if`), `sampler` qualifiers
+  (`fc_`/`fw_`/`pc_`/`pw_`), `GetPixel`, `GetBlur1`-`GetBlur3`, `tex2D`/`tex3D`,
+  `rot_*` matrices, the `_qa`-`_qh` q banks and `vol_att`, sampler-size uniforms
+  (`texsize_*`), the retained one-generation-old warp blur chain, and preset
+  texture files (`textures/<name>.jpg`).
+- Generated textures: `noise_lq`/`noise_mq`/`noise_hq` (256), `noise_lq_lite`
+  (32), `rand00`-`rand15`, and the 32³ volume noises.
+
+### Remaining gaps
+
+- **Motion vectors** use Orynivo's `mv_enabled`-gated recorded field and draw it
+  white with `mv_l`; the reference draws an arrow grid when `mv_a >= 0.001`
+  using `mv_x`/`mv_y` (fractional grid), `mv_dx`/`mv_dy` (offset), `mv_l`
+  (length), and `mv_r`/`mv_g`/`mv_b` (colour), before the warp. This is a
+  deliberate documented extension, not a match.
+- **Preset blending** (`m_bBlending`, the automatic/user blend time): MilkDrop
+  cross-fades between two presets; Orynivo switches hard while retaining the
+  feedback. Not implemented.
+- **Version-dependent defaults** (`MILKDROP_PRESET_VERSION`): the reference
+  applies version-specific default values while loading; Orynivo uses one fixed
+  default set.
+- **`texsize_<usertexture>`** for a preset's own image textures is not bound.
+- `bRedBlueStereo` is intentionally absent: the reference has it commented out.
