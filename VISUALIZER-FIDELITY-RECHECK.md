@@ -334,6 +334,10 @@ presets). No code was copied; only behaviour was reproduced.
   texture files (`textures/<name>.jpg`).
 - Generated textures: `noise_lq`/`noise_mq`/`noise_hq` (256), `noise_lq_lite`
   (32), `rand00`-`rand15`, and the 32³ volume noises.
+- Preset blending: the reference's cosine-eased non-motion per-frame variables
+  (`milkdropfs.cpp` lines 710-760) and the snapped boolean/ordinal switches are
+  reproduced by `PresetBlend` and `PresetRenderer.SetBlend`, and the feedback is
+  retained across the switch. See the remaining gaps for the geometric warp blend.
 
 ### Remaining gaps
 
@@ -341,9 +345,11 @@ presets). No code was copied; only behaviour was reproduced.
   alias onto `mv_a`, the arrows take `mv_r`/`mv_g`/`mv_b`, and `mv_l` is the length), but the
   drawing model is still Orynivo's recorded field on a fixed grid, not the reference's
   reverse-propagated arrow grid driven by `mv_x`/`mv_y` and `mv_dx`/`mv_dy`.
-- **Preset blending** (`m_bBlending`, the automatic/user blend time): MilkDrop
-  cross-fades between two presets; Orynivo switches hard while retaining the
-  feedback. Not implemented.
+- **Preset blending geometry:** the cosine-eased variables and the retained
+  feedback are implemented, but the reference's second warp pass — the outgoing
+  preset's own per-vertex UV set with a per-vertex alpha, drawn over the incoming
+  preset's mesh — is not. The two presets' geometries therefore swap on the first
+  blend frame while the parameter values ease over the configured duration.
 - **Version-dependent defaults** (`MILKDROP_PRESET_VERSION`): the reference
   applies version-specific default values while loading; Orynivo uses one fixed
   default set.

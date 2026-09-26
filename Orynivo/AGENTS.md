@@ -676,8 +676,13 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
   index silently changes meaning when an entry is added. `VisualizerAutoAdvanceEnabled` and
   `VisualizerAutoAdvanceSeconds` (default 15) let the render loop advance to the next preset after
   the dwell time; the window only sets `_presetIndex` and lets the next frame apply the switch, so
-  the change stays a render-thread request like the key and mouse navigation. The
-  defaults are 640 x 360 at 60 frames per second, which the parallel frame passes made affordable.
+  the change stays a render-thread request like the key and mouse navigation.
+  `AppSettings.VisualizerPresetBlendSeconds` (default 0 = hard switch) makes the window capture the
+  outgoing preset's live slots with `PresetRenderer.CaptureFrameState` before the old renderer is
+  disposed and call `SetBlend` each frame with the eased progress, so a switch eases its non-motion
+  parameters instead of snapping; the blend is cleared on reset, on the next switch, and when the
+  progress reaches one.
+  The defaults are 640 x 360 at 60 frames per second, which the parallel frame passes made affordable.
   The built-in presets are structured warp-shader effects (see `VisualizerPresets`), and
   `RenderTimingDiagnosticTests` documents their cost profile at two resolutions.
   `VisualizerAlwaysShowOverlay` decides whether the overlay is permanent or appears on pointer

@@ -294,6 +294,18 @@ This file applies to `Orynivo.Core/` and supplements `../AGENTS.md`.
   onto SkSL's `matN` (spreading a vector argument into scalars, because `matN` has no four-component
   constructor) and must not narrow a matrix argument. The shader entry points must clear the pool
   before evaluating a pixel, so a handle can never point at a matrix another pixel built.
+  Preset switching blends like the reference. `PresetBlend` owns the pure cosine easing and the
+  variable contract: the interpolated set (`decay`, the waveform colours and position, both border
+  bands, the motion-vector variables, the video echo, `gamma`, and the blur range keys), the snapped
+  set (`wrap`, `echo_orient`, the wave flags, `darken_center`, and the legacy display filters), and
+  the motion set, which is never blended. `PresetRenderer.CaptureFrameState` returns a copy of the
+  live slots and `SetBlend(outgoing, outgoingState, progress)` continues the outgoing preset from
+  those slots; the outgoing preset's per-frame block runs each blend frame on its own `_blendSlots`
+  so its user variables keep advancing, and `ApplyBlend` eases the interpolated values into `_slots`
+  after the incoming per-frame block. Never blend the motion variables or the per-pixel state, and
+  never re-run the outgoing preset's init block on every frame. The reference's geometric second
+  warp pass (two per-vertex UV sets with per-vertex alpha) is not implemented; the feedback still
+  carries the previous picture, so a switch morphs rather than restarting from black.
   `PresetRenderer.SeedFrameVariables` must keep `fps`
   finite on the first frame, because a preset that divides by it otherwise accumulates an infinity
   that then reaches the sampler. The per-frame `rand_frame` vector uses `Random.Shared` by default so

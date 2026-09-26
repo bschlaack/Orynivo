@@ -99,6 +99,13 @@ public sealed class AppSettings
     public int VisualizerAutoAdvanceSeconds { get; set; } = 15;
 
     /// <summary>
+    /// Gets or sets how many seconds a visualizer preset switch cross-fades over. Zero switches
+    /// hard, which is the default; a positive value eases the outgoing preset's per-frame variables
+    /// into the incoming one like MilkDrop.
+    /// </summary>
+    public double VisualizerPresetBlendSeconds { get; set; }
+
+    /// <summary>
     /// Gets or sets the stable keys of the visualizer presets the user deactivated. The visualizer
     /// skips them while browsing and during automatic advance. A built-in preset uses the key
     /// <c>builtin:&lt;name&gt;</c>; a user preset file uses <c>file:&lt;path relative to the preset

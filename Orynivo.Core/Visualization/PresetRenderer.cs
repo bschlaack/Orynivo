@@ -165,6 +165,13 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
     // in per-pixel) cannot overwrite the per-frame state. Milkdrop keeps the two stages separate;
     // only q1-q8 carry from per-frame to per-pixel.
     private double[] _pixelSlots;
+    // While one preset replaces another, the outgoing preset keeps running on its own slot array so
+    // the non-motion per-frame variables can be eased from it into the incoming preset, exactly like
+    // Milkdrop's m_pOldState.
+    private VisualizerPreset? _blendPreset;
+    private double[]? _blendSlots;
+    private float _blendMix = 1f;
+    private float _blendSnapPoint = PresetBlend.DefaultSnapPoint;
     private double _frameDelta = 1d / 60d;
     private static readonly string[] QNames = Enumerable.Range(1, 32).Select(i => "q" + i).ToArray();
     private static readonly string[] TNames = Enumerable.Range(1, 8).Select(i => "t" + i).ToArray();
@@ -655,6 +662,55 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
     }
 
     /// <summary>
+    /// Gets a value indicating whether a preset blend is in progress, so the caller can keep
+    /// advancing its progress until <see cref="SetBlend"/> is called with <see langword="null"/>.
+    /// </summary>
+    public bool IsBlending => _blendPreset is not null;
+
+    /// <summary>
+    /// Captures the live per-frame variable state so a preset switch can blend from the outgoing
+    /// preset exactly where it left off. Passing the returned array to the next renderer's
+    /// <see cref="SetBlend"/> continues the outgoing preset's user variables, including its spring
+    /// and accumulator state, instead of restarting it from its initialisation block.
+    /// </summary>
+    /// <returns>A copy of the per-frame slots of the current preset.</returns>
+    public double[] CaptureFrameState() => (double[])_slots.Clone();
+
+    /// <summary>
+    /// Starts, advances, or ends a blend from an outgoing preset. The first call captures the
+    /// outgoing preset's slot array once; later calls only move the eased mix, so the outgoing
+    /// preset's own user variables keep evolving frame by frame like the reference's old state.
+    /// Passing <see langword="null"/> for <paramref name="outgoing"/> ends the blend and leaves the
+    /// incoming preset's values untouched.
+    /// </summary>
+    /// <param name="outgoing">Preset to blend from, or <see langword="null"/> to end the blend.</param>
+    /// <param name="outgoingState">
+    /// The outgoing preset's live slots from <see cref="CaptureFrameState"/>, or <see langword="null"/>
+    /// to start it from its initialisation block.
+    /// </param>
+    /// <param name="progress">Blend progress where zero is the outgoing preset and one the incoming.</param>
+    public void SetBlend(VisualizerPreset? outgoing, double[]? outgoingState, float progress)
+    {
+        if (outgoing is null)
+        {
+            _blendPreset = null;
+            _blendSlots = null;
+            _blendMix = 1f;
+            return;
+        }
+
+        if (!ReferenceEquals(_blendPreset, outgoing) || _blendSlots is null)
+        {
+            _blendPreset = outgoing;
+            _blendSlots = new double[outgoing.Layout.Count];
+            if (outgoingState is not null)
+                Array.Copy(outgoingState, _blendSlots, Math.Min(outgoingState.Length, _blendSlots.Length));
+        }
+
+        _blendMix = PresetBlend.CosineInterp(progress);
+    }
+
+    /// <summary>
     /// Gets the overlay-only frame the last <see cref="RenderOverlayFrame"/> drew: the waveform,
     /// spectrum, motion vectors, and shapes without the feedback warp. A GPU pipeline composites it
     /// over its own warped frame, so the overlay stays the CPU's vector drawing.
@@ -906,6 +962,9 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
             _presetProgramsFailed = true;
             PresetError = "per_frame: " + exception.GetType().Name + ": " + exception.Message;
         }
+        // A blend eases the non-motion per-frame variables from the outgoing preset into the one
+        // that just ran, so every later stage reads the blended values.
+        ApplyBlend();
         var decay = Math.Clamp(Read("decay", Preset.Decay), 0f, 1f);
         // The reference hands the animated hue shade to every shader as hue_shader, so it is computed
         // before anything can return early; a GPU pipeline reads the values through WriteShaderUniforms.
@@ -1020,6 +1079,56 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
     }
 
     /// <summary>
+    /// Eases the outgoing preset's non-motion per-frame variables into the incoming preset while a
+    /// blend is active. The outgoing preset keeps running from its live state so its user variables
+    /// advance, exactly like the reference's <c>m_pOldState</c>; the motion variables are left
+    /// alone because MilkDrop blends their results through the warp mesh instead.
+    /// </summary>
+    private void ApplyBlend()
+    {
+        if (_blendPreset is null || _blendSlots is null)
+            return;
+
+        SeedFrameVariables(_blendSlots, _blendPreset, _randFrame);
+        try
+        {
+            _blendPreset.PerFrame.Execute(_blendSlots);
+        }
+        catch (Exception exception)
+        {
+            // A broken outgoing block must not take the incoming preset down with it.
+            PresetError ??= "blend per_frame: " + exception.GetType().Name + ": " + exception.Message;
+        }
+
+        var mix = _blendMix;
+        var outgoing = _blendPreset.Layout;
+        var incoming = Preset.Layout;
+        foreach (var name in PresetBlend.InterpolatedVariables)
+        {
+            var oldSlot = outgoing.IndexOf(name);
+            var newSlot = incoming.IndexOf(name);
+            if (oldSlot < 0 || newSlot < 0)
+                continue;
+
+            _slots[newSlot] = PresetBlend.Interpolate((float)_blendSlots[oldSlot], (float)_slots[newSlot], mix);
+        }
+
+        // A snapped variable keeps the outgoing preset's value until the eased mix passes the snap
+        // point and then flips to the incoming preset's, so an ordinal switch never lands between
+        // two of its own values.
+        if (mix < _blendSnapPoint)
+        {
+            foreach (var name in PresetBlend.SnappedVariables)
+            {
+                var oldSlot = outgoing.IndexOf(name);
+                var newSlot = incoming.IndexOf(name);
+                if (oldSlot >= 0 && newSlot >= 0)
+                    _slots[newSlot] = _blendSlots[oldSlot];
+            }
+        }
+    }
+
+    /// <summary>
     /// Reports the frame's mean brightness as it enters a named stage by sampling the buffer that
     /// stage reads. The value is what the previous stage produced, which is what lets a diagnostic
     /// attribute a white frame to the stage that turned it white.
@@ -1065,6 +1174,9 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
         _skipPerPixelThisFrame = false;
         _framesSinceSuspend = 0;
         Array.Clear(_slots);
+        _blendPreset = null;
+        _blendSlots = null;
+        _blendMix = 1f;
         _elementFrames.Clear();
         _elementPoints.Clear();
         _elementInitT.Clear();
@@ -1094,9 +1206,29 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
     /// <summary>Seeds the standard variables a preset expects for this frame.</summary>
     private void SeedFrameVariables()
     {
+        // Milkdrop keeps a random vector per frame; presets use it to vary a shader without
+        // changing it every pixel. The default generator is random; a configured seed uses a
+        // private generator so diagnostics can reproduce a render. It is drawn once here so both
+        // presets of a blend read the same values, like the reference's per-frame rand_frame.
+        for (var index = 0; index < _randFrame.Length; index++)
+            _randFrame[index] = NextRandom();
+        SeedFrameVariables(_slots, Preset, _randFrame);
+    }
+
+    /// <summary>
+    /// Seeds the standard variables of one preset into a specific slot array. It is split from
+    /// <see cref="SeedFrameVariables()"/> so a blend can reseed the outgoing preset's slots without
+    /// disturbing the incoming preset's user variables.
+    /// </summary>
+    /// <param name="slots">Slot array to seed.</param>
+    /// <param name="preset">Preset whose layout and defaults supply the values.</param>
+    /// <param name="randFrame">The frame's shared <c>rand_frame</c> vector.</param>
+    private void SeedFrameVariables(double[] slots, VisualizerPreset preset, float[] randFrame)
+    {
+        var layout = preset.Layout;
         var width = _previous.Width;
         var height = _previous.Height;
-        Write("time", (float)_elapsed);
+        Write(slots, layout, "time", (float)_elapsed);
         // The roam vectors only depend on the time, so they are computed once per frame rather than
         // once per pixel.
         var roamTime = (float)_elapsed;
@@ -1106,104 +1238,99 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
         _roam[3] = RoamVector(roamTime, sine: true, slow: true);
         // A first-frame fps of zero makes a preset that divides by fps produce an infinity that
         // sticks in its accumulators, so the measured rate is used from the first frame.
-        Write("fps", (float)(1d / _frameDelta));
-        Write("frame", _frame);
-        Write("monitor", 1f);
+        Write(slots, layout, "fps", (float)(1d / _frameDelta));
+        Write(slots, layout, "frame", _frame);
+        Write(slots, layout, "monitor", 1f);
         // Milkdrop's band variables are relative to their long-term average and can exceed one, so a
         // condition such as above(bass, 1.2) fires; the attenuated values are the smoothed relatives.
-        Write("bass", BassRelative);
-        Write("mid", MidRelative);
-        Write("treb", TrebleRelative);
-        Write("vol", (BassRelative + MidRelative + TrebleRelative) * 0.333f);
-        Write("vol_att", (BassAttRelative + MidAttRelative + TrebleAttRelative) * 0.333f);
-        Write("bass_att", BassAttRelative);
-        Write("mid_att", MidAttRelative);
-        Write("treb_att", TrebleAttRelative);
+        Write(slots, layout, "bass", BassRelative);
+        Write(slots, layout, "mid", MidRelative);
+        Write(slots, layout, "treb", TrebleRelative);
+        Write(slots, layout, "vol", (BassRelative + MidRelative + TrebleRelative) * 0.333f);
+        Write(slots, layout, "vol_att", (BassAttRelative + MidAttRelative + TrebleAttRelative) * 0.333f);
+        Write(slots, layout, "bass_att", BassAttRelative);
+        Write(slots, layout, "mid_att", MidAttRelative);
+        Write(slots, layout, "treb_att", TrebleAttRelative);
         WarpSampling.GetAspect(width, height, out var frameAspectX, out var frameAspectY);
         // Milkdrop binds the preset's aspectx/aspecty to the *inverse* aspect factors
         // (var_pf_aspectx = m_fInvAspectX, plugin.cpp), so a landscape frame is (1, width/height):
         // Petal/Mashup presets multiply their per-vertex position delta by aspecty, and the
         // non-inverse value compressed that delta a second time and flattened their warp.
-        Write("aspectx", 1f / frameAspectX);
-        Write("aspecty", 1f / frameAspectY);
-        Write("pixelsx", width);
-        Write("pixelsy", height);
+        Write(slots, layout, "aspectx", 1f / frameAspectX);
+        Write(slots, layout, "aspecty", 1f / frameAspectY);
+        Write(slots, layout, "pixelsx", width);
+        Write(slots, layout, "pixelsy", height);
         // Milkdrop's mesh is the sampling grid, and the progress through a preset's playlist time.
         // There is no playlist time here, so progress stays zero and the grid is the frame.
-        Write("meshx", width);
-        Write("meshy", height);
-        Write("progress", 0f);
-        // Milkdrop keeps a random vector per frame; presets use it to vary a shader without
-        // changing it every pixel. The default generator is random; a configured seed uses a
-        // private generator so diagnostics can reproduce a render.
-        for (var index = 0; index < _randFrame.Length; index++)
-            _randFrame[index] = NextRandom();
+        Write(slots, layout, "meshx", width);
+        Write(slots, layout, "meshy", height);
+        Write(slots, layout, "progress", 0f);
         // The per-frame defaults a preset can override before the warp reads them back.
-        Write("decay", Preset.Decay);
-        Write("fDecay", Preset.Decay);
-        Write("gamma", 1f);
-        Write("fWarpAnimSpeed", 1f);
-        Write("fWarpScale", 1f);
-        Write("zoom", Preset.Zoom);
-        Write("zoomexp", 1f);
-        Write("rot", 0f);
-        Write("cx", 0f);
-        Write("cy", 0f);
-        Write("dx", 0f);
-        Write("dy", 0f);
-        Write("warp", Preset.Warp);
-        Write("sx", 1f);
-        Write("sy", 1f);
-        Write("blur1_min", 0f); Write("blur1_max", 1f);
-        Write("blur2_min", 0f); Write("blur2_max", 1f);
-        Write("blur3_min", 0f); Write("blur3_max", 1f);
-        Write("blur1", Preset.BlurLevel);
-        Write("blur2", 0f);
-        Write("blur3", 0f);
-        Write("darken_center", 0f);
+        Write(slots, layout, "decay", preset.Decay);
+        Write(slots, layout, "fDecay", preset.Decay);
+        Write(slots, layout, "gamma", 1f);
+        Write(slots, layout, "fWarpAnimSpeed", 1f);
+        Write(slots, layout, "fWarpScale", 1f);
+        Write(slots, layout, "zoom", preset.Zoom);
+        Write(slots, layout, "zoomexp", 1f);
+        Write(slots, layout, "rot", 0f);
+        Write(slots, layout, "cx", 0f);
+        Write(slots, layout, "cy", 0f);
+        Write(slots, layout, "dx", 0f);
+        Write(slots, layout, "dy", 0f);
+        Write(slots, layout, "warp", preset.Warp);
+        Write(slots, layout, "sx", 1f);
+        Write(slots, layout, "sy", 1f);
+        Write(slots, layout, "blur1_min", 0f); Write(slots, layout, "blur1_max", 1f);
+        Write(slots, layout, "blur2_min", 0f); Write(slots, layout, "blur2_max", 1f);
+        Write(slots, layout, "blur3_min", 0f); Write(slots, layout, "blur3_max", 1f);
+        Write(slots, layout, "blur1", preset.BlurLevel);
+        Write(slots, layout, "blur2", 0f);
+        Write(slots, layout, "blur3", 0f);
+        Write(slots, layout, "darken_center", 0f);
         // Milkdrop's default wave mode is the single line (six), which its idle preset confirms.
-        Write("wave_mode", 6f);
-        Write("wave_r", 1f);
-        Write("wave_g", 1f);
-        Write("wave_b", 1f);
-        Write("wave_a", Preset.WaveAlpha);
-        Write("wave_x", 0.5f);
-        Write("wave_y", 0.5f);
-        Write("wave_mystery", 0f);
-        Write("wave_usedots", 0f);
-        Write("wave_thick", 0f);
-        Write("wave_additive", 1f);
-        Write("wave_brighten", 0f);
-        Write("ob_r", 0f);
-        Write("ob_g", 0f);
-        Write("ob_b", 0f);
-        Write("ob_a", 0f);
-        Write("ib_r", 0f);
-        Write("ib_g", 0f);
-        Write("ib_b", 0f);
-        Write("ib_a", 0f);
-        Write("echo_zoom", 1f);
-        Write("echo_alpha", 0f);
-        Write("echo_orient", 0f);
-        Write("fVideoEchoZoom", 1f);
-        Write("fVideoEchoAlpha", 0f);
-        Write("nVideoEchoOrientation", 0f);
+        Write(slots, layout, "wave_mode", 6f);
+        Write(slots, layout, "wave_r", 1f);
+        Write(slots, layout, "wave_g", 1f);
+        Write(slots, layout, "wave_b", 1f);
+        Write(slots, layout, "wave_a", preset.WaveAlpha);
+        Write(slots, layout, "wave_x", 0.5f);
+        Write(slots, layout, "wave_y", 0.5f);
+        Write(slots, layout, "wave_mystery", 0f);
+        Write(slots, layout, "wave_usedots", 0f);
+        Write(slots, layout, "wave_thick", 0f);
+        Write(slots, layout, "wave_additive", 1f);
+        Write(slots, layout, "wave_brighten", 0f);
+        Write(slots, layout, "ob_r", 0f);
+        Write(slots, layout, "ob_g", 0f);
+        Write(slots, layout, "ob_b", 0f);
+        Write(slots, layout, "ob_a", 0f);
+        Write(slots, layout, "ib_r", 0f);
+        Write(slots, layout, "ib_g", 0f);
+        Write(slots, layout, "ib_b", 0f);
+        Write(slots, layout, "ib_a", 0f);
+        Write(slots, layout, "echo_zoom", 1f);
+        Write(slots, layout, "echo_alpha", 0f);
+        Write(slots, layout, "echo_orient", 0f);
+        Write(slots, layout, "fVideoEchoZoom", 1f);
+        Write(slots, layout, "fVideoEchoAlpha", 0f);
+        Write(slots, layout, "nVideoEchoOrientation", 0f);
         // The reference's motion-vector defaults: length one, white, alpha zero (off) unless a preset
         // enables it. mv_enabled is Orynivo's own recording switch.
-        Write("mv_x", 0f);
-        Write("mv_y", 0f);
-        Write("mv_dx", 0f);
-        Write("mv_dy", 0f);
-        Write("mv_l", 1f);
-        Write("mv_a", 0f);
-        Write("mv_r", 1f);
-        Write("mv_g", 1f);
-        Write("mv_b", 1f);
-        Write("mv_enabled", 0f);
+        Write(slots, layout, "mv_x", 0f);
+        Write(slots, layout, "mv_y", 0f);
+        Write(slots, layout, "mv_dx", 0f);
+        Write(slots, layout, "mv_dy", 0f);
+        Write(slots, layout, "mv_l", 1f);
+        Write(slots, layout, "mv_a", 0f);
+        Write(slots, layout, "mv_r", 1f);
+        Write(slots, layout, "mv_g", 1f);
+        Write(slots, layout, "mv_b", 1f);
+        Write(slots, layout, "mv_enabled", 0f);
         // Preset keys are the per-frame starting values; the per-frame block may still override
         // them, and they are restored on the next frame just like in Milkdrop.
-        foreach (var (name, value) in Preset.Defaults)
-            Write(name, value);
+        foreach (var (name, value) in preset.Defaults)
+            Write(slots, layout, name, value);
     }
 
     /// <summary>
@@ -4551,6 +4678,18 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
         var slot = Preset.Layout.IndexOf(name);
         if (slot >= 0)
             _slots[slot] = value;
+    }
+
+    /// <summary>Writes a named variable of a specific preset into its own slot array.</summary>
+    /// <param name="slots">Slot array to write to.</param>
+    /// <param name="layout">Layout of the preset that owns the slot array.</param>
+    /// <param name="name">Variable name.</param>
+    /// <param name="value">Value to store.</param>
+    private static void Write(double[] slots, PresetVariableLayout layout, string name, float value)
+    {
+        var slot = layout.IndexOf(name);
+        if (slot >= 0)
+            slots[slot] = value;
     }
 
     /// <summary>Writes a slot that was resolved once, instead of looking the name up per pixel.</summary>

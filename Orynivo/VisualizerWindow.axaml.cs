@@ -253,6 +253,14 @@ public partial class VisualizerWindow : Window
     private readonly bool _autoAdvanceEnabled;
     private readonly double _autoAdvanceSeconds;
     private double _presetSeconds;
+    /// <summary>Seconds a preset switches cross-fade over; zero disables blending.</summary>
+    private readonly double _presetBlendSeconds;
+    /// <summary>The outgoing preset of the active blend, or <see langword="null"/> when none runs.</summary>
+    private VisualizerPreset? _blendPreset;
+    /// <summary>The outgoing preset's captured per-frame state, so its user variables continue.</summary>
+    private double[]? _blendState;
+    /// <summary>Seconds elapsed in the active blend.</summary>
+    private double _blendElapsed;
     private int _presentedPresetIndex = -1;
     private string? _presentedPresetName;
     private int _labeledPresetIndex = -1;
@@ -299,6 +307,7 @@ public partial class VisualizerWindow : Window
         _frameInterval = TimeSpan.FromMilliseconds(1000.0 / Math.Clamp(options.FrameRate, 5, 240));
         _autoAdvanceEnabled = options.AutoAdvanceEnabled;
         _autoAdvanceSeconds = Math.Clamp(options.AutoAdvanceSeconds, 1, 600);
+        _presetBlendSeconds = Math.Clamp(options.PresetBlendSeconds, 0d, 10d);
         // Only the built-ins are available here. Enumerating a real preset collection is a disk
         // walk over thousands of files and must never run while the window is being constructed,
         // because that would block the interface for as long as it takes.
@@ -579,11 +588,29 @@ public partial class VisualizerWindow : Window
             var loadMs = switchClock.ElapsedMilliseconds;
             // Continue from the previous preset's last frame instead of restarting from black.
             var previousFeedback = _renderer.MeshSource;
+            // Capture the outgoing preset's live state before it is disposed, so the blend can ease
+            // its per-frame variables into the new preset instead of snapping them.
+            var previousPreset = _renderer.Preset;
+            var previousState = _renderer.CaptureFrameState();
             var newRenderer = new PresetRenderer(preset, _renderWidth, _renderHeight);
             newRenderer.SeedFeedback(previousFeedback);
             _renderer.Dispose();
             _renderer = newRenderer;
             ConfigureRenderer(_renderer);
+            // A blend runs whenever a duration is configured and the preset actually changed; a
+            // reset or the first frame has nothing to blend from.
+            if (_presetBlendSeconds > 0 && !ReferenceEquals(previousPreset, preset))
+            {
+                _blendPreset = previousPreset;
+                _blendState = previousState;
+                _blendElapsed = 0;
+                _renderer.SetBlend(_blendPreset, _blendState, 0f);
+            }
+            else
+            {
+                _blendPreset = null;
+                _blendState = null;
+            }
             // The first frames are traced stage by stage so a frozen frame names its own stage, and
             // every frame reports the brightness as it enters each stage. The renderer probes the
             // buffer the stage reads, so the values follow the current frame instead of only the
@@ -608,6 +635,26 @@ public partial class VisualizerWindow : Window
             _resetRequested = false;
             _renderer.Reset();
             _presetSeconds = 0;
+            _blendPreset = null;
+            _blendState = null;
+        }
+
+        // Advance an active blend. The renderer eases the outgoing preset's per-frame variables into
+        // the incoming one; once the duration has passed the blend ends and later frames leave the
+        // incoming preset untouched.
+        if (_blendPreset is not null)
+        {
+            _blendElapsed += deltaSeconds;
+            var progress = _presetBlendSeconds <= 0
+                ? 1f
+                : (float)Math.Clamp(_blendElapsed / _presetBlendSeconds, 0d, 1d);
+            _renderer.SetBlend(_blendPreset, _blendState, progress);
+            if (progress >= 1f)
+            {
+                _renderer.SetBlend(null, null, 1f);
+                _blendPreset = null;
+                _blendState = null;
+            }
         }
 
         // Advance to the next preset after the configured dwell time. The switch is applied by the

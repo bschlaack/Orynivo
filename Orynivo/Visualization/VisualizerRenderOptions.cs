@@ -23,6 +23,10 @@ namespace Orynivo.Visualization;
 /// Stable keys of the presets the window must skip, or <see langword="null"/> when every preset is
 /// active.
 /// </param>
+/// <param name="PresetBlendSeconds">
+/// Seconds a preset switch cross-fades over, or zero to switch hard. The window eases the outgoing
+/// preset's per-frame variables into the incoming one over this duration.
+/// </param>
 public sealed record VisualizerRenderOptions(
     int Width,
     int Height,
@@ -32,7 +36,8 @@ public sealed record VisualizerRenderOptions(
     string? PresetDirectory,
     bool AutoAdvanceEnabled = false,
     int AutoAdvanceSeconds = 15,
-    IReadOnlyCollection<string>? DisabledPresetKeys = null);
+    IReadOnlyCollection<string>? DisabledPresetKeys = null,
+    double PresetBlendSeconds = 0d);
 
 /// <summary>A selectable visualizer frame size.</summary>
 /// <param name="Width">Frame width in pixels.</param>

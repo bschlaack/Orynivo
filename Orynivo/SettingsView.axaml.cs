@@ -221,6 +221,10 @@ internal partial class SettingsView : UserControl
             settings.VisualizerAutoAdvanceSeconds,
             1,
             600);
+        VisualizerPresetBlendSecondsNumericUpDown.Value = (decimal)Math.Clamp(
+            settings.VisualizerPresetBlendSeconds,
+            0d,
+            10d);
         var visualizerResolutionChoices = new[]
         {
             new SettingChoice<VisualizerResolution>(new VisualizerResolution(3840, 2160), "3840 × 2160"),
@@ -635,6 +639,10 @@ internal partial class SettingsView : UserControl
     /// <summary>Gets the seconds the visualizer shows one preset before advancing.</summary>
     public int VisualizerAutoAdvanceSeconds =>
         (int)Math.Clamp(VisualizerAutoAdvanceSecondsNumericUpDown.Value ?? 15m, 1m, 600m);
+
+    /// <summary>Gets the seconds a visualizer preset switch cross-fades over, or zero to switch hard.</summary>
+    public double VisualizerPresetBlendSeconds =>
+        (double)Math.Clamp(VisualizerPresetBlendSecondsNumericUpDown.Value ?? 0m, 0m, 10m);
 
     /// <summary>Gets the configured maximum PCM output sample rate in hertz, or zero for automatic.</summary>
     public int MaxOutputSampleRateHz =>

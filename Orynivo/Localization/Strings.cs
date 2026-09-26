@@ -1449,6 +1449,10 @@ public sealed record LocalizedStrings(
     public string VisualizerAutoAdvance { get; init; } = "";
     public string VisualizerAutoAdvanceHint { get; init; } = "";
     public string VisualizerAutoAdvanceSeconds { get; init; } = "";
+    /// <summary>Gets the label for the seconds a preset switch cross-fades over.</summary>
+    public string VisualizerPresetBlendSeconds { get; init; } = "";
+    /// <summary>Gets the explanatory text below the preset blend duration field.</summary>
+    public string VisualizerPresetBlendSecondsHint { get; init; } = "";
     /// <summary>Gets the action label that opens the preset selection dialog.</summary>
     public string VisualizerSelectPresets { get; init; } = "";
     /// <summary>Gets the explanatory text below the preset selection action.</summary>

@@ -1714,6 +1714,13 @@ position keeps the CPU warp, because an interpolated position has no meaning. A 
 GL context is unavailable falls back to the bitmap presentation, and setting
 `ORYNIVO_VISUALIZER_OPENGL=0` forces it.
 
+A preset switch continues from the previous preset's feedback instead of restarting from black, and
+a configurable **Preset switch cross-fade duration** (Settings > Playback > Visualizer, default 0 =
+hard switch) eases the switch like MilkDrop: the outgoing preset keeps running and its non-motion
+per-frame variables (`decay`, the wave colours and position, both border bands, the motion-vector
+display, the video echo, `gamma`, and the blur range keys) are blended into the incoming preset with
+MilkDrop's cosine curve, while the motion variables that drive the warp stay on the incoming preset.
+
 Presets are INI-style text with `per_frame_init`, `per_frame`, and `per_pixel` expression
 blocks plus `decay`, `zoom`, `warp`, `blur_level`, `wave_alpha`, and `wave_scale`. A
 `per_point` block may move every waveform point, and `shape_N_*` keys (`sides`, `x`, `y`,

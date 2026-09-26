@@ -837,6 +837,23 @@
                                    FormatString="0"
                                    HorizontalAlignment="Stretch"/>
 
+                    <TextBlock Text="{DynamicResource L_VisualizerPresetBlendSeconds}"
+                               FontSize="{DynamicResource FontSizeCaption}"
+                               Foreground="{DynamicResource AppMutedTextBrush}"
+                               Margin="0,14,0,4"/>
+                    <NumericUpDown x:Name="VisualizerPresetBlendSecondsNumericUpDown"
+                                   Height="30"
+                                   Minimum="0"
+                                   Maximum="10"
+                                   Increment="0.5"
+                                   FormatString="0.0"
+                                   HorizontalAlignment="Stretch"/>
+                    <TextBlock Text="{DynamicResource L_VisualizerPresetBlendSecondsHint}"
+                               FontSize="{DynamicResource FontSizeMeta}"
+                               Foreground="{DynamicResource AppMutedTextBrush}"
+                               TextWrapping="Wrap"
+                               Margin="0,4,0,0"/>
+
                     <TextBlock Text="{DynamicResource L_VisualizerPresetFolder}"
                                FontSize="{DynamicResource FontSizeCaption}"
                                Foreground="{DynamicResource AppMutedTextBrush}"

@@ -103,7 +103,8 @@ public partial class MainWindow : Window
                 _settings.VisualizerPresetDirectory,
                 _settings.VisualizerAutoAdvanceEnabled,
                 _settings.VisualizerAutoAdvanceSeconds,
-                _settings.DisabledVisualizerPresets),
+                _settings.DisabledVisualizerPresets,
+                _settings.VisualizerPresetBlendSeconds),
             new VisualizerTransport(
                 Previous: () => PreviousButton_OnClick(this, new RoutedEventArgs()),
                 PlayPause: () => PlayButton_OnClick(this, new RoutedEventArgs()),

@@ -801,6 +801,7 @@ public partial class MainWindow : Window
             _settings.VisualizerFrameRate = window.VisualizerFrameRateValue;
             _settings.VisualizerAutoAdvanceEnabled = window.VisualizerAutoAdvanceEnabled;
             _settings.VisualizerAutoAdvanceSeconds = window.VisualizerAutoAdvanceSeconds;
+            _settings.VisualizerPresetBlendSeconds = window.VisualizerPresetBlendSeconds;
             _settings.DisabledVisualizerPresets = window.DisabledVisualizerPresets.ToList();
             _settings.NonGaplessCrossfadeSeconds = window.NonGaplessCrossfadeSeconds;
             _settings.EqualizerEnabled      = window.EqualizerEnabled;
