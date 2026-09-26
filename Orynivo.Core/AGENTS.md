@@ -24,7 +24,12 @@ This file applies to `Orynivo.Core/` and supplements `../AGENTS.md`.
   A shape whose `shapecode_N_textured` is set must sample the previous feedback frame (`VS[0]`) instead of the
   gradient: interpolate the reference's fan texture coordinates (centre at the
   texture centre, rim on a circle of radius `0.5 / tex_zoom` rotated by `tex_ang`)
-  and read the frame with repeat.
+  and read the frame with repeat. Use the reference's own formula verbatim
+  (`milkdropfs.cpp`, marked "DON'T TOUCH!"): `u = 0.5 + 0.5 * cos(angle) / tex_zoom * aspectY`,
+  `v = 0.5 + 0.5 * sin(angle) / tex_zoom`, with `angle = t * 2pi + tex_ang + pi/4`. The v sine is
+  **positive**; the engine's frames are top-down like the reference's capture, so the OpenGL fragment
+  stage's bottom-up flip is the only one. Negating it sampled the capture mirrored.
+  `PresetShapeTests.RenderFrame_TexturedShapeUsesTheReferenceTextureCoordinate` pins the sign.
   A Milkdrop shape's space is Direct3D's y-up space (`v[0].y = shape_y*-2+1`), so a
   `MilkdropCoordinates` shape's y is negated out of the preset's expression space in
   `BuildVertices` and for the fan centre, because the overlay rasterizer is y-down. The

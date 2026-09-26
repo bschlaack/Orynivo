@@ -4025,7 +4025,11 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
     /// <summary>
     /// Builds the per-vertex texture coordinates of a textured shape. The centre of the fan maps to
     /// the texture centre and each rim vertex to a circle whose radius is <c>0.5 / tex_zoom</c>,
-    /// rotated by <c>tex_ang</c>; the engine's frames are top-down, so the vertical axis is mirrored.
+    /// rotated by <c>tex_ang</c>. The formula is the reference's own
+    /// (<c>milkdropfs.cpp</c>, marked "DON'T TOUCH!"): the normalized coordinate is
+    /// <c>0.5 + 0.5 * cos/sin(angle) / tex_zoom</c>, with the X term scaled by the aspect. The engine's
+    /// frames are top-down exactly like the reference's capture, so the vertical axis is **not**
+    /// mirrored here; the OpenGL fragment stage applies the single bottom-up flip.
     /// </summary>
     /// <param name="count">Rim vertex count.</param>
     private void BuildShapeTextureCoordinates(int count)
@@ -4038,7 +4042,7 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler, IDi
         {
             var angle = (i / (float)count * 2f * MathF.PI) + texAngle + (MathF.PI * 0.25f);
             _shapeUvX[i] = 0.5f + (0.5f * MathF.Cos(angle) / texZoom * aspectY);
-            _shapeUvY[i] = 0.5f - (0.5f * MathF.Sin(angle) / texZoom);
+            _shapeUvY[i] = 0.5f + (0.5f * MathF.Sin(angle) / texZoom);
         }
     }
 

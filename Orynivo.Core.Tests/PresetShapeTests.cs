@@ -170,6 +170,40 @@ public sealed class PresetShapeTests
         Assert.Equal(0f, middle, 5);
     }
 
+    /// <summary>
+    /// A textured shape's rim texture coordinates follow the reference formula
+    /// (<c>milkdropfs.cpp</c>, marked "DON'T TOUCH!"): <c>0.5 + 0.5 * sin(angle + tex_ang + pi/4)</c>.
+    /// Orynivo negated the sine, which sampled the captured frame mirrored, so the sign is pinned here.
+    /// </summary>
+    [Fact]
+    public void RenderFrame_TexturedShapeUsesTheReferenceTextureCoordinate()
+    {
+        var preset = VisualizerPreset.Parse("""
+            name=Textured
+            decay=0
+            wave_alpha=0
+            shapecode_0_enabled=1
+            shapecode_0_textured=1
+            shapecode_0_sides=4
+            shapecode_0_rad=0.2
+            shapecode_0_tex_zoom=1
+            shapecode_0_tex_ang=0
+            """);
+        var renderer = new PresetRenderer(preset, 64, 36) { CollectShapeFills = true };
+        renderer.RenderFrame(new StubAudio(), 1d / 60d);
+
+        var fill = Assert.Single(renderer.ShapeFills);
+        Assert.True(fill.Textured);
+        Assert.Equal(0.5f, fill.Vertices[0].V, 4);
+        // The fan closes by repeating its first rim vertex, so the rim is the count minus two.
+        var rimCount = fill.Vertices.Count - 2;
+        for (var k = 1; k <= rimCount; k++)
+        {
+            var angle = (((k - 1) / (float)rimCount) * 2f * MathF.PI) + (MathF.PI * 0.25f);
+            Assert.Equal(0.5f + (0.5f * MathF.Sin(angle)), fill.Vertices[k].V, 4);
+        }
+    }
+
     /// <summary>Audio source with a fixed spectrum and waveform.</summary>
     private sealed class StubAudio : IVisualizerAudioSource
     {

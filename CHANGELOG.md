@@ -60,6 +60,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   back ends, but GLSL spells a sampler `sampler2D` and rejected the whole warp shader. The declaration
   now follows the dialect, so the shader compiles; the unknown texture falls back to the previous
   feedback it already did on the SkSL path.
+- Corrected the vertical texture coordinate of MilkDrop's textured shapes. The reference
+  (`milkdropfs.cpp`, marked "DON'T TOUCH!") uses `0.5 + 0.5 * sin(angle + tex_ang + pi/4)`, while
+  Orynivo negated the sine and therefore sampled the captured frame mirrored; the frames are
+  top-down like the reference's capture, so the OpenGL fragment stage's single bottom-up flip is the
+  only one needed. `PresetShapeTests.RenderFrame_TexturedShapeUsesTheReferenceTextureCoordinate`
+  pins the sign.
 
 ### Changed
 - Rebuilt the built-in visualizer presets as structured warp-shader effects instead of a flat
