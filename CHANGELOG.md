@@ -8,7 +8,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
-- Added a linked YouTube walkthrough preview to the README.
+- Added an embedded walkthrough video to the README, with a YouTube link as an
+  alternative for browsers without H.265 playback support.
 
 ### Fixed
 

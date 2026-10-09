@@ -16,12 +16,13 @@ Parametric EQ Plex · Radio · Podcasts · AI Chat · MCP Server · Network Stre
 
 ## See Orynivo in action
 
-Watch the Orynivo walkthrough on YouTube:
+Watch the Orynivo walkthrough:
 
-[![Watch the Orynivo walkthrough][video-preview]][video-link]
+<!-- markdownlint-disable-next-line MD034 -->
+https://github.com/user-attachments/assets/92e1cde3-b787-4752-8ad9-944d47d0b32f
 
-[video-preview]: https://img.youtube.com/vi/llYTFwNLZAY/hqdefault.jpg
-[video-link]: https://www.youtube.com/watch?v=llYTFwNLZAY
+If the embedded video does not play in your browser,
+[watch it on YouTube](https://www.youtube.com/watch?v=llYTFwNLZAY).
 
 ## Why Orynivo?
 
