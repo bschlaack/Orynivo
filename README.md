@@ -14,6 +14,15 @@ cross-platform music server for local Hi-Fi libraries.
 cwASIO/Steinberg ASIO/WASAPI · DSD/DSF/DFF · Gapless Playback · ReplayGain ·
 Parametric EQ Plex · Radio · Podcasts · AI Chat · MCP Server · Network Streaming
 
+## See Orynivo in action
+
+Watch the Orynivo walkthrough on YouTube:
+
+[![Watch the Orynivo walkthrough][video-preview]][video-link]
+
+[video-preview]: https://img.youtube.com/vi/llYTFwNLZAY/hqdefault.jpg
+[video-link]: https://www.youtube.com/watch?v=llYTFwNLZAY
+
 ## Why Orynivo?
 
 Orynivo is for people who still own and manage a local music library and want a
