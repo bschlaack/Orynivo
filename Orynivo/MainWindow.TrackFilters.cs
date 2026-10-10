@@ -228,24 +228,13 @@ public partial class MainWindow : Window
             values.Remove(value);
     }
 
-    private bool MatchesTrackFilters(TrackFacetInfo facet, string? ignoredDimension = null)
-    {
-        if (ignoredDimension != "favorite" && _trackFavoritesOnly && !facet.IsFavorite)
-            return false;
-        if (ignoredDimension != "genre" && _selectedTrackGenres.Count > 0 &&
-            !SplitGenres(facet.Genre).Any(_selectedTrackGenres.Contains))
-            return false;
-        if (ignoredDimension != "format" && _selectedTrackFormats.Count > 0 &&
-            (string.IsNullOrWhiteSpace(facet.Format) || !_selectedTrackFormats.Contains(facet.Format)))
-            return false;
-        if (ignoredDimension != "bitrate" && _selectedTrackBitrates.Count > 0 &&
-            (!facet.Bitrate.HasValue || !_selectedTrackBitrates.Contains(facet.Bitrate.Value)))
-            return false;
-        if (ignoredDimension != "source" && _selectedTrackSources.Count > 0 &&
-            !_selectedTrackSources.Contains(facet.SourceKey))
-            return false;
-        return true;
-    }
+    /// <summary>Evaluates live facets using the same rules as captured asynchronous search filters.</summary>
+    /// <param name="facet">Track facet metadata.</param>
+    /// <param name="ignoredDimension">Optional dimension omitted from option counts.</param>
+    /// <returns>Whether the non-ignored dimensions match.</returns>
+    private bool MatchesTrackFilters(TrackFacetInfo facet, string? ignoredDimension = null) =>
+        TrackFacetFilterSnapshot.Matches(facet, _trackFavoritesOnly, _selectedTrackGenres,
+            _selectedTrackFormats, _selectedTrackBitrates, _selectedTrackSources, ignoredDimension);
 
     /// <summary>
     /// Builds the unified smart-playlist candidate set — the local library plus every configured
@@ -276,8 +265,7 @@ public partial class MainWindow : Window
             try
             {
                 using var serverCts = new CancellationTokenSource(TimeSpan.FromSeconds(60));
-                var provider = CreateOrynivoCatalogProvider(server);
-                var tracks = LoadAllOrynivoTracksAsync(server, provider, serverCts.Token)
+                var tracks = LoadAllOrynivoTracksAsync(server, serverCts.Token)
                     .GetAwaiter()
                     .GetResult();
                 foreach (var track in tracks)

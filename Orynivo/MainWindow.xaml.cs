@@ -812,6 +812,8 @@ public partial class MainWindow : Window
             _ => -1
         };
 
+    /// <summary>Cancels window-owned work and releases services when the desktop window closes.</summary>
+    /// <param name="e">Window close event.</param>
     protected override void OnClosed(EventArgs e)
     {
         LogUiDiagnostics("OnClosed started");
@@ -831,6 +833,7 @@ public partial class MainWindow : Window
         CancelAndDispose(ref _podcastSearchCts);
         CancelAndDispose(ref _podcastFeedCts);
         CancelAndDispose(ref _plexViewCts);
+        CancelLibrarySearch();
         CancelAndDispose(ref _unifiedLibraryAppendCts);
         _musicBrainzBackgroundCts.Cancel();
         CancelAudioFeatureWarmup();

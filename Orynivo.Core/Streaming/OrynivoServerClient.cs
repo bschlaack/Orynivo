@@ -649,17 +649,19 @@ public sealed class OrynivoServerClient : IDisposable
     /// </summary>
     /// <param name="server">Server connection settings.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
-    /// <returns>List of artist entries, or empty on error.</returns>
+    /// <param name="requireComplete">Propagate request and invalid-payload failures instead of returning an empty catalog.</param>
+    /// <returns>Artist entries; empty on error only when strict loading is disabled.</returns>
     public async Task<List<OrynivoArtistInfo>> GetArtistsAsync(
         OrynivoServerSettings server,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        bool requireComplete = false)
     {
         try
         {
             return await GetJsonAsync<List<OrynivoArtistInfo>>(server, "/api/artists", cancellationToken)
-                   ?? [];
+                   ?? (requireComplete ? throw new JsonException("Missing catalog payload.") : []);
         }
-        catch { return []; }
+        catch when (!requireComplete) { return []; }
     }
 
     /// <summary>
@@ -712,17 +714,19 @@ public sealed class OrynivoServerClient : IDisposable
     /// </summary>
     /// <param name="server">Server connection settings.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
-    /// <returns>List of album entries, or empty on error.</returns>
+    /// <param name="requireComplete">Propagate request and invalid-payload failures instead of returning an empty catalog.</param>
+    /// <returns>Album entries; empty on error only when strict loading is disabled.</returns>
     public async Task<List<OrynivoAlbumInfo>> GetAlbumsAsync(
         OrynivoServerSettings server,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        bool requireComplete = false)
     {
         try
         {
             return await GetJsonAsync<List<OrynivoAlbumInfo>>(server, "/api/albums", cancellationToken)
-                   ?? [];
+                   ?? (requireComplete ? throw new JsonException("Missing catalog payload.") : []);
         }
-        catch { return []; }
+        catch when (!requireComplete) { return []; }
     }
 
     /// <summary>
@@ -1188,20 +1192,22 @@ public sealed class OrynivoServerClient : IDisposable
     /// <param name="page">Zero-based page index.</param>
     /// <param name="pageSize">Number of tracks per page.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
-    /// <returns>List of track entries, or empty on error.</returns>
+    /// <param name="requireComplete">Propagate request and invalid-payload failures instead of returning an empty page.</param>
+    /// <returns>Track entries; empty on error only when strict loading is disabled.</returns>
     public async Task<List<OrynivoTrackInfo>> GetTracksAsync(
         OrynivoServerSettings server,
         int page = 0,
         int pageSize = 500,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        bool requireComplete = false)
     {
         try
         {
             return await GetJsonAsync<List<OrynivoTrackInfo>>(
                        server, $"/api/tracks?page={page}&pageSize={pageSize}", cancellationToken)
-                   ?? [];
+                   ?? (requireComplete ? throw new JsonException("Missing catalog payload.") : []);
         }
-        catch { return []; }
+        catch when (!requireComplete) { return []; }
     }
 
     /// <summary>
@@ -1237,12 +1243,14 @@ public sealed class OrynivoServerClient : IDisposable
     /// <param name="query">Search query.</param>
     /// <param name="limit">Maximum result count per category.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
-    /// <returns>Matching tracks, albums, and artists, or empty results on error.</returns>
+    /// <param name="requireComplete">Propagate HTTP, invalid-payload, and cancellation failures.</param>
+    /// <returns>Matching categories; empty on error only when strict loading is disabled.</returns>
     public async Task<OrynivoFullSearchResult> SearchFullAsync(
         OrynivoServerSettings server,
         string query,
         int limit = 50,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        bool requireComplete = false)
     {
         try
         {
@@ -1250,9 +1258,11 @@ public sealed class OrynivoServerClient : IDisposable
                 server,
                 $"/api/search/full?q={Uri.EscapeDataString(query)}&limit={limit}",
                 cancellationToken);
+            if (requireComplete && (result is null || result.Tracks is null || result.Albums is null || result.Artists is null))
+                throw new JsonException("Missing search categories.");
             return result ?? new OrynivoFullSearchResult([], [], []);
         }
-        catch
+        catch when (!requireComplete)
         {
             return new OrynivoFullSearchResult([], [], []);
         }
@@ -1264,17 +1274,19 @@ public sealed class OrynivoServerClient : IDisposable
     /// </summary>
     /// <param name="server">Server connection settings.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
-    /// <returns>Facet rows, or empty on error.</returns>
+    /// <param name="requireComplete">Propagate request and invalid-payload failures instead of returning empty facets.</param>
+    /// <returns>Facet rows; empty on error only when strict loading is disabled.</returns>
     public async Task<List<TrackFacetInfo>> GetTrackFacetsAsync(
         OrynivoServerSettings server,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        bool requireComplete = false)
     {
         try
         {
             return await GetJsonAsync<List<TrackFacetInfo>>(server, "/api/tracks/facets", cancellationToken)
-                   ?? [];
+                   ?? (requireComplete ? throw new JsonException("Missing catalog payload.") : []);
         }
-        catch { return []; }
+        catch when (!requireComplete) { return []; }
     }
 
     /// <summary>Performs a structured categorised library search on an Orynivo Server.</summary>
@@ -1354,12 +1366,16 @@ public sealed class OrynivoServerClient : IDisposable
     /// <param name="server">Server connection settings.</param>
     /// <param name="ids">Track identifiers to resolve.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
-    /// <returns>Matching track rows, or empty on error.</returns>
+    /// <param name="requireComplete">Propagate request and invalid-payload failures instead of returning empty rows.</param>
+    /// <returns>Matching track rows; empty on error only when strict loading is disabled.</returns>
     public async Task<List<OrynivoTrackInfo>> GetTracksByIdsAsync(
         OrynivoServerSettings server,
         IReadOnlyList<long> ids,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        bool requireComplete = false)
     {
+        if (requireComplete)
+            cancellationToken.ThrowIfCancellationRequested();
         if (ids.Count == 0)
             return [];
         try
@@ -1372,12 +1388,14 @@ public sealed class OrynivoServerClient : IDisposable
             };
             request.Headers.Add("X-Api-Key", server.ApiKey);
             using var response = await _http.SendAsync(request, cancellationToken);
+            if (requireComplete)
+                response.EnsureSuccessStatusCode();
             if (!response.IsSuccessStatusCode)
                 return [];
             return await response.Content.ReadFromJsonAsync<List<OrynivoTrackInfo>>(JsonOptions, cancellationToken)
-                   ?? [];
+                   ?? (requireComplete ? throw new JsonException("Missing catalog payload.") : []);
         }
-        catch { return []; }
+        catch when (!requireComplete) { return []; }
     }
 
     /// <summary>

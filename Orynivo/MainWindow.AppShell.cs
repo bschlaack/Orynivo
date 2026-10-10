@@ -79,9 +79,10 @@ public partial class MainWindow : Window
                    string.Equals(pair.First.ApiKey, pair.Second.ApiKey, StringComparison.Ordinal));
     }
 
+    /// <summary>Abandons pending searches and playback before replacing the local library.</summary>
     internal void PrepareForLibraryImport()
     {
-        _searchTimer.Stop();
+        CancelLibrarySearch();
         _libraryWatcher?.Dispose();
         _libraryWatcher = null;
         _visualizerWindow?.Close();

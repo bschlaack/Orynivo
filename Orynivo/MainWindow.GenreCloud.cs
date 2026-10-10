@@ -818,6 +818,9 @@ public partial class MainWindow
     }
 
     /// <summary>Resolves the distinct albums represented by the ranked track recommendations.</summary>
+    /// <param name="trackRows">Source-aware ranked tracks.</param>
+    /// <param name="cancellationToken">Owning recommendation cancellation.</param>
+    /// <returns>Available local and remote albums without discarding successful sources.</returns>
     private async Task<List<ContentRow>> ResolveGenreCandidateAlbumRowsAsync(
         IReadOnlyList<ContentRow> trackRows,
         CancellationToken cancellationToken)
@@ -857,9 +860,11 @@ public partial class MainWindow
             cancellationToken.ThrowIfCancellationRequested();
             var server = serverGroup.First().OrynivoServer!;
             var albumIds = serverGroup.Select(row => row.AlbumId!.Value).Distinct().ToHashSet();
-            var provider = CreateOrynivoCatalogProvider(server);
-            var albums = await LoadAllOrynivoAlbumsAsync(server, provider, cancellationToken);
-            result.AddRange(albums
+            var loaded = await LibrarySourceLoader.LoadAsync<LibraryCatalogAlbum>(
+                GetServerSourceKey(server.Id),
+                async token => await LoadAllOrynivoAlbumsAsync(server, token), cancellationToken);
+            cancellationToken.ThrowIfCancellationRequested();
+            result.AddRange(loaded.Rows
                 .Where(album => albumIds.Contains(album.Id))
                 .Select(album => ToCatalogAlbumContentRow(album, server)));
         }

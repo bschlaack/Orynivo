@@ -51,14 +51,14 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
   warp samples bottom-up feedback without an extra Y flip. Decay is applied by
   the fixed warp only; custom warp shaders own their fade. Re-check these
   contracts with a constant-output shader after changing them. Remaining
-  compatibility defects are recorded in `VISUALIZER-FIDELITY-RECHECK.md`;
-  previous "corrected" notes are not fidelity proof.
+  compatibility defects are recorded in `../docs/VISUALIZER-STATUS.md`; previous
+  "corrected" notes are not fidelity proof.
 
 - Blur generation changes the active GL framebuffer and viewport. The custom
   warp pass must rebind its full-resolution ping target after
   `BuildShaderBlurLevels` and before drawing. A constant-output shader at two
   sizes checks that the real GPU pipeline fills its target. See
-  `VISUALIZER-FIDELITY-AUDIT.md` for outstanding Milkdrop compatibility issues.
+  `../docs/VISUALIZER-STATUS.md` for outstanding Milkdrop compatibility issues.
 - The fixed GL warp transforms the texture coordinate in its vertex shader and
   interpolates the resulting coordinate, so `WarpVertexSource` computes the
   reference warp arithmetic (including the time-dependent displacement, whose
@@ -261,9 +261,9 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
 - The AirPlay 2 sender lives in the independent Qt-free `Native/AirPlay2Bridge`
   CMake project. Keep its public boundary as a stable C ABI with opaque session
   handles; it must not depend on Avalonia or Orynivo. Fail-closed transient
-  pairing, encrypted control, session SETUP, NTP timing, RECORD, and
+  pairing, encrypted control, session SETUP, PTP timing, RECORD, and
   audio-stream SETUP are implemented and Sonos-verified. ALAC encoding,
-  encrypted realtime RTP packetization, NTP/RTP sync anchors, retransmit
+  encrypted realtime RTP packetization, PTP/RTP sync anchors, retransmit
   handling, rate-aware prefill/pacing, and best-effort teardown are implemented
   behind the ABI and clean playback is verified on a Sonos stereo pair.
   `AirPlay2NativeSession` is the only managed interop boundary;
@@ -557,268 +557,10 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
   between queries: the same AE-5 reported 192 kHz and 384 kHz as supported in
   one run and neither in another, under .NET 8 and .NET 10 alike. Never make the
   DSD conversion depend on that answer alone.
-- The visualizer renders through `PresetRenderer` into a low-resolution
-  `PixelBuffer` and presents it through a `WriteableBitmap` that the image
-  control scales up. Both renderer creations enable
-  `PresetRenderer.UseSkiaPasses`, so the comp shader and a warp shader run as
-  Skia runtime effects and the interpreter stays the per-pass fallback; the
-  full-frame passes stay on the interpreter, and their effects are cached for
-  the process because their SkSL is constant. A per-pixel warp program prefers
-  the **parallel interpreter** over the Skia warp pass, because Skia rasterises
-  a runtime effect on one thread while the interpreter splits the rows across
-  every core: measured at 960 x 540, a parallelizable program costs about 18 ms
-  through the interpreter against 65 ms through Skia. The Skia warp pass
-  therefore only runs for a program the interpreter cannot split, which is why
-  the built-in presets keep their per-pixel angle in their own temporary
-  (`spin`, `wedge`, `s`) instead of a standard name like `a2`. Be clear about
-  what that is: `SkiaShaderRunner` builds its surfaces with
-  `SKSurface.Create(Info, pixels, rowBytes)`, which is Skia's **raster**
-  constructor, so those "Skia" passes are Skia's CPU runtime-effect JIT and **no
-  part of the preset pipeline runs on the GPU**. The finished frame is copied
-  into a `WriteableBitmap`, and the GPU only blits that bitmap. A comp shader
-  that samples more than one blur level therefore costs tens to hundreds of
-  milliseconds and needs the budget adaptation described below; do not describe
-  the Skia passes as a GPU path, and do not remove the interpreter fallback on
-  the assumption that Skia is hardware-accelerated. Roadmap 40f moves the
-  pipeline onto OpenGL: `Avalonia` 12 already ships `Avalonia.OpenGL` with
-  `OpenGlControlBase`, and the context is confirmed as OpenGL ES 3.0 through
-  ANGLE on Windows. `Orynivo.Controls.VisualizerGlPresenter` presents the frame
-  and owns the GPU pipeline; it is the default, and
-  `ORYNIVO_VISUALIZER_OPENGL=0` forces the bitmap presentation. The GPU owns the
-  frame only for a preset that builds a mesh, which excludes a per-pixel block
-  that writes the sample position `x` or `y` unless it can be emitted as a warp
-  fragment shader; a block that cannot be emitted keeps the CPU warp and the
-  presenter then uploads the finished CPU frame. A Milkdrop shape fill runs on
-  the GPU too: `PresetRenderer.CollectShapeFills` publishes `ShapeFills`, and
-  `VisualizerGlPipeline.DrawShapeFills` draws the fans into the post's source
-  with premultiplied `ONE, ONE_MINUS_SRC_ALPHA` (and `ONE, ONE` with the alpha
-  channel masked for an additive fill), which is the same "over" `PaintPixel`
-  applies. The fan repeats its first rim vertex because `GL_TRIANGLE_FAN` does
-  not wrap, its position is y-flipped into OpenGL's space, and a textured fill
-  samples the blurred frame with a flipped v. The fixed-function MilkDrop
-  texture stage modulates sampled RGB by the interpolated shape RGB and selects
-  the shape's diffuse alpha; do not use the sampled frame's alpha as fill
-  opacity. A Milkdrop shape's own space is Direct3D's y-up space, so
-  `BuildVertices` negates a `MilkdropCoordinates` shape's y as it leaves the
-  preset's expression space, and the fan centre is converted the same way; the
-  overlay rasterizer itself is y-down, which is why the waveform paths flip
-  explicitly instead. Keep those two conventions apart: the reference measures
-  `shape_y` from the top but `wave_y` from the bottom. `CollectShapeFills` must
-  only be set while `VisualizerGlPresenter.ShapeFillsSupported` is true, because
-  the renderer then skips its own fill. The custom waveforms are drawn on the
-  GPU the same way: `PresetRenderer.CollectWaveGeometry` publishes
-  `WaveGeometry` triangle lists and `VisualizerGlPipeline.DrawWaveGeometry`
-  draws them with the shape program untextured and the same blend, so the CPU
-  overlay no longer rasterizes the thick lines per pixel (that cost about 250 ms
-  per frame for a 512-sample wave at 1920x1080). `CollectWaveGeometry` must only
-  be set while `VisualizerGlPresenter.WaveGeometrySupported` is true, because
-  the renderer then skips its own draw. The borders and the default waveform
-  stay on the CPU. Such a block is emitted by default as a warp fragment shader
-  that computes the coordinate per pixel (`ShaderTranspiler.TranspileGlslWarp`
-  with a null body, drawn over a full-screen quad with the `_orynivo_*` motion
-  uniforms seeded from the mesh's first vertex, and the decay moved to the post
-  pass); `ORYNIVO_VISUALIZER_PIXELWARP=0` forces the CPU warp.
-  `ShaderTranspiler` must not fail the mesh path over such a block: the mesh
-  runs it and the shader never emits it, so only its uniforms are lost, while
-  the comp and Skia paths keep failing. A whole-frame CPU comparison cannot see
-  the warp, so its check draws the overlay only for the first frames and follows
-  the brightness centroid of the remaining warped feedback, with a control
-  preset without the block as the negative control. When the preset has no
-  shaders, `Orynivo.Controls.VisualizerGlPipeline` owns the whole frame: the
-  warp as a mesh draw whose fragment shader is a translation of
-  `WarpSampling.SamplePosition`, the blur as the same nine-tap clamped box
-  filter with ping-pong targets, and decay, video echo, centre darkening, both
-  border bands, gamma, and the additive overlay composite in one post pass. The
-  post pass draws the border bands as the same clip-space Chebyshev rings the
-  CPU uses, reading `VisualizerFrameParameters.OuterBorder`/`InnerBorder` (Inset
-  is the inner clip radius and Thickness the clip width); it must not fall back
-  to a min-dimension inset. `PresetRenderer.ExpressionsOnly` is the CPU half:
-  the per-frame block, the mesh, and the overlay, with no pixel pass. Keep the
-  bitmap path as the fallback for a platform whose GL context never arrives: the
-  window confirms the presenter once it has drawn a frame and otherwise switches
-  back within `GlPresenterGraceSeconds`, re-enabling the complete CPU frame.
-  Keep a shader, context, or pipeline failure logged and non-fatal (a failed
-  pipeline hands the frame back to the CPU), and remember two `GlInterface`
-  limits: it exposes only scalar uniforms, so a vector uniform is set component
-  by component, and it exposes no `TexSubImage2D`, so a texture update
-  re-specifies it through `TexImage2D` or goes through `GetProcAddress`. Every
-  GL texture holds the frame bottom-up, which is OpenGL's natural orientation,
-  so the overlay upload and the warp shader convert between that and the
-  engine's top-down coordinates; do not mix the two. The presenter must draw on
-  **every** refresh and re-present the texture it drew last when the render
-  thread published nothing new: Avalonia's GL surface is double buffered, so a
-  refresh that draws nothing swaps to the buffer two presentations old and the
-  picture appears to jump backwards. The render loop publishes at the configured
-  frame rate while the control refreshes at the display rate, so an undrawn
-  refresh is the normal case. **Every** pass clamps its colour output to
-  zero-to-one. When publishing a GPU frame, snapshot the overlay, mesh, shape
-  fills, and uniforms together: the render thread reuses its buffers
-  immediately, while Avalonia's GL callback consumes the published frame later.
-  `VisualizerPresetLibrary.At` logs the exact selected external section and
-  SHA-256 digest on first parse; the window logs the first frame's wave mode and
-  whether the GPU pipeline or CPU frame was actually handed to the presenter.
-  The GL callback also logs the applied preset index, linked shader stages, and
-  GLSL digests; inspect this event when the selected label and displayed picture
-  disagree. Mouse navigation advances only on the first primary-button press and
-  must exclude the transport button itself as well as its descendants. The clamp
-  is what gives a preset that amplifies its own feedback a stable fixed point,
-  so a float format without it diverges exponentially, becomes an infinity and
-  then a NaN, and paints the frame white. The float format buys precision, not
-  range. For `RGBA16F` render textures, `TexImage2D` must use `GL_HALF_FLOAT` as
-  its data type even with null initial data; ANGLE rejects `GL_UNSIGNED_BYTE`
-  with 0x502 and forces the pipeline's eight-bit fallback. A preset with shaders
-  now uses the GL pipeline too when its comp and warp shaders emit GLSL:
-  `ShaderTranspiler`'s GLSL dialect (`TranspileGlsl`, `TranspileGlslComp`,
-  `TranspileGlslWarp`) produces a `void main()` writing `orynivoColor`,
-  `VisualizerGlPipeline` runs the warp shader in place of the fixed mesh warp
-  and the comp shader after the post pass into its own display target, and the
-  feedback stays the pre-comp frame. The GLSL samples with normalised
-  coordinates while Skia's `eval` takes pixels, so the emitter branches on the
-  dialect; the vector uniforms are declared as scalars with a reconstructing
-  macro because `GlInterface` only exposes scalar uniform setters; and
-  `PresetRenderer.WriteShaderUniforms` seeds the same values the interpreter
-  binds. A shader the dialect cannot express leaves that stage on the fixed
-  pipeline, and a preset whose shaders do not emit keeps the CPU frame path.
-  `VisualizerWindow` owns `VisualizerAudioHub.IsActive`: while it is false the
-  players skip the tap entirely, so a closed visualizer costs nothing. Never
-  render, analyse, or evaluate preset expressions on the audio thread. A preset
-  switch must retain the audio analyzer's long-term loudness history; clearing
-  it on every selection can produce an extreme first-frame warp in MilkDrop
-  presets. Keep the window's `ReduceMotion` path on
-  `PresetRenderer.RenderOverlayOnly` so the reduce-motion preference is
-  honoured. The window renders with a silent audio source when nothing is
-  playing, so it never stays black, and `PixelBuffer.SampleBilinear` returns
-  transparent black outside the frame: clamping to the edge smeared the border
-  colour into long gradients when a preset warped outwards. Writing the frame
-  into the bitmap is not enough to make it visible: `Present()` must also call
-  `InvalidateVisual()` on the image, otherwise the window stays black even
-  though every frame renders correctly. The transport button **Visualisierung**
-  opens the window (there is no sidebar entry); it overlays the current title
-  and artist at the top and previous, play/pause, and next buttons at the bottom
-  left, wired through `VisualizerTransport` to the normal transport methods so
-  playback can be driven from the fullscreen window. Its overlay buttons copy
-  the transport bar's own geometry and sizes (36 px skip buttons with the
-  transport's 16 px glyphs, a 50 px play button with its 20 px glyph) instead of
-  scaling a generic path, because a stretched glyph does not sit optically
-  centred in its circle. The overlay buttons are deliberately not focusable: the
-  arrow keys switch presets, and a focusable button would keep a focus ring
-  after the key press. `AppSettings` stores the render size
-  (`VisualizerRenderWidth`/`VisualizerRenderHeight`), the target
-  `VisualizerFrameRate`, and the user preset folder; the **Visualisierung**
-  settings section edits all three, and the window clamps them to a sane range
-  (160-7680 wide, 5-240 fps). The resolution choices run from 320 x 180 up to
-  3840 x 2160; keep the list ordered from the largest down, and resolve a
-  missing selection through a named default rather than an index, because an
-  index silently changes meaning when an entry is added.
-  `VisualizerAutoAdvanceEnabled` and `VisualizerAutoAdvanceSeconds` (default 15)
-  let the render loop advance to the next preset after the dwell time; the
-  window only sets `_presetIndex` and lets the next frame apply the switch, so
-  the change stays a render-thread request like the key and mouse navigation.
-  `AppSettings.VisualizerPresetBlendSeconds` (default 0 = hard switch) makes the
-  window capture the outgoing preset's live slots with
-  `PresetRenderer.CaptureFrameState` before the old renderer is disposed and
-  call `SetBlend` each frame with the eased progress, so a switch eases its
-  non-motion parameters instead of snapping; the blend is cleared on reset, on
-  the next switch, and when the progress reaches one. The window additionally
-  snapshots the outgoing preset's GPU mesh and passes it with the eased mix to
-  `VisualizerGlPresenter.SetPipeline`, whose warp morphs the sampling coordinate
-  from that mesh to the incoming one through the second per-vertex motion block
-  and `uBlend`. The defaults are 640 x 360 at 60 frames per second, which the
-  parallel frame passes made affordable. The built-in presets are structured
-  warp-shader effects (see `VisualizerPresets`), and
-  `RenderTimingDiagnosticTests` documents their cost profile at two resolutions.
-  `VisualizerAlwaysShowOverlay` decides whether the overlay is permanent or
-  appears on pointer activity for three seconds; the reveal is driven by the
-  window's own `PointerMoved`, which only fires while the pointer is over it, so
-  a mouse move on another monitor must never reveal the overlay. Never replace
-  that with a global pointer hook. The window's once-per-second diagnostic line
-  also carries the averaged `RenderTimings` per stage (render, warp, blur, post,
-  overlay, composite, comp shader) plus the render size, the frame's mean
-  brightness and its **saturated share**, the frame's brightness **per stage**,
-  the presenter's source and destination brightness (`presentBrightness`), the
-  shader grid state, whether the per-pixel program is suspended, and any shader,
-  render, preset, or presentation error, so render cost is measured rather than
-  guessed. Keep the saturated share: a white window is either a genuinely
-  saturated frame or a frame that never reaches the screen, and only that number
-  tells the two apart, because a presentation fault leaves the rendered frame's
-  brightness and saturation untouched. Keep the line bounded and free of media
-  names and paths. The per-stage brightness must stay truthful: `PresetRenderer`
-  invokes its `StageBrightnessLogger` once per stage on **every** frame with the
-  mean brightness of the buffer that stage reads, and `PresetRenderer.Output` is
-  the post-comp display frame while `MeshSource` is the pre-comp feedback.
-  Sampling `Output` at a stage boundary instead reported the previous frame,
-  which made every stage look identical and pointed a white frame at the wrong
-  stage; a stale diagnostic is worse than none. The `presentBrightness` pair
-  samples the presentation buffer under `_presentLock` before and after the copy
-  plus the destination bytes, so a copy or bitmap fault is told apart from a
-  genuinely white source frame in one run. The render loop runs on a background
-  thread (`RenderLoop`, `RenderOneFrame`) because a frame can cost tens of
-  milliseconds; never move it back onto the Avalonia dispatcher. The UI thread
-  only ever reads the presentation buffer, never the renderer's live buffers,
-  and the short copy under `_presentLock` is the only shared state between the
-  two threads: keep it that way, and keep `PostPresent` coalescing to one queued
-  present so a busy UI thread cannot build a backlog. Preset switching
-  (`_presetIndex`), the reset key (`_resetRequested`), and shutdown
-  (`_renderRunning`, `_closed`) travel as flags that the render thread applies,
-  so UI event handlers must never touch the renderer directly. A completed
-  presentation snapshot carries the preset index, name, shader sources, mesh,
-  overlay, and uniforms together. The label follows
-  `GlPresenter.DrawnPresetIndex` on the GPU path, or the copied frame index on
-  the bitmap path; never advance it from `_presetIndex` or
-  `_renderedPresetIndex` before the frame reaches the presenter. A preset switch
-  must **not** clear the feedback: like Milkdrop, the new preset continues from
-  the last frame of the previous one, so `VisualizerGlPresenter` clears the
-  feedback only when its size changes (a freshly allocated texture holds
-  undefined content), and the CPU path seeds the new renderer with the previous
-  `MeshSource` through `PresetRenderer.SeedFeedback`. Frame pacing lives in the
-  pure, tested `Orynivo.Visualization.FramePacing`. `VisualizerPresetLibrary`
-  loads the built-in presets plus `.oryvis` and `.milk` files from
-  `AppSettings.VisualizerPresetDirectory` (default: a `visualizer-presets`
-  folder below the data root, including its subfolders, because preset
-  collections are sorted into directories; every `[presetNN]` section of a
-  `.milk` file becomes its own preset, a file that fails to parse is skipped and
-  reported with its reason through `RejectedReasons`, never fatal, and preset
-  files stay user data like equalizer profiles. User presets are discovered
-  eagerly but parsed lazily in `At`, one at a time, because compiling a preset
-  builds and JIT-compiles its expression trees; a collection of several hundred
-  presets must never be compiled when the window opens. Keep the discovered
-  count (`Count`) separate from the parsed presets, report a failure on first
-  use through `RejectedReasons`, and fall back to the first built-in so one
-  broken file can never stop the visualizer.
-  `AppSettings.DisabledVisualizerPresets` stores the stable keys the user
-  deactivated (`builtin:<name>` for a built-in,
-  `file:<path relative to the preset folder>` for a user file, so every section
-  of one file shares the file's key). `VisualizerPresetLibrary.Describe` lists
-  the built-ins and every discovered file without reading them for the **Select
-  presets…** dialog, and `SetDisabledKeys`/`ResolveEnabledIndex` make the
-  window's open, step, auto-advance, and mouse navigation skip a deactivated
-  preset in the requested direction; when every preset is deactivated the
-  requested index is kept so the visualizer never stops rendering. The window
-  must also re-check `IsDisabled` before every preset switch and once discovery
-  finishes, because the initial index is resolved against the built-ins only and
-  the deactivated set (or a user file) can arrive later; a deactivated preset
-  must never reach the renderer. `LoadBuiltIns` is the only thing the window
-  constructor may call: it touches no disk, so the window opens and renders
-  while `Discover` enumerates the folder on a worker thread. Discovery records
-  file paths only, never file contents, because a real collection holds
-  thousands of files and reading them up front froze the whole application; a
-  file is read the first time one of its presets is shown, and a multi-section
-  file exposes its remaining sections then. Never move discovery back onto the
-  UI thread, and keep `Count` and `At` usable while it runs.
-  `VisualizerPresets.BuiltIn` holds nine hand-written warp-shader presets
-  (`Spiral`, `Kaleidoscope`, `Fractal`, `Ripple`, `Vortex`, `Bloom`,
-  `Spectrum Bars`, `Starfield`, `Orbit`): each carries a small `warp_N` shader
-  that reads the previous feedback, so a first run shows structure instead of a
-  flat full-screen smear. Keep them on the documented expression and shader
-  subset, because they double as authoring examples; a procedural background
-  that accumulates through the feedback must be bounded (for example with `max`)
-  so it cannot blow out to white.
-  `VisualizerPresetsTests.BuiltIn_ContainsAWarpingPreset` accepts either a
-  per-pixel program or a warp shader. Preset stages share one slot layout, so a
-  stage-local built-in such as `x` or `rad` is one slot that each stage seeds
-  and reads back for itself: the per-pixel stage seeds it per pixel, a shape
-  seeds it per shape and per vertex. Never let a stage assume another stage's
-  value is still in place.
+- Before changing visualizer presentation or lifecycle, read the complete
+  desktop chapter of [Visualizer contracts](../docs/VISUALIZER-CONTRACTS.md).
+  OpenGL is the default supported GPU path; the bitmap/Skia CPU fallback stays
+  available and failures must never interrupt playback.
 - The desktop runs on Avalonia 12.1.2 with **compiled bindings enabled by
   default**; do not add `AvaloniaUseCompiledBindingsByDefault=false` back. Every
   `DataTemplate` and every item-binding scope needs an explicit `x:DataType`:
@@ -893,25 +635,29 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
   it never blocks playback, is skipped for items without an artist and title,
   and is not queued while offline. `BuildLastFmTrack` is the single place that
   builds the metadata for both now-playing and love, so an untagged item never
-  produces a request Last.fm rejects.- The year-in-review export shares one pure
-  content model, `Orynivo.Controls.YearInReviewLayout` (title, headline, monthly
-  bar ratios, and the leading sections). The Avalonia dialog renders it as
-  controls; the PDF export draws it through SkiaSharp in
-  `YearInReviewPdfExporter`, which must stay bounded to one A4 page, offline,
-  and free of new data collection. SkiaSharp is used through Avalonia.Skia's
-  pinned 2.88.9 reference, so do not add a separate SkiaSharp package reference
-  to the desktop project.- The Infinite Mix profile editor offers
-  Focus/Workout/Wind down presets through the pure
-  `Orynivo.InfiniteMixPresets.Apply`, which only pre-fills the mood, discovery
-  level, history period, and weighting and must preserve the server selection,
-  genre filters, feedback, and exclusions. Descriptor-based preset scoring stays
-  in the context-menu activity mix (`SimilarityFeatureService.RankPreset`); the
-  Infinite Mix profile itself remains metadata-based because the genre-cloud
-  candidate payload carries no acoustic descriptors.- Podcast downloads live in
-  `PodcastDownloadService` beneath the per-user `podcast-downloads` cache.
-  `PodcastDownloadCache.BuildCacheFileName` derives a stable hashed name per
-  podcast and episode key, playback prefers the cached file and marks it used,
-  and `EnforceLimit` evicts through the pure
+  produces a request Last.fm rejects.
+
+- The year-in-review export shares one pure content model,
+  `Orynivo.Controls.YearInReviewLayout` (title, headline, monthly bar ratios,
+  and the leading sections). The Avalonia dialog renders it as controls; the PDF
+  export draws it through SkiaSharp in `YearInReviewPdfExporter`, which must
+  stay bounded to one A4 page, offline, and free of new data collection.
+  SkiaSharp is used through Avalonia.Skia's pinned 3.119.4 dependency, so do not
+  add a separate SkiaSharp package reference to the desktop project.
+
+- The Infinite Mix profile editor offers Focus/Workout/Wind down presets through
+  the pure `Orynivo.InfiniteMixPresets.Apply`, which only pre-fills the mood,
+  discovery level, history period, and weighting and must preserve the server
+  selection, genre filters, feedback, and exclusions. Descriptor-based preset
+  scoring stays in the context-menu activity mix
+  (`SimilarityFeatureService.RankPreset`); the Infinite Mix profile itself
+  remains metadata-based because the genre-cloud candidate payload carries no
+  acoustic descriptors.
+
+- Podcast downloads live in `PodcastDownloadService` beneath the per-user
+  `podcast-downloads` cache. `PodcastDownloadCache.BuildCacheFileName` derives a
+  stable hashed name per podcast and episode key, playback prefers the cached
+  file and marks it used, and `EnforceLimit` evicts through the pure
   `PodcastDownloadCache.SelectForEviction` (least recently used first, newest
   always kept). The limit is `AppSettings.PodcastDownloadLimitMb`. Episode rows
   carry a download marker and their own context flyout, attached from
@@ -921,12 +667,13 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
   itself: the caller supplies the search through `Search` (the editor receives
   it via `ReferenceTrackPicker`), and `MainWindow.SearchReferenceTracksAsync`
   queries the local index plus every configured Orynivo Server, returning only
-  credential-free `local`/`server:<id>` identities.- The smart-playlist editor
-  (`SmartPlaylistDialog`) must show every stored criterion and must never drop a
-  criterion it cannot rebuild from its own input fields. The similarity
-  reference is displayed with a readable track label (track title and artist for
-  local references, server name for remote ones) and is carried across a save
-  through the pure, tested
+  credential-free `local`/`server:<id>` identities.
+
+- The smart-playlist editor (`SmartPlaylistDialog`) must show every stored
+  criterion and must never drop a criterion it cannot rebuild from its own input
+  fields. The similarity reference is displayed with a readable track label
+  (track title and artist for local references, server name for remote ones) and
+  is carried across a save through the pure, tested
   `SmartPlaylistCriteriaEditing.ResolveSimilarityReference`; it is removed only
   through the explicit **Remove reference** action. The reference label lookup
   runs off the UI thread.
@@ -949,8 +696,10 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
   center the window if its previous monitor is no longer attached.
 - Full server track catalogs must request at most 5,000 tracks per page,
   matching the server cap; requesting more falsely signals the end of
-  pagination. Track cache schema version 1 rejects legacy potentially truncated
-  caches. Reapply current client favorites after loading cached tracks.
+  pagination. Track cache schema version 2 and versioned artist/album cache
+  identities reject legacy potentially incomplete snapshots. Every full-catalog
+  disk-cache writer must use strict requests and finish every page successfully.
+  Reapply current client favorites after loading cached tracks.
 - Interactive cards use the shared cyan-violet gradient hover border. Main
   sidebar entries carry a source-appropriate shared vector icon; smart playlists
   use the shared 13-px icon footprint and spacing but retain a dedicated orange
@@ -1112,8 +861,30 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
   three-entry LRU session cache. Configured-server identity and a generation
   form the key; library-version, watcher, favorite, and artwork changes advance
   the generation. Independent remote servers load concurrently, and local
-  provider database work must not run synchronously on the Avalonia UI thread. A
-  manual local scan launched from Settings must raise
+  provider database work must not run synchronously on the Avalonia UI thread.
+  `LibraryLoadResult` retains explicit per-source success, failure, timeout, and
+  cancellation outcomes; a successful empty source is not a failure. Cache only
+  complete results, capturing the catalog generation before loading and
+  rejecting late writes atomically in `LibraryViewCache`. Navigation
+  cancellation and load versions reject stale publication; register remote
+  playback metadata only after that guard. Partial/failed shared views expose a
+  localized notice with an unavailable-source count and in-place retry. Keep
+  usable rows interactive while retrying, suppress duplicate retries, and retain
+  source-aware selection and scroll position at publication. Deferred restore
+  callbacks must reject abandoned loads; runtime language changes refresh the
+  notice. Successful empty catalogs and navigation cancellation show no failure
+  notice. Global and server-scoped library searches share cancellation/version
+  ownership, captured source/profile/favorite/filter context, strict full-search
+  reads, and at most three concurrent server loads. Source time budgets start
+  after admission. Text changes cancel before debounce; navigation, Settings,
+  imports, window close, and catalog/profile changes reject pending publication
+  and remote metadata registration. Keep available categories when a source
+  fails; show incomplete-search text instead of definitive no-match text for
+  empty categories, with an in-place retry. Deferred Back/retry scroll restores
+  must guard their owning search. Empty source selections are successful but
+  never eligible for source-backed catalog caching. Outcome metadata and
+  diagnostics contain no exception text, media paths, server names, URLs, or
+  credentials. A manual local scan launched from Settings must raise
   `SettingsView.LocalLibraryChanged` after a successful catalog mutation so the
   same Dashboard, Genre Cloud, and unified-library caches are invalidated as for
   watcher-driven changes; never require an application restart to see new rows.
@@ -1264,6 +1035,6 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
   within the compatible package line: its non-blocking observer dispatch avoids
   a shutdown race with Avalonia's stopped UI dispatcher.
 
-Consult the detailed matching sections in the root `AGENTS.md` before changing
-audio, queue, Dashboard, playlists, remote libraries, settings, or table/tree
-UI.
+Consult the detailed matching sections in `docs/PROJECT-REFERENCE.md`
+(repository-relative) before changing audio, queue, Dashboard, playlists, remote
+libraries, settings, or table/tree UI.

@@ -405,14 +405,25 @@ public partial class MainWindow : Window
     private OrynivoServerLibraryCatalogProvider CreateOrynivoCatalogProvider(OrynivoServerSettings server)
         => new(server, _orynivoClient, (entityType, id) => IsOrynivoFavorite(server, entityType, id));
 
+    /// <summary>Creates a catalog provider that never treats request failures as an empty library.</summary>
+    /// <param name="server">Owning remote source.</param>
+    /// <returns>A provider whose full catalog requests propagate failures.</returns>
+    private OrynivoServerLibraryCatalogProvider CreateCompleteOrynivoCatalogProvider(OrynivoServerSettings server)
+        => new(server, _orynivoClient, (entityType, id) => IsOrynivoFavorite(server, entityType, id), requireComplete: true);
+
     private OrynivoServerNowPlayingMetadataProvider CreateOrynivoNowPlayingProvider(OrynivoServerSettings server)
         => new(server, _orynivoClient);
 
+    /// <summary>Loads a complete remote track catalog, reusing only a current validated disk snapshot.</summary>
+    /// <param name="server">Owning source.</param>
+    /// <param name="cancellationToken">Source cancellation.</param>
+    /// <returns>All tracks after every page succeeds, with current client favorites.</returns>
     private async Task<List<LibraryCatalogTrack>> LoadAllOrynivoTracksAsync(
         OrynivoServerSettings server,
-        ILibraryCatalogProvider provider,
         CancellationToken cancellationToken)
     {
+        // Every writer of the shared disk cache must use strict requests.
+        var provider = CreateCompleteOrynivoCatalogProvider(server);
         // The server reports when its library index last changed; reuse the
         // locally cached track list while that timestamp is unchanged so the
         // full list does not have to be downloaded on every visit.
@@ -435,15 +446,8 @@ public partial class MainWindow : Window
             // Match the server's maximum page size. Requesting more makes the
             // capped first page look like the final page and truncates the cache.
             const int pageSize = 5000;
-            tracks = [];
-            for (var page = 0; ; page++)
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-                var batch = await provider.GetTracksAsync(page, pageSize, cancellationToken);
-                tracks.AddRange(batch);
-                if (batch.Count < pageSize)
-                    break;
-            }
+            tracks = await LibraryCatalogPaging.LoadAllAsync(
+                (page, token) => provider.GetTracksAsync(page, pageSize, token), pageSize, cancellationToken);
 
             if (libraryChangedAt.HasValue)
             {
@@ -462,6 +466,11 @@ public partial class MainWindow : Window
             .ToList();
     }
 
+    /// <summary>Reads only current-schema, version-matched complete track snapshots.</summary>
+    /// <param name="server">Owning source.</param>
+    /// <param name="libraryChangedAt">Current server library version.</param>
+    /// <param name="tracks">Resolved cached rows on success.</param>
+    /// <returns>Whether a valid complete cache was found.</returns>
     private static bool TryLoadOrynivoTrackListCache(
         OrynivoServerSettings server,
         long libraryChangedAt,
@@ -474,7 +483,7 @@ public partial class MainWindow : Window
             if (!File.Exists(path))
                 return false;
             var cache = JsonSerializer.Deserialize<OrynivoTrackListCache>(File.ReadAllText(path));
-            if (cache?.Tracks is null || cache.SchemaVersion != 1 || cache.LibraryChangedAt != libraryChangedAt)
+            if (cache?.Tracks is null || cache.SchemaVersion != 2 || cache.LibraryChangedAt != libraryChangedAt)
                 return false;
             tracks = cache.Tracks
                 .Select(track => track with
@@ -490,6 +499,10 @@ public partial class MainWindow : Window
         }
     }
 
+    /// <summary>Saves a successfully completed catalog using credential-free playback references.</summary>
+    /// <param name="server">Owning source.</param>
+    /// <param name="libraryChangedAt">Validated server library version.</param>
+    /// <param name="tracks">Complete track catalog.</param>
     private static void SaveOrynivoTrackListCache(
         OrynivoServerSettings server,
         long libraryChangedAt,
@@ -504,8 +517,8 @@ public partial class MainWindow : Window
                 DateTimeOffset.UtcNow.ToUnixTimeSeconds(),
                 tracks.Select(track => track with
                 {
-                    PlaybackPath = $"orynivo://{server.Id}/track/{track.Id}"
-                }).ToList(), SchemaVersion: 1);
+                    PlaybackPath = PlaylistReferences.BuildTrack(server.Id, track.Id)
+                }).ToList(), SchemaVersion: 2);
             File.WriteAllText(path, JsonSerializer.Serialize(cache));
         }
         catch
@@ -517,11 +530,15 @@ public partial class MainWindow : Window
     private static string GetOrynivoTrackListCachePath(OrynivoServerSettings server)
         => RemoteServerCache.TrackListCachePath(server);
 
+    /// <summary>Loads remote artists without caching failures as a valid empty catalog.</summary>
+    /// <param name="server">Owning source.</param>
+    /// <param name="cancellationToken">Source cancellation.</param>
+    /// <returns>Complete artists with current client favorites.</returns>
     private async Task<List<LibraryCatalogArtist>> LoadAllOrynivoArtistsAsync(
         OrynivoServerSettings server,
-        ILibraryCatalogProvider provider,
         CancellationToken cancellationToken)
     {
+        var provider = CreateCompleteOrynivoCatalogProvider(server);
         var scanStatus = await _orynivoClient.GetScanStatusAsync(server, cancellationToken);
         var libraryChangedAt = scanStatus?.LibraryChangedAt;
         List<LibraryCatalogArtist>? artists = null;
@@ -551,11 +568,15 @@ public partial class MainWindow : Window
             .ToList();
     }
 
+    /// <summary>Loads remote albums without caching failures as a valid empty catalog.</summary>
+    /// <param name="server">Owning source.</param>
+    /// <param name="cancellationToken">Source cancellation.</param>
+    /// <returns>Complete albums with current client favorites.</returns>
     private async Task<List<LibraryCatalogAlbum>> LoadAllOrynivoAlbumsAsync(
         OrynivoServerSettings server,
-        ILibraryCatalogProvider provider,
         CancellationToken cancellationToken)
     {
+        var provider = CreateCompleteOrynivoCatalogProvider(server);
         var scanStatus = await _orynivoClient.GetScanStatusAsync(server, cancellationToken);
         var libraryChangedAt = scanStatus?.LibraryChangedAt;
         List<LibraryCatalogAlbum>? albums = null;
@@ -686,18 +707,24 @@ public partial class MainWindow : Window
         }
     }
 
+    /// <summary>Builds a versioned artist cache filename excluding credentials and legacy partial catalogs.</summary>
+    /// <param name="server">Owning source.</param>
+    /// <returns>The current-schema cache path.</returns>
     private static string GetOrynivoArtistListCachePath(OrynivoServerSettings server)
     {
         var key = Convert.ToHexString(
-            SHA256.HashData(Encoding.UTF8.GetBytes($"{server.Id}|{server.BaseUrl}|{server.ApiKey}")));
+            SHA256.HashData(Encoding.UTF8.GetBytes($"{server.Id}|{server.BaseUrl}|complete-artists-v2")));
         return AppPaths.GetDataPath("remote-artist-cache", $"{key}.json");
     }
 
+    /// <summary>Builds a versioned album cache filename excluding credentials and legacy partial catalogs.</summary>
+    /// <param name="server">Owning source.</param>
+    /// <returns>The current-schema cache path.</returns>
     private static string GetOrynivoAlbumListCachePath(OrynivoServerSettings server)
     {
         var key = Convert.ToHexString(
             SHA256.HashData(Encoding.UTF8.GetBytes(
-                $"{server.Id}|{server.BaseUrl}|{server.ApiKey}|albums-with-tracks-v1")));
+                $"{server.Id}|{server.BaseUrl}|complete-albums-v2")));
         return AppPaths.GetDataPath("remote-album-cache", $"{key}.json");
     }
 
@@ -706,6 +733,7 @@ public partial class MainWindow : Window
     /// otherwise the server search results, otherwise all tracks. Uses the same
     /// <see cref="MatchesTrackFilters"/> logic as the local Tracks view.
     /// </summary>
+    /// <param name="server">Owning remote source.</param>
     /// <param name="provider">Active remote catalog provider.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>The track rows to display.</returns>
@@ -721,7 +749,12 @@ public partial class MainWindow : Window
         }
         if (!string.IsNullOrWhiteSpace(SearchTextBox.Text))
             return await provider.SearchTracksAsync(SearchTextBox.Text.Trim(), 500, cancellationToken);
-        return await LoadAllOrynivoTracksAsync(server, provider, cancellationToken);
+        // Preserve this legacy view's tolerant fallback without allowing its
+        // failed requests to write partial full-catalog disk snapshots.
+        var loaded = await LibrarySourceLoader.LoadAsync<LibraryCatalogTrack>(GetServerSourceKey(server.Id),
+            async token => await LoadAllOrynivoTracksAsync(server, token), cancellationToken);
+        cancellationToken.ThrowIfCancellationRequested();
+        return loaded.Rows;
     }
 
     /// <summary>Re-resolves and rebinds remote Tracks rows after a facet filter change.</summary>

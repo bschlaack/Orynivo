@@ -103,7 +103,14 @@ public partial class MainWindow : Window
     // DB-Abfragen
     // ------------------------------------------------------------------
 
-    private List<ContentRow> QueryRows(string view, string? searchQuery = null, bool registerRemoteMetadata = true)
+    /// <summary>Queries local rows, optionally propagating database failures to the unified loader.</summary>
+    /// <param name="view">Requested local view.</param>
+    /// <param name="searchQuery">Optional free-text search.</param>
+    /// <param name="registerRemoteMetadata">Whether resolved playlist metadata is registered for playback.</param>
+    /// <param name="requireComplete">Whether database failures must propagate rather than resemble an empty catalog.</param>
+    /// <returns>Resolved local rows.</returns>
+    private List<ContentRow> QueryRows(string view, string? searchQuery = null, bool registerRemoteMetadata = true,
+        bool requireComplete = false)
     {
         try
         {
@@ -197,7 +204,7 @@ public partial class MainWindow : Window
                     .ToList()
             };
         }
-        catch { return []; }
+        catch when (!requireComplete) { return []; }
     }
 
     private List<ContentRow> GetFilteredTrackRows()
@@ -231,7 +238,11 @@ public partial class MainWindow : Window
             throw new NotSupportedException();
     }
 
-    private async Task BindLocalRowsAndStartRemoteAppendAsync(string tag)
+    /// <summary>Loads independent sources and publishes only the current combined view, caching complete results.</summary>
+    /// <param name="tag">Shared Artists, Albums, or Tracks view.</param>
+    /// <param name="preservePosition">Whether to retain the selection and scroll position at publication.</param>
+    /// <returns>A task completing after publication or rejection of the superseded load.</returns>
+    private async Task BindLocalRowsAndStartRemoteAppendAsync(string tag, bool preservePosition = false)
     {
         var diagnosticStopwatch = Stopwatch.StartNew();
         LogUiDiagnostics($"BindLocalRowsAndStartRemoteAppendAsync start tag={tag}");
@@ -239,8 +250,13 @@ public partial class MainWindow : Window
         _unifiedLibraryAppendCts = new CancellationTokenSource();
         var cancellationToken = _unifiedLibraryAppendCts.Token;
         var version = ++_unifiedLibraryLoadVersion;
-        if (TryGetUnifiedLibraryViewCache(tag, out var cachedRows))
+        var generation = _unifiedLibraryViewCache.Generation;
+        var cacheKey = CreateUnifiedLibraryViewCacheKey(tag);
+        if (TryGetUnifiedLibraryViewCache(tag, out var cachedResult))
         {
+            var cachedRows = cachedResult!.Rows;
+            _unifiedLibraryLoadResult = cachedResult;
+            UpdateUnifiedLibraryLoadNotice();
             ApplyColumns(tag);
             ContentDataGrid.ItemsSource = cachedRows;
             BindUnifiedArtworkRowsIfVisible(tag, cachedRows);
@@ -250,128 +266,101 @@ public partial class MainWindow : Window
                 $"BindLocalRowsAndStartRemoteAppendAsync cache hit tag={tag} count={cachedRows.Count} elapsed={diagnosticStopwatch.ElapsedMilliseconds}ms");
             return;
         }
-        var rows = tag == "Tracks"
-            ? await Task.Run(GetFilteredTrackRows)
-            : await Task.Run(() => QueryRows(tag));
-        LogUiDiagnostics(
-            $"BindLocalRowsAndStartRemoteAppendAsync local rows loaded tag={tag} count={rows.Count} elapsed={diagnosticStopwatch.ElapsedMilliseconds}ms");
-        if (cancellationToken.IsCancellationRequested || version != _unifiedLibraryLoadVersion)
-        {
-            LogUiDiagnostics($"BindLocalRowsAndStartRemoteAppendAsync canceled before bind tag={tag} version={version}");
-            return;
-        }
+        var servers = (_settings.OrynivoServers ?? []).ToArray();
+        var localTask = LibrarySourceLoader.LoadAsync<ContentRow>("local",
+            async token => await Task.Run(() => tag == "Tracks"
+                ? GetFilteredTrackRows()
+                : QueryRows(tag, requireComplete: true), token), cancellationToken);
+        var remoteTask = LoadRemoteUnifiedRowsAsync(tag, servers, cancellationToken);
+        await Task.WhenAll(localTask, remoteTask);
+        var result = LibraryLoadResult<ContentRow>.Combine([await localTask, await remoteTask]);
 
-        if ((_settings.OrynivoServers?.Count ?? 0) > 0)
-        {
-            var remoteRows = await LoadRemoteUnifiedRowsAsync(tag, version, cancellationToken, diagnosticStopwatch);
-            if (remoteRows.Count > 0)
-            {
-                rows.AddRange(remoteRows);
-                LogUiDiagnostics(
-                    $"BindLocalRowsAndStartRemoteAppendAsync remote rows merged before bind tag={tag} remote={remoteRows.Count} total={rows.Count} elapsed={diagnosticStopwatch.ElapsedMilliseconds}ms");
-            }
-        }
-
-        if (cancellationToken.IsCancellationRequested || version != _unifiedLibraryLoadVersion)
+        if (cancellationToken.IsCancellationRequested || version != _unifiedLibraryLoadVersion ||
+            generation != _unifiedLibraryViewCache.Generation || result.Status == LibraryLoadStatus.Cancelled ||
+            !string.Equals(_currentTopLevelTag, tag, StringComparison.Ordinal))
         {
             LogUiDiagnostics($"BindLocalRowsAndStartRemoteAppendAsync canceled before combined bind tag={tag} version={version}");
             return;
         }
 
-        var sortedRows = SortUnifiedRows(rows);
+        var sortedRows = SortUnifiedRows(result.Rows);
         if (tag == "Artists")
             sortedRows = MergeUnifiedArtistRows(sortedRows);
         else if (tag == "Albums")
             sortedRows = MergeLogicalAlbumRows(sortedRows);
-        StoreUnifiedLibraryViewCache(tag, sortedRows);
+        result = result with { Rows = sortedRows };
+        foreach (var row in sortedRows)
+            if (row.OrynivoServer is not null && row.EntityType == "OrynivoTrack" && row.FilePath is { } path)
+                _orynivoTracksByUrl[path] = row;
+        _unifiedLibraryLoadResult = result;
+        StoreUnifiedLibraryViewCache(tag, cacheKey, generation, result);
+        LogUiDiagnostics($"Unified library outcome tag={tag} status={result.Status} sources={result.Sources.Count} failed={result.Sources.Count(source => source.Status != LibrarySourceLoadStatus.Success)}");
         LogUiDiagnostics(
             $"BindLocalRowsAndStartRemoteAppendAsync combined rows sorted tag={tag} count={sortedRows.Count} elapsed={diagnosticStopwatch.ElapsedMilliseconds}ms");
+        var selectedRow = preservePosition ? GetSelectedContentRow() : null;
+        var verticalOffset = preservePosition ? CaptureCurrentVerticalOffset() : (double?)null;
         ApplyColumns(tag);
         ContentDataGrid.ItemsSource = sortedRows;
         BindUnifiedArtworkRowsIfVisible(tag, sortedRows);
         UpdateAlphabetIndex(sortedRows, true);
         UpdateUnifiedContentCount(tag, sortedRows.Count);
+        UpdateUnifiedLibraryLoadNotice();
+        if (preservePosition)
+            RestoreSelectionFromCurrentItems(selectedRow?.Id, verticalOffset, selectedRow?.SourceKey,
+                () => !cancellationToken.IsCancellationRequested && version == _unifiedLibraryLoadVersion &&
+                      generation == _unifiedLibraryViewCache.Generation &&
+                      string.Equals(_currentTopLevelTag, tag, StringComparison.Ordinal));
         LogUiDiagnostics(
             $"BindLocalRowsAndStartRemoteAppendAsync combined bind completed tag={tag} count={sortedRows.Count} elapsed={diagnosticStopwatch.ElapsedMilliseconds}ms");
     }
 
-    private async Task<List<ContentRow>> LoadRemoteUnifiedRowsAsync(
+    /// <summary>Combines independent remote source outcomes in configured source order.</summary>
+    /// <param name="tag">Shared library view.</param>
+    /// <param name="servers">Server snapshot captured before asynchronous loading.</param>
+    /// <param name="cancellationToken">Owning navigation cancellation.</param>
+    /// <returns>Available remote rows with explicit per-source outcomes.</returns>
+    private async Task<LibraryLoadResult<ContentRow>> LoadRemoteUnifiedRowsAsync(
         string tag,
-        int version,
-        CancellationToken cancellationToken,
-        Stopwatch diagnosticStopwatch)
+        IReadOnlyList<OrynivoServerSettings> servers,
+        CancellationToken cancellationToken)
     {
-        LogUiDiagnostics(
-            $"LoadRemoteUnifiedRowsAsync start tag={tag} version={version} servers={_settings.OrynivoServers?.Count ?? 0}");
-        var tasks = (_settings.OrynivoServers ?? [])
+        var tasks = servers
             .Select(server => LoadRemoteUnifiedServerRowsAsync(
                 tag,
                 server,
-                version,
-                cancellationToken,
-                diagnosticStopwatch))
+                cancellationToken))
             .ToArray();
-        var rows = (await Task.WhenAll(tasks)).SelectMany(serverRows => serverRows).ToList();
-        LogUiDiagnostics(
-            $"LoadRemoteUnifiedRowsAsync finish tag={tag} rows={rows.Count} elapsed={diagnosticStopwatch.ElapsedMilliseconds}ms");
-        return rows;
+        return LibraryLoadResult<ContentRow>.Combine(await Task.WhenAll(tasks));
     }
 
     /// <summary>Loads one remote server's shared library rows with an independent timeout.</summary>
     /// <param name="tag">Shared Artists, Albums, or Tracks view tag.</param>
     /// <param name="server">Owning Orynivo Server.</param>
-    /// <param name="version">Navigation load version.</param>
     /// <param name="cancellationToken">Navigation cancellation token.</param>
-    /// <param name="diagnosticStopwatch">Shared diagnostic stopwatch.</param>
-    /// <returns>Mapped rows from this server, or an empty list when unavailable.</returns>
-    private async Task<List<ContentRow>> LoadRemoteUnifiedServerRowsAsync(
+    /// <returns>Mapped available rows and a sanitized source outcome.</returns>
+    private Task<LibraryLoadResult<ContentRow>> LoadRemoteUnifiedServerRowsAsync(
         string tag,
         OrynivoServerSettings server,
-        int version,
-        CancellationToken cancellationToken,
-        Stopwatch diagnosticStopwatch)
-    {
-        if (cancellationToken.IsCancellationRequested || version != _unifiedLibraryLoadVersion)
-            return [];
-        try
+        CancellationToken cancellationToken) =>
+        LibrarySourceLoader.LoadAsync<ContentRow>(GetServerSourceKey(server.Id), async token =>
         {
-            LogUiDiagnostics(
-                $"LoadRemoteUnifiedRowsAsync server start tag={tag} server={server.Name} elapsed={diagnosticStopwatch.ElapsedMilliseconds}ms");
-            using var timeoutCts = new CancellationTokenSource(TimeSpan.FromSeconds(20));
-            using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutCts.Token);
-            var provider = CreateOrynivoCatalogProvider(server);
-            var serverRows = tag switch
+            var provider = CreateCompleteOrynivoCatalogProvider(server);
+            return tag switch
             {
-                "Artists" => (await LoadAllOrynivoArtistsAsync(server, provider, linkedCts.Token))
+                "Artists" => (await LoadAllOrynivoArtistsAsync(server, token))
                     .Where(artist => !_artistFavoritesOnly || artist.IsFavorite)
                     .Select(artist => ToCatalogArtistContentRow(artist, server))
                     .ToList(),
-                "Albums" => (await LoadAllOrynivoAlbumsAsync(server, provider, linkedCts.Token))
+                "Albums" => (await LoadAllOrynivoAlbumsAsync(server, token))
                     .Where(album => !_albumFavoritesOnly || album.IsFavorite)
                     .Select(album => ToCatalogAlbumContentRow(album, server))
                     .ToList(),
-                "Tracks" => (await LoadRemoteTracksForUnifiedViewAsync(server, provider, linkedCts.Token))
-                    .Select(track => ToCatalogTrackContentRow(track, server))
+                "Tracks" => (await LoadRemoteTracksForUnifiedViewAsync(server, provider, token))
+                    .Select(track => ToCatalogTrackContentRow(track, server, registerRemoteMetadata: false))
                     .ToList(),
                 _ => []
             };
-            LogUiDiagnostics(
-                $"LoadRemoteUnifiedRowsAsync server rows loaded tag={tag} server={server.Name} count={serverRows.Count} elapsed={diagnosticStopwatch.ElapsedMilliseconds}ms");
-            return cancellationToken.IsCancellationRequested || version != _unifiedLibraryLoadVersion
-                ? []
-                : serverRows;
-        }
-        catch (OperationCanceledException)
-        {
-            return [];
-        }
-        catch (Exception ex)
-        {
-            LogUiDiagnostics(
-                $"LoadRemoteUnifiedRowsAsync server failed tag={tag} server={server.Name} error={ex.GetType().Name}: {ex.Message}");
-            return [];
-        }
-    }
+        }, cancellationToken, TimeSpan.FromSeconds(20));
 
     /// <summary>Returns cached plain or synchronized lyrics for the current track.</summary>
     /// <returns>Cached lyrics, or <see langword="null"/> when no eligible track or lyrics exist.</returns>
@@ -403,6 +392,11 @@ public partial class MainWindow : Window
         return server is not null && await _orynivoClient.TriggerScanAsync(server);
     }
 
+    /// <summary>Resolves strict remote track or facet requests for the shared Tracks view.</summary>
+    /// <param name="server">Owning source.</param>
+    /// <param name="provider">Strict catalog provider used for filtered ID resolution.</param>
+    /// <param name="cancellationToken">Source cancellation.</param>
+    /// <returns>Available tracks after the complete request succeeds.</returns>
     private async Task<IReadOnlyList<LibraryCatalogTrack>> LoadRemoteTracksForUnifiedViewAsync(
         OrynivoServerSettings server,
         ILibraryCatalogProvider provider,
@@ -410,7 +404,7 @@ public partial class MainWindow : Window
     {
         if (HasActiveFilters)
         {
-            var facets = await _orynivoClient.GetTrackFacetsAsync(server, cancellationToken);
+            var facets = await _orynivoClient.GetTrackFacetsAsync(server, cancellationToken, requireComplete: true);
             var ids = facets
                 .Select(facet => facet with
                 {
@@ -425,7 +419,7 @@ public partial class MainWindow : Window
                 : await provider.GetTracksByIdsAsync(ids, cancellationToken);
         }
 
-        return await ResolveOrynivoTrackRowsAsync(server, provider, cancellationToken);
+        return await LoadAllOrynivoTracksAsync(server, cancellationToken);
     }
 
     private void BindUnifiedRows(string tag, List<ContentRow> rows)

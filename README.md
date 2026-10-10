@@ -1,3 +1,4 @@
+<!-- markdownlint-disable MD033 MD041 -->
 <p align="center">
   <img src="Logo/logo_about.png" alt="Orynivo" width="720">
 </p>
@@ -18,8 +19,11 @@ Parametric EQ Plex · Radio · Podcasts · AI Chat · MCP Server · Network Stre
 
 Watch the Orynivo walkthrough:
 
-<!-- markdownlint-disable-next-line MD034 -->
+<!-- markdownlint-disable MD034 -->
+
 https://github.com/user-attachments/assets/92e1cde3-b787-4752-8ad9-944d47d0b32f
+
+<!-- markdownlint-enable MD034 -->
 
 If the embedded video does not play in your browser,
 [watch it on YouTube](https://www.youtube.com/watch?v=llYTFwNLZAY).
@@ -41,7 +45,7 @@ the ability to reach that library from any device on the local network.
 - Multi-select bulk editing in the shared Tracks table, applying favorite,
   unfavorite, or a personal rating to every selected local or Orynivo Server
   track at once, plus a genre field that stores a library-only override for the
-  selected local tracks (media files are never modified)
+  selected local or Orynivo Server tracks (media files are never modified)
 - Local library, playlists, smart playlists and full-text search
 - Unified artist detail pages with an album-style image-and-biography hero,
   synchronized favorites, image management, refreshable biographies, and
@@ -55,6 +59,15 @@ the ability to reach that library from any device on the local network.
 - Hierarchical Genre Cloud with source-aware track and album recommendations
   across the local library and connected Orynivo Servers, backed by a subtle
   cached grayscale mosaic of matching artist images
+- Shared Artists, Albums, and Tracks views retain available local/server results
+  when a source is unavailable. Only complete loads are cached, so reopening a
+  partial view retries missing sources. An incomplete-load notice offers **Try
+  again** without clearing usable rows; selection and scroll position survive
+  the refresh, and navigating away cancels it.
+- Library search queries independent servers concurrently, keeps available
+  results when a source fails, and offers **Try again** for incomplete searches.
+  New queries and navigation cancel the previous search; genuine empty results
+  remain distinct from unavailable sources.
 - Infinite Mix, which turns recent listening habits and favorites into a
   continuously replenished mixed-source queue
 - Album-artist-centered library attribution: explicit `ALBUMARTIST` metadata
@@ -1685,36 +1698,28 @@ archive in place.
 
 ## Visualizer
 
-Milkdrop compatibility is currently partial: loading or compiling a `.milk`
-preset does not guarantee the original appearance. The OpenGL path now honors
-sampler filter/wrap modes, custom-wave state, real shape keys, warp speed/scale,
-blur ranges, and display-only gamma/echo. The comp shader now samples
-`GetPixel(uv)` in normalized coordinates; the comp main and blur samplers read
-the preceding feedback frame as in the MilkDrop 2.25c source. Preset-facing
-bass, mid and treble now use MilkDrop's separate 576-sample, eight-bit
-custom-sound FFT; a matched 440 Hz Winamp capture verifies the three relative
-band responses. Custom-wave line colours and alpha now interpolate between
-vertices, and thick custom-wave dots cover the reference's 2×2 pixels at normal
-texture sizes. Centre darkening now matches MilkDrop's small, faint centre fan
-rather than darkening the whole image, and `fShader=0` leaves the legacy
-composite untinted. Textured shapes, default-wave geometry, exact audio
-alignment, some legacy hue shading and CPU fallback behavior still differ. See
-the [current verification report](VISUALIZER-FIDELITY-RECHECK.md) for fixes,
-tests and remaining limits. The Royal Mashup comparison against Winamp is now
-substantially brighter, but its full-frame geometry still differs. The analyzer
-uses the reference's one-sample pre-emphasis, raised-sine window period and
-multi-octave waveform alignment.
+MilkDrop compatibility is partial: loading or compiling a `.milk` preset never
+guarantees its original appearance. The implementation includes textured custom
+shapes, per-mode default-wave geometry, independent sampler modes, retained blur
+levels, display-only composite stages, and reference-based audio analysis. For
+maintained execution paths, verification, and evidence limits, see
+[Visualizer status](docs/VISUALIZER-STATUS.md). Historical comparisons in
+`ROADMAP.md` describe their original inputs and revision; they do not establish
+complete fidelity for the current application.
 
-**Visualisierung** in the sidebar opens a fullscreen music visualizer. It
-renders the playing audio through a Milkdrop-style preset engine at 640 x 360
-and scales the frame up. Escape closes it, a click or Space switches the preset,
-the arrow keys step through them, and R resets the picture; the **Reduce
-motion** preference draws a static spectrum instead of animating. The frame is
-presented through OpenGL, and the warp, the blur, and the full-frame passes run
-on the GPU for a preset that builds a mesh; a per-pixel block that writes the
-sample position keeps the CPU warp, because an interpolated position has no
-meaning. A platform whose GL context is unavailable falls back to the bitmap
-presentation, and setting `ORYNIVO_VISUALIZER_OPENGL=0` forces it.
+The **Visualizer** transport button opens a fullscreen music visualizer. The
+default render size is 640 x 360 at 60 frames per second. Escape closes it, a
+click or Space switches the preset, the arrow keys step through them, and R
+resets the picture. **Reduce motion** uses the simplified overlay path instead
+of the animated preset feedback pipeline.
+
+OpenGL is the default presentation path and runs supported pixel stages on the
+GPU. Core evaluates expressions and prepares motion and overlays on a background
+render thread. Representable position-writing blocks can use the emitted GLSL
+warp; blocks that also write motion use the evaluated mesh. Unsupported presets
+or unavailable/failed GL contexts retain CPU rendering. Setting
+`ORYNIVO_VISUALIZER_OPENGL=0` forces bitmap presentation. The bitmap fallback's
+Skia raster runtime effects run on the CPU, not the GPU.
 
 A preset switch continues from the previous preset's feedback instead of
 restarting from black, and a configurable **Preset switch cross-fade duration**
@@ -1738,12 +1743,13 @@ compound assignments `+=`, `-=`, `*=`, `/=`, and `%=`,
 `loop(count, statements)`, the shared `megabuf`/`gmegabuf` tables, and `//`
 comments; unknown keys are ignored so third-party presets degrade instead of
 failing. Milkdrop's `warp_N`/`comp_N` HLSL shader blocks run when they parse,
-with the per-pixel comp pass drawn on a reduced-resolution grid and left out for
-the rest of the frame when it would exceed the frame budget. Own presets go into
-the folder configured under **Preset folder** as `.oryvis` or `.milk` files
-(default: a `visualizer-presets` folder below the per-user data directory); a
-file that cannot be parsed is skipped and counted in the on-screen label. Nine
-presets ship with the application.
+with bounded CPU fallback work and adaptive shader-grid resolution for expensive
+interpreter/runtime-effect passes. Unsupported translation retains the CPU path
+rather than silently claiming GPU execution. Own presets go into the folder
+configured under **Preset folder** as `.oryvis` or `.milk` files (default: a
+`visualizer-presets` folder below the per-user data directory); a file that
+cannot be parsed is skipped and counted in the on-screen label. Nine presets
+ship with the application.
 
 A shader may also declare its own texture, such as `sampler sampler_seaweed;`.
 Orynivo resolves it to an image file of that name (`.jpg`, `.png`, `.bmp`,
@@ -1803,11 +1809,10 @@ required checks for each held-back line are recorded in
 
 ## Current Limitations
 
-- The visualizer's Milkdrop shader runtime does not implement the matrix types
-  `float2x2`, `float3x3`, and `float4x4`. A shader that uses one is disabled
-  rather than rendered incorrectly, and 913 files of a sample collection use a
-  matrix type, so those presets lose that shader's effect. The compiled shader
-  path is unaffected because it only compiles straight-line bodies.
+- MilkDrop visual compatibility remains partial. Square shader matrices
+  (`float2x2`, `float3x3`, and `float4x4`) are implemented; acceptance and
+  internal renderer agreement do not prove complete Winamp fidelity. See
+  [Visualizer status](docs/VISUALIZER-STATUS.md) for the evidence limits.
 - Linux output profiles include direct ALSA `hw:` endpoints and endpoints
   exposed by OpenAL. A direct ALSA profile opens the DAC at the track's PCM
   sample rate with ALSA software resampling disabled; it fails explicitly when
@@ -1855,6 +1860,12 @@ required checks for each held-back line are recorded in
 Bug reports and reproducible improvement proposals can be submitted through
 [GitHub Issues](https://github.com/bschlaack/Orynivo/issues). For audio issues,
 include the output backend, device, file format, and sample rate.
+
+Contributor architecture and maintenance guidance is indexed in
+[AGENTS.md](AGENTS.md). The [project reference](docs/PROJECT-REFERENCE.md)
+describes the maintained contracts, while
+[Visualizer status](docs/VISUALIZER-STATUS.md) separates the current rendering
+paths from historical implementation milestones.
 
 ## Dependencies and Notices
 
