@@ -4,6 +4,14 @@ All notable changes to Orynivo are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased]
+
+### Fixed
+
+- Render timing unit tests verify blur output and recorded stage durations
+  without comparing individual frame speeds, avoiding intermittent failures on
+  busy CI runners.
+
 ## [0.46.1] - 2026-10-10
 
 ### Changed
