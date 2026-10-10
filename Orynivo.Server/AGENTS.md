@@ -178,4 +178,5 @@ This file applies to `Orynivo.Server/` and supplements `../AGENTS.md`.
   streaming limit.
 
 Consult the detailed endpoint, configuration, scan, cache, and package rules in
-the root `AGENTS.md` before changing those areas.
+the [project reference](../docs/PROJECT-REFERENCE.md) before changing those
+areas.

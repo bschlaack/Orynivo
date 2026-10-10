@@ -6,6 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Changed
+
+- Separated repository working instructions from detailed project and visualizer
+  contracts, corrected outdated cache, rendering, AirPlay, and dependency
+  descriptions, and documented the current visualizer evidence limits.
+
 ### Added
 
 - Added an embedded walkthrough video to the README, with a YouTube link as an
@@ -13,8 +19,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
-- Removed runner-speed-dependent failures from the Skia shader fidelity tests
-  by raising both shader time budgets and reporting render errors directly.
+- Removed runner-speed-dependent failures from the Skia shader fidelity tests by
+  raising both shader time budgets and reporting render errors directly.
 
 ## [0.46.0] - 2026-09-26
 
@@ -431,11 +437,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   accepts the emitted SkSL, and the collection-wide translation harness reports
   every sampled shader accepted.
 - Fixed the **Visualisierung** entry in Settings having no icon.
-  `IconVisualizer` is a stroke-only
-  geometry (rising spectrum bars over a baseline), while the Settings navigation
-  style sets `Fill`, so the icon drew nothing. It now strokes with the
-  navigation item's foreground, exactly like the transport button that already
-  used the same geometry.
+  `IconVisualizer` is a stroke-only geometry (rising spectrum bars over a
+  baseline), while the Settings navigation style sets `Fill`, so the icon drew
+  nothing. It now strokes with the navigation item's foreground, exactly like
+  the transport button that already used the same geometry.
 - Fixed presets turning into a solid white screen a few seconds after the
   sixteen-bit feedback landed. Eight-bit textures clamp every write to the
   colour range, so a preset that amplifies its own feedback (`fGammaAdj` below
@@ -1531,13 +1536,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   touching the feedback buffers. A GPU path composites that overlay over its own
   warped frame instead of re-drawing it.
 - Extracted the warp's sampling arithmetic into
-  `Orynivo.Visualization.WarpSampling`, which is now
-  the single definition of it: the CPU warp calls it per pixel and the GPU
-  warp's fragment shader is its translation, so a GPU warp cannot silently
-  disagree with the reference. `WarpSamplingTests` covers the identity, zoom,
-  offset, rotation, stretch, and radial-exponent cases. The extraction is
-  behaviour-preserving; the mesh and parallel tests still render byte-identical
-  frames.
+  `Orynivo.Visualization.WarpSampling`, which is now the single definition of
+  it: the CPU warp calls it per pixel and the GPU warp's fragment shader is its
+  translation, so a GPU warp cannot silently disagree with the reference.
+  `WarpSamplingTests` covers the identity, zoom, offset, rotation, stretch, and
+  radial-exponent cases. The extraction is behaviour-preserving; the mesh and
+  parallel tests still render byte-identical frames.
 - Added the Core-side interface a GPU warp needs. `PresetRenderer.MeshGridX`,
   `MeshGridY`, and `MeshValues` are public, `MeshRequested` evaluates the
   per-vertex mesh without switching the CPU picture over, and
@@ -5715,12 +5719,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 - Added **EQ** and **Output** quick-pick buttons to the right side of the
   transport bar (below the volume control). The EQ button opens a popup with an
-  equalizer-profile ComboBox, a ⚙ button that navigates to Settings >
-  Equalizer, and a themed enable/disable checkbox. The Output button opens a
-  popup with an output-profile ComboBox and a ⚙ button that navigates to
-  Settings > Audio Device. Both buttons use vector path icons, tooltips, and
-  respect the active light/dark theme. (`EqPickerButton`, `OutputPickerButton`,
-  `EqPickerPopup`, `OutputPickerPopup`, `PopupCheckBoxTheme`)
+  equalizer-profile ComboBox, a ⚙ button that navigates to Settings > Equalizer,
+  and a themed enable/disable checkbox. The Output button opens a popup with an
+  output-profile ComboBox and a ⚙ button that navigates to Settings > Audio
+  Device. Both buttons use vector path icons, tooltips, and respect the active
+  light/dark theme. (`EqPickerButton`, `OutputPickerButton`, `EqPickerPopup`,
+  `OutputPickerPopup`, `PopupCheckBoxTheme`)
 - The output-profile dropdown in Settings now shows a compact summary line (e.g.
   `WASAPI  ·  Realtek HD Audio`) beneath it when a profile is selected.
 - Increased the transport album artwork from 42 × 42 px to 58 × 58 px to better
