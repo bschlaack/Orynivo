@@ -44,8 +44,12 @@ namespace Orynivo;
 /// </summary>
 public partial class MainWindow : Window
 {
+    /// <summary>Resets detail navigation and cancels any superseded shared library load.</summary>
+    /// <param name="clearNavigationHistory">Whether saved Back states are also removed.</param>
     private void ResetDrilldownState(bool clearNavigationHistory = true)
     {
+        CancelAndDispose(ref _unifiedLibraryAppendCts);
+        _unifiedLibraryLoadResult = null;
         _activeAlbumFilterId = null;
         _activeAlbumFilterTitle = null;
         _activeArtistFilterId = null;
@@ -61,8 +65,11 @@ public partial class MainWindow : Window
         BackButton.IsVisible = _navigationStack.Count > 0;
     }
 
+    /// <summary>Captures the current view before navigation and cancels its pending shared-library load.</summary>
     private void PushCurrentNavigationState()
     {
+        CancelAndDispose(ref _unifiedLibraryAppendCts);
+        _unifiedLibraryLoadResult = null;
         if (_restoringNavigationHistory)
             return;
 

@@ -696,8 +696,10 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
   center the window if its previous monitor is no longer attached.
 - Full server track catalogs must request at most 5,000 tracks per page,
   matching the server cap; requesting more falsely signals the end of
-  pagination. Track cache schema version 1 rejects legacy potentially truncated
-  caches. Reapply current client favorites after loading cached tracks.
+  pagination. Track cache schema version 2 and versioned artist/album cache
+  identities reject legacy potentially incomplete snapshots. Every full-catalog
+  disk-cache writer must use strict requests and finish every page successfully.
+  Reapply current client favorites after loading cached tracks.
 - Interactive cards use the shared cyan-violet gradient hover border. Main
   sidebar entries carry a source-appropriate shared vector icon; smart playlists
   use the shared 13-px icon footprint and spacing but retain a dedicated orange
@@ -859,7 +861,14 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
   three-entry LRU session cache. Configured-server identity and a generation
   form the key; library-version, watcher, favorite, and artwork changes advance
   the generation. Independent remote servers load concurrently, and local
-  provider database work must not run synchronously on the Avalonia UI thread. A
+  provider database work must not run synchronously on the Avalonia UI thread.
+  `LibraryLoadResult` retains explicit per-source success, failure, timeout, and
+  cancellation outcomes; a successful empty source is not a failure. Cache only
+  complete results, capturing the catalog generation before loading and
+  rejecting late writes atomically in `LibraryViewCache`. Navigation
+  cancellation and load versions reject stale publication; register remote
+  playback metadata only after that guard. Outcome metadata and diagnostics
+  contain no exception text, media paths, server names, URLs, or credentials. A
   manual local scan launched from Settings must raise
   `SettingsView.LocalLibraryChanged` after a successful catalog mutation so the
   same Dashboard, Genre Cloud, and unified-library caches are invalidated as for

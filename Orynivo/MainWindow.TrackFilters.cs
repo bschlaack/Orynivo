@@ -276,8 +276,7 @@ public partial class MainWindow : Window
             try
             {
                 using var serverCts = new CancellationTokenSource(TimeSpan.FromSeconds(60));
-                var provider = CreateOrynivoCatalogProvider(server);
-                var tracks = LoadAllOrynivoTracksAsync(server, provider, serverCts.Token)
+                var tracks = LoadAllOrynivoTracksAsync(server, serverCts.Token)
                     .GetAwaiter()
                     .GetResult();
                 foreach (var track in tracks)

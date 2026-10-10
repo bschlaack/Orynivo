@@ -59,6 +59,10 @@ the ability to reach that library from any device on the local network.
 - Hierarchical Genre Cloud with source-aware track and album recommendations
   across the local library and connected Orynivo Servers, backed by a subtle
   cached grayscale mosaic of matching artist images
+- Shared Artists, Albums, and Tracks views retain available local/server results
+  when a source is unavailable. Only complete loads are cached, so reopening a
+  partial view retries missing sources. Dedicated failure indicators and an
+  in-place retry action are not yet available.
 - Infinite Mix, which turns recent listening habits and favorites into a
   continuously replenished mixed-source queue
 - Album-artist-centered library attribution: explicit `ALBUMARTIST` metadata

@@ -52,6 +52,8 @@ public partial class MainWindow : Window
         if (showLoadingSkeleton)
             ShowContentLoadingSkeleton();
         _currentTopLevelTag = tag;
+        CancelAndDispose(ref _unifiedLibraryAppendCts);
+        _unifiedLibraryLoadResult = null;
         _orynivoTrackFacets = null;
         // A fresh load reflects current library data, so any pending refresh prompt is stale.
         SetLibraryRefreshAvailable(false);

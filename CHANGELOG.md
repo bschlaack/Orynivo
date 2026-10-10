@@ -19,6 +19,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- Shared Artists, Albums, and Tracks views keep results from available sources
+  when another source fails. Failed requests and timeouts no longer resemble a
+  successful empty catalog or enter the complete-library cache. Cancelled or
+  invalidated loads cannot replace the current view or repopulate its cache;
+  legacy remote catalog caches are refreshed once.
 - Removed runner-speed-dependent failures from the Skia shader fidelity tests by
   raising both shader time budgets and reporting render errors directly.
 

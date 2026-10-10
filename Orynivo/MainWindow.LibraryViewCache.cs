@@ -2,64 +2,40 @@ namespace Orynivo;
 
 public partial class MainWindow
 {
-    /// <summary>One resolved shared-library view retained for fast repeated navigation.</summary>
-    /// <param name="Rows">Sorted and source-merged rows.</param>
-    /// <param name="LastAccessUtc">Last access time used for bounded eviction.</param>
-    private sealed record UnifiedLibraryViewCacheEntry(
-        List<ContentRow> Rows,
-        DateTimeOffset LastAccessUtc);
-
-    private const int UnifiedLibraryViewCacheMaximumEntries = 3;
-    private readonly object _unifiedLibraryViewCacheSync = new();
-    private readonly Dictionary<string, UnifiedLibraryViewCacheEntry> _unifiedLibraryViewCache =
-        new(StringComparer.Ordinal);
-    private int _unifiedLibraryCatalogGeneration;
+    private readonly LibraryViewCache<ContentRow> _unifiedLibraryViewCache = new(3);
+    private LibraryLoadResult<ContentRow>? _unifiedLibraryLoadResult;
 
     /// <summary>Returns a cached unfiltered Artists, Albums, or Tracks view when available.</summary>
     /// <param name="tag">Shared library view tag.</param>
-    /// <param name="rows">Cached rows when found.</param>
+    /// <param name="result">Complete cached rows and source outcomes when found.</param>
     /// <returns><see langword="true"/> when a current entry exists.</returns>
-    private bool TryGetUnifiedLibraryViewCache(string tag, out List<ContentRow> rows)
+    private bool TryGetUnifiedLibraryViewCache(string tag, out LibraryLoadResult<ContentRow>? result)
     {
-        rows = [];
+        result = null;
         if (!CanCacheUnifiedLibraryView(tag))
             return false;
         var key = CreateUnifiedLibraryViewCacheKey(tag);
-        lock (_unifiedLibraryViewCacheSync)
-        {
-            if (!_unifiedLibraryViewCache.TryGetValue(key, out var cached))
-                return false;
-            _unifiedLibraryViewCache[key] = cached with { LastAccessUtc = DateTimeOffset.UtcNow };
-            rows = cached.Rows;
-            return true;
-        }
+        return _unifiedLibraryViewCache.TryGet(key, _unifiedLibraryViewCache.Generation, out result);
     }
 
     /// <summary>Stores one completed unfiltered shared-library view.</summary>
     /// <param name="tag">Shared library view tag.</param>
-    /// <param name="rows">Sorted and merged rows.</param>
-    private void StoreUnifiedLibraryViewCache(string tag, List<ContentRow> rows)
+    /// <param name="key">View identity captured before starting the load.</param>
+    /// <param name="generation">Catalog generation captured before starting the load.</param>
+    /// <param name="result">Sorted and merged rows with explicit source outcomes.</param>
+    private void StoreUnifiedLibraryViewCache(string tag, string key, int generation, LibraryLoadResult<ContentRow> result)
     {
         if (!CanCacheUnifiedLibraryView(tag))
             return;
-        var key = CreateUnifiedLibraryViewCacheKey(tag);
-        lock (_unifiedLibraryViewCacheSync)
-        {
-            _unifiedLibraryViewCache[key] = new UnifiedLibraryViewCacheEntry(rows, DateTimeOffset.UtcNow);
-            while (_unifiedLibraryViewCache.Count > UnifiedLibraryViewCacheMaximumEntries)
-            {
-                var oldest = _unifiedLibraryViewCache.MinBy(pair => pair.Value.LastAccessUtc).Key;
-                _unifiedLibraryViewCache.Remove(oldest);
-            }
-        }
+        if (!string.Equals(key, CreateUnifiedLibraryViewCacheKey(tag), StringComparison.Ordinal))
+            return;
+        _unifiedLibraryViewCache.TryStore(key, generation, result);
     }
 
     /// <summary>Clears shared-library view snapshots after catalog or favorite changes.</summary>
     private void InvalidateUnifiedLibraryViewCache()
     {
-        Interlocked.Increment(ref _unifiedLibraryCatalogGeneration);
-        lock (_unifiedLibraryViewCacheSync)
-            _unifiedLibraryViewCache.Clear();
+        _unifiedLibraryViewCache.Invalidate();
         InvalidateSimilarityFeatureCache();
     }
 
@@ -88,6 +64,6 @@ public partial class MainWindow
             "Artists" => _showArtistArtworkView,
             _ => false
         };
-        return $"{Volatile.Read(ref _unifiedLibraryCatalogGeneration)};{tag};{artworkMode};{servers}";
+        return $"{tag};{artworkMode};{servers}";
     }
 }

@@ -1747,6 +1747,20 @@ unsigned fallback or allow client-provided commands/paths to reach the helper.
 - The shared Artists, Albums, and Tracks views retain at most three versioned
   final row snapshots. Local/remote loading runs concurrently where independent;
   watcher, remote-version, favorite, and artwork mutations invalidate the cache.
+  `LibrarySourceLoader` isolates source failures with credential-free outcome
+  metadata. `LibraryLoadResult` distinguishes complete, partial, failed, and
+  cancelled requests independently of row count. The UI keeps successful rows
+  when another source fails; only complete results enter `LibraryViewCache`.
+  That cache atomically rejects results from an invalidated catalog generation.
+  Navigation cancellation and load versions also reject late publication, and
+  remote playback registration happens only after those checks. The current
+  source outcomes remain in memory for later status presentation; dedicated
+  failure indicators and in-place retry are still pending. Full remote catalog
+  cache writers use the HTTP client's strict `requireComplete` mode, including
+  every 5,000-row track page. Track cache schema version 2 and new artist/album
+  filename identities discard older potentially incomplete snapshots. A request
+  failure never saves a partial catalog; a valid server library timestamp is
+  required before disk-cache reuse.
 - `GetTracksByDirectory(dirPath)` uses an SQL prefix query plus a direct-child
   filter
 - `GetTrackPathsUnderDirectory(rootPath)` returns all recursive track paths

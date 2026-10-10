@@ -404,19 +404,23 @@ internal sealed class OrynivoServerLibraryCatalogProvider : ILibraryCatalogProvi
     private readonly OrynivoServerSettings _server;
     private readonly OrynivoServerClient _client;
     private readonly Func<string, long, bool> _isFavorite;
+    private readonly bool _requireComplete;
 
     /// <summary>Initializes a new instance of the <see cref="OrynivoServerLibraryCatalogProvider"/> class.</summary>
     /// <param name="server">Remote server connection settings.</param>
     /// <param name="client">HTTP client wrapper.</param>
     /// <param name="isFavorite">Client-side favorite lookup.</param>
+    /// <param name="requireComplete">Whether full catalog loads propagate failures for completeness tracking.</param>
     public OrynivoServerLibraryCatalogProvider(
         OrynivoServerSettings server,
         OrynivoServerClient client,
-        Func<string, long, bool> isFavorite)
+        Func<string, long, bool> isFavorite,
+        bool requireComplete = false)
     {
         _server = server;
         _client = client;
         _isFavorite = isFavorite;
+        _requireComplete = requireComplete;
     }
 
     /// <inheritdoc/>
@@ -431,14 +435,14 @@ internal sealed class OrynivoServerLibraryCatalogProvider : ILibraryCatalogProvi
     /// <inheritdoc/>
     public async Task<IReadOnlyList<LibraryCatalogArtist>> GetArtistsAsync(CancellationToken cancellationToken = default)
     {
-        var artists = await _client.GetArtistsAsync(_server, cancellationToken);
+        var artists = await _client.GetArtistsAsync(_server, cancellationToken, _requireComplete);
         return artists.Select(ToArtist).ToList();
     }
 
     /// <inheritdoc/>
     public async Task<IReadOnlyList<LibraryCatalogAlbum>> GetAlbumsAsync(bool includeArtwork, CancellationToken cancellationToken = default)
     {
-        var albums = await _client.GetAlbumsAsync(_server, cancellationToken);
+        var albums = await _client.GetAlbumsAsync(_server, cancellationToken, _requireComplete);
         return albums.Select(ToAlbum).ToList();
     }
 
@@ -463,7 +467,7 @@ internal sealed class OrynivoServerLibraryCatalogProvider : ILibraryCatalogProvi
     /// <inheritdoc/>
     public async Task<IReadOnlyList<LibraryCatalogTrack>> GetTracksAsync(int page = 0, int pageSize = int.MaxValue, CancellationToken cancellationToken = default)
     {
-        var tracks = await _client.GetTracksAsync(_server, page, pageSize == int.MaxValue ? 500 : pageSize, cancellationToken);
+        var tracks = await _client.GetTracksAsync(_server, page, pageSize == int.MaxValue ? 500 : pageSize, cancellationToken, _requireComplete);
         return tracks.Select(ToTrack).ToList();
     }
 
@@ -487,7 +491,7 @@ internal sealed class OrynivoServerLibraryCatalogProvider : ILibraryCatalogProvi
     /// <inheritdoc/>
     public async Task<IReadOnlyList<LibraryCatalogTrack>> GetTracksByIdsAsync(IReadOnlyList<long> ids, CancellationToken cancellationToken = default)
     {
-        var tracks = await _client.GetTracksByIdsAsync(_server, ids, cancellationToken);
+        var tracks = await _client.GetTracksByIdsAsync(_server, ids, cancellationToken, _requireComplete);
         return tracks.Select(ToTrack).ToList();
     }
 
