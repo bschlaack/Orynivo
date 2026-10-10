@@ -1,6 +1,10 @@
 # Orynivo Roadmap
 
-Items 1-37 are complete and listed for reference only.
+Items 1-37 are complete and listed for reference only. Later sections preserve
+dated implementation milestones and measurements; they are not a current
+quality-work backlog or proof of complete renderer fidelity. For current
+execution paths and evidence limits, see
+[Visualizer status](docs/VISUALIZER-STATUS.md).
 
 Each item is one commit and must follow the completion checklist in `AGENTS.md`:
 build every affected project, run the three test projects, update `CHANGELOG.md`
@@ -22,19 +26,18 @@ a controlled Royal Mashup probe exposed and corrected textured-shape
 colour/alpha modulation. Dynamic preset playback is still not
 frame-synchronized, so its single-frame pixel error is diagnostic only.
 
-See [the current verification report](VISUALIZER-FIDELITY-RECHECK.md) for
-evidence and remaining work: the reference's logarithmic frequency equalization,
-fallback-path differences and matched Winamp/ANGLE captures. The analyzer now
-uses the reference's one-sample pre-emphasis, raised-sine window period and
-multi-octave waveform alignment; the local reference-player comparison renders
-both engines under identical resolution, frame time and audio and writes a
-matching test tone, so a reference-player capture can be compared with the
-renders. The default waveform now uses the reference's per-mode geometry
-(`MilkdropWaveform`), textured custom shapes sample the frame through the
-reference's fan texture coordinates, and the legacy final composite applies the
-reference's animated hue shade, all replacing earlier approximations. Historical
-completed items below describe implementation milestones, not proof of full
-reference fidelity.
+This historical follow-up identified the reference's logarithmic frequency
+equalization, fallback-path differences and matched Winamp/ANGLE captures. The
+analyzer now uses the reference's one-sample pre-emphasis, raised-sine window
+period and multi-octave waveform alignment; the local reference-player
+comparison renders both engines under identical resolution, frame time and audio
+and writes a matching test tone, so a reference-player capture can be compared
+with the renders. The default waveform now uses the reference's per-mode
+geometry (`MilkdropWaveform`), textured custom shapes sample the frame through
+the reference's fan texture coordinates, and the legacy final composite applies
+the reference's animated hue shade, all replacing earlier approximations.
+Historical completed items below describe implementation milestones, not proof
+of full reference fidelity.
 
 ## Completed (1–14)
 
@@ -252,7 +255,7 @@ Steps:
 
 ## 26. Reduce motion and keyboard navigation — `Done`
 
-**Design**
+### Design
 
 - Add an `AppSettings.ReduceMotion` toggle that disables the Genre Cloud,
   Dashboard stage, and karaoke animations.
@@ -265,7 +268,7 @@ Steps:
 
 ## 27. Resume a track across devices — `Done`
 
-**Design**
+### Design
 
 - Store the last position per track on the server (profile-scoped) and offer
   **Resume on this device** when a track starts elsewhere.
@@ -278,7 +281,7 @@ Steps:
 
 ## 28. Record the dependency migration plan — `Done`
 
-**Design**
+### Design
 
 - Document when and how to move to Avalonia 12/.NET 10 LTS, what would unblock
   `Avalonia.Controls.DataGrid` beyond 11.3.13, and how the SkiaSharp 2.88.9 pin
@@ -291,7 +294,7 @@ Steps:
 
 ## 29. Correct the toolchain target to .NET 10 LTS - `Done`
 
-**Design**
+### Design
 
 - .NET 9 is in security-only maintenance and reaches end of support on 10
   November 2026, the same day as the currently used .NET 8, so the record's
@@ -310,7 +313,7 @@ Steps:
 
 ## 30. Migrate the solution to .NET 10 LTS - `Done`
 
-**Design**
+### Design
 
 - All six projects target `net10.0` / `net10.0-windows10.0.19041.0`;
   `global.json` pins SDK `10.0.100` with `rollForward: latestFeature`; every
@@ -329,7 +332,7 @@ Steps:
 
 ## 31. Migrate the desktop to Avalonia 12 - `Done`
 
-**Design**
+### Design
 
 - Avalonia 11.3.22 to 12.1.2 in one commit, including
   `Avalonia.Controls.DataGrid` (which does ship 12.1.2; the earlier "no release
@@ -351,7 +354,7 @@ in `DEPENDENCY-MIGRATION.md`.
 
 ## 32. Adopt Avalonia 12 compiled bindings - `Done`
 
-**Design**
+### Design
 
 - Every template and item-binding scope carries an explicit `x:DataType`;
   `AvaloniaUseCompiledBindingsByDefault=false` is gone.
@@ -368,7 +371,7 @@ report 0 errors and 0 warnings.
 
 ## 33. Extract `ContentRow` and finish compiled bindings - `Done`
 
-**Design**
+### Design
 
 - `ContentRow` (287 lines, 77 members) and `LogicalAlbumPart` moved out of
   `MainWindow.xaml.cs` into top-level `internal` types with full XML docs.
@@ -383,7 +386,7 @@ report 0 errors and 0 warnings.
 
 ## 34. Fix DSD-to-PCM playback over exclusive WASAPI - `Done`
 
-**Design**
+### Design
 
 - The WASAPI format chooser ordered candidates from
   `Math.Max(SourceSampleRate, OutputSampleRate)`, so a DSD source preferred the
@@ -401,7 +404,7 @@ fractional-rate ordering, DSD128, the PCM ordering, and uniqueness.
 
 ## 35. Add a maximum output sample rate setting - `Done`
 
-**Design**
+### Design
 
 - `AppSettings.MaxOutputSampleRateHz` (zero = automatic) caps the PCM output
   rate for exclusive WASAPI and ASIO/cwASIO, so a driver that advertises an
@@ -418,7 +421,7 @@ cap.
 
 ## 36. Fix the Linux and macOS desktop builds - `Done`
 
-**Design**
+### Design
 
 - The new maximum-output-rate parameter reached the Windows `WasapiAudioPlayer`
   but not the `Compatibility/Linux` replacement that the non-Windows targets
@@ -436,14 +439,14 @@ once the parameter is restored.
 
 ## 37. Music visualizer with a Milkdrop-style preset engine - `Done`
 
-**Goal**
+### Goal
 
 A fullscreen visualizer window that reacts to the playing music, driven by text
 presets in the spirit of Winamp's Milkdrop and AVS: per-frame and per-pixel
 expressions over the audio spectrum, a feedback warp of the previous frame, blur
 passes, waveform and custom-shape overlays, and a composite stage.
 
-**Design**
+### Design
 
 - **Audio tap.** Players publish their processed PCM (after volume, ReplayGain,
   EQ, and crossfeed, so the picture matches what is audible) into the lock-free
@@ -477,7 +480,7 @@ passes, waveform and custom-shape overlays, and a composite stage.
   every shipped preset are written here. Presets are user files, like equalizer
   profiles.
 
-**Phases**
+### Phases
 
 - 37a Audio analysis foundation - `Done`: `Fft`, `AudioSpectrumAnalyzer`, and
   `PcmVisualizationTap` in `Orynivo.Core/Audio`, covered by 21 tests (sine
@@ -562,7 +565,7 @@ render surface does not currently expose.
 preset stay written here. No third-party visualizer code or preset bundle is
 linked.
 
-**Phases**
+### Phases
 
 - 38a Full pipeline and block set - `Done`: the `per_frame_init`,
   `per_pixel_init`, `wave_N_init`, and `shape_N_init` blocks, the complete
@@ -667,7 +670,7 @@ shaders), the HLSL runtime walks its syntax tree per pixel, and
 stalls the interface as well. Only the presentation is GPU work: the finished
 frame is uploaded to a `WriteableBitmap` that Skia scales up.
 
-**Phases**
+### Phases
 
 - 39a Render measurement - `Done`: per-stage timings (warp, blur, shader,
   overlay, composite, present) reported per preset and per resolution, surfaced
@@ -783,7 +786,7 @@ frame is uploaded to a `WriteableBitmap` that Skia scales up.
 frame rates become affordable. This is a project of its own and must keep the
 CPU path as the fallback.
 
-**Phases**
+### Phases
 
 - 40a Render-surface decision - `Done`: Avalonia's own Skia surface through
   `SKRuntimeEffect` (SkSL) was chosen over an own OpenGL/Vulkan surface, because

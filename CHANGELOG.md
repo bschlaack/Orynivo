@@ -6,11 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
-### Fixed
+### Changed
 
-- Render timing unit tests verify blur output and recorded stage durations
-  without comparing individual frame speeds, avoiding intermittent failures on
-  busy CI runners.
+### Fixed
 
 ## [0.46.1] - 2026-10-10
 
@@ -41,6 +39,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   legacy remote catalog caches are refreshed once.
 - Removed runner-speed-dependent failures from the Skia shader fidelity tests by
   raising both shader time budgets and reporting render errors directly.
+- Render timing unit tests verify blur output and recorded stage durations
+  without comparing individual frame speeds, avoiding intermittent failures on
+  busy CI runners.
 
 ## [0.46.0] - 2026-09-26
 
