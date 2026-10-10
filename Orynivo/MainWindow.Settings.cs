@@ -932,6 +932,7 @@ public partial class MainWindow : Window
             if (languageChanged)
             {
                 LocalizationManager.Apply(_settings.Language);
+                UpdateUnifiedLibraryLoadNotice();
                 // Recreate dynamic navigation entries so headers such as the
                 // local Playlists group use the newly selected language.
                 LoadNavPlaylists();

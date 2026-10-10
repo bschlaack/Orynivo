@@ -1196,6 +1196,14 @@ public sealed record LocalizedStrings(
     public string EditSmartPlaylist { get; init; } = "";
     /// <summary>Gets the hint shown under the Library header when no local directories or Orynivo Servers are configured.</summary>
     public string LibraryEmptyHint { get; init; } = "";
+    /// <summary>Gets the incomplete catalog notice with an unavailable-source count.</summary>
+    public string LibraryLoadPartial { get; init; } = "";
+    /// <summary>Gets the failed catalog notice with an unavailable-source count.</summary>
+    public string LibraryLoadFailed { get; init; } = "";
+    /// <summary>Gets the action label for retrying the current catalog.</summary>
+    public string LibraryLoadRetry { get; init; } = "";
+    /// <summary>Gets the busy label while retrying the current catalog.</summary>
+    public string LibraryLoadRetrying { get; init; } = "";
     /// <summary>Gets the status message shown after a smart playlist was updated.</summary>
     public string SmartPlaylistUpdated { get; init; } = "";
     /// <summary>Gets the command label for importing an M3U8 playlist.</summary>

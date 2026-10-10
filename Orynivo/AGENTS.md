@@ -867,12 +867,18 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
   complete results, capturing the catalog generation before loading and
   rejecting late writes atomically in `LibraryViewCache`. Navigation
   cancellation and load versions reject stale publication; register remote
-  playback metadata only after that guard. Outcome metadata and diagnostics
-  contain no exception text, media paths, server names, URLs, or credentials. A
-  manual local scan launched from Settings must raise
-  `SettingsView.LocalLibraryChanged` after a successful catalog mutation so the
-  same Dashboard, Genre Cloud, and unified-library caches are invalidated as for
-  watcher-driven changes; never require an application restart to see new rows.
+  playback metadata only after that guard. Partial/failed shared views expose a
+  localized notice with an unavailable-source count and in-place retry. Keep
+  usable rows interactive while retrying, suppress duplicate retries, and retain
+  source-aware selection and scroll position at publication. Deferred restore
+  callbacks must reject abandoned loads; runtime language changes refresh the
+  notice. Successful empty catalogs and navigation cancellation show no failure
+  notice. Outcome metadata and diagnostics contain no exception text, media
+  paths, server names, URLs, or credentials. A manual local scan launched from
+  Settings must raise `SettingsView.LocalLibraryChanged` after a successful
+  catalog mutation so the same Dashboard, Genre Cloud, and unified-library
+  caches are invalidated as for watcher-driven changes; never require an
+  application restart to see new rows.
 - A cached Genre Cloud level renders immediately and must not retain the
   first-load branch-transition delay.
 - `AppSettings.LastMainView` persists every selectable sidebar leaf tag, not a

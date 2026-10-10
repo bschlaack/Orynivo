@@ -1754,8 +1754,10 @@ unsigned fallback or allow client-provided commands/paths to reach the helper.
   That cache atomically rejects results from an invalidated catalog generation.
   Navigation cancellation and load versions also reject late publication, and
   remote playback registration happens only after those checks. The current
-  source outcomes remain in memory for later status presentation; dedicated
-  failure indicators and in-place retry are still pending. Full remote catalog
+  source outcomes drive a localized incomplete-load notice and **Try again**
+  action. Retry keeps usable rows interactive until publication, then restores
+  source-aware selection and scroll position. Deferred restore callbacks reject
+  navigation, load-version, and catalog-generation changes. Full remote catalog
   cache writers use the HTTP client's strict `requireComplete` mode, including
   every 5,000-row track page. Track cache schema version 2 and new artist/album
   filename identities discard older potentially incomplete snapshots. A request

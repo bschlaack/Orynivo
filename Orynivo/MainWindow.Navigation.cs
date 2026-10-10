@@ -49,7 +49,7 @@ public partial class MainWindow : Window
     private void ResetDrilldownState(bool clearNavigationHistory = true)
     {
         CancelAndDispose(ref _unifiedLibraryAppendCts);
-        _unifiedLibraryLoadResult = null;
+        ClearUnifiedLibraryLoadNotice();
         _activeAlbumFilterId = null;
         _activeAlbumFilterTitle = null;
         _activeArtistFilterId = null;
@@ -69,7 +69,7 @@ public partial class MainWindow : Window
     private void PushCurrentNavigationState()
     {
         CancelAndDispose(ref _unifiedLibraryAppendCts);
-        _unifiedLibraryLoadResult = null;
+        ClearUnifiedLibraryLoadNotice();
         if (_restoringNavigationHistory)
             return;
 
@@ -464,24 +464,41 @@ public partial class MainWindow : Window
         }
     }
 
+    /// <summary>Restores a source-aware selection and scroll position from the current binding.</summary>
+    /// <param name="selectedId">Selected entity ID, when available.</param>
+    /// <param name="verticalOffset">Previously visible vertical position.</param>
+    /// <param name="selectedSourceKey">Source identity disambiguating matching IDs.</param>
+    /// <param name="canRestore">Optional guard rejecting restoration after navigation or invalidation.</param>
     private void RestoreSelectionFromCurrentItems(
         long? selectedId,
         double? verticalOffset = null,
-        string? selectedSourceKey = null)
+        string? selectedSourceKey = null,
+        Func<bool>? canRestore = null)
     {
+        if (canRestore is not null && !canRestore())
+            return;
         var rows = (ContentDataGrid.ItemsSource as IEnumerable<ContentRow>)?.ToList()
                    ?? (AlbumArtworkListBox.ItemsSource as IEnumerable<ContentRow>)?.ToList()
                    ?? (ArtistArtworkListBox.ItemsSource as IEnumerable<ContentRow>)?.ToList()
                    ?? [];
-        RestoreSelection(rows, selectedId, verticalOffset, selectedSourceKey);
+        RestoreSelection(rows, selectedId, verticalOffset, selectedSourceKey, canRestore);
     }
 
+    /// <summary>Restores a source-aware selection using the existing table or artwork controls.</summary>
+    /// <param name="rows">Published content rows.</param>
+    /// <param name="selectedId">Selected entity ID, when available.</param>
+    /// <param name="verticalOffset">Previously visible vertical position.</param>
+    /// <param name="selectedSourceKey">Source identity disambiguating matching IDs.</param>
+    /// <param name="canRestore">Optional guard rejecting stale restoration.</param>
     private void RestoreSelection(
         List<ContentRow> rows,
         long? selectedId,
         double? verticalOffset = null,
-        string? selectedSourceKey = null)
+        string? selectedSourceKey = null,
+        Func<bool>? canRestore = null)
     {
+        if (canRestore is not null && !canRestore())
+            return;
         var row = selectedId is long id
             ? rows.FirstOrDefault(candidate =>
                 candidate.Id == id &&
@@ -492,7 +509,7 @@ public partial class MainWindow : Window
         if (ContentDataGrid.IsVisible)
         {
             ContentDataGrid.SelectedItem = row;
-            RestoreDataGridPositionAfterLayout(row, verticalOffset);
+            RestoreDataGridPositionAfterLayout(row, verticalOffset, canRestore);
             return;
         }
 
@@ -509,7 +526,7 @@ public partial class MainWindow : Window
             EnsureArtworkRowBound(listBox, row);
             listBox.SelectedItem = row;
         }
-        RestoreArtworkPositionAfterLayout(listBox, row, verticalOffset);
+        RestoreArtworkPositionAfterLayout(listBox, row, verticalOffset, canRestore);
     }
 
     private void RestoreSearchSelection(
@@ -546,12 +563,19 @@ public partial class MainWindow : Window
         }
     }
 
+    /// <summary>Restores table position after layout only while its owning load remains current.</summary>
+    /// <param name="row">Selected content row.</param>
+    /// <param name="verticalOffset">Previously visible vertical position.</param>
+    /// <param name="canRestore">Optional guard evaluated when the dispatcher callback runs.</param>
     private void RestoreDataGridPositionAfterLayout(
         ContentRow? row,
-        double? verticalOffset)
+        double? verticalOffset,
+        Func<bool>? canRestore = null)
     {
         Dispatcher.UIThread.Post(() =>
         {
+            if (canRestore is not null && !canRestore())
+                return;
             AttachContentDataGridVerticalScrollBar();
             if (verticalOffset is double offset &&
                 _contentDataGridVerticalScrollBar is { } scrollBar)
@@ -565,15 +589,21 @@ public partial class MainWindow : Window
         }, DispatcherPriority.Loaded);
     }
 
+    /// <summary>Restores artwork position after layout while both binding and load remain current.</summary>
+    /// <param name="listBox">Active artwork list.</param>
+    /// <param name="row">Selected content row.</param>
+    /// <param name="verticalOffset">Previously visible vertical position.</param>
+    /// <param name="canRestore">Optional guard evaluated before deferred restoration.</param>
     private void RestoreArtworkPositionAfterLayout(
         ListBox listBox,
         ContentRow? row,
-        double? verticalOffset)
+        double? verticalOffset,
+        Func<bool>? canRestore = null)
     {
         var bindingVersion = _artworkBindingVersion;
         Dispatcher.UIThread.Post(() =>
         {
-            if (bindingVersion != _artworkBindingVersion)
+            if (bindingVersion != _artworkBindingVersion || (canRestore is not null && !canRestore()))
                 return;
 
             var scrollViewer = listBox.GetVisualDescendants()
@@ -599,7 +629,7 @@ public partial class MainWindow : Window
 
                 Dispatcher.UIThread.Post(() =>
                 {
-                    if (bindingVersion != _artworkBindingVersion)
+                    if (bindingVersion != _artworkBindingVersion || (canRestore is not null && !canRestore()))
                         return;
                     var restoredViewer = listBox.GetVisualDescendants()
                         .OfType<ScrollViewer>()
@@ -615,7 +645,7 @@ public partial class MainWindow : Window
             }
             else if (row is not null)
             {
-                ScrollArtworkRowIntoViewAfterLayout(listBox, row);
+                ScrollArtworkRowIntoViewAfterLayout(listBox, row, canRestore);
             }
         }, DispatcherPriority.Loaded);
     }

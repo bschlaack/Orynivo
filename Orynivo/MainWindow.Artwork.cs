@@ -269,12 +269,16 @@ public partial class MainWindow : Window
         }
     }
 
-    private void ScrollArtworkRowIntoViewAfterLayout(ListBox listBox, ContentRow row)
+    /// <summary>Scrolls an artwork row after layout while its binding and optional load guard remain current.</summary>
+    /// <param name="listBox">Active artwork list.</param>
+    /// <param name="row">Content row to reveal.</param>
+    /// <param name="canRestore">Optional guard rejecting scroll callbacks after navigation or invalidation.</param>
+    private void ScrollArtworkRowIntoViewAfterLayout(ListBox listBox, ContentRow row, Func<bool>? canRestore = null)
     {
         var bindingVersion = _artworkBindingVersion;
         Dispatcher.UIThread.Post(() =>
         {
-            if (bindingVersion != _artworkBindingVersion ||
+            if (bindingVersion != _artworkBindingVersion || (canRestore is not null && !canRestore()) ||
                 (listBox.ItemsSource as System.Collections.IList)?.Contains(row) != true)
             {
                 _isAlphabetProgrammaticScroll = false;
@@ -284,7 +288,7 @@ public partial class MainWindow : Window
             listBox.ScrollIntoView(row);
             Dispatcher.UIThread.Post(() =>
             {
-                if (bindingVersion == _artworkBindingVersion)
+                if (bindingVersion == _artworkBindingVersion && (canRestore is null || canRestore()))
                 {
                     listBox.ScrollIntoView(row);
                     QueueHydrateVisibleArtworkRows(listBox);

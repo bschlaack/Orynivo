@@ -240,7 +240,9 @@ public partial class MainWindow : Window
 
     /// <summary>Loads independent sources and publishes only the current combined view, caching complete results.</summary>
     /// <param name="tag">Shared Artists, Albums, or Tracks view.</param>
-    private async Task BindLocalRowsAndStartRemoteAppendAsync(string tag)
+    /// <param name="preservePosition">Whether to retain the selection and scroll position at publication.</param>
+    /// <returns>A task completing after publication or rejection of the superseded load.</returns>
+    private async Task BindLocalRowsAndStartRemoteAppendAsync(string tag, bool preservePosition = false)
     {
         var diagnosticStopwatch = Stopwatch.StartNew();
         LogUiDiagnostics($"BindLocalRowsAndStartRemoteAppendAsync start tag={tag}");
@@ -248,13 +250,13 @@ public partial class MainWindow : Window
         _unifiedLibraryAppendCts = new CancellationTokenSource();
         var cancellationToken = _unifiedLibraryAppendCts.Token;
         var version = ++_unifiedLibraryLoadVersion;
-        _unifiedLibraryLoadResult = null;
         var generation = _unifiedLibraryViewCache.Generation;
         var cacheKey = CreateUnifiedLibraryViewCacheKey(tag);
         if (TryGetUnifiedLibraryViewCache(tag, out var cachedResult))
         {
             var cachedRows = cachedResult!.Rows;
             _unifiedLibraryLoadResult = cachedResult;
+            UpdateUnifiedLibraryLoadNotice();
             ApplyColumns(tag);
             ContentDataGrid.ItemsSource = cachedRows;
             BindUnifiedArtworkRowsIfVisible(tag, cachedRows);
@@ -295,11 +297,19 @@ public partial class MainWindow : Window
         LogUiDiagnostics($"Unified library outcome tag={tag} status={result.Status} sources={result.Sources.Count} failed={result.Sources.Count(source => source.Status != LibrarySourceLoadStatus.Success)}");
         LogUiDiagnostics(
             $"BindLocalRowsAndStartRemoteAppendAsync combined rows sorted tag={tag} count={sortedRows.Count} elapsed={diagnosticStopwatch.ElapsedMilliseconds}ms");
+        var selectedRow = preservePosition ? GetSelectedContentRow() : null;
+        var verticalOffset = preservePosition ? CaptureCurrentVerticalOffset() : (double?)null;
         ApplyColumns(tag);
         ContentDataGrid.ItemsSource = sortedRows;
         BindUnifiedArtworkRowsIfVisible(tag, sortedRows);
         UpdateAlphabetIndex(sortedRows, true);
         UpdateUnifiedContentCount(tag, sortedRows.Count);
+        UpdateUnifiedLibraryLoadNotice();
+        if (preservePosition)
+            RestoreSelectionFromCurrentItems(selectedRow?.Id, verticalOffset, selectedRow?.SourceKey,
+                () => !cancellationToken.IsCancellationRequested && version == _unifiedLibraryLoadVersion &&
+                      generation == _unifiedLibraryViewCache.Generation &&
+                      string.Equals(_currentTopLevelTag, tag, StringComparison.Ordinal));
         LogUiDiagnostics(
             $"BindLocalRowsAndStartRemoteAppendAsync combined bind completed tag={tag} count={sortedRows.Count} elapsed={diagnosticStopwatch.ElapsedMilliseconds}ms");
     }

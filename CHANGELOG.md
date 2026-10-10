@@ -14,6 +14,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- Shared Artists, Albums, and Tracks views show a localized incomplete-load
+  notice with **Try again**. Retry keeps usable rows visible, restores selection
+  and scroll position, and discards responses after navigation.
 - Added an embedded walkthrough video to the README, with a YouTube link as an
   alternative for browsers without H.265 playback support.
 
