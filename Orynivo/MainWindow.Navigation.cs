@@ -48,6 +48,7 @@ public partial class MainWindow : Window
     /// <param name="clearNavigationHistory">Whether saved Back states are also removed.</param>
     private void ResetDrilldownState(bool clearNavigationHistory = true)
     {
+        CancelLibrarySearch();
         CancelAndDispose(ref _unifiedLibraryAppendCts);
         ClearUnifiedLibraryLoadNotice();
         _activeAlbumFilterId = null;
@@ -68,6 +69,7 @@ public partial class MainWindow : Window
     /// <summary>Captures the current view before navigation and cancels its pending shared-library load.</summary>
     private void PushCurrentNavigationState()
     {
+        CancelLibrarySearch();
         CancelAndDispose(ref _unifiedLibraryAppendCts);
         ClearUnifiedLibraryLoadNotice();
         if (_restoringNavigationHistory)
@@ -408,8 +410,15 @@ public partial class MainWindow : Window
 
             case "Search":
                 SearchTextBox.Text = state.SearchQuery ?? string.Empty;
-                await ShowSearchResultsAsync(state.SearchQuery ?? string.Empty);
-                RestoreSearchSelection(state.SelectedId, state.SelectedSourceKey, state.VerticalOffset);
+                var searchRestore = ShowSearchResultsAsync(state.SearchQuery ?? string.Empty);
+                var searchVersion = _librarySearchVersion;
+                var searchGeneration = _unifiedLibraryViewCache.Generation;
+                var searchToken = _librarySearchCts?.Token;
+                await searchRestore;
+                RestoreSearchSelection(state.SelectedId, state.SelectedSourceKey, state.VerticalOffset,
+                    () => searchToken.HasValue && !searchToken.Value.IsCancellationRequested &&
+                          searchVersion == _librarySearchVersion &&
+                          searchGeneration == _unifiedLibraryViewCache.Generation && SearchResultsScrollViewer.IsVisible);
                 return;
 
             case "GenreCloud":
@@ -529,17 +538,28 @@ public partial class MainWindow : Window
         RestoreArtworkPositionAfterLayout(listBox, row, verticalOffset, canRestore);
     }
 
+    /// <summary>Restores a search result selection and scroll position while its optional owning load is current.</summary>
+    /// <param name="selectedId">Selected provider-local entity ID.</param>
+    /// <param name="selectedSourceKey">Source identity disambiguating matching IDs.</param>
+    /// <param name="verticalOffset">Outer search page scroll offset.</param>
+    /// <param name="canRestore">Optional deferred restoration guard.</param>
+    /// <param name="selectedEntityType">Optional category identity for an in-place retry.</param>
     private void RestoreSearchSelection(
         long? selectedId,
         string? selectedSourceKey,
-        double? verticalOffset)
+        double? verticalOffset,
+        Func<bool>? canRestore = null,
+        string? selectedEntityType = null)
     {
+        if (canRestore is not null && !canRestore())
+            return;
         if (selectedId is long id)
         {
             foreach (var grid in new[] { SearchTracksDataGrid, SearchAlbumsDataGrid, SearchArtistsDataGrid })
             {
                 var row = (grid.ItemsSource as IEnumerable<ContentRow>)?.FirstOrDefault(candidate =>
                     candidate.Id == id &&
+                    (selectedEntityType is null || candidate.EntityType == selectedEntityType) &&
                     (selectedSourceKey is null ||
                      string.Equals(candidate.SourceKey, selectedSourceKey, StringComparison.OrdinalIgnoreCase)));
                 if (row is null)
@@ -552,13 +572,18 @@ public partial class MainWindow : Window
         if (verticalOffset is double offset)
         {
             Dispatcher.UIThread.Post(
-                () => SearchResultsScrollViewer.Offset = new Vector(
-                    SearchResultsScrollViewer.Offset.X,
-                    Math.Clamp(
-                        offset,
-                        0,
-                        Math.Max(0, SearchResultsScrollViewer.Extent.Height -
-                                    SearchResultsScrollViewer.Viewport.Height))),
+                () =>
+                {
+                    if (canRestore is not null && !canRestore())
+                        return;
+                    SearchResultsScrollViewer.Offset = new Vector(
+                        SearchResultsScrollViewer.Offset.X,
+                        Math.Clamp(
+                            offset,
+                            0,
+                            Math.Max(0, SearchResultsScrollViewer.Extent.Height -
+                                        SearchResultsScrollViewer.Viewport.Height)));
+                },
                 DispatcherPriority.Loaded);
         }
     }

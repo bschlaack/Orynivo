@@ -319,10 +319,12 @@ This file applies to `Orynivo.Core/` and supplements `../AGENTS.md`.
 - Streaming URL builders may carry credentials for immediate playback, but such
   URLs must never be persisted, logged, documented, or returned to a model.
 - Catalog reads expose an opt-in `requireComplete` mode for artists, albums,
-  track pages, facets, and ID resolution. It must propagate HTTP, payload, and
-  cancellation failures; successful empty lists remain valid. Keep the tolerant
-  fallback for existing callers. Complete-catalog cache writers use strict mode
-  so a failed page cannot masquerade as the end of a catalog.
+  track pages, facets, ID resolution, and categorized full search. Strict full
+  search requires all three category arrays; missing categories are invalid,
+  while three empty arrays are a valid no-match result. It must propagate HTTP,
+  payload, and cancellation failures; successful empty lists remain valid. Keep
+  the tolerant fallback for existing callers. Complete-catalog cache writers use
+  strict mode so a failed page cannot masquerade as the end of a catalog.
 - Shared release-update models verify the ECDSA P-256 signed manifest before an
   asset is selected and verify its SHA-256 digest after download. Consumers must
   never bypass either verification or accept an unsigned fallback.

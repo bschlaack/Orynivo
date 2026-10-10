@@ -22,6 +22,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- Global and server-scoped library searches distinguish unavailable sources from
+  genuine empty results and offer **Try again**. Independent servers load with
+  bounded concurrency; replaced queries and navigation cannot publish stale
+  rows, register remote playback metadata, or restore an abandoned position.
 - Shared Artists, Albums, and Tracks views keep results from available sources
   when another source fails. Failed requests and timeouts no longer resemble a
   successful empty catalog or enter the complete-library cache. Cancelled or

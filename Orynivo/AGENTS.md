@@ -873,12 +873,21 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
   source-aware selection and scroll position at publication. Deferred restore
   callbacks must reject abandoned loads; runtime language changes refresh the
   notice. Successful empty catalogs and navigation cancellation show no failure
-  notice. Outcome metadata and diagnostics contain no exception text, media
-  paths, server names, URLs, or credentials. A manual local scan launched from
-  Settings must raise `SettingsView.LocalLibraryChanged` after a successful
-  catalog mutation so the same Dashboard, Genre Cloud, and unified-library
-  caches are invalidated as for watcher-driven changes; never require an
-  application restart to see new rows.
+  notice. Global and server-scoped library searches share cancellation/version
+  ownership, captured source/profile/favorite/filter context, strict full-search
+  reads, and at most three concurrent server loads. Source time budgets start
+  after admission. Text changes cancel before debounce; navigation, Settings,
+  imports, window close, and catalog/profile changes reject pending publication
+  and remote metadata registration. Keep available categories when a source
+  fails; show incomplete-search text instead of definitive no-match text for
+  empty categories, with an in-place retry. Deferred Back/retry scroll restores
+  must guard their owning search. Empty source selections are successful but
+  never eligible for source-backed catalog caching. Outcome metadata and
+  diagnostics contain no exception text, media paths, server names, URLs, or
+  credentials. A manual local scan launched from Settings must raise
+  `SettingsView.LocalLibraryChanged` after a successful catalog mutation so the
+  same Dashboard, Genre Cloud, and unified-library caches are invalidated as for
+  watcher-driven changes; never require an application restart to see new rows.
 - A cached Genre Cloud level renders immediately and must not retain the
   first-load branch-transition delay.
 - `AppSettings.LastMainView` persists every selectable sidebar leaf tag, not a

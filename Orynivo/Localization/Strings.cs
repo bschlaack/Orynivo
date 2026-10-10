@@ -1204,6 +1204,10 @@ public sealed record LocalizedStrings(
     public string LibraryLoadRetry { get; init; } = "";
     /// <summary>Gets the busy label while retrying the current catalog.</summary>
     public string LibraryLoadRetrying { get; init; } = "";
+    /// <summary>Gets the incomplete search notice with an unavailable-source count.</summary>
+    public string SearchLoadPartial { get; init; } = "";
+    /// <summary>Gets the failed search notice with an unavailable-source count.</summary>
+    public string SearchLoadFailed { get; init; } = "";
     /// <summary>Gets the status message shown after a smart playlist was updated.</summary>
     public string SmartPlaylistUpdated { get; init; } = "";
     /// <summary>Gets the command label for importing an M3U8 playlist.</summary>

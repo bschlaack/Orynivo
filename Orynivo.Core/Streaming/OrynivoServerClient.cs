@@ -1243,12 +1243,14 @@ public sealed class OrynivoServerClient : IDisposable
     /// <param name="query">Search query.</param>
     /// <param name="limit">Maximum result count per category.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
-    /// <returns>Matching tracks, albums, and artists, or empty results on error.</returns>
+    /// <param name="requireComplete">Propagate HTTP, invalid-payload, and cancellation failures.</param>
+    /// <returns>Matching categories; empty on error only when strict loading is disabled.</returns>
     public async Task<OrynivoFullSearchResult> SearchFullAsync(
         OrynivoServerSettings server,
         string query,
         int limit = 50,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        bool requireComplete = false)
     {
         try
         {
@@ -1256,9 +1258,11 @@ public sealed class OrynivoServerClient : IDisposable
                 server,
                 $"/api/search/full?q={Uri.EscapeDataString(query)}&limit={limit}",
                 cancellationToken);
+            if (requireComplete && (result is null || result.Tracks is null || result.Albums is null || result.Artists is null))
+                throw new JsonException("Missing search categories.");
             return result ?? new OrynivoFullSearchResult([], [], []);
         }
-        catch
+        catch when (!requireComplete)
         {
             return new OrynivoFullSearchResult([], [], []);
         }

@@ -2502,7 +2502,21 @@ unsigned fallback or allow client-provided commands/paths to reach the helper.
 - **Search**: delayed Lucene search returns separate themed Track, Album, and
   Artist sections, supports partial words and German normalization variants,
   sorts by score then display name, and preserves the original query across
-  drill-down Back navigation
+  drill-down Back navigation. Global and server-scoped searches share one
+  window-owned cancellation/version lifecycle. Text changes cancel immediately
+  before the debounce delay; navigation, Settings, imports, window close, and
+  catalog/profile changes abandon pending work. Capture source settings,
+  favorites, and facet selections before loading. Local Lucene/SQLite work runs
+  off the dispatcher while `LibrarySourceBatchLoader` admits at most three
+  independent servers, with a separate source budget after admission. Full
+  search uses strict HTTP/payload handling and retains per-source outcomes. Bind
+  only the current version/generation; register remote playback rows after that
+  guard on the dispatcher. Partial/failed searches show localized
+  unavailable-source counts and **Try again**; empty categories never claim
+  definitive no-match results when a source failed. Retry keeps usable rows and
+  restores selection by category/source/ID plus outer scroll offset, with a
+  deferred navigation guard. A selection requesting no sources completes empty
+  without entering the source-backed catalog cache.
 - **Folder structure**: configured library roots start expanded; child folders
   load lazily; double-clicking a track queues its direct folder sorted by disc,
   track number, and file name
@@ -2526,11 +2540,11 @@ unsigned fallback or allow client-provided commands/paths to reach the helper.
   persisted on that server.
 - Tracks **search** honours the active facets: the source facet gates which
   sources contribute results (`ShowSearchResultsAsync` skips local when the
-  source facet excludes it and `AddRemoteSearchResultsAsync` skips servers not
-  in the source set), while favourite/genre/format/bitrate filter the track
-  section through the shared `MatchesTrackFilters`
-  (`RemoteSearchTrackMatchesFilters` re-applies client-side favourites for
-  remote hits). The same applies to the per-server
+  source facet excludes it and the captured source snapshot skips servers not in
+  the source set), while favourite/genre/format/bitrate filter the track section
+  through the shared `MatchesTrackFilters` (`TrackFacetFilterSnapshot` shares
+  live filter semantics and remote providers apply the captured client-side
+  favourites). The same applies to the per-server
   `ShowOrynivoSearchResultsAsync`.
 - Right-clicking a smart playlist in the sidebar exposes **Edit smart
   playlist**, which opens the shared `SmartPlaylistDialog` with the stored name

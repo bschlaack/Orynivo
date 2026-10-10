@@ -51,6 +51,7 @@ public partial class MainWindow : Window
         var showLoadingSkeleton = !tag.StartsWith("Radio:", StringComparison.Ordinal);
         if (showLoadingSkeleton)
             ShowContentLoadingSkeleton();
+        CancelLibrarySearch();
         _currentTopLevelTag = tag;
         CancelAndDispose(ref _unifiedLibraryAppendCts);
         ClearUnifiedLibraryLoadNotice();

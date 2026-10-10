@@ -64,6 +64,10 @@ the ability to reach that library from any device on the local network.
   partial view retries missing sources. An incomplete-load notice offers **Try
   again** without clearing usable rows; selection and scroll position survive
   the refresh, and navigating away cancels it.
+- Library search queries independent servers concurrently, keeps available
+  results when a source fails, and offers **Try again** for incomplete searches.
+  New queries and navigation cancel the previous search; genuine empty results
+  remain distinct from unavailable sources.
 - Infinite Mix, which turns recent listening habits and favorites into a
   continuously replenished mixed-source queue
 - Album-artist-centered library attribution: explicit `ALBUMARTIST` metadata

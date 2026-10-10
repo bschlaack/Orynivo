@@ -37,10 +37,10 @@ internal sealed record LibrarySourceLoadOutcome(string SourceKey, LibrarySourceL
 /// <param name="Sources">Credential-free source outcomes.</param>
 internal sealed record LibraryLoadResult<T>(IReadOnlyList<T> Rows, IReadOnlyList<LibrarySourceLoadOutcome> Sources)
 {
-    /// <summary>Gets completeness independently of whether successful sources returned rows.</summary>
+    /// <summary>Gets completeness independently of row count; a selection with no requested sources is complete.</summary>
     internal LibraryLoadStatus Status => Sources.Any(source => source.Status == LibrarySourceLoadStatus.Cancelled)
         ? LibraryLoadStatus.Cancelled
-        : Sources.Count > 0 && Sources.All(source => source.Status == LibrarySourceLoadStatus.Success)
+        : Sources.All(source => source.Status == LibrarySourceLoadStatus.Success)
             ? LibraryLoadStatus.Complete
             : Sources.Any(source => source.Status == LibrarySourceLoadStatus.Success)
                 ? LibraryLoadStatus.Partial

@@ -245,11 +245,15 @@ public partial class MainWindow : Window
     // Einstellungen
     // ------------------------------------------------------------------
 
+    /// <summary>Opens embedded Settings after abandoning pending library search work.</summary>
+    /// <param name="sender">Settings action source.</param>
+    /// <param name="e">Button activation event.</param>
     private void SettingsButton_OnClick(object? sender, RoutedEventArgs e)
     {
         if (SettingsViewHost.IsVisible)
             return;
 
+        CancelLibrarySearch();
         var view = new SettingsView(_settings, paths =>
         {
             _settings.LibraryPaths = paths;
@@ -933,6 +937,7 @@ public partial class MainWindow : Window
             {
                 LocalizationManager.Apply(_settings.Language);
                 UpdateUnifiedLibraryLoadNotice();
+                RefreshLibrarySearchPresentation();
                 // Recreate dynamic navigation entries so headers such as the
                 // local Playlists group use the newly selected language.
                 LoadNavPlaylists();

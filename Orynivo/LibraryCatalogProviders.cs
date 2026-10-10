@@ -410,7 +410,7 @@ internal sealed class OrynivoServerLibraryCatalogProvider : ILibraryCatalogProvi
     /// <param name="server">Remote server connection settings.</param>
     /// <param name="client">HTTP client wrapper.</param>
     /// <param name="isFavorite">Client-side favorite lookup.</param>
-    /// <param name="requireComplete">Whether full catalog loads propagate failures for completeness tracking.</param>
+    /// <param name="requireComplete">Whether catalog and full-search reads propagate failures for completeness tracking.</param>
     public OrynivoServerLibraryCatalogProvider(
         OrynivoServerSettings server,
         OrynivoServerClient client,
@@ -508,7 +508,7 @@ internal sealed class OrynivoServerLibraryCatalogProvider : ILibraryCatalogProvi
                        IReadOnlyList<LibraryCatalogArtist> Artists)> SearchFullAsync(
         string query, int limit, CancellationToken cancellationToken = default)
     {
-        var result = await _client.SearchFullAsync(_server, query, limit, cancellationToken);
+        var result = await _client.SearchFullAsync(_server, query, limit, cancellationToken, _requireComplete);
         return (
             result.Tracks.Select(ToTrack).ToList(),
             result.Albums.Select(ToAlbum).ToList(),

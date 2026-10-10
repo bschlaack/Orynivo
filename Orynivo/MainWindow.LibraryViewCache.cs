@@ -32,9 +32,10 @@ public partial class MainWindow
         _unifiedLibraryViewCache.TryStore(key, generation, result);
     }
 
-    /// <summary>Clears shared-library view snapshots after catalog or favorite changes.</summary>
+    /// <summary>Clears catalog snapshots and abandons pending searches while retaining published search failures.</summary>
     private void InvalidateUnifiedLibraryViewCache()
     {
+        CancelLibrarySearch(clearResult: false);
         _unifiedLibraryViewCache.Invalidate();
         InvalidateSimilarityFeatureCache();
     }

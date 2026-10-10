@@ -43,12 +43,12 @@ internal sealed class LibraryViewCache<T>
     /// <param name="key">Credential-free view and source configuration key.</param>
     /// <param name="generation">Generation captured before loading.</param>
     /// <param name="result">Final sorted, merged result with all source outcomes.</param>
-    /// <returns>Whether a complete current result was retained.</returns>
+    /// <returns>Whether a complete current result backed by at least one loaded source was retained.</returns>
     internal bool TryStore(string key, int generation, LibraryLoadResult<T> result)
     {
         lock (_sync)
         {
-            if (generation != _generation || result.Status != LibraryLoadStatus.Complete)
+            if (generation != _generation || result.Sources.Count == 0 || result.Status != LibraryLoadStatus.Complete)
                 return false;
             _entries[key] = (result, ++_access);
             while (_entries.Count > _maximumEntries)
