@@ -4,9 +4,8 @@ using Xunit;
 namespace Orynivo.Core.Tests;
 
 /// <summary>
-/// Verifies the per-stage render measurement of phase 39a. Every assertion is a ratio or a
-/// bound rather than an absolute duration, so the tests describe where the cost goes without
-/// depending on how fast the machine running them happens to be.
+/// Verifies per-stage render measurements and rendering effects without comparing execution
+/// speeds, which can vary with scheduling, compilation, and concurrent test workloads.
 /// </summary>
 public sealed class RenderTimingTests
 {
@@ -33,24 +32,28 @@ public sealed class RenderTimingTests
         Assert.True(timings.Measured <= timings.Total + 0.5d, $"{timings.Measured} > {timings.Total}");
     }
 
-    /// <summary>More blur passes cost more blur time.</summary>
+    /// <summary>Requested blur passes change the feedback image and report their stage time.</summary>
     [Fact]
-    public void RenderFrame_BlurTimeGrowsWithTheBlurCount()
+    public void RenderFrame_ReportsBlurTimeAndChangesTheFeedback()
     {
         var plain = new PresetRenderer(VisualizerPreset.Parse("fDecay=0.95"), Width, Height);
         var blurred = new PresetRenderer(VisualizerPreset.Parse("fDecay=0.95\nblur2=3"), Width, Height);
 
+        plain.MeshSource.AddPixel(Width / 2, Height / 2, 1f, 1f, 1f);
+        blurred.MeshSource.AddPixel(Width / 2, Height / 2, 1f, 1f, 1f);
+
         plain.RenderFrame(new TimingAudio(), 1d / 60d);
         blurred.RenderFrame(new TimingAudio(), 1d / 60d);
 
-        Assert.True(blurred.Timings.Blur > plain.Timings.Blur);
+        Assert.True(blurred.Timings.Blur > 0d);
+        Assert.True(blurred.Timings.Blur <= blurred.Timings.Total);
+        Assert.False(plain.Output.Pixels.SequenceEqual(blurred.Output.Pixels));
     }
 
-    /// <summary>A warp shader runs inside the warp stage and dominates its cost.</summary>
+    /// <summary>A warp shader reports its execution time inside the warp stage.</summary>
     [Fact]
-    public void RenderFrame_WarpShaderCostsMoreThanThePlainSample()
+    public void RenderFrame_ReportsTheWarpShaderTime()
     {
-        var plain = new PresetRenderer(VisualizerPreset.Parse("fDecay=0.95"), Width, Height);
         var shaded = new PresetRenderer(
             VisualizerPreset.Parse("""
                 fDecay=0.95
@@ -66,10 +69,9 @@ public sealed class RenderTimingTests
             ShaderTimeBudgetMilliseconds = 10_000d
         };
 
-        plain.RenderFrame(new TimingAudio(), 1d / 60d);
         shaded.RenderFrame(new TimingAudio(), 1d / 60d);
 
-        Assert.True(shaded.Timings.Warp > plain.Timings.Warp);
+        Assert.True(shaded.Timings.Warp > 0d);
         Assert.True(shaded.LastShaderMilliseconds > 0d);
     }
 
