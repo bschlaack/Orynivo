@@ -228,6 +228,7 @@ public sealed class SkiaCompPassTests
         var renderer = new PresetRenderer(VisualizerPreset.Parse(Preset), 32, 18)
         {
             ShaderTimeBudgetMilliseconds = 100_000d,
+            ShaderPassBudgetMilliseconds = 100_000d,
             UseSkiaPasses = true
         };
         try
@@ -349,12 +350,15 @@ public sealed class SkiaCompPassTests
     {
         var renderer = new PresetRenderer(VisualizerPreset.Parse(preset), 32, 18)
         {
+            // Fidelity checks must finish both passes even when CI is busy or Skia is cold.
             ShaderTimeBudgetMilliseconds = 100_000d,
+            ShaderPassBudgetMilliseconds = 100_000d,
             UseSkiaPasses = skia
         };
         try
         {
             renderer.RenderFrame(new Silent(), 1d / 60d);
+            Assert.True(string.IsNullOrEmpty(renderer.ShaderError), renderer.ShaderError);
             return renderer.Output.Pixels.ToArray();
         }
         finally

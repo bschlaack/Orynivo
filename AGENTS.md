@@ -179,6 +179,11 @@ limited compatibility types described above for the Linux target.
 
 ## Build and Run
 
+Skia shader fidelity tests must raise both `ShaderTimeBudgetMilliseconds` and
+`ShaderPassBudgetMilliseconds` so cold compilation and CI contention cannot
+abort the reference frame or force a fallback. Assert that rendering reports
+no shader error; retain production budgets in application code.
+
 ```powershell
 .\build.ps1
 .\Orynivo\bin\Debug\net10.0-windows10.0.19041.0\Orynivo.exe

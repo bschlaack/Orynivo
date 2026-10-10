@@ -13,6 +13,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- Removed runner-speed-dependent failures from the Skia shader fidelity tests
+  by raising both shader time budgets and reporting render errors directly.
+
 ## [0.46.0] - 2026-09-26
 
 ### Fixed
