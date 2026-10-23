@@ -15,6 +15,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- The AUR binary package draft declares native .NET and Avalonia dependencies
+  explicitly and offers CoreCLR tracing as an optional dependency.
+
 - Equalizer APO/AutoEQ imports reject malformed filter rows, unsupported
   trailing parameters and non-finite values instead of silently importing a
   partial or altered profile. Explicit neutral profiles now import successfully.

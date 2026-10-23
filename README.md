@@ -144,6 +144,13 @@ Installed packages place Orynivo under `/usr/lib/orynivo`, add the `orynivo`
 command, and register a desktop launcher. All Linux player artifacts are covered
 by the signed release manifest.
 
+The unpublished [AUR draft](packaging/README.md#arch) declares native .NET,
+Avalonia and audio dependencies; it bundles the managed runtime. Clean-chroot
+installation, a synthetic-profile upgrade from 0.48.0, virtual-display startup,
+and maintainer-tested CachyOS playback and temporary desktop-menu startup
+passed. AUR publication remains pending; see the validation notes for test
+scope.
+
 Build and publish the macOS desktop for either supported architecture:
 
 ```bash

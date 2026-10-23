@@ -17,11 +17,75 @@ signed update manifest.
 ## Arch
 
 `aur/PKGBUILD` repackages the existing x86-64 release tree with explicit ALSA,
-OpenAL and FFmpeg dependencies. It conflicts with the official `orynivo` package
-so the same installation paths cannot be owned twice. It preserves managed
-binaries without stripping or debug splitting. It does not use a moving `latest`
-URL or a `pkgver()` implementation: this is a versioned binary release, and
-version/checksum updates should be reviewed together.
+OpenAL and FFmpeg dependencies, plus native .NET and Avalonia libraries. The
+managed runtime is bundled; installing `dotnet-runtime` is unnecessary.
+`lttng-ust2.12` is optional for CoreCLR tracing. The recipe conflicts with the
+official `orynivo` package so the same installation paths cannot be owned twice.
+It preserves managed binaries without stripping or debug splitting. It does not
+use a moving `latest` URL or a `pkgver()` implementation: this is a versioned
+binary release, and version/checksum updates should be reviewed together.
+
+Validation on CachyOS on 2026-10-23:
+
+- The pinned source SHA-256 passed. Arch `extra-x86_64-build` built and
+  installed `0.48.1-2` successfully in a clean chroot. Recipe `namcap` reported
+  no warnings; package `namcap` retained the upstream/dynamic-library warnings
+  below.
+- The local repackaged payload preserved all 405 upstream paths, including file
+  hashes, modes and symlinks. The chroot-installed package passed `pacman -Qkk`
+  with 406 total files and no altered files.
+- In the disposable chroot, `pacman` upgraded draft revision 1 to revision 2 and
+  replaced the official `orynivo` package with `orynivo-bin`. A synthetic
+  profile marker survived both operations. This covers package transactions, not
+  a previous application-version upgrade or migration of real user settings.
+- With Xvfb, Xauth and DejaVu fonts installed only for acceptance, the command
+  opened the Orynivo main window and initial profile dialog as an unprivileged
+  test user. `ORYNIVO_DATA_DIR` selected isolated data and its migration marker
+  was created. Desktop metadata validation and the installed icon check passed.
+
+- The maintainer reported the manual CachyOS checklist successful after starting
+  the extracted revision 2 package with an isolated `ORYNIVO_DATA_DIR`: display
+  and artwork, music import and audible playback, pause, seeking, volume and
+  settings persistence after restart. This was a user-observed test without
+  installing the package on the host.
+- The maintainer confirmed that a temporary KDE application-menu entry appeared
+  and launched normally. It used the packaged desktop metadata with absolute
+  executable/icon paths adjusted to the extracted tree and an isolated data
+  root. The temporary entry was removed after the test; the host package was
+  never installed.
+
+- A disposable chroot upgraded the official `0.48.0-1` package to AUR draft
+  `0.48.1-2`. Both versions opened the same synthetic profile under Xvfb/Openbox
+  and exited through the window manager without forced termination. Active
+  profile identity/name, one favorite marker, volume and language survived; each
+  application saved 98 settings fields. SQLite integrity checks passed before
+  and after the upgrade (23 tables). This is an empty-catalog/profile smoke
+  test, not exhaustive migration coverage for populated libraries.
+
+No personal profile or host player installation was used. AUR publication also
+requires an available maintainer account. The manual playback report supplements
+the virtual-display smoke check; it does not cover all audio devices, formats or
+output modes.
+
+Interpret `namcap` output in the context of this binary package:
+
+- Unstripped SkiaSharp, HarfBuzzSharp and SQLite binaries and missing FULL RELRO
+  are properties of the upstream release. Repackaging preserves those binaries;
+  changing compiler flags in this recipe cannot harden prebuilt libraries.
+- ALSA, OpenAL, FFmpeg and some framework libraries are loaded dynamically or
+  invoked as processes, so static dependency analysis can report them as unused.
+- The tracing provider references `liblttng-ust.so.0`; its optional dependency
+  follows the Arch .NET runtime package.
+- `checkpkg` cannot compare against a repository version of `orynivo-bin` before
+  one exists. Its “target not found” message does not invalidate the build.
+
+The native dependency baseline follows the
+[Arch .NET runtime](https://archlinux.org/packages/extra/x86_64/dotnet-runtime/)
+and
+[Avalonia Linux requirements](https://docs.avaloniaui.net/docs/deployment/docker).
+The manual CachyOS result establishes playback on the tested setup; broader
+hardware coverage remains unverified. The menu check used an extracted package,
+while installed file ownership was checked separately in the chroot.
 
 Before submitting from an AUR maintainer account:
 
