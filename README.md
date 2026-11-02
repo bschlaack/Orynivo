@@ -5,19 +5,23 @@
 
 # Orynivo
 
-An Avalonia desktop music library for Windows, Linux, and macOS, plus a
-cross-platform music server for local Hi-Fi libraries.
+**A free, open-source Hi-Fi music library, player, and self-hosted server for
+Windows, Linux, and macOS — for people who still own their music.**
 
-**Official website:** [orynivo.app](https://orynivo.app/) · **Documentation:**
-[GitHub Wiki](https://github.com/bschlaack/Orynivo/wiki) · **Downloads:**
-[Latest release](https://github.com/bschlaack/Orynivo/releases/latest)
+If you like what Roon does, but want software that is free, open source, and
+keeps your files and listening data yours, Orynivo is built for you.
 
-cwASIO/Steinberg ASIO/WASAPI · DSD/DSF/DFF · Gapless Playback · ReplayGain ·
-Parametric EQ Plex · Radio · Podcasts · AI Chat · MCP Server · Network Streaming
+[![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
+[![Release](https://img.shields.io/github/v/release/bschlaack/Orynivo)](https://github.com/bschlaack/Orynivo/releases/latest)
+![Platforms](https://img.shields.io/badge/platforms-Windows%20%C2%B7%20Linux%20%C2%B7%20macOS-lightgrey)
+
+**Website:** [orynivo.app](https://orynivo.app/) · **Downloads:**
+[latest release](https://github.com/bschlaack/Orynivo/releases/latest) ·
+**Docs:** [GitHub Wiki](https://github.com/bschlaack/Orynivo/wiki) · **Full
+feature reference:**
+[docs/FULL-FEATURE-REFERENCE.md](docs/FULL-FEATURE-REFERENCE.md)
 
 ## See Orynivo in action
-
-Watch the Orynivo walkthrough:
 
 <!-- markdownlint-disable MD034 -->
 
@@ -28,236 +32,95 @@ https://github.com/user-attachments/assets/92e1cde3-b787-4752-8ad9-944d47d0b32f
 If the embedded video does not play in your browser,
 [watch it on YouTube](https://www.youtube.com/watch?v=llYTFwNLZAY).
 
+## Screenshots
+
+<table>
+  <tr>
+    <td><img src="html/assets/screenshots/dashboard.webp" alt="Dashboard" width="400"></td>
+    <td><img src="html/assets/screenshots/albums.webp" alt="Albums" width="400"></td>
+  </tr>
+  <tr>
+    <td><img src="html/assets/screenshots/artists.webp" alt="Artists" width="400"></td>
+    <td><img src="html/assets/screenshots/tracks.webp" alt="Tracks" width="400"></td>
+  </tr>
+  <tr>
+    <td><img src="html/assets/screenshots/cloud.webp" alt="Genre Cloud" width="400"></td>
+    <td><img src="html/assets/screenshots/ai-chat.webp" alt="AI Chat" width="400"></td>
+  </tr>
+</table>
+
 ## Why Orynivo?
 
-Orynivo is for people who still own and manage a local music library and want a
-modern Windows, Linux, or macOS player with serious audio output support — and
-the ability to reach that library from any device on the local network.
+- **Bit-perfect audio.** Exclusive WASAPI, cwASIO, and Steinberg ASIO output on
+  Windows; direct ALSA hardware profiles on Linux with native DSD (DSF/DFF) and
+  no ASIO bridge required. DoP fallback, gapless playback, ReplayGain, +6 dB PCM
+  boost, and a parametric EQ with Equalizer APO / AutoEQ import.
+- **Your library, everywhere.** Orynivo Server is a headless server for Linux,
+  macOS, and Windows that exposes your library over the local network via REST
+  and HTTP streaming. Desktop clients merge local and remote libraries into one
+  unified Artists / Albums / Tracks experience.
+- **Made for large collections.** Artists, albums, tracks, and folder views; CUE
+  sheets and MKA chapters; smart playlists; full-text search across local and
+  remote sources; bulk favorite/rating/genre editing that never rewrites your
+  media files.
+- **Discovery built in.** A hierarchical Genre Cloud across all connected
+  sources, Infinite Mix that keeps a queue replenished from your listening
+  habits, internet radio, podcasts, and lyrics.
+- **AirPlay to your Hi-Fi.** RAOP receiver discovery on every platform plus a
+  native AirPlay 2 bridge, verified with clean audible playback on a Sonos
+  stereo pair.
+- **AI that stays local.** Embedded AI chat through LM Studio, Ollama, or any
+  OpenAI-compatible endpoint, and an MCP server with 37 individually toggleable
+  tools for external assistants such as Claude Desktop.
+- **Private by design.** Apache-2.0 licensed, no telemetry, no account. API keys
+  and tokens live in an encrypted per-user credential store. The full UI is
+  available in English, German, French, Spanish, Russian, Simplified Chinese,
+  and Hindi.
 
-- Bit-perfect/native DSD playback through direct ALSA on Linux without a native
-  bridge, or through cwASIO/the optional Steinberg ASIO bridge on Windows
-- Exclusive WASAPI, cwASIO, and Steinberg ASIO output profiles
-- Classic AirPlay (RAOP) output profiles with automatic receiver discovery on
-  Windows, Linux, and macOS
-- Gapless playback
-- CUE sheet support
-- ReplayGain and parametric EQ
-- Multi-select bulk editing in the shared Tracks table, applying favorite,
-  unfavorite, or a personal rating to every selected local or Orynivo Server
-  track at once, plus a genre field that stores a library-only override for the
-  selected local or Orynivo Server tracks (media files are never modified)
-- Local library, playlists, smart playlists and full-text search
-- Empty-library guidance opens Directories, Orynivo servers or Output device in
-  Settings, with localized, wrapped and keyboard-focusable setup actions. Tab
-  and Shift+Tab reach each sidebar setup action; Enter activates it. Keyboard
-  focus highlights setup and output-profile actions in both themes. Setup hints
-  use readable secondary text and avoid duplicate focus outlines.
-- Play is disabled before a source is selected; remembered tracks retain their
-  resume/retry action.
-- Output Settings keeps the profile selector full-width and wraps its actions
-  below it so longer translations remain visible in narrow layouts.
-- Adding the first local music folder expands Library so Artists, Albums and
-  Tracks are immediately reachable. Later folder changes keep a collapsed
-  Library collapsed.
-- Adding a folder in Directories Settings starts its scan automatically. Follow
-  progress or cancel below that folder; Scan remains available for later scans.
-  After completion, save Settings and open Tracks for playback.
-- Successfully loaded empty library views offer source/filter guidance and a
-  Settings action; server-only profiles open their server settings directly. The
-  guidance disappears when reloading or when library changes invalidate that
-  result, and returns only for a current successful empty load.
-- Unified artist detail pages with an album-style image-and-biography hero,
-  synchronized favorites, image management, refreshable biographies, and
-  combined local/Orynivo Server albums. Their cards include cover search,
-  favorites, and local/server source badges, and a source-aware track table
-  below them lists the artist's tracks ordered by album and track number. Manual
-  biography refresh can use an editable external lookup name without changing
-  the library artist name while the artist's albums render before profile
-  loading and remain available throughout it; profile text follows German,
-  English, French, Spanish, Russian, Simplified Chinese, or Hindi
-- Hierarchical Genre Cloud with source-aware track and album recommendations
-  across the local library and connected Orynivo Servers, backed by a subtle
-  cached grayscale mosaic of matching artist images
-- Shared Artists, Albums, and Tracks views retain available local/server results
-  when a source is unavailable. Only complete loads are cached, so reopening a
-  partial view retries missing sources. Overlapping reloads retain only the
-  latest request, including a reload triggered during cancellation. Each load
-  keeps its initial filters and server/profile settings throughout its queries.
-  Saving changed server connections clears cached catalog views, including
-  changes to profile and streaming options. An incomplete-load notice offers
-  **Try again** without clearing usable rows; selection and scroll position
-  survive the refresh, and navigating away cancels it. Background library
-  updates keep the current view in place and offer a controlled refresh.
-  Removing library roots from Settings invalidates cached results after indexed
-  rows are removed.
-- Library search queries independent servers concurrently, keeps available
-  results when a source fails, and offers **Try again** for incomplete searches.
-  New queries and navigation cancel the previous search; genuine empty results
-  remain distinct from unavailable sources.
-- Infinite Mix, which turns recent listening habits and favorites into a
-  continuously replenished mixed-source queue
-- Album-artist-centered library attribution: explicit `ALBUMARTIST` metadata
-  wins, untagged multi-artist compilations are grouped under `Various Artists`,
-  featured track credits do not create extra library artists, and embedded
-  MusicBrainz artist IDs unify verified spelling variants
-- Optional curated Fanart.tv artist thumbnails. Enter a personal key under
-  Settings > Artist information, or set the `FANART_TV_API_KEY` environment
-  variable before starting Orynivo. Entered keys are stored in Orynivo's
-  encrypted current-user credential container. Manual artist images always take
-  priority. The same Settings section can fill missing artist images in the
-  local library and every configured Orynivo Server sequentially, trying
-  Fanart.tv first when a key is available and Wikimedia Commons as the fallback.
-  With a configured Fanart.tv key, the review dialog can automatically accept
-  Fanart.tv results for the remainder of the run. Wikimedia candidates always
-  remain subject to individual acceptance or rejection, and the complete run can
-  be cancelled from the review dialog. Manual image searches from artist
-  information use an editable query and the same Fanart.tv-first, Wikimedia-
-  fallback order. The batch displays progress and an estimated remaining time
-- Unified local and Orynivo Server artist browsing: matching artists appear once
-  in Artists and search, and every artist link opens one combined album view
-  across those libraries regardless of which source the clicked item came from.
-  Renaming a unified artist applies the new name to its matching local identity
-  and to its matching artists on every reachable configured Orynivo Server;
-  local merge-priority choices are applied to equivalent server collisions.
-  Cached biographies and images are shared across matching identities, and new
-  profile downloads or manual image selections are synchronized to each source.
-  Opening a unified artist or album also fills missing artwork in either the
-  local library or matching reachable Orynivo Servers from an existing
-  counterpart.
-- AI control via local LLMs, LM Studio/Ollama/OpenAI-compatible endpoints
-- MCP server for external AI assistants
-- **Orynivo Server** — headless cross-platform music server (Linux, macOS,
-  Windows) that exposes the same library over the local network via REST and
-  HTTP streaming
+## Download
 
-[![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
+Self-contained builds (the .NET runtime is bundled; no prerequisites) from the
+[latest release](https://github.com/bschlaack/Orynivo/releases/latest):
 
-## Product website
+| Component      | Packages                                                       |
+| -------------- | -------------------------------------------------------------- |
+| Windows player | `Setup.exe`, portable ZIP (Windows 10/11 x64)                  |
+| Linux player   | DEB, RPM, Arch `.pkg.tar.zst`, portable tar.gz (x64 and ARM64) |
+| macOS player   | PKG and portable app ZIP (Apple Silicon and Intel)             |
+| Orynivo Server | DEB and RPM (Linux x64 / ARM64, incl. Raspberry Pi)            |
 
-The official website is available at [orynivo.app](https://orynivo.app/). Its
-self-contained responsive source lives in [`html/`](html/). It defaults to
-English, can switch to German, French, Spanish, Russian, Simplified Chinese or
-Hindi, and includes current application screenshots, feature and installation
-guides, and download links that resolve through GitHub's latest public release
-API. See [`html/README.md`](html/README.md) for local preview and publishing
-notes.
+The signed in-app updater installs updates through your native package manager
+on Linux and verifies download digests on every platform.
 
-The Windows desktop includes cwASIO/Steinberg ASIO and WASAPI playback. The
-Linux desktop is a separately packaged player with direct ALSA hardware profiles
-for exact-rate PCM and native DSD output without resampling, alongside an OpenAL
-system route through PipeWire, PulseAudio, or ALSA. It supports FFmpeg-decoded
-local files, remote streams, CUE/MKA segments, gapless queues, seeking,
-ReplayGain, PCM boost, and the parametric equalizer. The macOS desktop provides
-the same library, streaming, playlist, radio, podcast, AI Chat, MCP, and PCM
-processing features through the system OpenAL output path on Intel and Apple
-Silicon. Native DSD output remains available only through Windows ASIO/cwASIO or
-Linux direct ALSA. Windows System Media Transport Controls remain
-Windows-specific, while the Linux desktop exposes the MPRIS 2 media player
-interface so desktop media keys, panels, and applets can control playback.
+## Orynivo Server
 
-AirPlay output profiles discover local `_raop._tcp` receivers on every desktop
-platform. On Windows, the bundled native `AirPlay2Bridge` is preferred and
-performs transient pairing, encrypted ALAC transport, unicast PTP timing, and
-receiver-requested RTP retransmission. This path has been verified with clean
-audible playback on a Sonos stereo pair. Playback is decoded to 44.1 kHz stereo
-PCM; volume and ReplayGain are applied before it reaches the native bridge.
-AirPlay volume uses a perceptual curve with additional control at normal
-listening levels instead of mapping the slider directly to linear PCM gain. The
-receiver now-playing display receives the current title, artist, album, and
-bounded JPEG/PNG cover artwork when it is available locally or through the
-active library provider. Receiver-side Play, Pause, Next, and Previous controls
-are synchronized back to Orynivo through the authenticated AirPlay event
-channel. Resuming after a receiver-side pause rebuilds the stream at its current
-position for Sonos compatibility. Receiver-originated timeline seeking is not
-currently supported; it requires a separate DACP control endpoint rather than
-the reverse event channel used by those buttons. If the bridge is unavailable,
-Orynivo falls back to a compatible `raop_play` executable beside Orynivo or on
-`PATH`. The helper is deliberately not bundled because available RAOP
-implementations use licenses independent of Orynivo's Apache-2.0 distribution.
-Gapless transitions and Orynivo's parametric equalizer are not yet supported for
-either network path.
+`Orynivo.Server` scans the same library directories as the desktop app and
+serves them over the local network: browse artists, albums, tracks, playlists,
+artwork, waveforms, and lyrics, and stream audio with authenticated URLs that
+work directly in FFmpeg and browsers. It runs as a plain binary or a systemd
+service, and every release ships DEB/RPM packages. The
+[Wiki](https://github.com/bschlaack/Orynivo/wiki) and the
+[full reference](docs/FULL-FEATURE-REFERENCE.md#orynivo-server) document the
+complete REST API and setup.
 
-> **Experimental:** Native AirPlay 2 support is an interoperability
-> implementation based on observed protocol behavior rather than a public Apple
-> sender specification. Continuous playback, seeking, timing, and stereo-pair
-> output have been verified with the tested Sonos receiver, but other receiver
-> models, firmware versions, grouped configurations, and network environments
-> may behave differently. Keep a conventional local output profile available and
-> report reproducible receiver-specific problems with model and firmware
-> information.
+## Supported formats
 
-The Qt-free `AirPlay2Bridge` provides native AirPlay 2 support while retaining
-the existing RAOP route for AirPlay 1 receivers. The evaluated
-[`airplay2-sender-cpp`](https://github.com/akustikrausch/airplay2-sender-cpp)
-project supplies the reusable Apache-2.0 cryptographic core fetched at a pinned
-commit; its Qt sender is not linked. The native bridge fetches Apple's official
-Apache-2.0 ALAC encoder separately.
+`DSF`, `DFF`, `FLAC`, `MP3`, `WAV`, `AIFF`, `M4A`, `MKA` (with chapters), `AAC`,
+`OGG`, `Opus`, `WMA`, and CUE sheets referencing PCM sources. PCM is decoded via
+FFmpeg, which Orynivo locates or downloads automatically.
 
-Development of that component has started in
-[`Native/AirPlay2Bridge`](Native/AirPlay2Bridge/README.md). It is deliberately a
-standalone CMake project with a versioned C ABI and no dependency on Avalonia,
-Orynivo, or Qt, so it can later be published and consumed independently. The
-current milestone provides portable sockets, fail-closed transient pairing,
-authenticated encrypted control, unicast gPTP timing, timing-peer registration,
-session/audio-stream SETUP, official Apple ALAC support, partial-PCM buffering,
-and encrypted realtime type-96 media over receiver-selected UDP ports. Its PTP
-clock behavior follows a complete working iPhone-to-Sonos capture; 352-frame
-ALAC packets use a PTP/RTP synchronization anchor and bounded retransmission.
-Captured type-103 TCP framing remains isolated for later AAC use. Initial
-receiver volume, RTP-anchored DMAP metadata, encrypted teardown, and
-PTP/buffered-packet diagnostics are included. These paths are backed by native
-tests. Session negotiation, encrypted media, PTP timing, retransmission,
-teardown, and clean audible playback are verified against a Sonos stereo-pair
-receiver. The Windows build copies the bridge beside Orynivo and loads it
-through its stable C ABI.
+## Documentation
 
-Settings > Playback offers mutually exclusive DSD routing preferences for lossy
-DSD-to-PCM conversion and bit-perfect DSD over PCM (DoP). DoP requires a
-DoP-capable DAC and an exact-rate output path; PCM volume, ReplayGain, boost,
-and equalizer processing do not apply to the encapsulated DSD payload. The Linux
-path supports local and Orynivo-Server-streamed stereo DSF and uncompressed
-stereo DFF/DSDIFF through direct ALSA. When ALSA exposes the native `DSD_U32_BE`
-hardware format, Orynivo sends bit-perfect DSD directly to the DAC; otherwise it
-uses DoP as a fallback (for example a 176.4-kHz carrier for DSD64). Neither
-Linux DSD path requires cwASIO, the Steinberg SDK, or an Orynivo native bridge.
+- [HTTPS and reverse proxies](docs/SERVER-REVERSE-PROXY.md) — Caddy and nginx
+  examples for Orynivo Server and authenticated MCP access
+- [GitHub Wiki](https://github.com/bschlaack/Orynivo/wiki) — end-user guides
+- [Full feature & technical reference](docs/FULL-FEATURE-REFERENCE.md) — every
+  feature, output profile, format behavior, and build detail
+- [CHANGELOG.md](CHANGELOG.md) · [ROADMAP.md](ROADMAP.md)
 
-API keys and access tokens for Last.fm, Fanart.tv, AI Chat, Orynivo Server,
-Plex, and streaming providers are kept out of `settings.json`. Orynivo stores
-them in one current-user encrypted credential container: Windows uses
-current-user DPAPI; Linux and macOS use AES-GCM with a separate random key file
-restricted to the current operating-system user. Existing plaintext settings and
-the older Windows Plex/streaming credential files are migrated automatically.
+## Building from source
 
-The application uses the Orynivo wordmark in the startup screen, sidebar, and
-About dialog, plus a multi-resolution Windows application icon based on the
-standalone logo.
-
-> This project is under active development. The database schema, user interface,
-> and available features may still change.
-
-## Desktop builds
-
-The desktop project selects its target from the build host:
-
-- Windows builds target `net10.0-windows10.0.19041.0` and include the existing
-  WASAPI/ASIO integrations.
-- Linux builds target `net10.0`; PCM audio is rendered through direct ALSA or
-  OpenAL. The Windows endpoint-volume integration is replaced by a compatibility
-  service, and system-media integration is provided by MPRIS 2
-  (`org.mpris.MediaPlayer2.orynivo`) for desktop media keys and panels.
-- macOS builds target `net10.0`; PCM audio is rendered through Apple's system
-  OpenAL framework. Windows audio, endpoint-volume, and SMTC integrations are
-  replaced by compatibility services, and native DSD output is not currently
-  available.
-- Linux output profiles expose OpenAL and direct exclusive ALSA as separate
-  output types. OpenAL lists only PipeWire/system-routed devices; direct ALSA
-  lists only `hw:` endpoints that require exclusive access. Selecting another
-  desktop default output does not release a card that PipeWire still owns; its
-  system sound-device profile must be disabled before direct ALSA can open it.
-- The Linux target pins Tmds.DBus.Protocol 0.92.0 so D-Bus observer cleanup
-  remains non-blocking while Avalonia's UI dispatcher is shutting down.
-
-Build the Linux desktop with .NET 10:
+Requires the [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0):
 
 ```bash
 dotnet restore Orynivo/Orynivo.csproj
@@ -509,7 +372,7 @@ size/redirect/timeout limits, no arbitrary downloads, request logging).
 Configure the SearXNG URL and limits under **Settings → Integration → MCP Server
 → Web browsing**.
 
-## Orynivo Server
+## Orynivo Server reference
 
 `Orynivo.Server` is a self-contained headless music server that runs on
 **Windows, Linux, and macOS**. It scans the same local library directories and
@@ -1472,7 +1335,7 @@ architecture before opening the normal macOS Installer.
   ImageMagick or other external image conversion tools are not required.
 - No ASIO drivers or Windows dependencies
 
-## Download
+## Release package reference
 
 Download the latest builds from
 [Releases](https://github.com/bschlaack/Orynivo/releases).
@@ -2168,78 +2031,15 @@ required checks for each held-back line are recorded in
 
 ## Contributing
 
-Bug reports and reproducible improvement proposals can be submitted through
-[GitHub Issues](https://github.com/bschlaack/Orynivo/issues). For audio issues,
-include the output backend, device, file format, and sample rate.
-
-Contributor architecture and maintenance guidance is indexed in
-[AGENTS.md](AGENTS.md). The [project reference](docs/PROJECT-REFERENCE.md)
-describes the maintained contracts, while
-[Visualizer status](docs/VISUALIZER-STATUS.md) separates the current rendering
-paths from historical implementation milestones.
-
-## Dependencies and Notices
-
-Orynivo uses components under MIT, Apache-2.0, LGPL-2.1-only, and other
-compatible terms. This includes Avalonia, SkiaSharp, Lucene.NET,
-Microsoft.Data.Sqlite, NAudio, TagLibSharp, SQLitePCLRaw, cwASIO, and their
-transitive dependencies.
-
-The complete attribution and redistribution information is maintained in
-[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md). Applicable license texts are
-provided in [`licenses/`](licenses/) and are copied into build and publish
-outputs.
-
-FFmpeg is run as a separate executable. If it is not installed, Orynivo
-downloads the BtbN LGPL essentials build into `%LOCALAPPDATA%\Orynivo\ffmpeg` on
-Windows by resolving the current release asset through the GitHub API. On macOS,
-the matching `eugeneware/ffmpeg-static` FFmpeg and FFprobe release assets are
-downloaded into Orynivo's per-user cache. FFmpeg remains subject to its own
-license and is not covered by the Orynivo license.
-
-ASIO is a trademark and software of Steinberg Media Technologies GmbH. The
-optional Steinberg ASIO SDK is not included in this repository and must be
-obtained and licensed separately. The vendored cwASIO implementation is an
-independent MIT-licensed implementation.
+Issues, feature requests, and pull requests are welcome — please target the
+`development` branch. See [CONTRIBUTING.md](CONTRIBUTING.md) for the dev setup,
+test suite, and what the maintainers look for.
 
 ## License
 
-Copyright 2026 Björn Schlaack.
+Orynivo is licensed under the [Apache License 2.0](LICENSE). Third-party
+components are listed in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) and
+[`licenses/`](licenses/).
 
-Orynivo's original source code and documentation are licensed under the
-[Apache License 2.0](LICENSE). The license does not grant trademark rights in
-the Orynivo name, wordmark, logo, or application icon.
-
-Third-party components and the optional Steinberg ASIO SDK are excluded from
-that grant and remain subject to their respective terms. See [NOTICE](NOTICE)
-and [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
-
-## WASAPI output rate limit
-
-High-resolution WavPack files use a bounded FFprobe fallback when the tag reader
-cannot supply technical properties. CUE track information reports the physical
-source format, sample rate, precision and channels; playback may report FLAC
-when a server transcodes that source. Use Refresh all metadata on the owning
-library to update previously indexed entries with missing values. Remote library
-metadata must be refreshed on the server running the updated scanner.
-
-For WASAPI devices that report unstable high sample rates, set Maximum output
-sample rate in Settings > Playback to a known working rate. This is a strict
-limit: playback never falls back above it. High-resolution sources are decoded
-and resampled to an accepted output rate; if none works within the limit,
-playback reports failure instead of exceeding it. Automatic retains the
-unrestricted device selection.
-
-## Fresh profiles and legacy data
-
-The default data directory is the Orynivo folder under local application data.
-On its first start, Orynivo copies missing files from the former Player folder
-and records completion in `.legacy-data-migrated`. Renaming Orynivo alone
-removes that marker and can therefore import old settings and large artwork
-caches again. Existing destination files are never overwritten.
-
-For a clean test, use an explicit `ORYNIVO_DATA_DIR` pointing to a separate
-folder. Explicit roots do not import legacy settings or caches. On Windows,
-`scripts/prepare-first-playback-check.ps1 -Scenario Local -Start` prepares and
-opens an isolated profile with a small test track; the original data stays in
-place. See [first-playback acceptance](docs/FIRST-PLAYBACK-ACCEPTANCE.md).
+> Orynivo is under active development. The database schema, user interface, and
+> available features may still change between releases.

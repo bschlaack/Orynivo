@@ -6,7 +6,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added
+
+- Caddy/nginx reverse-proxy guidance for HTTPS server access and authenticated
+  MCP streaming, with matching local wiki navigation. Added version-pinned AUR
+  and Homebrew packaging drafts with native validation/publication checklists;
+  these are not published distribution channels.
+
 ### Fixed
+
+- Equalizer APO/AutoEQ imports reject malformed filter rows, unsupported
+  trailing parameters and non-finite values instead of silently importing a
+  partial or altered profile. Explicit neutral profiles now import successfully.
+  Offline tests cover import boundaries, stereo bypass, filter gain and
+  transitions.
 
 - Release uploads reconcile existing assets on every retry so interrupted
   successful transfers do not repeatedly fail with duplicate-name errors.

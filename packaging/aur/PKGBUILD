@@ -1,0 +1,20 @@
+# Draft for issue #178. Validate in an Arch clean chroot before publication.
+pkgname=orynivo-bin
+pkgver=0.48.1
+pkgrel=1
+pkgdesc='Music library and Hi-Fi audio player'
+arch=('x86_64')
+url='https://orynivo.app'
+license=('Apache-2.0')
+depends=('alsa-lib' 'openal' 'ffmpeg')
+provides=("orynivo=${pkgver}")
+conflicts=('orynivo')
+options=('!strip' '!debug')
+source=("https://github.com/bschlaack/Orynivo/releases/download/v${pkgver}/orynivo-${pkgver}-1-x86_64.pkg.tar.zst")
+sha256sums=('c7f1c59474035a02a55cf8cd11cf255c61de0874d34a1c123101df6ea005426a')
+
+package() {
+    # makepkg extracts the release archive. Repackage only its installation
+    # tree, never upstream .PKGINFO metadata or any files from the build host.
+    cp -a "${srcdir}/usr" "${pkgdir}/"
+}

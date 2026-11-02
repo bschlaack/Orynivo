@@ -11,6 +11,11 @@ This file applies to `Orynivo.Core/` and supplements `../AGENTS.md`.
 
 ## Core Invariants
 
+- Equalizer APO imports must reject malformed recognized equalizer directives
+  and non-finite values instead of returning a partial profile. Explicit neutral
+  profiles are valid. Preserve the four-MiB file and 512-active-filter limits;
+  unsupported bandwidth syntax must never silently fall back to a default Q.
+
 - Genre taxonomy ancestor and phrase caches derive only from the immutable
   embedded graph. Raw genre-value memoization stays snapshot-scoped; retain
   multi-parent ancestry, unknown genres, candidate ordering and individual

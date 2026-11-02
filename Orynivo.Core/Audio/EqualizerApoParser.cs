@@ -31,9 +31,10 @@ internal static partial class EqualizerApoParser
     internal static EqualizerProfile Parse(string name, IEnumerable<string> lines)
     {
         var profile = new EqualizerProfile { Name = name };
+        var hasSupportedDirective = false;
         foreach (var rawLine in lines)
         {
-            var line = rawLine.Trim();
+            var line = rawLine.Split('#', 2)[0].Trim();
             if (line.Length == 0 || line.StartsWith('#') || line.StartsWith(';'))
                 continue;
 
@@ -41,6 +42,9 @@ internal static partial class EqualizerApoParser
             if (preampMatch.Success)
             {
                 profile.PreampDb += ParseNumber(preampMatch.Groups["gain"].Value);
+                if (!double.IsFinite(profile.PreampDb))
+                    throw new FormatException("The Equalizer APO preamp is outside the supported range.");
+                hasSupportedDirective = true;
                 continue;
             }
 
@@ -50,6 +54,7 @@ internal static partial class EqualizerApoParser
                 if (filterMatch.Groups["state"].Value.Equals("OFF", StringComparison.OrdinalIgnoreCase))
                     continue;
                 profile.Filters.Add(ParseFilter(filterMatch));
+                hasSupportedDirective = true;
                 EnsureFilterLimit(profile);
                 continue;
             }
@@ -59,14 +64,22 @@ internal static partial class EqualizerApoParser
             {
                 AddGraphicEqFilters(profile, graphicMatch.Groups["points"].Value);
                 EnsureFilterLimit(profile);
+                hasSupportedDirective = true;
+                continue;
             }
+
+            if (DirectiveRegex().IsMatch(line))
+                throw new FormatException("The Equalizer APO profile contains an invalid or unsupported equalizer directive.");
         }
 
-        if (profile.Filters.Count == 0 && Math.Abs(profile.PreampDb) < 0.0001)
+        if (!hasSupportedDirective)
             throw new FormatException("The file contains no supported Equalizer APO filters.");
         return profile;
     }
 
+    /// <summary>Parses one supported filter without silently substituting invalid numeric values.</summary>
+    /// <param name="match">The complete filter directive match.</param>
+    /// <returns>The validated filter.</returns>
     private static EqualizerFilter ParseFilter(Match match)
     {
         var typeCode = match.Groups["type"].Value.ToUpperInvariant();
@@ -82,29 +95,37 @@ internal static partial class EqualizerApoParser
         var q = match.Groups["q"].Success
             ? ParseNumber(match.Groups["q"].Value)
             : 0.7071067811865476;
+        var frequency = ParseNumber(match.Groups["frequency"].Value);
+        if (q <= 0 || frequency <= 0)
+            throw new FormatException("Equalizer APO frequency and Q must be positive.");
         return new EqualizerFilter
         {
             Type = type,
-            Frequency = ParseNumber(match.Groups["frequency"].Value),
+            Frequency = frequency,
             GainDb = match.Groups["gain"].Success ? ParseNumber(match.Groups["gain"].Value) : 0,
             Q = q
         };
     }
 
+    /// <summary>Converts complete graphic points into bounded shelf filters.</summary>
+    /// <param name="profile">The profile receiving the filters and baseline gain.</param>
+    /// <param name="pointsText">Semicolon-separated frequency and gain pairs.</param>
     private static void AddGraphicEqFilters(EqualizerProfile profile, string pointsText)
     {
         var points = pointsText.Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
             .Select(point => point.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries))
-            .Where(parts => parts.Length >= 2)
-            .Select(parts => (Frequency: ParseNumber(parts[0]), Gain: ParseNumber(parts[1])))
-            .Where(point => point.Frequency > 0)
+            .Select(parts => parts.Length == 2
+                ? (Frequency: ParseNumber(parts[0]), Gain: ParseNumber(parts[1]))
+                : throw new FormatException("Each GraphicEQ point requires a frequency and gain."))
             .OrderBy(point => point.Frequency)
             .ToArray();
 
-        if (points.Length == 0)
-            return;
+        if (points.Length == 0 || points.Any(point => point.Frequency <= 0))
+            throw new FormatException("GraphicEQ points require positive frequencies.");
 
         profile.PreampDb += points[0].Gain;
+        if (!double.IsFinite(profile.PreampDb))
+            throw new FormatException("The Equalizer APO preamp is outside the supported range.");
         for (var index = 1; index < points.Length; index++)
         {
             var gainChange = points[index].Gain - points[index - 1].Gain;
@@ -117,12 +138,23 @@ internal static partial class EqualizerApoParser
                 GainDb = gainChange,
                 Q = 0.7071067811865476
             });
+            EnsureFilterLimit(profile);
         }
     }
 
-    private static double ParseNumber(string value) =>
-        double.Parse(value.Replace(',', '.'), NumberStyles.Float, CultureInfo.InvariantCulture);
+    /// <summary>Parses a finite culture-independent profile value.</summary>
+    /// <param name="value">The numeric field.</param>
+    /// <returns>The finite value.</returns>
+    private static double ParseNumber(string value)
+    {
+        if (!double.TryParse(value.Replace(',', '.'), NumberStyles.Float, CultureInfo.InvariantCulture, out var result) ||
+            !double.IsFinite(result))
+            throw new FormatException("The Equalizer APO profile contains an invalid numeric value.");
+        return result;
+    }
 
+    /// <summary>Rejects imports exceeding the supported active-filter count.</summary>
+    /// <param name="profile">The profile under construction.</param>
     private static void EnsureFilterLimit(EqualizerProfile profile)
     {
         if (profile.Filters.Count > MaximumFilters)
@@ -134,8 +166,10 @@ internal static partial class EqualizerApoParser
         RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
     private static partial Regex PreampRegex();
 
+    /// <summary>Matches complete supported parametric directives without accepting unknown suffixes.</summary>
+    /// <returns>The supported parametric filter recognizer.</returns>
     [GeneratedRegex(
-        @"^\s*Filter(?:\s+\d+)?\s*:\s*(?<state>ON|OFF)\s+(?<type>[A-Z]+)\s+Fc\s+(?<frequency>[+-]?\d+(?:[.,]\d+)?)\s*Hz(?:\s+Gain\s+(?<gain>[+-]?\d+(?:[.,]\d+)?)\s*dB)?(?:\s+Q\s+(?<q>[+-]?\d+(?:[.,]\d+)?))?.*$",
+        @"^\s*Filter(?:\s+\d+)?\s*:\s*(?<state>ON|OFF)\s+(?<type>[A-Z]+)\s+Fc\s+(?<frequency>[+-]?\d+(?:[.,]\d+)?)\s*Hz(?:\s+Gain\s+(?<gain>[+-]?\d+(?:[.,]\d+)?)\s*dB)?(?:\s+Q\s+(?<q>[+-]?\d+(?:[.,]\d+)?))?\s*$",
         RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
     private static partial Regex FilterRegex();
 
@@ -143,4 +177,9 @@ internal static partial class EqualizerApoParser
         @"^\s*GraphicEQ\s*:\s*(?<points>.+)$",
         RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
     private static partial Regex GraphicEqRegex();
+
+    /// <summary>Identifies equalizer directives whose invalid syntax must not be ignored.</summary>
+    /// <returns>The supported directive-prefix recognizer.</returns>
+    [GeneratedRegex(@"^(?:Preamp|Filter|GraphicEQ)\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    private static partial Regex DirectiveRegex();
 }

@@ -795,7 +795,11 @@ WavPack metadata, PCM/DSD caps and an empty eligible candidate set.
   track/album gain values, select the configured fallback mode, and calculate
   the linear PCM gain factor
 - `Orynivo.Core/Audio/EqualizerApoParser.cs`: imports Equalizer APO and AutoEQ
-  preamp, parametric filter, and `GraphicEQ` text profiles
+  preamp, parametric filter, and `GraphicEQ` text profiles. Recognized malformed
+  directives, unsupported filter parameters and non-finite values reject the
+  complete import. Explicit zero-gain profiles are valid. Files are limited to
+  four MiB and profiles to 512 active filters. Parametric imports accept `Fc`,
+  `Gain` and `Q`; `BW Oct` is rejected rather than silently using a default Q.
 - `Orynivo.Core/Audio/ParametricEqualizer.cs`: stereo biquad PCM equalizer with
   a short crossfade when the active profile changes and filter-state reset after
   seeks
