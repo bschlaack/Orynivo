@@ -72,6 +72,10 @@ Release upload retries must reconcile existing assets on each attempt and reject
 workflows whose release tag no longer resolves to their build checkout. Keep
 offline upload recovery checks in the CI verify job.
 
+AUR recipe changes must regenerate `packaging/aur/.SRCINFO`, preserve the
+version/checksum pin and upstream binaries, and repeat clean-chroot validation
+before publication. Record remaining acceptance in `packaging/README.md`.
+
 Keep this file updated whenever architecture, build behavior, or user-visible
 behavior changes.
 

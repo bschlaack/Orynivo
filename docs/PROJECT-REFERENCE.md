@@ -256,6 +256,12 @@ exact root-level archive entry (not `./.PKGINFO`), and the workflow must
 validate that entry before uploading the package because `pacman -U` otherwise
 rejects the archive as missing package metadata.
 
+The unpublished `packaging/aur/PKGBUILD` repackages only the release `usr` tree,
+pins the version and SHA-256, and declares native runtime dependencies. It
+preserves upstream binaries with `!strip` and `!debug`; CoreCLR tracing is
+optional. Keep its generated `.SRCINFO` synchronized with every recipe change.
+See `packaging/README.md` for validation evidence and remaining acceptance.
+
 ## Orynivo.Server
 
 `Orynivo.Server` is a `net10.0` ASP.NET Core Minimal API server that exposes the
