@@ -84,6 +84,18 @@ public sealed class McpPlayerBridge
     /// <summary>Gets or sets a provider-bound track browser for one mobile album identity.</summary>
     public Func<string, CancellationToken, Task<IReadOnlyList<global::Orynivo.Remote.MobileRemoteTrack>>>? BrowseMobileAlbumTracksFunc { get; set; }
 
+    /// <summary>Gets or sets the saved-station and Radio Browser search adapter, invoked on the UI dispatcher.</summary>
+    public Func<string?, CancellationToken, Task<IReadOnlyList<global::Orynivo.Remote.MobileRemoteMedia>>>? BrowseMobileRadioFunc { get; set; }
+
+    /// <summary>Gets or sets the pinned-podcast and catalog search adapter, invoked on the UI dispatcher.</summary>
+    public Func<string?, CancellationToken, Task<IReadOnlyList<global::Orynivo.Remote.MobileRemoteMedia>>>? BrowseMobilePodcastsFunc { get; set; }
+
+    /// <summary>Gets or sets the opaque podcast episode browser, invoked on the UI dispatcher.</summary>
+    public Func<string, CancellationToken, Task<IReadOnlyList<global::Orynivo.Remote.MobileRemoteMedia>?>>? BrowseMobileEpisodesFunc { get; set; }
+
+    /// <summary>Gets or sets radio and podcast playback through the existing readiness owner.</summary>
+    public Func<string, string, Task<bool>>? PlayMobileMediaFunc { get; set; }
+
     /// <summary>Gets or sets the shared regular and smart playlist browser.</summary>
     public Func<CancellationToken, Task<IReadOnlyList<global::Orynivo.Remote.MobileRemotePlaylist>>>? BrowseMobilePlaylistsFunc { get; set; }
 

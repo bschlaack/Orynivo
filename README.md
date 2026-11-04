@@ -265,30 +265,30 @@ IP address if your phone cannot resolve the computer name; both devices must be
 on a mutually reachable network. No port forwarding is needed.
 
 The responsive interface has separate **Now playing**, **Library**,
-**Playlists**, and **Up next** sections, with a bottom navigation bar on phones
-and a larger side-by-side artwork/player layout on tablets. It shows state
-without disclosing file paths or authenticated stream URLs. Previous,
-play/pause, next, stop, seek, volume, and direct queue-entry controls are
-available. Current artwork is transferred as a bounded thumbnail and retained
-through private browser cache headers. The search field queries tracks in the
-local library and every configured Orynivo Server concurrently. Results can be
-played immediately, inserted next, or appended; the browser receives only an
-opaque identity and display metadata, never a physical path, server address, or
-API key. LAN access is disabled by default. The current track can be marked as a
-favourite, configured output profiles can be selected, and queue entries can be
-moved or removed without opening the desktop window. The library section browses
-artists, their albums, and album tracks from both the local catalog and every
-configured Orynivo Server. The Playlists section uses the desktop's shared
-regular and smart playlists, including resolvable local and Orynivo Server
-tracks. Open a playlist to browse its tracks, play the entire list (replacing
-the queue), or append it without replacing the current music. Smart criteria are
-resolved live. Unresolved entries and standalone imported streams not indexed in
-a library are currently omitted by this browser; legacy server-only playlists
-remain outside the shared list, as on the desktop. Refresh reloads newly created
-or edited playlists. Provider identities remain opaque until a selected track is
-resolved inside the desktop for playback. Do not forward this unencrypted HTTP
-port to the internet; use a trusted VPN or an HTTPS reverse proxy for access
-outside the home network.
+**Playlists**, **Internet Radio**, **Podcasts**, and **Up next** sections, with
+a bottom navigation bar on phones and a larger side-by-side artwork/player
+layout on tablets. It shows state without disclosing file paths or authenticated
+stream URLs. Previous, play/pause, next, stop, seek, volume, and direct
+queue-entry controls are available. Current artwork is transferred as a bounded
+thumbnail and retained through private browser cache headers. The search field
+queries tracks in the local library and every configured Orynivo Server
+concurrently. Results can be played immediately, inserted next, or appended; the
+browser receives only an opaque identity and display metadata, never a physical
+path, server address, or API key. LAN access is disabled by default. The current
+track can be marked as a favourite, configured output profiles can be selected,
+and queue entries can be moved or removed without opening the desktop window.
+The library section browses artists, their albums, and album tracks from both
+the local catalog and every configured Orynivo Server. The Playlists section
+uses the desktop's shared regular and smart playlists, including resolvable
+local and Orynivo Server tracks. Open a playlist to browse its tracks, play the
+entire list (replacing the queue), or append it without replacing the current
+music. Smart criteria are resolved live. Unresolved entries and standalone
+imported streams not indexed in a library are currently omitted by this browser;
+legacy server-only playlists remain outside the shared list, as on the desktop.
+Refresh reloads newly created or edited playlists. Provider identities remain
+opaque until a selected track is resolved inside the desktop for playback. Do
+not forward this unencrypted HTTP port to the internet; use a trusted VPN or an
+HTTPS reverse proxy for access outside the home network.
 
 Single-track Play from MCP resolves remote references inside the owning playback
 preparation. Mobile single-track Play also guards its identity lookup: a newer
@@ -352,7 +352,20 @@ including initial seek, rather than the end of the track. Later playback errors
 remain observed by the desktop. An abandoned MCP start is cancelled; an
 unavailable mobile track or queue-index start is not reported as successful.
 
+**Internet Radio** lists up to 100 saved stations and searches Radio Browser by
+name. **Podcasts** lists up to 100 pinned shows and searches Apple Podcasts.
+Open a show to browse its latest 500 feed episodes, including publication dates
+and durations when available, then choose **Play**. **Refresh** returns to saved
+stations or pinned shows; searching does not save or pin results. Playback runs
+on the desktop computer and uses its selected output. Pinned podcast episodes
+reuse saved resume progress and existing downloads, including when the show was
+found through search. Search and feed availability depend on the providers.
+Expired media selections require refreshing the list. The browser receives only
+display metadata and bounded, process-local opaque identities, never feed or
+audio URLs. All seven interface languages are available in the remote.
+
 Remote verification:
+
 `dotnet run --project scripts/RemoteSmoke/RemoteSmoke.csproj` checks the
 production host with synthetic data. With Node.js and Playwright available,
 `node scripts/verify-mobile-remote.cjs` checks the embedded UI using a mock

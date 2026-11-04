@@ -14,6 +14,7 @@
     try { sessionStorage.removeItem('orynivoRemoteToken'); } catch { /* Storage may be disabled. */ }
     let session = 0, controller, reconnectTimer, messageTimer, connected = false;
     let state, artKey = '', artUrl = '', queueKey = '', currentView = 'playing';
+    const mediaVersions = { radio:0, podcasts:0 };
     let libraryLoaded = false, playlistsLoaded = false, libraryLevel = 'artists', libraryArtist;
     let libraryVersion = 0, playlistVersion = 0, searchVersion = 0, playlistId, filterTimer;
     const paths = {
@@ -41,6 +42,7 @@
         session++; controller?.abort(); clearTimeout(reconnectTimer); connected = false; key = '';
         $('app').hidden = true; $('logout').hidden = true; $('login').hidden = false;
         $('token').value = ''; $('authError').textContent = error; $('connect').disabled = false;
+        mediaVersions.radio++; mediaVersions.podcasts++;
         libraryLoaded = playlistsLoaded = false; libraryVersion++; playlistVersion++; searchVersion++;
         queueKey = artKey = ''; state = null;
         $('cover').hidden = true; $('cover').removeAttribute('src');
@@ -179,9 +181,11 @@
         } catch(e) { if(e.name !== 'AbortError') notice(t.failed); }
     }
     function showView(view) {
+        mediaVersions.radio++; mediaVersions.podcasts++;
         currentView = view;
         document.querySelectorAll('[data-panel]').forEach(p => p.hidden = p.id !== view);
         document.querySelectorAll('[data-view]').forEach(b => b.setAttribute('aria-pressed',String(b.dataset.view === view)));
+        if (view === 'radio' || view === 'podcasts') browseMedia(view);
         if (view === 'library' && !libraryLoaded) browseArtists();
         if (view === 'playlists' && !playlistsLoaded) browsePlaylists();
     }
@@ -238,6 +242,38 @@
             if(version !== playlistVersion) return;
             showRows($('playlistList'),rows,trackRow); $('playlistActions').hidden = !rows.length;
         } catch(e) { if(version === playlistVersion && e.name !== 'AbortError') empty($('playlistList'),t.failed); }
+    }
+    async function browseMedia(kind, podcast) {
+        const version = ++mediaVersions[kind], list = $(kind+'List');
+        $(kind+'Title').textContent = podcast ? podcast.title : t[kind];
+        $(kind+'Back').hidden = !podcast;
+        $(kind+'Form').hidden = !!podcast;
+        empty(list,t.loading);
+        const path = podcast ? 'media/podcasts/'+encodeURIComponent(podcast.id)+'/episodes'
+            : 'media/'+kind+'?q='+encodeURIComponent($(kind+'Search').value.trim());
+        try {
+            const rows = await (await api(path)).json();
+            if (version !== mediaVersions[kind] || currentView !== kind) return;
+            showRows(list,rows,item => {
+                const meta = [item.subtitle];
+                if (item.publishedAt) meta.push(new Date(item.publishedAt).toLocaleDateString());
+                if (item.durationSeconds) meta.push(clock(item.durationSeconds));
+                const li = row(item.title,meta.filter(Boolean).join(' · '),
+                    kind === 'podcasts' && !podcast ? ()=>browseMedia(kind,item) : null);
+                if (kind === 'radio' || podcast) {
+                    const actions = document.createElement('div'); actions.className = 'result-actions';
+                    actions.append(actionButton(t.play,()=>api('media/'+kind+'/play',{id:item.id})));
+                    li.append(actions);
+                }
+                return li;
+            });
+        } catch(e) { if(version === mediaVersions[kind] && e.name !== 'AbortError') empty(list,t.failed); }
+    }
+    for (const kind of ['radio','podcasts']) {
+        $(kind+'Form').onsubmit = e => { e.preventDefault(); browseMedia(kind); };
+        $(kind+'Search').oninput = () => { mediaVersions[kind]++; };
+        $(kind+'Back').onclick = () => browseMedia(kind);
+        $(kind+'Refresh').onclick = () => { $(kind+'Search').value = ''; browseMedia(kind); };
     }
     $('login').onsubmit = e => { e.preventDefault(); key = $('token').value.trim(); if(!key){$('authError').textContent=t.missing;return;} connect(); };
     $('logout').onclick = () => disconnect();

@@ -1006,6 +1006,31 @@ WavPack metadata, PCM/DSD caps and an empty eligible candidate set.
   compares the generated 256-bit token in constant time; maps MCP at `/mcp`;
   logging is cleared so Kestrel output does not appear in the player console;
   `IAsyncDisposable` — `DisposeAsync` delegates to `StopAsync`
+- Mobile radio and podcast browsing uses
+  `Orynivo/MainWindow.MobileRemote.Media.cs` and dispatcher-bound bridge
+  adapters. Authenticated `GET /remote/api/media/radio` and
+  `GET /remote/api/media/podcasts` accept optional `q` (maximum 250 characters).
+  An empty query reads saved stations or pinned podcasts off-thread; a search
+  uses the existing Radio Browser or Apple Podcasts client. Results are bounded
+  to 100 display summaries. `GET /remote/api/media/podcasts/{id}/episodes`
+  resolves a known podcast before loading its feed and returns the newest 500
+  episodes with optional publication dates/durations. Unknown podcasts return
+  404; provider errors return a sanitized 502 rather than an empty success.
+  Browsing responses are not cached.
+- `Orynivo/Remote/MobileRemoteMediaCatalog.cs` retains at most 2,048 opaque GUID
+  identities in memory on the dispatcher. Sources remain desktop-owned: DTOs
+  contain no feed/audio URLs, paths or credentials. FIFO eviction never rebinds
+  an old ID. Episode records retain the original podcast, and podcast search
+  matches pinned feed URLs to preserve progress and downloaded copies.
+  `POST /remote/api/media/{kind}/play` accepts only radio/podcasts and a known
+  opaque ID; it reuses `StartReadyPlaybackAsync`, reports failure for abandoned
+  or unsuccessful preparation, and confirms only the current player. It never
+  waits for playback to end. Searching does not persist stations or podcasts.
+  Existing desktop progress/download and output selection behavior is retained.
+  Mobile response versions reject obsolete search, episode, navigation and
+  sign-out results; six navigation buttons use two rows on phones. Remote JSON
+  contains complete German, English, French, Spanish, Russian, Simplified
+  Chinese and Hindi resources.
 - `Orynivo/AI/AiChatSettings.cs`: persisted configuration for the embedded AI
   chat (endpoint URL, optional API key, model name, max tokens); stored as
   `AppSettings.AiChat`

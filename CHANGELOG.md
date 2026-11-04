@@ -4,6 +4,19 @@ All notable changes to Orynivo are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.48.3] - 2026-11-04
+
+### Added
+
+- Mobile web remote sections for saved internet-radio stations, Radio Browser
+  search, pinned podcasts, Apple Podcasts search, and episode playback through
+  the desktop output. Pinned episodes reuse progress and existing downloads.
+  Media selections use bounded opaque identities without exposing feed or audio
+  URLs. The remote now also includes complete Russian and Simplified Chinese
+  translations alongside its five existing languages.
+
+### Fixed
+
 ## [0.48.2] - 2026-11-02
 
 ### Added

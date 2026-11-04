@@ -129,6 +129,39 @@ public sealed class MobileRemoteServerService : IAsyncDisposable
                 return Results.BadRequest(new { error = "invalid_album" });
             return Results.Json(await bridge.BrowseMobileAlbumTracksFunc(albumId, ct).ConfigureAwait(false));
         });
+        app.MapGet("/remote/api/media/{kind}", async (string kind, string? q, HttpContext context, CancellationToken ct) =>
+        {
+            context.Response.Headers.CacheControl = "no-store";
+            var browse = kind == "radio" ? bridge.BrowseMobileRadioFunc
+                : kind == "podcasts" ? bridge.BrowseMobilePodcastsFunc : null;
+            if (browse is null || q?.Length > 250) return Results.BadRequest();
+            try
+            {
+                var rows = await bridge.OnUiAsync(() => browse(q, ct), ct).ConfigureAwait(false);
+                return Results.Json(rows);
+            }
+            catch (OperationCanceledException) when (ct.IsCancellationRequested) { return Results.StatusCode(499); }
+            catch { return Results.StatusCode(StatusCodes.Status502BadGateway); }
+        });
+        app.MapGet("/remote/api/media/podcasts/{id}/episodes", async (string id, HttpContext context, CancellationToken ct) =>
+        {
+            context.Response.Headers.CacheControl = "no-store";
+            if (id.Length > 64 || bridge.BrowseMobileEpisodesFunc is not { } browse) return Results.BadRequest();
+            try
+            {
+                var rows = await bridge.OnUiAsync(() => browse(id, ct), ct).ConfigureAwait(false);
+                return rows is null ? Results.NotFound() : Results.Json(rows);
+            }
+            catch (OperationCanceledException) when (ct.IsCancellationRequested) { return Results.StatusCode(499); }
+            catch { return Results.StatusCode(StatusCodes.Status502BadGateway); }
+        });
+        app.MapPost("/remote/api/media/{kind}/play", async (string kind, MobileRemoteMediaAction request, CancellationToken ct) =>
+        {
+            if (kind is not ("radio" or "podcasts") || string.IsNullOrWhiteSpace(request.Id) ||
+                request.Id.Length > 64 || bridge.PlayMobileMediaFunc is not { } play) return Results.BadRequest();
+            var accepted = await bridge.OnUiAsync(() => play(kind, request.Id), ct).ConfigureAwait(false);
+            return accepted ? Results.NoContent() : Results.BadRequest();
+        });
         app.MapGet("/remote/api/playlists", async (CancellationToken ct) =>
             Results.Json(bridge.BrowseMobilePlaylistsFunc is { } browse
                 ? await browse(ct).ConfigureAwait(false) : Array.Empty<MobileRemotePlaylist>()));
@@ -373,6 +406,10 @@ public sealed record MobileRemotePlaylist(long Id, string Name, int? TrackCount,
 /// <summary>A whole-playlist playback request.</summary>
 /// <param name="Action">Either play (replace queue) or append.</param>
 public sealed record MobileRemotePlaylistAction(string Action);
+
+/// <summary>A radio or podcast play request that never accepts a browser-supplied URL.</summary>
+/// <param name="Id">Opaque identity previously returned by the media browser.</param>
+public sealed record MobileRemoteMediaAction(string Id);
 
 /// <summary>A validated edit request for the playback queue.</summary>
 /// <param name="Action">One of <c>remove</c>, <c>up</c>, <c>down</c>, or <c>clear</c>.</param>
