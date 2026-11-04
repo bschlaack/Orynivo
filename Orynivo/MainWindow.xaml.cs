@@ -663,6 +663,7 @@ public partial class MainWindow : Window
             _queue.Select((item, i) => new Mcp.QueueEntry(
                 i, i == _queueIndex, item.FilePath, item.DisplayTitle)).ToList();
         _mcpBridge.GetCurrentArtworkFunc = ResolveMobileRemoteArtworkAsync;
+        _mcpBridge.GetMobilePlaybackInfoFunc = GetMobilePlaybackInfo;
         _mcpBridge.PlayQueueIndexFunc = async index =>
         {
             if (index < 0 || index >= _queue.Count)

@@ -52,7 +52,9 @@
     "radio": "इंटरनेट रेडियो",
     "podcasts": "पॉडकास्ट",
     "radioHint": "सहेजे गए स्टेशन। और स्टेशन खोजें या सहेजे गए स्टेशनों पर लौटने के लिए रीफ़्रेश करें।",
-    "podcastHint": "पिन किए गए पॉडकास्ट। और कार्यक्रम खोजें और उनके एपिसोड खोलें।"
+    "podcastHint": "पिन किए गए पॉडकास्ट। और कार्यक्रम खोजें और उनके एपिसोड खोलें।",
+    "music": "संगीत",
+    "published": "प्रकाशित:"
   },
   "de": {
     "welcome": "Deine Musik. Deine Kontrolle.",
@@ -107,7 +109,9 @@
     "radio": "Internetradio",
     "podcasts": "Podcasts",
     "radioHint": "Gespeicherte Sender. Suche nach weiteren Sendern oder kehre mit Aktualisieren zurück.",
-    "podcastHint": "Angeheftete Podcasts. Suche nach weiteren Sendungen und öffne ihre Episoden."
+    "podcastHint": "Angeheftete Podcasts. Suche nach weiteren Sendungen und öffne ihre Episoden.",
+    "music": "Musik",
+    "published": "Veröffentlicht:"
   },
   "en": {
     "welcome": "Your music. Your control.",
@@ -162,7 +166,9 @@
     "radio": "Internet radio",
     "podcasts": "Podcasts",
     "radioHint": "Saved stations. Search for more stations or refresh to return to your saved stations.",
-    "podcastHint": "Pinned podcasts. Search for more shows and open their episodes."
+    "podcastHint": "Pinned podcasts. Search for more shows and open their episodes.",
+    "music": "Music",
+    "published": "Published:"
   },
   "fr": {
     "welcome": "Votre musique. À votre rythme.",
@@ -217,7 +223,9 @@
     "radio": "Radio Internet",
     "podcasts": "Podcasts",
     "radioHint": "Stations enregistrées. Recherchez d’autres stations ou actualisez pour revenir aux stations enregistrées.",
-    "podcastHint": "Podcasts épinglés. Recherchez d’autres émissions et ouvrez leurs épisodes."
+    "podcastHint": "Podcasts épinglés. Recherchez d’autres émissions et ouvrez leurs épisodes.",
+    "music": "Musique",
+    "published": "Publié le :"
   },
   "es": {
     "welcome": "Tu música. Tú decides.",
@@ -272,7 +280,9 @@
     "radio": "Radio por Internet",
     "podcasts": "Pódcasts",
     "radioHint": "Emisoras guardadas. Busca más emisoras o actualiza para volver a las guardadas.",
-    "podcastHint": "Pódcasts fijados. Busca más programas y abre sus episodios."
+    "podcastHint": "Pódcasts fijados. Busca más programas y abre sus episodios.",
+    "music": "Música",
+    "published": "Publicado:"
   },
   "ru": {
     "welcome": "Ваша музыка. Ваше управление.",
@@ -327,7 +337,9 @@
     "radio": "Интернет-радио",
     "podcasts": "Подкасты",
     "radioHint": "Сохранённые станции. Найдите другие станции или обновите список, чтобы вернуться к сохранённым.",
-    "podcastHint": "Закреплённые подкасты. Найдите другие передачи и откройте их выпуски."
+    "podcastHint": "Закреплённые подкасты. Найдите другие передачи и откройте их выпуски.",
+    "music": "Музыка",
+    "published": "Опубликовано:"
   },
   "zh": {
     "welcome": "你的音乐，由你掌控。",
@@ -382,6 +394,8 @@
     "radio": "网络电台",
     "podcasts": "播客",
     "radioHint": "已保存的电台。搜索更多电台，或刷新以返回已保存的电台。",
-    "podcastHint": "已固定的播客。搜索更多节目并打开其单集。"
+    "podcastHint": "已固定的播客。搜索更多节目并打开其单集。",
+    "music": "音乐",
+    "published": "发布日期："
   }
 }

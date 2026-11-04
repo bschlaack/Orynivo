@@ -1031,6 +1031,31 @@ WavPack metadata, PCM/DSD caps and an empty eligible candidate set.
   sign-out results; six navigation buttons use two rows on phones. Remote JSON
   contains complete German, English, French, Spanish, Russian, Simplified
   Chinese and Hindi resources.
+- `MainWindow.MobileRemote.Presentation.cs` supplies source-owned mobile
+  playback details through `McpPlayerBridge.GetMobilePlaybackInfoFunc`. The
+  mobile snapshot captures player state, details, queue and favorite together on
+  the dispatcher. Its optional `Playback` DTO carries source kind, the actual
+  album, station/publisher, genre/station details, audio format, episode
+  publication date, seeking capability and an opaque artwork revision; no
+  playback URLs or physical paths are returned.
+- Mobile Play actions navigate to Now playing only after acknowledgement and
+  refresh state without overwriting a newer live event. Next/append and failed
+  starts retain browsing. Periodic events never force navigation. Empty album
+  and artist lines are hidden; phone artwork is compact enough to prioritize
+  playback controls.
+- `Remote/MobileRemoteArtworkCache` shares one thumbnail task per playback and
+  published desktop-image revision. It prefers a private scaled copy of the
+  published desktop bitmap, captured before yielding and encoded off-thread so
+  replacing the displayed image cannot dispose the worker's copy. This also
+  avoids downloading already displayed podcast covers again. Without a desktop
+  bitmap, music resolves local or registered server/ Plex artwork; radio
+  resolves its cached logo or favicon and podcasts their cover. The existing
+  bounded reader limits input; local reads and image decoding/640-pixel JPEG
+  encoding run off-thread. An image arriving later renews the revision even if
+  the title stays unchanged. The artwork endpoint accepts `key` and rejects
+  obsolete revisions before/after asynchronous work, retaining private
+  content-hash ETags. Browser blob replacement removes old images immediately
+  and ignores superseded responses.
 - `Orynivo/AI/AiChatSettings.cs`: persisted configuration for the embedded AI
   chat (endpoint URL, optional API key, model name, max tokens); stored as
   `AppSettings.AiChat`

@@ -191,6 +191,35 @@ var run = Task.Run(async () =>
         var snapshot = await client.GetStringAsync("/remote/api/state");
         Check(!snapshot.Contains("private-path") && !snapshot.Contains("secret-path") && !snapshot.Contains(token), "safe state DTO");
         Check(snapshot.Contains("\"title\":\"Fixture track\""), "camelCase state");
+        var artworkEntered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var artworkReady = new TaskCompletionSource<RemoteArtwork?>();
+        var revision = "radio-revision";
+        await bridge.OnUiAsync(() =>
+        {
+            bridge.GetMobilePlaybackInfoFunc = () => new("radio", null, "Fixture station", "Jazz", "MP3 · 128 kbps", null, false, revision);
+            bridge.GetCurrentArtworkFunc = () => { artworkEntered.TrySetResult(); return artworkReady.Task; };
+        });
+        var radioState = await client.GetFromJsonAsync<JsonElement>("/remote/api/state");
+        Check(radioState.GetProperty("album").ValueKind == JsonValueKind.Null &&
+            radioState.GetProperty("playback").GetProperty("sourceName").GetString() == "Fixture station" &&
+            !radioState.GetProperty("playback").GetProperty("canSeek").GetBoolean(), "active radio details exclude stale queue album");
+        var oldArtwork = client.GetAsync("/remote/api/artwork?key=radio-revision");
+        await artworkEntered.Task.WaitAsync(TimeSpan.FromSeconds(10));
+        await bridge.OnUiAsync(() => revision = "podcast-revision");
+        artworkReady.SetResult(new RemoteArtwork([1, 2, 3], "image/jpeg", "thumbnail"));
+        using (var rejected = await oldArtwork)
+            Check(rejected.StatusCode == HttpStatusCode.NotFound, "late source artwork rejected");
+        using (var artwork = await client.GetAsync("/remote/api/artwork?key=podcast-revision"))
+        {
+            Check(artwork.StatusCode == HttpStatusCode.OK &&
+                (await artwork.Content.ReadAsByteArrayAsync()).SequenceEqual(new byte[] { 1, 2, 3 }), "authenticated current artwork bytes");
+            Check(artwork.Headers.CacheControl?.Private == true && artwork.Headers.ETag?.Tag == "\"thumbnail\"", "private artwork validator");
+        }
+        await bridge.OnUiAsync(() => bridge.GetMobilePlaybackInfoFunc = () =>
+            new("podcasts", null, "Fixture publisher", "Culture", "AAC", DateTimeOffset.UnixEpoch, true, revision));
+        var podcastState = await client.GetFromJsonAsync<JsonElement>("/remote/api/state");
+        Check(podcastState.GetProperty("playback").GetProperty("publishedAt").ValueKind == JsonValueKind.String &&
+            podcastState.GetProperty("playback").GetProperty("canSeek").GetBoolean(), "podcast publication and seeking details");
         var playlists = await client.GetStringAsync("/remote/api/playlists");
         Check(playlists.Contains("Fixture playlist"), "playlist enumeration");
         var tracks = await client.GetStringAsync("/remote/api/playlists/1/tracks");

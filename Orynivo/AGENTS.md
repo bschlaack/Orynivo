@@ -341,6 +341,19 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
   provider errors, and reject stale browser responses after search, navigation
   or sign-out. Keep all six navigation destinations visible on phones and all
   seven remote locales complete.
+- Successful mobile Play actions open Now playing after readiness; next/append
+  and failed starts retain browsing. MobileRemotePlaybackInfo uses the active
+  source, never a leftover queue album. Snapshot state/details/queue/favorite
+  must be captured in one dispatcher turn. MobileRemoteArtworkCache coalesces
+  one bounded thumbnail per playback/image revision; invalidate on delayed
+  desktop image publication and reject superseded results. Source addresses stay
+  inside the desktop. Cover endpoints validate the requested revision before and
+  after loading; publish only authenticated, privately cached JPEGs. Prefer a
+  private bounded copy of the published desktop bitmap: copy before yielding and
+  encode off-thread. Source fallbacks use the existing bounded reader; decoding
+  and local reads stay off-thread. Browser artwork/state refreshes reject stale
+  sessions and newer live state. Never auto-navigate on periodic state updates
+  alone.
 - AI endpoint discovery and testing use `AiEndpointService` and the unsaved
   values currently visible in Settings. Query only the credential-free
   OpenAI-compatible `/models` URL, accept standard and Ollama model-list shapes,

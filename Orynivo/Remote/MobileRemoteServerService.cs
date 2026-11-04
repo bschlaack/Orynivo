@@ -87,11 +87,16 @@ public sealed class MobileRemoteServerService : IAsyncDisposable
         app.MapGet("/", () => Results.Redirect("/remote"));
         app.MapGet("/remote/api/state", async (CancellationToken ct) =>
             Results.Json(await CreateSnapshotAsync(bridge, ct).ConfigureAwait(false)));
-        app.MapGet("/remote/api/artwork", async (HttpContext context, CancellationToken ct) =>
+        app.MapGet("/remote/api/artwork", async (string? key, HttpContext context, CancellationToken ct) =>
         {
             if (bridge.GetCurrentArtworkFunc is null)
                 return Results.NotFound();
-            var artwork = await bridge.OnUiAsync(bridge.GetCurrentArtworkFunc, ct).ConfigureAwait(false);
+            var artwork = await bridge.OnUiAsync(async () =>
+            {
+                if (key is not null && bridge.GetMobilePlaybackInfoFunc?.Invoke().ArtworkKey != key) return null;
+                var result = await bridge.GetCurrentArtworkFunc();
+                return key is null || bridge.GetMobilePlaybackInfoFunc?.Invoke().ArtworkKey == key ? result : null;
+            }, ct).ConfigureAwait(false);
             if (artwork is null)
                 return Results.NotFound();
             var etag = $"\"{artwork.CacheKey}\"";
@@ -266,26 +271,26 @@ public sealed class MobileRemoteServerService : IAsyncDisposable
 
     private static async Task<MobileRemoteSnapshot> CreateSnapshotAsync(McpPlayerBridge bridge, CancellationToken ct)
     {
-        var state = await bridge.OnUiAsync(
-            () => bridge.GetStateFunc?.Invoke() ?? new PlayerState("stopped", null, null, null, null, 0, 0, 0, -1, 0),
-            ct).ConfigureAwait(false);
-        var queue = await bridge.OnUiAsync(
-            () => (bridge.GetQueueFunc?.Invoke() ?? []).Select(entry =>
-                new MobileRemoteQueueEntry(entry.Index, entry.IsCurrent, entry.FileName)).ToList(),
-            ct).ConfigureAwait(false);
-        return new MobileRemoteSnapshot(
+        return await bridge.OnUiAsync(() =>
+        {
+            var state = bridge.GetStateFunc?.Invoke() ?? new PlayerState("stopped", null, null, null, null, 0, 0, 0, -1, 0);
+            var info = bridge.GetMobilePlaybackInfoFunc?.Invoke();
+            var queue = (bridge.GetQueueFunc?.Invoke() ?? []).Select(entry =>
+                new MobileRemoteQueueEntry(entry.Index, entry.IsCurrent, entry.FileName)).ToList();
+            return new MobileRemoteSnapshot(
             state.Status,
             state.Title,
             state.Artist,
-            state.Album,
+            info is null ? state.Album : info.Album,
             state.PositionSeconds,
             state.DurationSeconds,
             state.Volume,
             state.QueueIndex,
-            await bridge.OnUiAsync(() => bridge.GetCurrentFavoriteFunc?.Invoke(), ct).ConfigureAwait(false),
-            Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(
+            bridge.GetCurrentFavoriteFunc?.Invoke(),
+            info?.ArtworkKey ?? Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(
                 $"{state.QueueIndex}\n{state.Title}\n{state.Artist}\n{state.Album}"))),
-            queue);
+            queue, info);
+        }, ct).ConfigureAwait(false);
     }
 
     private static async Task<bool> ExecuteCommandAsync(
@@ -338,6 +343,7 @@ public sealed class MobileRemoteServerService : IAsyncDisposable
 /// <param name="IsFavorite">Current track favorite state, or no value for unsupported media.</param>
 /// <param name="ArtworkKey">Credential-free identity used to refresh current artwork.</param>
 /// <param name="Queue">Path-free queue entries.</param>
+/// <param name="Playback">Optional source-owned playback details.</param>
 public sealed record MobileRemoteSnapshot(
     string Status,
     string? Title,
@@ -349,7 +355,20 @@ public sealed record MobileRemoteSnapshot(
     int QueueIndex,
     bool? IsFavorite,
     string ArtworkKey,
-    IReadOnlyList<MobileRemoteQueueEntry> Queue);
+    IReadOnlyList<MobileRemoteQueueEntry> Queue,
+    MobileRemotePlaybackInfo? Playback = null);
+
+/// <summary>Source-owned playback information containing no URLs, paths or credentials.</summary>
+/// <param name="MediaKind">Music, radio or podcasts.</param>
+/// <param name="Album">Actual current album, or null outside music playback.</param>
+/// <param name="SourceName">Station name or podcast publisher.</param>
+/// <param name="Details">Available genre and station information.</param>
+/// <param name="AudioFormat">Current codec, sample rate, channels and output-rate information.</param>
+/// <param name="PublishedAt">Optional episode publication date.</param>
+/// <param name="CanSeek">Whether the active player supports seeking.</param>
+/// <param name="ArtworkKey">Opaque revision changed by source or delayed artwork publication.</param>
+public sealed record MobileRemotePlaybackInfo(string MediaKind, string? Album, string? SourceName,
+    string? Details, string? AudioFormat, DateTimeOffset? PublishedAt, bool CanSeek, string ArtworkKey);
 
 /// <summary>One path-free queue entry returned to the web remote.</summary>
 /// <param name="Index">Queue index.</param>

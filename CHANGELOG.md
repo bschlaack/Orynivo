@@ -4,6 +4,19 @@ All notable changes to Orynivo are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased]
+
+### Added
+
+- Starting playback in the mobile web remote opens **Now playing** and refreshes
+  the current source information. Music displays its actual album, radio shows
+  its station and live title, and podcasts show their episode, show, publisher
+  and publication date when available, alongside genre and audio details. Album
+  covers, station logos and podcast covers load through the authenticated
+  thumbnail endpoint, including images that arrive after playback starts.
+
+### Fixed
+
 ## [0.48.3] - 2026-11-04
 
 ### Added
@@ -14,8 +27,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   Media selections use bounded opaque identities without exposing feed or audio
   URLs. The remote now also includes complete Russian and Simplified Chinese
   translations alongside its five existing languages.
-
-### Fixed
 
 ## [0.48.2] - 2026-11-02
 

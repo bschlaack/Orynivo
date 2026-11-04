@@ -364,6 +364,16 @@ Expired media selections require refreshing the list. The browser receives only
 display metadata and bounded, process-local opaque identities, never feed or
 audio URLs. All seven interface languages are available in the remote.
 
+Starting a track, station, episode, playlist or queue entry opens **Now
+playing** after playback preparation succeeds. **Play next** and **Append**
+retain the browsing view. The playback page shows the available album cover,
+station logo or podcast cover and the active source's title, artist/show, album
+or station/publisher, genre/station details, episode publication date and audio
+format. Images arriving later refresh automatically; missing images use the
+default illustration. Seeking is available only when the active player supports
+it. Playback controls, position, duration, volume and output selection remain on
+the same page.
+
 Remote verification:
 
 `dotnet run --project scripts/RemoteSmoke/RemoteSmoke.csproj` checks the

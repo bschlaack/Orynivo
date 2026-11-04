@@ -69,6 +69,9 @@ public sealed class McpPlayerBridge
     /// <summary>Gets or sets an asynchronous function returning bounded current-track artwork.</summary>
     public Func<Task<RemoteArtwork?>>? GetCurrentArtworkFunc { get; set; }
 
+    /// <summary>Gets or sets the source-owned, path-free mobile playback presentation.</summary>
+    public Func<global::Orynivo.Remote.MobileRemotePlaybackInfo>? GetMobilePlaybackInfoFunc { get; set; }
+
     /// <summary>Gets or sets a function that starts a queue entry by zero-based index.</summary>
     public Func<int, Task<bool>>? PlayQueueIndexFunc { get; set; }
 

@@ -1,5 +1,16 @@
 # Workflow verification scopes
 
+Mobile playback presentation (2026-11-04): `MobileRemoteArtworkCacheTests`
+checks shared loads, source replacement and delayed-image revision without UI,
+network or audio. `scripts/RemoteSmoke` checks active-source metadata, omission
+of an old queue album, seeking flags, authenticated thumbnail bytes/private
+validators and rejected delayed images. The browser harness checks successful
+Play navigation for radio, podcasts, music, playlists and queue entries; failed
+Play and append remain in browsing. It verifies radio/podcast details, missing
+then delayed logos and responsive layout with synthetic images. This is software
+evidence; physical playback and live directory artwork availability are not
+established by these checks.
+
 Mobile radio/podcast coverage (2026-11-04): `MobileRemoteMediaCatalogTests`
 checks source-kind isolation, retained podcast identity and bounded eviction
 without identity reuse. `scripts/RemoteSmoke` checks authenticated production

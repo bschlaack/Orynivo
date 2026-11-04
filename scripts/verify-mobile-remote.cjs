@@ -15,6 +15,10 @@ const token = 'synthetic-test-key&plus+equals=';
 const commands = [], errors = [], requests = [];
 const track = {id:'server:synthetic:42',title:'A song with a longer title',artist:'Example Artist',album:'Example Album',year:1998,source:'Music server'};
 const state = {status:'playing',title:track.title,artist:track.artist,album:track.album,positionSeconds:65,durationSeconds:240,volume:.35,isFavorite:true,artworkKey:'fixture',queue:[{index:0,isCurrent:true,title:track.title}]};
+state.playback = {mediaKind:'music',audioFormat:'FLAC · 44,100 Hz · 2 ch',canSeek:true};
+const eventClients = new Set();
+const broadcast = () => {for(const client of eventClients) client.write('event: state\ndata: '+JSON.stringify(state)+'\n\n');};
+let artworkMissing = false, failNextPlay = false;
 let deny = false, releaseRadio;
 let signalRadioHeld;
 const radioHeld = new Promise(resolve=>{signalRadioHeld=resolve;});
@@ -34,15 +38,32 @@ const server = http.createServer(async(req,res)=>{
     }
     if(req.method==='POST'){
         let body='';for await(const chunk of req) body+=chunk;
-        commands.push({url:req.url,body:JSON.parse(body)});res.writeHead(204);res.end();return;
+        const value=JSON.parse(body);commands.push({url:req.url,body:value});
+        const starts = req.url.endsWith('/play') || value.action==='play' || value.command==='queue-index';
+        if(starts && failNextPlay){failNextPlay=false;res.writeHead(400);res.end();return;}
+        if(starts){
+            artworkMissing=false;
+            Object.assign(state,{title:track.title,artist:track.artist,album:track.album,durationSeconds:240,artworkKey:'music',
+                playback:{mediaKind:'music',audioFormat:'FLAC · 44,100 Hz · 2 ch',canSeek:true}});
+            if(req.url.includes('/media/radio/')) {
+                artworkMissing=true;
+                Object.assign(state,{title:'Live radio title',artist:'Live artist',album:null,isFavorite:null,durationSeconds:0,artworkKey:'radio-pending',
+                    playback:{mediaKind:'radio',sourceName:'Synthetic radio',details:'Jazz · DE · MP3 · 128 kbps',canSeek:false}});
+            } else if(req.url.includes('/media/podcasts/'))
+                Object.assign(state,{title:'Synthetic episode',artist:'Synthetic podcast',album:null,isFavorite:null,durationSeconds:1800,artworkKey:'podcast',
+                    playback:{mediaKind:'podcasts',sourceName:'Publisher',details:'Science',audioFormat:'AAC · 48,000 Hz',publishedAt:'2026-01-02T00:00:00Z',canSeek:true}});
+        }
+        res.writeHead(204);res.end();return;
     }
     if(req.url.endsWith('/events')){
         res.writeHead(200,{'Content-Type':'text/event-stream'});
+        eventClients.add(res);res.on('close',()=>eventClients.delete(res));
         res.write('event: state\ndata: '+JSON.stringify(state)+'\n\n');return;
     }
     let data;
     if(req.url.endsWith('/state')) data=state;
-    else if(req.url.endsWith('/artwork')){
+    else if(req.url.startsWith('/remote/api/artwork')){
+        if(artworkMissing){res.writeHead(404);res.end();return;}
         res.writeHead(200,{'Content-Type':'image/svg+xml'});
         res.end('<svg xmlns="http://www.w3.org/2000/svg" width="320" height="320"><rect width="320" height="320" fill="#235972"/><circle cx="160" cy="160" r="90" fill="#62437b"/><circle cx="160" cy="160" r="25" fill="#20364b"/></svg>');return;
     }
@@ -80,9 +101,22 @@ const server = http.createServer(async(req,res)=>{
         await page.screenshot({path:path.join(root,'out/mobile-remote-phone.png'),fullPage:true});
         await page.locator('[data-view=radio]').click();
         await page.waitForSelector('#radioList .result-actions button');
+        failNextPlay=true;
+        await page.locator('#radioList .result-actions button').click();
+        await page.waitForFunction(text=>document.getElementById('message').textContent===text,words.de.failed);
+        assert(await page.locator('#radio').isVisible(),'Rejected play must retain browsing');
         await page.locator('#radioList .result-actions button').click();
         await page.waitForFunction(()=>!document.querySelector('#radioList .result-actions button').disabled);
+        await page.locator('#playing').waitFor({state:'visible'});
+        await page.waitForFunction(()=>document.getElementById('trackTitle').textContent==='Live radio title');
+        assert.equal(await page.locator('#sourceName').textContent(),'Synthetic radio');
+        assert.equal(await page.locator('#album').textContent(),'');
+        assert(await page.locator('#seek').isDisabled());
+        artworkMissing=false;state.artworkKey='radio-ready';broadcast();
+        await page.waitForFunction(()=>!document.getElementById('cover').hidden&&document.getElementById('cover').naturalWidth>0);
+        await page.screenshot({path:path.join(root,'out/mobile-remote-radio-playing.png'),fullPage:true});
         assert(commands.some(x=>x.url==='/remote/api/media/radio/play'&&x.body.id==='station-id'));
+        await page.locator('[data-view=radio]').click();
         await page.locator('#radioSearch').fill('jazz');
         await Promise.all([page.waitForRequest(r=>r.url().includes('/media/radio?q=jazz')),
             page.locator('#radioSearch').press('Enter')]);
@@ -104,8 +138,17 @@ const server = http.createServer(async(req,res)=>{
         assert((await page.locator('#podcastsList').textContent()).includes('30:00'));
         await page.locator('#podcastsList .result-actions button').click();
         await page.waitForFunction(()=>!document.querySelector('#podcastsList .result-actions button').disabled);
+        await page.locator('#playing').waitFor({state:'visible'});
+        await page.waitForFunction(()=>document.getElementById('trackTitle').textContent==='Synthetic episode');
+        assert.equal(await page.locator('#artist').textContent(),'Synthetic podcast');
+        assert.equal(await page.locator('#sourceName').textContent(),'Publisher');
+        assert((await page.locator('#published').textContent()).includes('2026'));
+        assert.equal(await page.locator('#audioFormat').textContent(),'AAC · 48,000 Hz');
+        assert(await page.locator('#seek').isEnabled());
         assert(commands.some(x=>x.url==='/remote/api/media/podcasts/play'&&x.body.id==='episode-id'));
         await page.screenshot({path:path.join(root,'out/mobile-remote-podcasts.png'),fullPage:true});
+        await page.locator('[data-view=podcasts]').click();
+        await page.getByRole('button',{name:'Synthetic podcast',exact:true}).click();
         await page.locator('#podcastsBack').click();
         await page.getByRole('button',{name:'Synthetic podcast',exact:true}).waitFor();
         await page.locator('#podcastsSearch').fill('science');
@@ -121,10 +164,13 @@ const server = http.createServer(async(req,res)=>{
         await page.waitForSelector('#playlistPlay',{state:'visible'});
         await page.locator('#playlistPlay').click();
         await page.waitForFunction(()=>!document.getElementById('playlistPlay').disabled);
+        await page.locator('#playing').waitFor({state:'visible'});
         assert(commands.some(x=>x.url==='/remote/api/playlists/1/queue'&&x.body.action==='play'));
+        await page.locator('[data-view=playlists]').click();
         await page.locator('#playlistAppend').click();
         await page.waitForFunction(()=>!document.getElementById('playlistAppend').disabled);
         assert(commands.some(x=>x.body.action==='append'));
+        assert(await page.locator('#playlists').isVisible(),'Append must retain browsing');
         await page.locator('#playlistList button').filter({hasText:words.de.playNext}).click();
         await page.waitForTimeout(100);
         assert(commands.some(x=>x.body.id===track.id&&x.body.action==='next'));
@@ -132,7 +178,12 @@ const server = http.createServer(async(req,res)=>{
         await page.getByRole('button',{name:'Example Artist',exact:true}).click();
         await page.getByRole('button',{name:'Example Album',exact:true}).click();
         await page.waitForSelector('#libraryList .result-actions');
-        await page.locator('[data-view=playing]').click();
+        await page.locator('#libraryList .result-actions button').filter({hasText:words.de.play}).first().click();
+        await page.locator('#playing').waitFor({state:'visible'});
+        await page.waitForFunction(()=>document.getElementById('album').textContent==='Example Album');
+        await page.locator('[data-view=queue]').click();
+        await page.locator('#queueList .row-name').click();
+        await page.locator('#playing').waitFor({state:'visible'});
         await page.setViewportSize({width:1024,height:768});
         await page.screenshot({path:path.join(root,'out/mobile-remote-tablet.png'),fullPage:true});
         assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);

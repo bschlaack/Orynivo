@@ -14,6 +14,7 @@
     try { sessionStorage.removeItem('orynivoRemoteToken'); } catch { /* Storage may be disabled. */ }
     let session = 0, controller, reconnectTimer, messageTimer, connected = false;
     let state, artKey = '', artUrl = '', queueKey = '', currentView = 'playing';
+    let renderVersion = 0;
     const mediaVersions = { radio:0, podcasts:0 };
     let libraryLoaded = false, playlistsLoaded = false, libraryLevel = 'artists', libraryArtist;
     let libraryVersion = 0, playlistVersion = 0, searchVersion = 0, playlistId, filterTimer;
@@ -70,6 +71,17 @@
         finally { if (button) button.disabled = false; }
     }
     const command = (command, value) => api('command', { command, value });
+    async function startPlayback(path, body) {
+        const generation = session;
+        await api(path, body);
+        if (generation !== session) return;
+        showView('playing'); window.scrollTo({top:0,behavior:'auto'});
+        const version = renderVersion;
+        try {
+            const next = await (await api('state')).json();
+            if (generation === session && version === renderVersion) render(next);
+        } catch { /* Live state still refreshes after a successful start. */ }
+    }
     function actionButton(label, action) {
         const button = document.createElement('button'); button.type = 'button'; button.textContent = label;
         button.onclick = () => perform(action, button); return button;
@@ -88,7 +100,8 @@
         const li = row(track.title, [track.artist, track.album, track.year, track.source].filter(Boolean).join(' · '));
         const actions = document.createElement('div'); actions.className = 'result-actions';
         for (const action of ['play','next','append'])
-            actions.append(actionButton(t[action === 'next' ? 'playNext' : action], () => api('tracks/queue', { id:track.id, action })));
+            actions.append(actionButton(t[action === 'next' ? 'playNext' : action], () =>
+                action === 'play' ? startPlayback('tracks/queue', {id:track.id,action}) : api('tracks/queue', {id:track.id,action})));
         li.append(actions); return li;
     }
     function showRows(list, rows, build, emptyText = t.empty) {
@@ -103,19 +116,29 @@
         artKey = k;
         const generation = session;
         $('cover').hidden = true;
+        $('cover').removeAttribute('src');
+        if (artUrl) URL.revokeObjectURL(artUrl); artUrl = '';
         try {
-            const r = await api('artwork'); const blob = await r.blob();
+            const r = await api('artwork?key='+encodeURIComponent(k)); const blob = await r.blob();
             if (generation !== session || artKey !== k) return;
             if (artUrl) URL.revokeObjectURL(artUrl);
             artUrl = URL.createObjectURL(blob); $('cover').src = artUrl; $('cover').hidden = false;
         } catch { /* Missing artwork leaves the illustration visible. */ }
     }
     function render(s) {
+        renderVersion++;
         state = s;
         $('status').textContent = t[s.status] || t.stopped;
         $('trackTitle').textContent = s.title || t.nothingPlaying;
         $('artist').textContent = s.artist || ''; $('album').textContent = s.album || '';
-        $('seek').max = Math.max(1, s.durationSeconds); $('seek').disabled = !(s.durationSeconds > 0);
+        $('artist').hidden = !s.artist; $('album').hidden = !s.album;
+        const info = s.playback || {};
+        for (const [id,value] of Object.entries({mediaKind:t[info.mediaKind],sourceName:info.sourceName,
+            playbackDetails:info.details,audioFormat:info.audioFormat,
+            published:info.publishedAt ? t.published+' '+new Date(info.publishedAt).toLocaleDateString() : ''})) {
+            $(id).textContent = value || ''; $(id).hidden = !value;
+        }
+        $('seek').max = Math.max(1, s.durationSeconds); $('seek').disabled = info.canSeek === false || !(s.durationSeconds > 0);
         if (document.activeElement !== $('seek')) $('seek').value = s.positionSeconds;
         if (document.activeElement !== $('volume')) $('volume').value = s.volume;
         $('elapsed').textContent = clock(s.positionSeconds); $('duration').textContent = clock(s.durationSeconds);
@@ -130,7 +153,7 @@
         if (signature === queueKey) return;
         queueKey = signature;
         showRows($('queueList'), queue, x => {
-            const li = row(x.title, '', () => perform(() => command('queue-index',x.index)));
+            const li = row(x.title, '', () => perform(() => startPlayback('command',{command:'queue-index',value:x.index})));
             li.className = x.isCurrent ? 'active' : '';
             const actions = document.createElement('div'); actions.className = 'result-actions';
             for (const action of ['up','down','remove']) {
@@ -262,7 +285,7 @@
                     kind === 'podcasts' && !podcast ? ()=>browseMedia(kind,item) : null);
                 if (kind === 'radio' || podcast) {
                     const actions = document.createElement('div'); actions.className = 'result-actions';
-                    actions.append(actionButton(t.play,()=>api('media/'+kind+'/play',{id:item.id})));
+                    actions.append(actionButton(t.play,()=>startPlayback('media/'+kind+'/play',{id:item.id})));
                     li.append(actions);
                 }
                 return li;
@@ -289,7 +312,7 @@
     $('libraryFilter').oninput = () => {clearTimeout(filterTimer);libraryVersion++;filterTimer=setTimeout(browseArtists,250);};
     $('libraryBack').onclick = () => libraryLevel === 'tracks' && libraryArtist ? browseAlbums(libraryArtist) : browseArtists();
     $('playlistBack').onclick = $('playlistRefresh').onclick = browsePlaylists;
-    $('playlistPlay').onclick = () => perform(()=>api('playlists/'+playlistId+'/queue',{action:'play'}),$('playlistPlay'));
+    $('playlistPlay').onclick = () => perform(()=>startPlayback('playlists/'+playlistId+'/queue',{action:'play'}),$('playlistPlay'));
     $('playlistAppend').onclick = () => perform(()=>api('playlists/'+playlistId+'/queue',{action:'append'}),$('playlistAppend'));
     document.querySelectorAll('[data-view]').forEach(b=>b.onclick=()=>showView(b.dataset.view));
     window.addEventListener('hashchange', () => {
