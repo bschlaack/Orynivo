@@ -4,6 +4,14 @@ All notable changes to Orynivo are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased]
+
+### Fixed
+
+- macOS CI and release builds use supported macOS 15 runners matched to Intel
+  and Apple Silicon, replacing the retired macOS 14 runner image that prevented
+  jobs from starting and left Apple Silicon release packages unavailable.
+
 ## [0.48.3] - 2026-11-04
 
 ### Added

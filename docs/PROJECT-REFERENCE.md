@@ -209,6 +209,18 @@ runs `scripts/verify-mcp-tool-parity.ps1` and
 `scripts/verify-localization-parity.ps1` on every push and pull request, so MCP
 tool parity and the seven-language desktop/website/mobile localization coverage
 cannot silently drift. Keep these scripts passing; do not remove the job.
+
+The macOS matrices in `dotnet-desktop.yml` and `player-macos-release.yml` map
+`osx-x64` to `macos-15-intel` and `osx-arm64` to `macos-15`, so both builds use
+supported architecture-matched hosted runners. GitHub retired `macos-14` on
+2026-11-02; a runner acquisition failure occurs before checkout and produces no
+application build log. Keep both matrix entries and update the workflows
+together when images retire. Existing release dispatch can use the repaired
+workflow from `main` while checking out an existing release tag for the build;
+the upload helper must still verify that the tag resolves to that checkout. An
+incomplete published release needs its missing packages rebuilt before the
+signed-manifest workflow can complete; never relax its completeness checks.
+
 `.github/dependabot.yml` tracks NuGet and GitHub Actions updates weekly, but
 ignores NuGet upgrades that cannot build on the pinned toolchain: Avalonia
 **major** updates plus major upgrades of Microsoft.Data.Sqlite and
