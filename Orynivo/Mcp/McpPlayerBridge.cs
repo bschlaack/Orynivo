@@ -135,6 +135,9 @@ public sealed class McpPlayerBridge
     /// <summary>Gets or sets the filtered all-album browser.</summary>
     public Func<string?, CancellationToken, Task<IReadOnlyList<global::Orynivo.Remote.MobileRemoteAlbum>>>? BrowseMobileAllAlbumsFunc { get; set; }
 
+    /// <summary>Gets or sets bounded artwork loading for opaque artist and album keys.</summary>
+    public Func<string, CancellationToken, Task<RemoteArtwork?>>? GetMobileLibraryArtworkFunc { get; set; }
+
     /// <summary>Gets or sets a function returning the current track favorite state, or no value when unavailable.</summary>
     public Func<bool?>? GetCurrentFavoriteFunc { get; set; }
 

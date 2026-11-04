@@ -105,8 +105,9 @@ public partial class MainWindow
                 return artists
                     .Where(artist => string.IsNullOrWhiteSpace(query) ||
                         artist.Name.Contains(query.Trim(), StringComparison.CurrentCultureIgnoreCase))
-                    .Select(artist => new MobileRemoteArtist(
-                        CreateMobileIdentity(provider, artist.Id), artist.Name, provider.DisplayName))
+                    .Select(artist => (Summary: new MobileRemoteArtist(
+                        CreateMobileIdentity(provider, artist.Id), artist.Name, provider.DisplayName),
+                        Location: artist.ThumbnailPath ?? artist.ArtworkPath))
                     .ToList();
             }
             catch
@@ -116,9 +117,10 @@ public partial class MainWindow
         });
         var rows = await Task.WhenAll(tasks);
         return rows.SelectMany(static row => row)
-            .OrderBy(static artist => artist.Name, StringComparer.CurrentCultureIgnoreCase)
-            .ThenBy(static artist => artist.Source, StringComparer.CurrentCultureIgnoreCase)
+            .OrderBy(static artist => artist.Summary.Name, StringComparer.CurrentCultureIgnoreCase)
+            .ThenBy(static artist => artist.Summary.Source, StringComparer.CurrentCultureIgnoreCase)
             .Take(limit)
+            .Select(artist => artist.Summary with { ArtworkKey = _mobileLibraryArtwork.Register(artist.Location) })
             .ToList();
     }
 
@@ -133,16 +135,18 @@ public partial class MainWindow
         try
         {
             var albums = await target.Value.Provider.GetAlbumsByArtistAsync(
-                target.Value.Id, includeArtwork: false, cancellationToken);
+                target.Value.Id, includeArtwork: true, cancellationToken);
             return albums
                 .OrderBy(static album => album.Year ?? int.MaxValue)
                 .ThenBy(static album => album.Title, StringComparer.CurrentCultureIgnoreCase)
+                .Take(500)
                 .Select(album => new MobileRemoteAlbum(
                     CreateMobileIdentity(target.Value.Provider, album.Id),
                     album.Title,
                     album.DisplayArtist,
                     album.Year,
-                    target.Value.Provider.DisplayName))
+                    target.Value.Provider.DisplayName,
+                    _mobileLibraryArtwork.Register(album.ArtworkPath ?? album.ThumbnailPath)))
                 .ToList();
         }
         catch

@@ -120,6 +120,17 @@ public sealed partial class MobileRemoteServerService : IAsyncDisposable
                 .ConfigureAwait(false);
             return Results.Json(results);
         });
+        app.MapGet("/remote/api/library/artwork", async (string? key, HttpContext context, CancellationToken ct) =>
+        {
+            if (!Guid.TryParseExact(key, "N", out _) || bridge.GetMobileLibraryArtworkFunc is not { } load) return Results.NotFound();
+            var artwork = await load(key!, ct).ConfigureAwait(false);
+            if (artwork is null) return Results.NotFound();
+            var etag = $"\"{artwork.CacheKey}\"";
+            context.Response.Headers.CacheControl = "private, max-age=86400";
+            context.Response.Headers.ETag = etag;
+            if (context.Request.Headers.IfNoneMatch.ToString() == etag) return Results.StatusCode(304);
+            return Results.File(artwork.Data, artwork.MimeType);
+        });
         app.MapGet("/remote/api/library/artists", async (string? q, int? limit, CancellationToken ct) =>
         {
             if (bridge.BrowseMobileArtistsFunc is null)
@@ -433,7 +444,8 @@ public sealed record MobileRemoteTrack(
 /// <param name="Id">Opaque identity accepted by the album browser.</param>
 /// <param name="Name">Artist display name.</param>
 /// <param name="Source">Safe provider display name.</param>
-public sealed record MobileRemoteArtist(string Id, string Name, string Source);
+/// <param name="ArtworkKey">Opaque key for an authenticated thumbnail, or null when unavailable.</param>
+public sealed record MobileRemoteArtist(string Id, string Name, string Source, string? ArtworkKey = null);
 
 /// <summary>A provider-bound album summary for mobile library browsing.</summary>
 /// <param name="Id">Opaque identity accepted by the track browser.</param>
@@ -441,7 +453,8 @@ public sealed record MobileRemoteArtist(string Id, string Name, string Source);
 /// <param name="Artist">Album artist.</param>
 /// <param name="Year">Release year.</param>
 /// <param name="Source">Safe provider display name.</param>
-public sealed record MobileRemoteAlbum(string Id, string Title, string? Artist, int? Year, string Source);
+/// <param name="ArtworkKey">Opaque key for an authenticated thumbnail, or null when unavailable.</param>
+public sealed record MobileRemoteAlbum(string Id, string Title, string? Artist, int? Year, string Source, string? ArtworkKey = null);
 
 /// <summary>A playback or queue action targeting an opaque mobile search result.</summary>
 /// <param name="Id">Opaque search-result identity.</param>

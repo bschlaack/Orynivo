@@ -8,6 +8,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- Artist and album rows in the web remote show their artwork before the text,
+  with lazy authenticated thumbnails and stable placeholders for missing images.
+
 - The web remote has dedicated **Artists** and **Albums** destinations in a
   single navigation row, with remaining destinations in **More**. Browser music
   output offers **Original format**, **DSD → PCM**, six FLAC precision/rate

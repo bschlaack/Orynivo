@@ -11,6 +11,40 @@ namespace Orynivo;
 public partial class MainWindow
 {
     private readonly MobileRemoteArtworkCache _mobileArtworkCache = new();
+    private readonly MobileLibraryArtworkCatalog _mobileLibraryArtwork = new();
+    private readonly SemaphoreSlim _mobileLibraryArtworkWorkers = new(4);
+
+    /// <summary>Loads a registered catalog image off the dispatcher and delivers a bounded list thumbnail.</summary>
+    /// <param name="key">Opaque catalog key, never a browser-supplied location.</param>
+    /// <param name="ct">HTTP request cancellation.</param>
+    /// <returns>A small private JPEG, or null for unavailable, invalid or evicted artwork.</returns>
+    private async Task<RemoteArtwork?> ResolveMobileLibraryArtworkAsync(string key, CancellationToken ct)
+    {
+        var location = _mobileLibraryArtwork.Resolve(key);
+        if (location is null) return null;
+        await _mobileLibraryArtworkWorkers.WaitAsync(ct).ConfigureAwait(false);
+        try
+        {
+            return await Task.Run(async () =>
+            {
+                var image = await TryReadArtworkBytesAsync(location, ct).ConfigureAwait(false);
+                ct.ThrowIfCancellationRequested();
+                if (image is null) return null;
+                using var source = SKBitmap.Decode(image.Value.Data);
+                if (source is null) return null;
+                var scale = Math.Min(1d, 160d / Math.Max(source.Width, source.Height));
+                using var small = source.Resize(new SKImageInfo(Math.Max(1, (int)(source.Width * scale)),
+                    Math.Max(1, (int)(source.Height * scale))), new SKSamplingOptions(SKFilterMode.Linear));
+                using var encoded = small?.Encode(SKEncodedImageFormat.Jpeg, 88);
+                var bytes = encoded?.ToArray();
+                return bytes is { Length: > 0 } && _mobileLibraryArtwork.Resolve(key) == location
+                    ? new RemoteArtwork(bytes, "image/jpeg", Convert.ToHexString(SHA256.HashData(bytes))) : null;
+            }, ct).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) { throw; }
+        catch { return null; }
+        finally { _mobileLibraryArtworkWorkers.Release(); }
+    }
 
     /// <summary>Captures mobile playback details from the active source rather than a retained queue entry.</summary>
     /// <returns>Path-free metadata and the current opaque artwork revision.</returns>

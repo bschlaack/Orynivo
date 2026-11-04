@@ -15,13 +15,15 @@ public partial class MainWindow
         var providers = GetMobileRemoteProviders();
         var sources = await Task.WhenAll(providers.Select(async provider =>
         {
-            var albums = await provider.GetAlbumsAsync(false, ct);
+            var albums = await provider.GetAlbumsAsync(true, ct);
             return albums.Where(a => !string.IsNullOrWhiteSpace(a.Title) && (string.IsNullOrWhiteSpace(query) ||
                     a.Title.Contains(query.Trim(), StringComparison.CurrentCultureIgnoreCase) ||
                     a.DisplayArtist?.Contains(query.Trim(), StringComparison.CurrentCultureIgnoreCase) == true))
-                .Select(a => new MobileRemoteAlbum(CreateMobileIdentity(provider, a.Id), a.Title, a.DisplayArtist, a.Year, provider.DisplayName));
+                .Select(a => (Summary: new MobileRemoteAlbum(CreateMobileIdentity(provider, a.Id), a.Title, a.DisplayArtist, a.Year, provider.DisplayName),
+                    Location: a.ArtworkPath ?? a.ThumbnailPath));
         }));
-        return sources.SelectMany(x => x).OrderBy(a => a.Title, StringComparer.CurrentCultureIgnoreCase).Take(500).ToArray();
+        return sources.SelectMany(x => x).OrderBy(a => a.Summary.Title, StringComparer.CurrentCultureIgnoreCase).Take(500)
+            .Select(a => a.Summary with { ArtworkKey = _mobileLibraryArtwork.Register(a.Location) }).ToArray();
     }
 
     /// <summary>Resolves the displayed library/search suffix under shared queue and playback ownership.</summary>

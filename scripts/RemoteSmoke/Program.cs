@@ -40,6 +40,8 @@ var run = Task.Run(async () =>
         BrowseMobilePlaylistTracksFunc = (_, _) => Task.FromResult<IReadOnlyList<MobileRemoteTrack>>([new("local:1", "Fixture track", null, null, 1998, "Local")]),
         QueueMobilePlaylistFunc = (id, action) => { lastAction = action; return Task.FromResult(id == 1); },
         QueueMobileTracksFunc = ids => { lastIdentities = ids; return Task.FromResult(true); },
+        GetMobileLibraryArtworkFunc = (key, _) => Task.FromResult<RemoteArtwork?>(key == new string('a', 32)
+            ? new RemoteArtwork([1, 2, 3], "image/jpeg", "library-fixture") : null),
         PlayMobilePlaylistFromTrackFunc = (id, index, identity) =>
             Task.FromResult(id == 1 && index == 2 && identity == "local:1"),
         BrowseMobileRadioFunc = async (q, ct) =>
@@ -64,6 +66,7 @@ var run = Task.Run(async () =>
         Check(html.Headers.CacheControl?.NoStore == true, "HTML must not be cached");
         Check(html.Headers.GetValues("Content-Security-Policy").Single().Contains("blob:"), "authenticated artwork blobs");
         foreach (var route in new[] { "/remote/api/state", "/remote/api/playlists", "/remote/api/playlists/1/tracks", "/remote/api/events",
+            "/remote/api/library/artwork?key=" + new string('a', 32),
             "/remote/api/media/radio", "/remote/api/media/podcasts", "/remote/api/media/podcasts/podcast-id/episodes" })
         {
             using var denied = await client.GetAsync(route);
@@ -228,6 +231,17 @@ var run = Task.Run(async () =>
         Check(playlists.Contains("Fixture playlist"), "playlist enumeration");
         var tracks = await client.GetStringAsync("/remote/api/playlists/1/tracks");
         Check(tracks.Contains("local:1") && !tracks.Contains("path"), "safe playlist tracks");
+        using var libraryImage = await client.GetAsync("/remote/api/library/artwork?key=" + new string('a', 32));
+        Check(libraryImage.IsSuccessStatusCode && libraryImage.Headers.CacheControl?.Private == true &&
+            libraryImage.Headers.ETag?.Tag == "\"library-fixture\"" && (await libraryImage.Content.ReadAsByteArrayAsync()).SequenceEqual(new byte[] { 1, 2, 3 }), "private catalog artwork bytes and validator");
+        using var missingLibraryImage = await client.GetAsync("/remote/api/library/artwork?key=" + new string('b', 32));
+        Check(missingLibraryImage.StatusCode == HttpStatusCode.NotFound, "missing catalog artwork");
+        using var invalidLibraryImage = await client.GetAsync("/remote/api/library/artwork?key=unregistered-source");
+        Check(invalidLibraryImage.StatusCode == HttpStatusCode.NotFound, "catalog artwork rejects source locations");
+        using var cachedLibraryRequest = new HttpRequestMessage(HttpMethod.Get, "/remote/api/library/artwork?key=" + new string('a', 32));
+        cachedLibraryRequest.Headers.IfNoneMatch.Add(new EntityTagHeaderValue("\"library-fixture\""));
+        using var cachedLibraryImage = await client.SendAsync(cachedLibraryRequest);
+        Check(cachedLibraryImage.StatusCode == HttpStatusCode.NotModified, "catalog artwork cache validation");
         foreach (var action in new[] { "play", "append" })
         {
             using var result = await client.PostAsJsonAsync("/remote/api/playlists/1/queue", new { action });

@@ -1,5 +1,11 @@
 # Workflow verification scopes
 
+Mobile catalog row artwork (2026-11-04): unit checks cover opaque source keys,
+deduplication and bounded eviction. API smoke checks private image bytes/ETags
+and missing/invalid key rejection. Muted Edge verifies artist and album images
+before row text, including artist-to-album navigation and missing-image layout;
+synthetic phone screenshots are visually inspected. No personal library is used.
+
 Mobile music delivery (2026-11-04): synthetic tests cover literal all-word
 search and cross-source ranking, format whitelisting, no realtime input
 throttling and input-side seek bounds. Real FFmpeg/FFprobe verifies all offered

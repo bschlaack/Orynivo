@@ -386,7 +386,9 @@ The single bottom navigation row contains **Now playing**, **Artists**,
 **Albums**, and **More**. Open **More** for search, playlists, radio, podcasts
 or **Up Next**. Music search combines local/server matches by relevance; playing
 from search or an album queues the displayed tracks from the chosen row onward.
-The playback cover prefers original artwork, bounded to 1280 pixels.
+The playback cover prefers original artwork, bounded to 1280 pixels. Artist and
+album rows show a small image at the left. Thumbnails load as rows approach the
+viewport; unavailable images retain a placeholder.
 
 While **This device** is selected, **Music format** offers:
 

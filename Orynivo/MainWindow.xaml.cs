@@ -688,6 +688,7 @@ public partial class MainWindow : Window
         _mcpBridge.SetBrowserMusicFormatFunc = id => _browserMusicEncoding = Audio.BrowserAudioEncoding.Find(id)!;
         _mcpBridge.QueueMobileTracksFunc = QueueMobileRemoteTracksAsync;
         _mcpBridge.BrowseMobileAllAlbumsFunc = BrowseMobileRemoteAllAlbumsAsync;
+        _mcpBridge.GetMobileLibraryArtworkFunc = ResolveMobileLibraryArtworkAsync;
         _mcpBridge.BrowseMobileRadioFunc = BrowseMobileRadioAsync;
         _mcpBridge.BrowseMobilePodcastsFunc = BrowseMobilePodcastsAsync;
         _mcpBridge.BrowseMobileEpisodesFunc = BrowseMobileEpisodesAsync;

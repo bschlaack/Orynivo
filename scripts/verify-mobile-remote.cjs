@@ -89,7 +89,7 @@ const server = http.createServer(async(req,res)=>{
     }
     let data;
     if(req.url.endsWith('/state')) data=state;
-    else if(req.url.startsWith('/remote/api/artwork')){
+    else if(req.url.startsWith('/remote/api/artwork')||req.url.startsWith('/remote/api/library/artwork')){
         if(artworkMissing){res.writeHead(404);res.end();return;}
         res.writeHead(200,{'Content-Type':'image/svg+xml'});
         res.end('<svg xmlns="http://www.w3.org/2000/svg" width="320" height="320"><rect width="320" height="320" fill="#235972"/><circle cx="160" cy="160" r="90" fill="#62437b"/><circle cx="160" cy="160" r="25" fill="#20364b"/></svg>');return;
@@ -101,8 +101,8 @@ const server = http.createServer(async(req,res)=>{
     else if(req.url.includes('/media/podcasts')) data=[{id:'podcast-id',title:'Synthetic podcast',subtitle:'Publisher'}];
     else if(req.url.endsWith('/playlists')) data=[{id:1,name:'Evening favorites',trackCount:2,isSmart:false},{id:2,name:'Smart discovery',trackCount:null,isSmart:true}];
     else if(req.url.includes('/playlists/1/tracks')) data=[{...track,playlistIndex:0},{...track,playlistIndex:2}];
-    else if(req.url.includes('/library/artists')) data=[{id:'local:1',name:'Example Artist',source:'Local'}];
-    else if(req.url.includes('/library/albums')) data=[{id:'local:2',title:'Example Album',year:1998,source:'Local'}];
+    else if(req.url.includes('/library/artists')) data=[{id:'local:1',name:'Example Artist',source:'Local',artworkKey:'a'.repeat(32)},{id:'local:4',name:'No artist picture',source:'Local'}];
+    else if(req.url.includes('/library/albums')) data=[{id:'local:2',title:'Example Album',year:1998,source:'Local',artworkKey:'c'.repeat(32)}];
     else data=[track,{...track,id:'local:3',title:'Second track'}];
     res.setHeader('Content-Type','application/json');res.end(JSON.stringify(data));
 });
@@ -127,7 +127,18 @@ const server = http.createServer(async(req,res)=>{
         await page.waitForSelector('#cover',{state:'visible'});
         assert.equal(await page.locator('.tabs > button').count(),4,'One navigation row');
         assert.equal(await page.locator('#moreMenu').isVisible(),false);
-        await navigate(page,'albums');await page.getByRole('button',{name:'Example Album',exact:true}).click();
+        await navigate(page,'artists');
+        await page.waitForSelector('#libraryList .library-row-art img:not([hidden])');
+        assert.equal(await page.locator('#libraryList .library-row-art.artist').count(),2);
+        assert.equal(await page.locator('#libraryList .library-row-art img').count(),1,'Missing image retains illustration');
+        const imageBox=await page.locator('#libraryList .library-row-art').first().boundingBox();
+        const textBox=await page.locator('#libraryList .row-name').first().boundingBox();
+        assert(imageBox.x+imageBox.width<textBox.x,'Artist image appears before row text');
+        await page.screenshot({path:path.join(root,'out/mobile-remote-artist-images.png'),fullPage:true});
+        await navigate(page,'albums');
+        await page.waitForSelector('#libraryList .library-row-art.album img:not([hidden])');
+        await page.screenshot({path:path.join(root,'out/mobile-remote-album-images.png'),fullPage:true});
+        await page.getByRole('button',{name:'Example Album',exact:true}).click();
         await page.waitForSelector('#libraryList .result-actions');
         await navigate(page,'playing');
         assert.equal(new URL(page.url()).hash,'');
@@ -216,6 +227,7 @@ const server = http.createServer(async(req,res)=>{
         assert(commands.some(x=>x.body.id===track.id&&x.body.action==='next'));
         await navigate(page,'artists');
         await page.getByRole('button',{name:'Example Artist',exact:true}).click();
+        await page.waitForSelector('#libraryList .library-row-art.album img:not([hidden])');
         await page.getByRole('button',{name:'Example Album',exact:true}).click();
         await page.waitForSelector('#libraryList .result-actions');
         await page.locator('#libraryList .result-actions button').filter({hasText:words.de.play}).first().click();

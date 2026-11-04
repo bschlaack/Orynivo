@@ -29,6 +29,8 @@
     const mediaVersions = { radio:0, podcasts:0 };
     let libraryLoaded = false, playlistsLoaded = false, libraryLevel = 'artists', libraryArtist;
     let libraryVersion = 0, playlistVersion = 0, searchVersion = 0, playlistId, filterTimer;
+    let libraryImageController, libraryImageObserver, libraryImageQueue = [], libraryImageRunning = 0;
+    const libraryImageUrls = new Set();
     const paths = {
         previous:'M5 4h3v16H5zM19 4v16L8 12z', next:'M16 4h3v16h-3zM5 4v16l11-8z',
         play:'M7 3v18l15-9z', pause:'M5 3h5v18H5zM14 3h5v18h-5z', stop:'M5 5h14v14H5z'
@@ -51,6 +53,7 @@
         if (text) messageTimer = setTimeout(() => { if (connected) $('message').hidden = true; }, 5000);
     }
     function disconnect(error = '') {
+        resetLibraryImages();
         releaseBrowserAudio(); stopBrowserAudio();
         session++; controller?.abort(); clearTimeout(reconnectTimer); connected = false; key = '';
         $('app').hidden = true; $('logout').hidden = true; $('login').hidden = false;
@@ -62,12 +65,12 @@
         if (artUrl) URL.revokeObjectURL(artUrl); artUrl = '';
         notice(''); $('token').focus();
     }
-    async function api(path, body) {
+    async function api(path, body, signal = controller?.signal) {
         const generation = session;
         const r = await fetch('/remote/api/' + path, {
             method: body === undefined ? 'GET' : 'POST',
             headers: { Authorization: 'Bearer ' + key, 'Content-Type': 'application/json' },
-            cache: 'no-store', signal: controller?.signal,
+            cache: 'no-store', signal,
             ...(body === undefined ? {} : { body: JSON.stringify(body) })
         });
         if (generation !== session) throw new DOMException('', 'AbortError');
@@ -108,6 +111,53 @@
         if (open) { name.type = 'button'; name.onclick = open; }
         const meta = document.createElement('div'); meta.className = 'meta'; meta.textContent = secondary || '';
         li.append(name, meta); return li;
+    }
+    function resetLibraryImages() {
+        libraryImageController?.abort(); libraryImageObserver?.disconnect(); libraryImageQueue = [];
+        for (const url of libraryImageUrls) URL.revokeObjectURL(url);
+        libraryImageUrls.clear(); libraryImageController = new AbortController();
+        libraryImageObserver = new IntersectionObserver(entries=>{
+            for (const entry of entries) if (entry.isIntersecting) {
+                libraryImageObserver.unobserve(entry.target);
+                libraryImageQueue.push({image:entry.target.querySelector('img'),signal:libraryImageController.signal});
+            }
+            loadLibraryImages();
+        },{rootMargin:'120px'});
+    }
+    function loadLibraryImages() {
+        while (libraryImageRunning < 4 && libraryImageQueue.length) {
+            const {image,signal} = libraryImageQueue.shift();
+            if (signal.aborted || !image.isConnected) continue;
+            libraryImageRunning++;
+            (async()=>{
+                try {
+                    const response = await api('library/artwork?key='+encodeURIComponent(image.dataset.artworkKey),undefined,signal);
+                    const blob = await response.blob();
+                    if (signal.aborted || !image.isConnected) return;
+                    const url = URL.createObjectURL(blob); libraryImageUrls.add(url);
+                    image.onload = () => { if (!signal.aborted && image.isConnected) { image.hidden = false; image.previousElementSibling.setAttribute('hidden',''); } };
+                    image.src = url;
+                } catch { /* Missing pictures retain the fixed-size illustration. */ }
+                finally { libraryImageRunning--; loadLibraryImages(); }
+            })();
+        }
+    }
+    function libraryRow(item, kind, open) {
+        const li = row(item.name || item.title,[item.artist,item.year,item.source].filter(Boolean).join(' · '),open);
+        li.className = 'library-row';
+        const copy = document.createElement('div'); copy.className = 'library-row-copy'; copy.append(...li.childNodes);
+        const art = document.createElement('div'); art.className = 'library-row-art '+kind;
+        const svg = document.createElementNS('http://www.w3.org/2000/svg','svg');
+        svg.setAttribute('viewBox','0 0 24 24'); svg.setAttribute('aria-hidden','true');
+        const path = document.createElementNS(svg.namespaceURI,'path');
+        path.setAttribute('d',kind==='artist' ? 'M12 3a4 4 0 1 0 0 8 4 4 0 0 0 0-8M4 21v-3a8 6 0 0 1 16 0v3z' : 'M3 3h18v18H3zM12 7a5 5 0 1 0 0 10 5 5 0 0 0 0-10M12 11a1 1 0 1 1 0 2 1 1 0 0 1 0-2');
+        path.setAttribute('fill-rule','evenodd'); svg.append(path); art.append(svg);
+        if (item.artworkKey) {
+            const image = document.createElement('img'); image.alt = ''; image.hidden = true;
+            image.width = image.height = 56; image.decoding = 'async'; image.dataset.artworkKey = item.artworkKey;
+            art.append(image); libraryImageObserver.observe(art);
+        }
+        li.append(art,copy); return li;
     }
     function trackRow(track, context) {
         const li = row(track.title, [track.artist, track.album, track.year, track.source].filter(Boolean).join(' · '));
@@ -332,6 +382,7 @@
         $('moreMenu').hidden = true; $('moreButton').setAttribute('aria-expanded','false');
         currentView = view;
         const panel = view === 'artists' || view === 'albums' ? 'library' : view;
+        if (panel !== 'library') resetLibraryImages();
         document.querySelectorAll('[data-panel]').forEach(p => p.hidden = p.id !== panel);
         $('searchForm').hidden = view !== 'library'; $('results').hidden = view !== 'library';
         $('libraryBrowser').hidden = view === 'library';
@@ -342,6 +393,7 @@
         if (view === 'playlists' && !playlistsLoaded) browsePlaylists();
     }
     async function libraryFetch(path, build) {
+        resetLibraryImages();
         const version = ++libraryVersion; empty($('libraryList'),t.loading);
         try {
             const rows = await (await api(path)).json();
@@ -353,19 +405,19 @@
         libraryLevel = 'artists'; libraryArtist = null;
         $('libraryTitle').textContent = t.artists; $('libraryBack').hidden = true; $('libraryFilter').hidden = false;
         return libraryFetch('library/artists?q='+encodeURIComponent($('libraryFilter').value.trim())+'&limit=250',
-            x => row(x.name,x.source,()=>browseAlbums(x)));
+            x => libraryRow(x,'artist',()=>browseAlbums(x)));
     }
     function browseAllAlbums() {
         libraryLevel = 'allAlbums'; libraryArtist = null;
         $('libraryTitle').textContent = t.albums; $('libraryBack').hidden = true; $('libraryFilter').hidden = false;
         return libraryFetch('library/albums?q='+encodeURIComponent($('libraryFilter').value.trim()),
-            x => row(x.title,[x.artist,x.year,x.source].filter(Boolean).join(' · '),()=>browseTracks(x)));
+            x => libraryRow(x,'album',()=>browseTracks(x)));
     }
     function browseAlbums(artist) {
         libraryLevel = 'albums'; libraryArtist = artist;
         $('libraryTitle').textContent = artist.name; $('libraryBack').hidden = false; $('libraryFilter').hidden = true;
         return libraryFetch('library/albums?artistId='+encodeURIComponent(artist.id),
-            x => row(x.title,[x.year,x.source].filter(Boolean).join(' · '),()=>browseTracks(x)));
+            x => libraryRow(x,'album',()=>browseTracks(x)));
     }
     function browseTracks(album) {
         libraryLevel = 'tracks'; $('libraryTitle').textContent = album.title;

@@ -1056,6 +1056,15 @@ WavPack metadata, PCM/DSD caps and an empty eligible candidate set.
   obsolete revisions before/after asynchronous work, retaining private
   content-hash ETags. Browser blob replacement removes old images immediately
   and ignores superseded responses.
+- Artist/album DTOs include optional opaque ArtworkKey values, registered only
+  for the returned result set. `MobileLibraryArtworkCatalog` retains at most
+  2048 source locations in memory. `/remote/api/library/artwork` requires bearer
+  authentication, accepts only registered opaque keys and returns private-cache
+  JPEGs with content-hash ETags. Four background workers resize images to 160
+  pixels. The browser lazily fetches images near the viewport with four workers,
+  revokes blob URLs and cancels obsolete loads when browsing changes or the user
+  signs out. Artist images are circular, album images square; missing images
+  retain a fixed-size decorative placeholder before the row text.
 - `MainWindow.MobileRemote.Output.cs` owns the transient page output override.
   Browser selection captures the active source, position and pause state, marks
   the requested page before cancellation, detaches endpoint-volume sync, awaits

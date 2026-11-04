@@ -355,6 +355,13 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
   and local reads stay off-thread. Browser artwork/state refreshes reject stale
   sessions and newer live state. Never auto-navigate on periodic state updates
   alone.
+- Catalog artist/album rows expose only opaque artwork keys. Register only the
+  final bounded result set, never raw source locations. Keep the registry
+  bounded to 2048 entries, decode 160-pixel JPEGs off-thread with four workers
+  and serve them through bearer-authenticated private-cache endpoints. Lazy
+  browser loads have four workers and must abort/revoke image URLs on
+  replacement or sign-out. Missing images preserve row geometry and a decorative
+  placeholder.
 - Browser audio is a transient factory override, never a persisted OutputBackend
   or saved output profile. SelectBrowserOutputAsync captures source/position/
   pause, publishes the new output owner before cancellation, fully drains old
