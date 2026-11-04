@@ -16,14 +16,16 @@ permissions:
 jobs:
   build:
     name: Build macOS player ${{ matrix.rid }}
-    runs-on: macos-14
+    runs-on: ${{ matrix.runner }}
 
     strategy:
       fail-fast: false
       matrix:
-        rid:
-          - osx-x64
-          - osx-arm64
+        include:
+          - rid: osx-x64
+            runner: macos-15-intel
+          - rid: osx-arm64
+            runner: macos-15
 
     steps:
       - name: Checkout repository
