@@ -1663,6 +1663,10 @@ dotnet publish Orynivo.Server/Orynivo.Server.csproj \
 The CI and release workflows use the Node.js 24 generations of GitHub's
 checkout/.NET setup actions and the GitHub Release upload action.
 
+macOS CI and release jobs use `macos-15-intel` for `osx-x64` and `macos-15` for
+`osx-arm64`. Both architectures remain required for a complete release and its
+signed update manifest.
+
 Pushing a version tag triggers two parallel release workflows:
 
 ```powershell

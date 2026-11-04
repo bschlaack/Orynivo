@@ -68,6 +68,11 @@ declaration without a `<summary>`.
 
 ## Maintenance Requirement
 
+Keep macOS CI and release runner selections supported and matched to each matrix
+runtime architecture. Update both workflows together; runner image retirement
+must not be worked around by dropping a release architecture or allowing partial
+update manifests.
+
 Release upload retries must reconcile existing assets on each attempt and reject
 workflows whose release tag no longer resolves to their build checkout. Keep
 offline upload recovery checks in the CI verify job.
