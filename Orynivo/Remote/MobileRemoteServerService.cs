@@ -11,7 +11,7 @@ using System.Text.Json;
 namespace Orynivo.Remote;
 
 /// <summary>Hosts the opt-in, token-protected mobile web remote for the desktop player.</summary>
-public sealed class MobileRemoteServerService : IAsyncDisposable
+public sealed partial class MobileRemoteServerService : IAsyncDisposable
 {
     private static readonly JsonSerializerOptions RemoteJsonOptions = new(JsonSerializerDefaults.Web);
     private WebApplication? _app;
@@ -49,13 +49,19 @@ public sealed class MobileRemoteServerService : IAsyncDisposable
             context.Response.Headers["Referrer-Policy"] = "no-referrer";
             context.Response.Headers["Content-Security-Policy"] =
                 "default-src 'self'; connect-src 'self'; img-src 'self' data: blob:; " +
-                "style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; frame-ancestors 'none'";
+                "media-src 'self' blob:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; frame-ancestors 'none'";
             if (!context.Request.Path.StartsWithSegments("/remote/api"))
             {
                 await next(context).ConfigureAwait(false);
                 return;
             }
 
+            if (context.Request.Path.StartsWithSegments("/remote/api/browser-audio/stream"))
+            {
+                if (!AuthorizeBrowserStream(context)) { context.Response.StatusCode = 401; return; }
+                await next(context).ConfigureAwait(false);
+                return;
+            }
             var authorization = context.Request.Headers.Authorization.ToString();
             const string prefix = "Bearer ";
             var supplied = authorization.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)
@@ -122,8 +128,10 @@ public sealed class MobileRemoteServerService : IAsyncDisposable
                 .ConfigureAwait(false);
             return Results.Json(results);
         });
-        app.MapGet("/remote/api/library/albums", async (string? artistId, CancellationToken ct) =>
+        app.MapGet("/remote/api/library/albums", async (string? artistId, string? q, CancellationToken ct) =>
         {
+            if (string.IsNullOrWhiteSpace(artistId) && bridge.BrowseMobileAllAlbumsFunc is { } all)
+                return Results.Json(await all(q, ct).ConfigureAwait(false));
             if (bridge.BrowseMobileAlbumsFunc is null || string.IsNullOrWhiteSpace(artistId))
                 return Results.BadRequest(new { error = "invalid_artist" });
             return Results.Json(await bridge.BrowseMobileAlbumsFunc(artistId, ct).ConfigureAwait(false));
@@ -175,6 +183,13 @@ public sealed class MobileRemoteServerService : IAsyncDisposable
                 ? await browse(id, ct).ConfigureAwait(false) : Array.Empty<MobileRemoteTrack>()));
         app.MapPost("/remote/api/playlists/{id:long}/queue", async (long id, MobileRemotePlaylistAction request, CancellationToken ct) =>
         {
+            if (request.StartIndex is { } index)
+            {
+                if (id <= 0 || index < 0 || request.Action != "play" || string.IsNullOrWhiteSpace(request.TrackId) ||
+                    request.TrackId.Length > 256 || bridge.PlayMobilePlaylistFromTrackFunc is not { } playFrom) return Results.BadRequest();
+                return await bridge.OnUiAsync(() => playFrom(id, index, request.TrackId), ct).ConfigureAwait(false)
+                    ? Results.NoContent() : Results.BadRequest();
+            }
             if (id <= 0 || request.Action is not ("play" or "append") || bridge.QueueMobilePlaylistFunc is null)
                 return Results.BadRequest();
             var accepted = await bridge.OnUiAsync(() => bridge.QueueMobilePlaylistFunc(id, request.Action), ct).ConfigureAwait(false);
@@ -206,6 +221,12 @@ public sealed class MobileRemoteServerService : IAsyncDisposable
         });
         app.MapPost("/remote/api/tracks/queue", async (MobileRemoteTrackAction request, CancellationToken ct) =>
         {
+            if (request.Ids is { } ids)
+            {
+                if (request.Action != "play" || ids.Count is < 1 or > 500 || ids.Any(id => string.IsNullOrWhiteSpace(id) || id.Length > 256) ||
+                    bridge.QueueMobileTracksFunc is not { } play) return Results.BadRequest();
+                return await bridge.OnUiAsync(() => play(ids), ct).ConfigureAwait(false) ? Results.NoContent() : Results.BadRequest();
+            }
             if (bridge.QueueMobileTrackFunc is null || string.IsNullOrWhiteSpace(request.Id))
                 return Results.BadRequest(new { error = "invalid_track" });
             var accepted = await bridge.OnUiAsync(
@@ -220,28 +241,33 @@ public sealed class MobileRemoteServerService : IAsyncDisposable
                 () => bridge.EditMobileQueueFunc(request.Action, request.Index), ct).ConfigureAwait(false);
             return accepted ? Results.NoContent() : Results.BadRequest(new { error = "invalid_queue_action" });
         });
-        app.MapGet("/remote/api/outputs", async (CancellationToken ct) =>
+        app.MapGet("/remote/api/outputs", async (string? clientId, CancellationToken ct) =>
         {
             var values = await bridge.OnUiAsync(
                 () => bridge.GetOutputProfilesFunc?.Invoke() ?? [], ct).ConfigureAwait(false);
-            return Results.Json(values.Select(value =>
+            var browser = await bridge.OnUiAsync(() => bridge.GetBrowserAudioStateFunc?.Invoke(), ct).ConfigureAwait(false);
+            var outputs = values.Select(value =>
             {
                 const string selectedSuffix = " (selected)";
                 var selected = value.EndsWith(selectedSuffix, StringComparison.Ordinal);
                 return new MobileRemoteOutput(
                     selected ? value[..^selectedSuffix.Length] : value,
-                    selected);
-            }));
+                    selected && browser is null);
+            }).ToList();
+            if (bridge.SelectBrowserOutputFunc is not null) outputs.Add(new MobileRemoteOutput("", browser?.ClientId == clientId, true));
+            return Results.Json(outputs);
         });
         app.MapPost("/remote/api/outputs/select", async (MobileRemoteOutputSelection request, CancellationToken ct) =>
         {
             if (bridge.SelectOutputProfileFunc is null || string.IsNullOrWhiteSpace(request.Name))
                 return Results.BadRequest(new { error = "invalid_output" });
+            Interlocked.Increment(ref _browserSelectionVersion);
             var selected = await bridge.OnUiAsync(
                 () => bridge.SelectOutputProfileFunc(request.Name), ct).ConfigureAwait(false);
             return selected ? Results.NoContent() : Results.NotFound(new { error = "output_not_found" });
         });
 
+        MapBrowserAudioEndpoints(app, bridge);
         await app.StartAsync(cancellationToken).ConfigureAwait(false);
         _app = app;
     }
@@ -255,15 +281,18 @@ public sealed class MobileRemoteServerService : IAsyncDisposable
             return;
         var app = _app;
         _app = null;
+        try { await StopBrowserOutputAsync().ConfigureAwait(false); }
+        catch { /* A failed output release must not retain the HTTP listener. */ }
         try
         {
             await app.StopAsync(cancellationToken).ConfigureAwait(false);
-            await app.DisposeAsync().ConfigureAwait(false);
         }
         catch
         {
             // A remote shutdown failure must not prevent Orynivo from closing.
         }
+        try { await app.DisposeAsync().ConfigureAwait(false); }
+        catch { /* Disposal remains best effort during application shutdown. */ }
     }
 
     /// <inheritdoc/>
@@ -289,7 +318,7 @@ public sealed class MobileRemoteServerService : IAsyncDisposable
             bridge.GetCurrentFavoriteFunc?.Invoke(),
             info?.ArtworkKey ?? Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(
                 $"{state.QueueIndex}\n{state.Title}\n{state.Artist}\n{state.Album}"))),
-            queue, info);
+            queue, info, bridge.GetBrowserAudioStateFunc?.Invoke());
         }, ct).ConfigureAwait(false);
     }
 
@@ -344,6 +373,7 @@ public sealed class MobileRemoteServerService : IAsyncDisposable
 /// <param name="ArtworkKey">Credential-free identity used to refresh current artwork.</param>
 /// <param name="Queue">Path-free queue entries.</param>
 /// <param name="Playback">Optional source-owned playback details.</param>
+/// <param name="BrowserAudio">Transient browser output state, or null for a physical output.</param>
 public sealed record MobileRemoteSnapshot(
     string Status,
     string? Title,
@@ -356,7 +386,8 @@ public sealed record MobileRemoteSnapshot(
     bool? IsFavorite,
     string ArtworkKey,
     IReadOnlyList<MobileRemoteQueueEntry> Queue,
-    MobileRemotePlaybackInfo? Playback = null);
+    MobileRemotePlaybackInfo? Playback = null,
+    BrowserAudioState? BrowserAudio = null);
 
 /// <summary>Source-owned playback information containing no URLs, paths or credentials.</summary>
 /// <param name="MediaKind">Music, radio or podcasts.</param>
@@ -388,13 +419,15 @@ public sealed record MobileRemoteCommand(string Command, double? Value);
 /// <param name="Album">Album title.</param>
 /// <param name="Year">Release year.</param>
 /// <param name="Source">Safe provider display name.</param>
+/// <param name="PlaylistIndex">Original playlist-row index, retaining duplicate entry identity.</param>
 public sealed record MobileRemoteTrack(
     string Id,
     string Title,
     string? Artist,
     string? Album,
     int? Year,
-    string Source);
+    string Source,
+    int? PlaylistIndex = null);
 
 /// <summary>A provider-bound artist summary for mobile library browsing.</summary>
 /// <param name="Id">Opaque identity accepted by the album browser.</param>
@@ -413,7 +446,8 @@ public sealed record MobileRemoteAlbum(string Id, string Title, string? Artist, 
 /// <summary>A playback or queue action targeting an opaque mobile search result.</summary>
 /// <param name="Id">Opaque search-result identity.</param>
 /// <param name="Action">One of <c>play</c>, <c>next</c>, or <c>append</c>.</param>
-public sealed record MobileRemoteTrackAction(string Id, string Action);
+/// <param name="Ids">Optional ordered visible-list suffix; source paths are never accepted.</param>
+public sealed record MobileRemoteTrackAction(string Id = "", string Action = "play", IReadOnlyList<string>? Ids = null);
 
 /// <summary>A shared regular or smart playlist without paths or filter internals.</summary>
 /// <param name="Id">Database playlist identifier.</param>
@@ -424,7 +458,9 @@ public sealed record MobileRemotePlaylist(long Id, string Name, int? TrackCount,
 
 /// <summary>A whole-playlist playback request.</summary>
 /// <param name="Action">Either play (replace queue) or append.</param>
-public sealed record MobileRemotePlaylistAction(string Action);
+/// <param name="StartIndex">Optional original row at which playlist playback begins.</param>
+/// <param name="TrackId">Expected selected row identity to reject changed playlists.</param>
+public sealed record MobileRemotePlaylistAction(string Action, int? StartIndex = null, string? TrackId = null);
 
 /// <summary>A radio or podcast play request that never accepts a browser-supplied URL.</summary>
 /// <param name="Id">Opaque identity previously returned by the media browser.</param>
@@ -438,7 +474,8 @@ public sealed record MobileRemoteQueueAction(string Action, int? Index);
 /// <summary>A selectable output profile exposed to the mobile remote.</summary>
 /// <param name="Name">Profile display name.</param>
 /// <param name="Selected">Whether this profile is currently selected.</param>
-public sealed record MobileRemoteOutput(string Name, bool Selected);
+/// <param name="IsBrowser">Whether this choice represents the current browser rather than a stored profile.</param>
+public sealed record MobileRemoteOutput(string Name, bool Selected, bool IsBrowser = false);
 
 /// <summary>An output-profile selection request.</summary>
 /// <param name="Name">Exact configured profile name.</param>

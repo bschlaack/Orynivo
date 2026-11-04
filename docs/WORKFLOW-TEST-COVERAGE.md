@@ -1,5 +1,35 @@
 # Workflow verification scopes
 
+Mobile music delivery (2026-11-04): synthetic tests cover literal all-word
+search and cross-source ranking, format whitelisting, no realtime input
+throttling and input-side seek bounds. Real FFmpeg/FFprobe verifies all offered
+FLAC precisions/rates, MP3 bitrates and DSD-to-FLAC output. API/browser checks
+exercise ordered library/search suffixes, duplicates, bounds, dedicated
+album/artist navigation, the More menu, format handoff and all seven languages.
+The existing held-source streaming checks establish packet delivery before
+source EOF, not a physical phone startup-latency guarantee.
+
+Browser output (2026-11-04): `BrowserAudioPlayerTests` covers
+source/page/command ownership, seek cancellation, actual-browser-end completion,
+full encoder drain, DSD/segment encoding arguments and inactivity pause with a
+controlled clock. `scripts/RemoteSmoke` holds output admission, checks
+session-only HttpOnly cookie scope, bearer-only/media-only rejection, stream
+bytes, takeover/revocation and old-page release isolation through the real host
+with fake playback adapters. The browser harness plays synthetic audio in muted
+headless Edge, checks that media waits for output acknowledgement, and exercises
+pause/resume, seek stream replacement, native return, takeover and autoplay
+refusal. The opt-in `scripts/BrowserAudioSmoke` invokes actual FFmpeg/FFprobe on
+generated PCM/DSF, virtual segments and multipart input and validates decodable
+stereo MP3 plus write-failure/cancellation cleanup. It opens no audio hardware.
+Held loopback sources also prove live byte delivery and real FFmpeg packet
+delivery before upstream EOF, unchanged direct bytes and forwarded 206 ranges.
+Playlist tests cover duplicate occurrences, stale identity and suffix ordering.
+The headless UI suite checks the actual transient output picker and detached
+resume decision, without opening outputs or starting playback. These checks do
+not establish native WASAPI/ASIO driver release, physical phone sound, mobile
+background behavior or audible gapless playback; real-device acceptance remains
+separate. All sources and HTTP fixtures are synthetic.
+
 Mobile playback presentation (2026-11-04): `MobileRemoteArtworkCacheTests`
 checks shared loads, source replacement and delayed-image revision without UI,
 network or audio. `scripts/RemoteSmoke` checks active-source metadata, omission

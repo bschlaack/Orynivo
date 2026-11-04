@@ -299,7 +299,7 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
   physical paths, authenticated stream URLs, credentials, and private provider
   settings. Live updates send compact state changes only and reconnect without
   reloading the complete library. Current artwork must be decoded off the UI
-  thread, bounded to a 640-pixel JPEG, served only through the authenticated
+  thread, bounded to a 1280-pixel JPEG, served only through the authenticated
   API, and carry private cache validators. Queue selection accepts only a
   validated zero-based index. Mobile search combines local and configured
   Orynivo Server tracks away from the UI thread. Results expose only display
@@ -339,7 +339,8 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
   StartReadyPlaybackAsync and acknowledge only the still-current prepared
   player. Limit lists to 100 stations/shows and 500 newest episodes, sanitize
   provider errors, and reject stale browser responses after search, navigation
-  or sign-out. Keep all six navigation destinations visible on phones and all
+  or sign-out. Keep one navigation row with Now playing, Artists, Albums and
+  More; additional destinations live in its keyboard-accessible menu. Keep all
   seven remote locales complete.
 - Successful mobile Play actions open Now playing after readiness; next/append
   and failed starts retain browsing. MobileRemotePlaybackInfo uses the active
@@ -349,11 +350,55 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
   desktop image publication and reject superseded results. Source addresses stay
   inside the desktop. Cover endpoints validate the requested revision before and
   after loading; publish only authenticated, privately cached JPEGs. Prefer a
-  private bounded copy of the published desktop bitmap: copy before yielding and
-  encode off-thread. Source fallbacks use the existing bounded reader; decoding
+  original source before a private bounded desktop-bitmap fallback: copy before
+  yielding and encode off-thread. Source reads use the bounded reader; decoding
   and local reads stay off-thread. Browser artwork/state refreshes reject stale
   sessions and newer live state. Never auto-navigate on periodic state updates
   alone.
+- Browser audio is a transient factory override, never a persisted OutputBackend
+  or saved output profile. SelectBrowserOutputAsync captures source/position/
+  pause, publishes the new output owner before cancellation, fully drains old
+  players/preparations and rechecks output/start ownership before readiness.
+  Selecting even the previously selected physical profile must leave browser
+  mode and await its stream cleanup. Keep endpoint-volume synchronization
+  detached and the exclusive-device lock open/disabled in browser mode.
+- BrowserAudioPlayer owns no audio device. Browser feedback is bound to page,
+  stream and control revisions; actual media end, not encoder EOF, advances the
+  queue. Seeking/ReplayGain changes cancel old streams. Disposal waits for all
+  encoder cleanup off the dispatcher. A disconnected, inactive page pauses after
+  30 seconds and must never trigger native output fallback. Closing/releasing
+  the page stops playback while retaining transient browser mode until explicit
+  physical selection. Retain source/position/user pause for that explicit
+  selection, including after lease pause; explicit Stop clears retained resume.
+  Show a transient selected Remote device row without changing saved profiles.
+- Browser music uses a validated transient format choice: original bytes,
+  DSD-to-FLAC with other files unchanged, explicit FLAC precision/rate, or MP3
+  bitrate. Original requires a single physical source and browser codec support;
+  never silently change it to lossy output. Bound format IDs, use indexed source
+  metadata before probing and rely on response backpressure instead of FFmpeg
+  realtime input throttling. Flush packets progressively. Radio/podcasts ignore
+  music format choices. Relay radio/podcasts without probing to EOF, preserve
+  supported ranges and use encoding only as a decode fallback. Display the
+  delivered format, and distinguish native direct seek from encoder offsets.
+  Playlist row Play must retain original row occurrence and queue its suffix.
+  Library/search Play queues the displayed ordered suffix through validated
+  opaque identities. Resolve in bounded provider ID batches, preserve duplicate
+  occurrences, and guard queue/start/catalog ownership before publication.
+  Search ranks local and remote candidates together, requires all literal query
+  words and rejects stale results immediately when query text changes. Preserve
+  segment bounds, multipart ordering and encoded ReplayGain. Never accept
+  browser-supplied source URLs/paths, log process arguments/stderr, or return
+  them in DTOs. The selecting page receives only a scoped HttpOnly SameSite
+  session cookie; media GETs require it and current output ownership. Cookie
+  access must not authorize control APIs. Revoke media ownership on takeover,
+  release and host shutdown. Await child-tree termination after cancellation or
+  write failure. Keep MP3 output separate from native DSD bit-perfect paths.
+- Do not start the media element until output-selection acknowledgement has
+  installed its cookie. Keep tokens/client identity in page memory, expose no
+  media credentials in URLs, handle autoplay refusal with localized Play here,
+  and stop old audio on physical selection, takeover or sign-out. Browser EQ,
+  crossfeed and native gapless are currently unsupported and must remain
+  explicit.
 - AI endpoint discovery and testing use `AiEndpointService` and the unsaved
   values currently visible in Settings. Query only the credential-free
   OpenAI-compatible `/models` URL, accept standard and Ollama model-list shapes,

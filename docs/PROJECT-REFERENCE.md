@@ -1056,6 +1056,81 @@ WavPack metadata, PCM/DSD caps and an empty eligible candidate set.
   obsolete revisions before/after asynchronous work, retaining private
   content-hash ETags. Browser blob replacement removes old images immediately
   and ignores superseded responses.
+- `MainWindow.MobileRemote.Output.cs` owns the transient page output override.
+  Browser selection captures the active source, position and pause state, marks
+  the requested page before cancellation, detaches endpoint-volume sync, awaits
+  complete `StopPlaybackAsync(true)` (including older retirements and pending
+  creation), then checks output/start generations before ordinary readiness.
+  `CreatePlaybackPlayerAsync` checks this override before physical backend
+  routing; no native output is opened. Selecting an existing profile, including
+  the already saved one, clears the override and drains browser playback before
+  restarting through the normal native factory. This selection is never stored
+  in AppSettings/OutputBackend; the device-lock icon stays open/disabled.
+- `Audio/BrowserAudioPlayer.cs` implements IAudioPlayer without a hardware sink.
+  Its page, stream and command revisions reject stale progress/end/error
+  reports. Audible progress follows browser reports with bounded duration and
+  elapsed-time interpolation; natural browser end completes the shared player
+  lifetime and ordinary queue advancement. Seek and ReplayGain changes create a
+  new opaque stream, cancelling the old writer. One encoder writes at a time;
+  player disposal cancels and awaits all encoders through background retirement.
+  Without a connection or feedback for 30 seconds it pauses. Page release stops
+  the player and retains browser mode, so later playback cannot unexpectedly
+  reopen the computer's output. Restoring a physical profile is explicit.
+- `Audio/BrowserAudioTranscoder.cs` probes/encodes with hidden, shell-free
+  FFprobe/FFmpeg children. It handles actual source paths, ordered multipart
+  input and virtual segment bounds; browser requests never provide those values.
+  `BrowserAudioEncoding` whitelists transient music choices: original,
+  DSD-to-FLAC with other single files unchanged, six FLAC precision/rate choices
+  and four MP3 bitrates. Indexed local/remote metadata skips redundant FFprobe.
+  Original requires a single physical file and browser codec support; it never
+  silently becomes MP3. Encoded virtual/multipart tracks preserve boundaries.
+  Encoding uses pipe/response backpressure without `-re`; input-side seek and
+  small probe bounds reduce startup work. Packets flush before EOF. Radio and
+  podcasts ignore music format choices, skip preparation probing and use
+  `BrowserAudioRelay` for immediate byte-preserving HTTP/local delivery with
+  range support. Browser decode failure switches them to progressive MP3. Direct
+  media uses native absolute seeking; encoded streams use source offsets.
+  Reported format follows the delivered stream. Cancellation and failed response
+  writes kill the child tree and await exit independently of the cancelled
+  token. Process arguments, stderr, authenticated URLs and paths must remain out
+  of logs/DTOs. Browser output does not implement native gapless, equalizer,
+  crossfeed or native DSD; it never modifies source files.
+- `Remote/MobileRemoteServerService.BrowserAudio.cs` maps authenticated
+  `POST /remote/api/browser-audio/select`, `/release` and `/report`. Selection
+  acknowledges only after old output release/preparation and then installs a
+  random session-only HttpOnly SameSite=Strict cookie scoped to this route
+  subtree. `GET /remote/api/browser-audio/stream/{id}` requires that cookie and
+  the currently owning page, returns no-store audio and rejects old stream
+  revisions. The media cookie grants no control API access; bearer-only clients
+  cannot consume another page's media. A later selection rotates ownership;
+  release and host shutdown revoke the cookie. No credentials appear in media
+  URLs or application settings. The optional BrowserAudio snapshot contains only
+  page ID, stream revision, start offset, desired pause/volume and command
+  version. Output lists add a localized This device option and suppress stale
+  physical selected markers while browser output is active.
+- The remote uses one HTML audio element, enables same-origin media in CSP,
+  waits for selection/cookie acknowledgement before loading it and sends
+  revision-bound feedback. Native controls use the existing remote command path.
+  A browser gain node applies volume when available; autoplay refusal offers
+  localized Play here. Source changes and seeking replace the element's stream;
+  takeover/native selection/sign-out removes the old source. Closing or
+  backgrounding depends on browser lifecycle, so loss pauses/stops without
+  native fallback. The desktop picker shows a transient Remote device row.
+  Explicit physical selection resumes retained source/position/user pause even
+  after release or lease expiry; explicit Stop discards detached resume state.
+  Playlist row Play validates the original row index and source identity before
+  replacing the queue with its playable suffix, preserving duplicate
+  occurrences. Primary bearer tokens and page IDs remain memory-only; scoped
+  media cookies are separate session authentication for the element.
+- Mobile library/search Play submits a bounded ordered suffix of opaque IDs.
+  `MainWindow.MobileRemote.Library` resolves provider IDs using the existing
+  bounded batch loader, preserving order/duplicates before the normal queue
+  replacement. Queue/start/catalog guards reject obsolete results. Literal
+  search matching and common relevance ranking prevent unrelated substring hits
+  and local-first truncation. Original artwork precedes the desktop image
+  fallback, with a 1280-pixel JPEG cap. A single navigation row offers Now
+  playing, Artists, Albums and More, whose menu contains the remaining
+  destinations.
 - `Orynivo/AI/AiChatSettings.cs`: persisted configuration for the embedded AI
   chat (endpoint URL, optional API key, model name, max tokens); stored as
   `AppSettings.AiChat`

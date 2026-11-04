@@ -54,7 +54,19 @@
     "radioHint": "सहेजे गए स्टेशन। और स्टेशन खोजें या सहेजे गए स्टेशनों पर लौटने के लिए रीफ़्रेश करें।",
     "podcastHint": "पिन किए गए पॉडकास्ट। और कार्यक्रम खोजें और उनके एपिसोड खोलें।",
     "music": "संगीत",
-    "published": "प्रकाशित:"
+    "published": "प्रकाशित:",
+    "thisDevice": "यह डिवाइस",
+    "browserAudioActive": "ऑडियो इस डिवाइस पर चल रहा है। कंप्यूटर का ऑडियो आउटपुट मुक्त कर दिया गया है।",
+    "browserAudioBlocked": "ब्राउज़र में चलाने की अनुमति देने के लिए “यहाँ चलाएँ” दबाएँ।",
+    "browserAudioFailed": "ऑडियो स्ट्रीम नहीं चल सकी। इस डिवाइस को फिर चुनें या दूसरा आउटपुट चुनें।",
+    "browserAudioPlay": "यहाँ चलाएँ",
+    "otherBrowser": "दूसरे डिवाइस पर वेब ऐप",
+    "albums": "एल्बम",
+    "more": "और",
+    "musicFormat": "संगीत प्रारूप",
+    "originalFormat": "मूल प्रारूप",
+    "dsdPcm": "DSD → PCM (FLAC 24 बिट / 88.2 kHz)",
+    "formatHint": "मूल प्रारूप के लिए ब्राउज़र समर्थन और एकल फ़ाइल चाहिए। DSD → PCM अन्य फ़ाइलें नहीं बदलता। FLAC/MP3 स्ट्रीम करते समय बदलते हैं; रेडियो और पॉडकास्ट अपरिवर्तित रहते हैं।"
   },
   "de": {
     "welcome": "Deine Musik. Deine Kontrolle.",
@@ -111,7 +123,19 @@
     "radioHint": "Gespeicherte Sender. Suche nach weiteren Sendern oder kehre mit Aktualisieren zurück.",
     "podcastHint": "Angeheftete Podcasts. Suche nach weiteren Sendungen und öffne ihre Episoden.",
     "music": "Musik",
-    "published": "Veröffentlicht:"
+    "published": "Veröffentlicht:",
+    "thisDevice": "Dieses Gerät",
+    "browserAudioActive": "Der Ton wird auf diesem Gerät wiedergegeben. Die Audioausgabe am Rechner ist freigegeben.",
+    "browserAudioBlocked": "Tippe auf „Hier abspielen“, um die Browser-Wiedergabe freizugeben.",
+    "browserAudioFailed": "Der Audiostream konnte nicht wiedergegeben werden. Wähle dieses Gerät erneut oder ein anderes Ausgabegerät.",
+    "browserAudioPlay": "Hier abspielen",
+    "otherBrowser": "Web-App auf anderem Gerät",
+    "albums": "Alben",
+    "more": "Mehr",
+    "musicFormat": "Musikformat",
+    "originalFormat": "Originalformat",
+    "dsdPcm": "DSD → PCM (FLAC 24 Bit / 88,2 kHz)",
+    "formatHint": "Original benötigt Browser-Unterstützung und einzelne Dateien. DSD → PCM lässt andere Dateien unverändert. FLAC/MP3 konvertieren beim Streamen; Radio und Podcasts bleiben unverändert."
   },
   "en": {
     "welcome": "Your music. Your control.",
@@ -168,7 +192,19 @@
     "radioHint": "Saved stations. Search for more stations or refresh to return to your saved stations.",
     "podcastHint": "Pinned podcasts. Search for more shows and open their episodes.",
     "music": "Music",
-    "published": "Published:"
+    "published": "Published:",
+    "thisDevice": "This device",
+    "browserAudioActive": "Audio plays on this device. The computer’s audio output is released.",
+    "browserAudioBlocked": "Tap “Play here” to allow browser playback.",
+    "browserAudioFailed": "The audio stream could not be played. Select this device again or choose another output.",
+    "browserAudioPlay": "Play here",
+    "otherBrowser": "Web app on another device",
+    "albums": "Albums",
+    "more": "More",
+    "musicFormat": "Music format",
+    "originalFormat": "Original format",
+    "dsdPcm": "DSD → PCM (FLAC 24-bit / 88.2 kHz)",
+    "formatHint": "Original requires browser support and single files. DSD → PCM leaves other files unchanged. FLAC/MP3 convert while streaming; radio and podcasts remain unchanged."
   },
   "fr": {
     "welcome": "Votre musique. À votre rythme.",
@@ -225,7 +261,19 @@
     "radioHint": "Stations enregistrées. Recherchez d’autres stations ou actualisez pour revenir aux stations enregistrées.",
     "podcastHint": "Podcasts épinglés. Recherchez d’autres émissions et ouvrez leurs épisodes.",
     "music": "Musique",
-    "published": "Publié le :"
+    "published": "Publié le :",
+    "thisDevice": "Cet appareil",
+    "browserAudioActive": "Le son est diffusé sur cet appareil. La sortie audio de l’ordinateur est libérée.",
+    "browserAudioBlocked": "Touchez « Lire ici » pour autoriser la lecture dans le navigateur.",
+    "browserAudioFailed": "Impossible de lire le flux audio. Sélectionnez à nouveau cet appareil ou une autre sortie.",
+    "browserAudioPlay": "Lire ici",
+    "otherBrowser": "Application web sur un autre appareil",
+    "albums": "Albums",
+    "more": "Plus",
+    "musicFormat": "Format musical",
+    "originalFormat": "Format d’origine",
+    "dsdPcm": "DSD → PCM (FLAC 24 bits / 88,2 kHz)",
+    "formatHint": "L’original nécessite un navigateur compatible et des fichiers individuels. DSD → PCM conserve les autres fichiers. FLAC/MP3 convertissent pendant la diffusion ; radio et podcasts restent inchangés."
   },
   "es": {
     "welcome": "Tu música. Tú decides.",
@@ -282,7 +330,19 @@
     "radioHint": "Emisoras guardadas. Busca más emisoras o actualiza para volver a las guardadas.",
     "podcastHint": "Pódcasts fijados. Busca más programas y abre sus episodios.",
     "music": "Música",
-    "published": "Publicado:"
+    "published": "Publicado:",
+    "thisDevice": "Este dispositivo",
+    "browserAudioActive": "El audio se reproduce en este dispositivo. La salida del ordenador queda liberada.",
+    "browserAudioBlocked": "Toca « Reproducir aquí » para permitir la reproducción en el navegador.",
+    "browserAudioFailed": "No se pudo reproducir el audio. Selecciona este dispositivo de nuevo u otra salida.",
+    "browserAudioPlay": "Reproducir aquí",
+    "otherBrowser": "Aplicación web en otro dispositivo",
+    "albums": "Álbumes",
+    "more": "Más",
+    "musicFormat": "Formato de música",
+    "originalFormat": "Formato original",
+    "dsdPcm": "DSD → PCM (FLAC 24 bits / 88,2 kHz)",
+    "formatHint": "Original requiere un navegador compatible y archivos individuales. DSD → PCM conserva los demás archivos. FLAC/MP3 convierten durante la transmisión; radio y podcasts no cambian."
   },
   "ru": {
     "welcome": "Ваша музыка. Ваше управление.",
@@ -339,7 +399,19 @@
     "radioHint": "Сохранённые станции. Найдите другие станции или обновите список, чтобы вернуться к сохранённым.",
     "podcastHint": "Закреплённые подкасты. Найдите другие передачи и откройте их выпуски.",
     "music": "Музыка",
-    "published": "Опубликовано:"
+    "published": "Опубликовано:",
+    "thisDevice": "Это устройство",
+    "browserAudioActive": "Звук воспроизводится на этом устройстве. Аудиовыход компьютера освобождён.",
+    "browserAudioBlocked": "Нажмите «Воспроизвести здесь», чтобы разрешить звук в браузере.",
+    "browserAudioFailed": "Не удалось воспроизвести поток. Снова выберите это устройство или другой выход.",
+    "browserAudioPlay": "Воспроизвести здесь",
+    "otherBrowser": "Веб-приложение на другом устройстве",
+    "albums": "Альбомы",
+    "more": "Ещё",
+    "musicFormat": "Формат музыки",
+    "originalFormat": "Исходный формат",
+    "dsdPcm": "DSD → PCM (FLAC 24 бит / 88,2 кГц)",
+    "formatHint": "Исходный формат требует поддержки браузером и отдельных файлов. DSD → PCM сохраняет другие файлы. FLAC/MP3 преобразуются при передаче; радио и подкасты не меняются."
   },
   "zh": {
     "welcome": "你的音乐，由你掌控。",
@@ -396,6 +468,18 @@
     "radioHint": "已保存的电台。搜索更多电台，或刷新以返回已保存的电台。",
     "podcastHint": "已固定的播客。搜索更多节目并打开其单集。",
     "music": "音乐",
-    "published": "发布日期："
+    "published": "发布日期：",
+    "thisDevice": "此设备",
+    "browserAudioActive": "音频在此设备上播放。电脑的音频输出已释放。",
+    "browserAudioBlocked": "点击“在此播放”以允许浏览器播放。",
+    "browserAudioFailed": "无法播放音频流。请重新选择此设备或其他输出。",
+    "browserAudioPlay": "在此播放",
+    "otherBrowser": "其他设备上的网页应用",
+    "albums": "专辑",
+    "more": "更多",
+    "musicFormat": "音乐格式",
+    "originalFormat": "原始格式",
+    "dsdPcm": "DSD → PCM（FLAC 24 位 / 88.2 kHz）",
+    "formatHint": "原始格式需要浏览器支持且为单个文件。DSD → PCM 保留其他文件格式。FLAC/MP3 在流式传输时转换；广播和播客保持不变。"
   }
 }

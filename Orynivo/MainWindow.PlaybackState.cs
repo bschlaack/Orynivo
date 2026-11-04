@@ -286,6 +286,7 @@ public partial class MainWindow : Window
     /// <summary>Detaches playback immediately and registers background output disposal.</summary>
     private void StopPlayback()
     {
+        _browserOutputResume = null;
         _audioDeviceExplicitlyReleased = false;
         ClearReleasedOutputResumeState();
         var player = StopPlaybackCore();

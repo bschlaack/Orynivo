@@ -58,6 +58,7 @@ internal static class Program
             CatalogRecoveryWorkflows.Run();
             ViewRefreshWorkflows.Run();
             ShuffleWorkflows.Run();
+            BrowserOutputReclaimWorkflows.Run();
             if (DenyExternalRequests.Requests != 0)
                 throw new InvalidOperationException("Cached workflows attempted external provider requests.");
             Console.WriteLine("All Windows UI smoke workflows passed.");

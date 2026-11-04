@@ -8,6 +8,23 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- The web remote has dedicated **Artists** and **Albums** destinations in a
+  single navigation row, with remaining destinations in **More**. Browser music
+  output offers **Original format**, **DSD → PCM**, six FLAC precision/rate
+  choices from 16-bit/44.1 kHz to 24-bit/192 kHz and MP3 at 128–320 kbps. Radio
+  and podcasts retain their independent streaming behavior.
+
+- **This device** in the mobile web remote sends audio exclusively to the
+  selecting browser. Switching waits for complete WASAPI/ASIO or other output
+  release, retains the current position/pause state, and progressively converts
+  music PCM or DSD to stereo 48 kHz MP3 at 192 kbps through FFmpeg. Radio and
+  podcasts use direct streaming with a browser-format fallback. Browser
+  progress, pause, seeking, volume and natural queue advancement use the shared
+  player lifecycle. Session-only, HttpOnly media cookies protect streaming
+  without placing tokens or source URLs in media addresses. Returning to a
+  configured output restores desktop playback; closing the page never
+  automatically reopens a device.
+
 - Starting playback in the mobile web remote opens **Now playing** and refreshes
   the current source information. Music displays its actual album, radio shows
   its station and live title, and podcasts show their episode, show, publisher
@@ -16,6 +33,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   thumbnail endpoint, including images that arrive after playback starts.
 
 ### Fixed
+
+- Web music search ranks local/server matches together, favors exact titles and
+  requires every literal query word. Playing from search or album browsing now
+  queues the displayed suffix. Provider ID batches avoid per-track network
+  lookups during queue preparation. Now-playing artwork prefers the original
+  image and delivers up to 1280 pixels. Indexed audio metadata avoids redundant
+  probes; conversion and seeking no longer throttle input to realtime speed.
+
+- Playing a playlist row in the web remote now continues through the remaining
+  playlist, retaining the selected occurrence even for duplicate tracks. Browser
+  music conversion streams packets immediately; radio and podcasts relay their
+  original bytes with supported range seeking and an encoding fallback for
+  unsupported formats. Playback details show the delivered format. The desktop
+  output picker shows **Remote device** and restores the source and position
+  when a physical output is selected, even after the remote closes.
 
 ## [0.48.3] - 2026-11-04
 

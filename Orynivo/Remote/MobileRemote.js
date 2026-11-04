@@ -6,7 +6,7 @@
     document.documentElement.lang = words[lang] ? lang : 'en';
     document.querySelectorAll('[data-i18n]').forEach(el => el.textContent = t[el.dataset.i18n]);
     $('search').placeholder = t.placeholder;
-    $('libraryFilter').placeholder = t.filter;
+    $('libraryFilter').placeholder = t.search;
     const fragment = new URLSearchParams(location.hash.slice(1));
     let key = fragment.get('token') || '';
     if (fragment.has('token')) history.replaceState(null, '', location.pathname + location.search);
@@ -15,6 +15,17 @@
     let session = 0, controller, reconnectTimer, messageTimer, connected = false;
     let state, artKey = '', artUrl = '', queueKey = '', currentView = 'playing';
     let renderVersion = 0;
+    const newBrowserClientId = () => [...crypto.getRandomValues(new Uint8Array(16))].map(x=>x.toString(16).padStart(2,'0')).join('');
+    let browserClientId = newBrowserClientId();
+    const browserAudio = $('browserAudio');
+    for (const [id,label] of [['original',t.originalFormat],['dsd-pcm',t.dsdPcm],
+        ...[[16,44100],[16,48000],[24,88200],[24,96000],[24,176400],[24,192000]].map(([bits,rate])=>['flac-'+bits+'-'+rate,'FLAC · '+bits+' bit · '+(rate/1000).toLocaleString()+' kHz']),
+        ...[128,192,256,320].map(rate=>['mp3-'+rate,'MP3 · '+rate+' kbps'])])
+        $('musicFormat').add(new Option(label,id));
+    $('musicFormat').value = 'mp3-192';
+    let browserInfo = null, audioContext, audioGain, audioBlocked = false, mediaFailed = false, playPending = false, reportPending = false;
+    let outputVersion = 0, outputOwner, outputSwitching = false;
+    let directSeekPending = false;
     const mediaVersions = { radio:0, podcasts:0 };
     let libraryLoaded = false, playlistsLoaded = false, libraryLevel = 'artists', libraryArtist;
     let libraryVersion = 0, playlistVersion = 0, searchVersion = 0, playlistId, filterTimer;
@@ -40,6 +51,7 @@
         if (text) messageTimer = setTimeout(() => { if (connected) $('message').hidden = true; }, 5000);
     }
     function disconnect(error = '') {
+        releaseBrowserAudio(); stopBrowserAudio();
         session++; controller?.abort(); clearTimeout(reconnectTimer); connected = false; key = '';
         $('app').hidden = true; $('logout').hidden = true; $('login').hidden = false;
         $('token').value = ''; $('authError').textContent = error; $('connect').disabled = false;
@@ -72,6 +84,7 @@
     }
     const command = (command, value) => api('command', { command, value });
     async function startPlayback(path, body) {
+        unlockBrowserAudio();
         const generation = session;
         await api(path, body);
         if (generation !== session) return;
@@ -96,12 +109,15 @@
         const meta = document.createElement('div'); meta.className = 'meta'; meta.textContent = secondary || '';
         li.append(name, meta); return li;
     }
-    function trackRow(track) {
+    function trackRow(track, context) {
         const li = row(track.title, [track.artist, track.album, track.year, track.source].filter(Boolean).join(' · '));
         const actions = document.createElement('div'); actions.className = 'result-actions';
         for (const action of ['play','next','append'])
             actions.append(actionButton(t[action === 'next' ? 'playNext' : action], () =>
-                action === 'play' ? startPlayback('tracks/queue', {id:track.id,action}) : api('tracks/queue', {id:track.id,action})));
+                action === 'play' ? Array.isArray(context)
+                    ? startPlayback('tracks/queue',{action,ids:context}) : context && track.playlistIndex != null
+                    ? startPlayback('playlists/'+context.id+'/queue',{action,startIndex:track.playlistIndex,trackId:track.id})
+                    : startPlayback('tracks/queue', {id:track.id,action}) : api('tracks/queue', {id:track.id,action})));
         li.append(actions); return li;
     }
     function showRows(list, rows, build, emptyText = t.empty) {
@@ -128,13 +144,17 @@
     function render(s) {
         renderVersion++;
         state = s;
+        if (s.browserAudio?.formatId) $('musicFormat').value = s.browserAudio.formatId;
+        $('musicFormat').disabled = s.browserAudio?.clientId !== browserClientId || s.playback?.mediaKind === 'radio' || s.playback?.mediaKind === 'podcasts';
+        syncBrowserAudio(s.browserAudio);
+        if (outputOwner !== s.browserAudio?.clientId) { outputOwner = s.browserAudio?.clientId; loadOutputs(); }
         $('status').textContent = t[s.status] || t.stopped;
         $('trackTitle').textContent = s.title || t.nothingPlaying;
         $('artist').textContent = s.artist || ''; $('album').textContent = s.album || '';
         $('artist').hidden = !s.artist; $('album').hidden = !s.album;
         const info = s.playback || {};
         for (const [id,value] of Object.entries({mediaKind:t[info.mediaKind],sourceName:info.sourceName,
-            playbackDetails:info.details,audioFormat:info.audioFormat,
+            playbackDetails:info.details,audioFormat:s.browserAudio?.format || info.audioFormat,
             published:info.publishedAt ? t.published+' '+new Date(info.publishedAt).toLocaleDateString() : ''})) {
             $(id).textContent = value || ''; $(id).hidden = !value;
         }
@@ -198,18 +218,127 @@
         } finally { if (generation === session) $('connect').disabled = false; }
     }
     async function loadOutputs() {
+        const version = ++outputVersion;
         try {
-            const rows = await (await api('outputs')).json();
-            $('output').replaceChildren(...rows.map(x => { const o = document.createElement('option'); o.value = o.textContent = x.name; o.selected = x.selected; return o; }));
+            const rows = await (await api('outputs?clientId='+browserClientId)).json();
+            if (version !== outputVersion) return;
+            const options = rows.map(x => {
+                const o = document.createElement('option'); o.value = x.isBrowser ? 'browser' : 'profile:'+x.name;
+                o.textContent = x.isBrowser ? t.thisDevice : x.name; o.selected = x.selected; return o;
+            });
+            if (!rows.some(x=>x.selected) && state?.browserAudio) {
+                const other = new Option(t.otherBrowser,'other',true,true); other.disabled = true; options.unshift(other);
+            }
+            $('output').replaceChildren(...options);
         } catch(e) { if(e.name !== 'AbortError') notice(t.failed); }
     }
+    function unlockBrowserAudio() {
+        if (!audioContext) {
+            const AudioContext = window.AudioContext || window.webkitAudioContext;
+            if (AudioContext) {
+                try {
+                    audioContext = new AudioContext(); audioGain = audioContext.createGain();
+                    audioContext.createMediaElementSource(browserAudio).connect(audioGain); audioGain.connect(audioContext.destination);
+                } catch { audioContext = audioGain = null; }
+            }
+        }
+        audioContext?.resume().catch(()=>{});
+    }
+    function stopBrowserAudio(releaseContext = true) {
+        browserInfo = null; audioBlocked = mediaFailed = playPending = directSeekPending = false;
+        browserAudio.pause(); browserAudio.removeAttribute('src'); browserAudio.load();
+        if (releaseContext) audioContext?.suspend().catch(()=>{});
+        $('browserAudioHint').hidden = $('browserAudioPlay').hidden = true;
+    }
+    function releaseBrowserAudio() {
+        if (!key || state?.browserAudio?.clientId !== browserClientId) return;
+        fetch('/remote/api/browser-audio/release',{method:'POST',keepalive:true,
+            headers:{Authorization:'Bearer '+key,'Content-Type':'application/json'},body:JSON.stringify({clientId:browserClientId})}).catch(()=>{});
+    }
+    async function playBrowserAudio() {
+        if (!browserInfo || playPending) return;
+        if (!applyDirectSeek()) return;
+        const id = browserInfo.streamId; playPending = true;
+        try {
+            await browserAudio.play();
+            if (browserInfo?.streamId === id) {
+                audioBlocked = !!audioContext && audioContext.state !== 'running';
+                $('browserAudioPlay').hidden = !audioBlocked;
+                if (audioBlocked) $('browserAudioHint').textContent = t.browserAudioBlocked;
+            }
+        } catch(e) {
+            if (browserInfo?.streamId === id && e.name !== 'AbortError') {
+                audioBlocked = true; $('browserAudioHint').textContent = t.browserAudioBlocked;
+                $('browserAudioPlay').hidden = false;
+            }
+        } finally { if (browserInfo?.streamId === id) playPending = false; }
+    }
+    function syncBrowserAudio(info) {
+        if (outputSwitching) return;
+        if (info?.clientId !== browserClientId || !info.streamId) {
+            if (browserInfo) stopBrowserAudio(info?.clientId !== browserClientId);
+            return;
+        }
+        const changed = browserInfo?.streamId !== info.streamId;
+        if (changed) {
+            stopBrowserAudio(false); browserInfo = info;
+            directSeekPending = !!info.direct && info.seekSeconds > 0;
+            browserAudio.preload = directSeekPending ? 'metadata' : 'none';
+            browserAudio.src = '/remote/api/browser-audio/stream/'+encodeURIComponent(info.streamId);
+            browserAudio.load();
+        } else browserInfo = info;
+        $('browserAudioHint').hidden = false;
+        if (mediaFailed) $('browserAudioHint').textContent = info.direct ? t.loading : t.browserAudioFailed;
+        else if (!audioBlocked) $('browserAudioHint').textContent = t.browserAudioActive;
+        if (audioGain) audioGain.gain.value = info.volume;
+        else browserAudio.volume = info.volume;
+        if (info.paused) browserAudio.pause();
+        else if (browserAudio.paused && !audioBlocked && !mediaFailed) playBrowserAudio();
+    }
+    async function reportBrowserAudio(ended = false, failed = false) {
+        if (!browserInfo || !connected || (reportPending && !ended && !failed)) return;
+        reportPending = true;
+        const info = browserInfo, time = Number.isFinite(browserAudio.currentTime) ? browserAudio.currentTime : 0;
+        try { await api('browser-audio/report',{clientId:browserClientId,streamId:info.streamId,
+            controlRevision:info.controlRevision,positionSeconds:info.startSeconds+time,
+            playing:!browserAudio.paused && browserAudio.readyState >= 3,ended,failed,
+            durationSeconds:Number.isFinite(browserAudio.duration) && browserAudio.duration>0 ? browserAudio.duration : null}); }
+        catch { /* Old stream/command feedback is intentionally rejected. */ }
+        finally { reportPending = false; }
+    }
+    browserAudio.onended = () => reportBrowserAudio(true);
+    browserAudio.onplaying = () => reportBrowserAudio();
+    function applyDirectSeek() {
+        if (!directSeekPending) return true;
+        if (!browserInfo || browserAudio.readyState < 1) return false;
+        try { browserAudio.currentTime = browserInfo.seekSeconds; directSeekPending = false; return true; }
+        catch { return false; }
+    }
+    browserAudio.onloadedmetadata = () => {
+        if (applyDirectSeek() && browserInfo && !browserInfo.paused && !audioBlocked) playBrowserAudio();
+    };
+    browserAudio.onerror = () => {
+        if (!browserInfo || !browserAudio.error || browserAudio.error.code === 1) return;
+        mediaFailed = true;
+        $('browserAudioHint').textContent = browserInfo.direct ? t.loading : t.browserAudioFailed;
+        if (!browserInfo.direct) notice(t.browserAudioFailed);
+        reportBrowserAudio(false,true);
+    };
+    $('browserAudioPlay').onclick = () => { unlockBrowserAudio(); audioBlocked = false; playBrowserAudio(); };
+    setInterval(()=>reportBrowserAudio(false,mediaFailed),1500);
+    window.addEventListener('pagehide',()=>{releaseBrowserAudio();stopBrowserAudio();});
     function showView(view) {
         mediaVersions.radio++; mediaVersions.podcasts++;
+        $('moreMenu').hidden = true; $('moreButton').setAttribute('aria-expanded','false');
         currentView = view;
-        document.querySelectorAll('[data-panel]').forEach(p => p.hidden = p.id !== view);
+        const panel = view === 'artists' || view === 'albums' ? 'library' : view;
+        document.querySelectorAll('[data-panel]').forEach(p => p.hidden = p.id !== panel);
+        $('searchForm').hidden = view !== 'library'; $('results').hidden = view !== 'library';
+        $('libraryBrowser').hidden = view === 'library';
         document.querySelectorAll('[data-view]').forEach(b => b.setAttribute('aria-pressed',String(b.dataset.view === view)));
         if (view === 'radio' || view === 'podcasts') browseMedia(view);
-        if (view === 'library' && !libraryLoaded) browseArtists();
+        if (view === 'artists') browseArtists();
+        if (view === 'albums') browseAllAlbums();
         if (view === 'playlists' && !playlistsLoaded) browsePlaylists();
     }
     async function libraryFetch(path, build) {
@@ -217,7 +346,7 @@
         try {
             const rows = await (await api(path)).json();
             if (version !== libraryVersion) return;
-            showRows($('libraryList'),rows,build); libraryLoaded = true;
+            showRows($('libraryList'),rows,build === trackRow ? (x,i)=>trackRow(x,rows.slice(i).map(t=>t.id)) : build); libraryLoaded = true;
         } catch(e) { if(version === libraryVersion && e.name !== 'AbortError') empty($('libraryList'),t.failed); }
     }
     function browseArtists() {
@@ -225,6 +354,12 @@
         $('libraryTitle').textContent = t.artists; $('libraryBack').hidden = true; $('libraryFilter').hidden = false;
         return libraryFetch('library/artists?q='+encodeURIComponent($('libraryFilter').value.trim())+'&limit=250',
             x => row(x.name,x.source,()=>browseAlbums(x)));
+    }
+    function browseAllAlbums() {
+        libraryLevel = 'allAlbums'; libraryArtist = null;
+        $('libraryTitle').textContent = t.albums; $('libraryBack').hidden = true; $('libraryFilter').hidden = false;
+        return libraryFetch('library/albums?q='+encodeURIComponent($('libraryFilter').value.trim()),
+            x => row(x.title,[x.artist,x.year,x.source].filter(Boolean).join(' · '),()=>browseTracks(x)));
     }
     function browseAlbums(artist) {
         libraryLevel = 'albums'; libraryArtist = artist;
@@ -242,7 +377,7 @@
         empty($('results'),t.loading);
         try {
             const rows = await (await api('search?q='+encodeURIComponent(q)+'&limit=50')).json();
-            if(version === searchVersion) showRows($('results'),rows,trackRow);
+            if(version === searchVersion) showRows($('results'),rows,(x,i)=>trackRow(x,rows.slice(i).map(t=>t.id)));
         } catch(e) { if(version === searchVersion && e.name !== 'AbortError') empty($('results'),t.failed); }
     }
     async function browsePlaylists() {
@@ -263,7 +398,7 @@
         try {
             const rows = await (await api('playlists/'+playlist.id+'/tracks')).json();
             if(version !== playlistVersion) return;
-            showRows($('playlistList'),rows,trackRow); $('playlistActions').hidden = !rows.length;
+            showRows($('playlistList'),rows,x=>trackRow(x,playlist)); $('playlistActions').hidden = !rows.length;
         } catch(e) { if(version === playlistVersion && e.name !== 'AbortError') empty($('playlistList'),t.failed); }
     }
     async function browseMedia(kind, podcast) {
@@ -305,12 +440,38 @@
     $('seek').onchange = () => perform(()=>command('seek',+$('seek').value));
     $('volume').oninput = () => $('volumeValue').textContent = Math.round(+$('volume').value*100)+'%';
     $('volume').onchange = () => perform(()=>command('volume',+$('volume').value));
-    $('output').onchange = () => perform(async()=>{await api('outputs/select',{name:$('output').value});await loadOutputs();},$('output'));
+    $('output').onchange = () => {
+        unlockBrowserAudio();
+        const selected = $('output').value;
+        if (selected === 'browser') browserClientId = newBrowserClientId();
+        outputSwitching = true;
+        if (selected !== 'browser') stopBrowserAudio();
+        perform(async()=>{
+            try {
+                if (selected === 'browser') await api('browser-audio/select',{clientId:browserClientId,formatId:$('musicFormat').value});
+                else await api('outputs/select',{name:selected.slice(8)});
+            } finally { outputSwitching = false; }
+            const next = await (await api('state')).json(); render(next); await loadOutputs();
+        },$('output'));
+    };
+    $('musicFormat').onchange = () => {
+        outputSwitching = true; stopBrowserAudio(false);
+        perform(async()=>{
+            try { await api('browser-audio/select',{clientId:browserClientId,formatId:$('musicFormat').value}); }
+            finally { outputSwitching = false; }
+            render(await (await api('state')).json());
+        },$('musicFormat'));
+    };
+    $('moreButton').onclick = () => {
+        $('moreMenu').hidden = !$('moreMenu').hidden;
+        $('moreButton').setAttribute('aria-expanded',String(!$('moreMenu').hidden));
+    };
+    document.addEventListener('keydown',e=>{if(e.key==='Escape'){$('moreMenu').hidden=true;$('moreButton').setAttribute('aria-expanded','false');$('moreButton').focus();}});
     $('clear').onclick = () => {if(confirm(t.confirmClear)) perform(()=>api('queue',{action:'clear'}),$('clear'));};
     $('searchForm').onsubmit = e => {e.preventDefault();runSearch();};
-    $('search').oninput = () => {if(!$('search').value){searchVersion++;$('results').replaceChildren();}};
-    $('libraryFilter').oninput = () => {clearTimeout(filterTimer);libraryVersion++;filterTimer=setTimeout(browseArtists,250);};
-    $('libraryBack').onclick = () => libraryLevel === 'tracks' && libraryArtist ? browseAlbums(libraryArtist) : browseArtists();
+    $('search').oninput = () => {searchVersion++;$('results').replaceChildren();};
+    $('libraryFilter').oninput = () => {clearTimeout(filterTimer);libraryVersion++;filterTimer=setTimeout(currentView==='albums'?browseAllAlbums:browseArtists,250);};
+    $('libraryBack').onclick = () => libraryLevel === 'tracks' && libraryArtist ? browseAlbums(libraryArtist) : currentView==='albums'?browseAllAlbums():browseArtists();
     $('playlistBack').onclick = $('playlistRefresh').onclick = browsePlaylists;
     $('playlistPlay').onclick = () => perform(()=>startPlayback('playlists/'+playlistId+'/queue',{action:'play'}),$('playlistPlay'));
     $('playlistAppend').onclick = () => perform(()=>api('playlists/'+playlistId+'/queue',{action:'append'}),$('playlistAppend'));

@@ -304,6 +304,7 @@ public partial class MainWindow : Window
         if (!_playbackStarts.IsCurrent(intent))
             return;
         _currentFilePath = filePath;
+        _browserOutputResume = null;
         _currentRadioStation = radioStation;
         _currentPodcastPlayback = podcastPlayback;
         _podcastResumePrepared = false;
@@ -353,7 +354,7 @@ public partial class MainWindow : Window
 #else
         const bool usesDop = false;
 #endif
-        FileInfoTextBlock.Text = usesDop
+        FileInfoTextBlock.Text = player is BrowserAudioPlayer browserOutput ? browserOutput.OutputFormat : usesDop
             ? $"{info.ContainerName.ToUpperInvariant()}  ·  {info.SourceSampleRate:N0} Hz  ·  {LocalizationManager.Current.DopOutput} ({info.OutputSampleRate:N0} Hz)"
             : usesNativeDsd
             ? $"{info.ContainerName.ToUpperInvariant()}  ·  {info.SourceSampleRate:N0} Hz  ·  {LocalizationManager.Current.NativeDsdOutput}"
@@ -506,7 +507,7 @@ public partial class MainWindow : Window
             player.Duration,
             force: true);
 
-        var outputName = _settings.OutputBackend switch
+        var outputName = _player is BrowserAudioPlayer ? LocalizationManager.Current.BrowserAudioOutput : _settings.OutputBackend switch
         {
             OutputBackend.Asio or OutputBackend.CwAsio => _settings.SelectedDriverName,
             OutputBackend.AirPlay => _settings.SelectedAirPlayDeviceName,
@@ -727,6 +728,12 @@ public partial class MainWindow : Window
         string filePath, bool allowQueuedTracks, CancellationToken cancellationToken)
     {
         var playbackTrack = ResolveGaplessPlaybackItem(filePath);
+        if (_browserAudioClientId is { } browserClient)
+        {
+            if (_currentPodcastPlayback?.Episode.FeedDuration is { } feedDuration && playbackTrack.KnownDuration is null)
+                playbackTrack = playbackTrack with { KnownDuration = feedDuration };
+            return await CreateBrowserAudioPlayerAsync(playbackTrack, browserClient, _currentRadioStation, _currentPodcastPlayback, cancellationToken);
+        }
         var ext = Path.GetExtension(playbackTrack.PlaybackPath);
         IAudioPlayer player;
         AudioFileInfo info;

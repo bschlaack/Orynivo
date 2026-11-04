@@ -21,20 +21,26 @@ public partial class MainWindow
     {
         var result = await LoadStoredPlaylistAsync(id, ct);
         var rows = result.Rows;
-        return rows.Where(r => r.Id.HasValue).Select(r => new MobileRemoteTrack(
+        return rows.Select((r, index) => (Row: r, Index: index)).Where(entry => entry.Row.Id.HasValue).Select(entry =>
+        {
+            var r = entry.Row;
+            return new MobileRemoteTrack(
             r.OrynivoServer is { } server
                 ? $"server:{Uri.EscapeDataString(server.Id)}:{r.Id}"
                 : $"local:{r.Id}",
             r.Title ?? string.Empty, r.Artist, r.Album,
             int.TryParse(r.Year, out var year) ? year : null,
-            r.OrynivoServer?.Name ?? Localization.LocalizationManager.Current.LocalSource)).ToArray();
+            r.OrynivoServer?.Name ?? Localization.LocalizationManager.Current.LocalSource, entry.Index);
+        }).ToArray();
     }
 
     /// <summary>Owns playlist-play resolution before registering metadata or replacing the queue.</summary>
     /// <param name="id">The stored playlist identifier.</param>
     /// <param name="action">Play replaces the queue; append preserves independent queue semantics.</param>
+    /// <param name="startIndex">Optional original selected row index.</param>
+    /// <param name="expectedIdentity">Expected opaque identity of that row.</param>
     /// <returns>Whether current playable rows were accepted.</returns>
-    private async Task<bool> QueueMobileRemotePlaylistAsync(long id, string action)
+    private async Task<bool> QueueMobileRemotePlaylistAsync(long id, string action, int? startIndex = null, string? expectedIdentity = null)
     {
         if (id <= 0 || action is not ("play" or "append")) return false;
         if (_playbackShuttingDown) return false;
@@ -51,7 +57,11 @@ public partial class MainWindow
         if (_playbackShuttingDown || !_queueEdits.IsCurrent(edit.Version) || generation != _unifiedLibraryLoads.Generation ||
             (action == "play" && !_playbackStarts.IsCurrent(intent))) return false;
         var rows = result.Rows;
-        var playable = rows.Where(r => r.Id.HasValue && !string.IsNullOrEmpty(r.FilePath)).ToList();
+        var selectedRows = startIndex is { } index
+            ? MobilePlaylistSelection.From(rows, index, expectedIdentity,
+                r => r.OrynivoServer is { } server ? $"server:{Uri.EscapeDataString(server.Id)}:{r.Id}" : $"local:{r.Id}",
+                r => r.Id.HasValue && !string.IsNullOrEmpty(r.FilePath)) : rows;
+        var playable = selectedRows.Where(r => r.Id.HasValue && !string.IsNullOrEmpty(r.FilePath)).ToList();
         if (playable.Count == 0) return false;
         foreach (var row in playable)
             if (row.OrynivoServer is not null) _orynivoTracksByUrl[row.FilePath!] = row;
@@ -216,7 +226,7 @@ public partial class MainWindow
 
         var localTask = Task.Run(() =>
         {
-            var ids = TrackSearchIndex.SearchByCategory(query, limit).Tracks.Ids.Take(limit).ToList();
+            var ids = TrackSearchIndex.SearchByCategory(query, 500).Tracks.Ids.ToList();
             using var db = AudioDatabase.OpenDefault();
             return db.GetTrackListByIds(ids)
                 .Select(track => new MobileRemoteTrack(
@@ -236,7 +246,7 @@ public partial class MainWindow
             {
                 using var client = new OrynivoServerClient();
                 var result = await client.SearchStructuredAsync(
-                    server, query, "tracks", null, null, null, null, "relevance", limit,
+                    server, query, "tracks", null, null, null, null, "relevance", 500,
                     cancellationToken);
                 return result.Tracks.Select(track => new MobileRemoteTrack(
                     $"server:{Uri.EscapeDataString(server.Id)}:{track.Id.ToString(CultureInfo.InvariantCulture)}",
@@ -254,6 +264,10 @@ public partial class MainWindow
         var remote = await Task.WhenAll(remoteTasks);
         var local = await localTask;
         return local.Concat(remote.SelectMany(static tracks => tracks))
+            .Select(track => (Track: track, Score: MobileSearchRanking.Score(query, track)))
+            .Where(match => match.Score > 0).OrderByDescending(match => match.Score)
+            .ThenBy(match => match.Track.Title, StringComparer.CurrentCultureIgnoreCase)
+            .ThenBy(match => match.Track.Id, StringComparer.Ordinal).Select(match => match.Track)
             .Take(limit)
             .ToList();
     }
