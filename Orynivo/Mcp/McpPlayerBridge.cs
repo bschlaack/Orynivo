@@ -69,6 +69,22 @@ public sealed class McpPlayerBridge
     /// <summary>Gets or sets an asynchronous function returning bounded current-track artwork.</summary>
     public Func<Task<RemoteArtwork?>>? GetCurrentArtworkFunc { get; set; }
 
+    /// <summary>Gets or sets the source-owned, path-free mobile playback presentation.</summary>
+    public Func<global::Orynivo.Remote.MobileRemotePlaybackInfo>? GetMobilePlaybackInfoFunc { get; set; }
+
+    /// <summary>Gets or sets the transient browser output selector; completes after exclusive-device release.</summary>
+    public Func<string, Task<bool>>? SelectBrowserOutputFunc { get; set; }
+    /// <summary>Gets or sets release of a page's output without resuming the physical device.</summary>
+    public Func<string, Task>? ReleaseBrowserOutputFunc { get; set; }
+    /// <summary>Gets or sets the safe current browser output state.</summary>
+    public Func<global::Orynivo.Remote.BrowserAudioState?>? GetBrowserAudioStateFunc { get; set; }
+    /// <summary>Gets or sets a dispatcher-bound resolver returning a device-free response writer.</summary>
+    public Func<string, Func<Stream, CancellationToken, Task>?>? OpenBrowserAudioStreamFunc { get; set; }
+    /// <summary>Gets or sets the source-owned HTTP audio responder, including direct-stream byte ranges.</summary>
+    public Func<string, Func<Microsoft.AspNetCore.Http.HttpContext, CancellationToken, Task>?>? OpenBrowserAudioResponseFunc { get; set; }
+    /// <summary>Gets or sets source- and revision-checked browser progress feedback.</summary>
+    public Func<global::Orynivo.Remote.BrowserAudioReport, bool>? ReportBrowserAudioFunc { get; set; }
+
     /// <summary>Gets or sets a function that starts a queue entry by zero-based index.</summary>
     public Func<int, Task<bool>>? PlayQueueIndexFunc { get; set; }
 
@@ -104,9 +120,23 @@ public sealed class McpPlayerBridge
 
     /// <summary>Gets or sets the play or append action for a shared playlist.</summary>
     public Func<long, string, Task<bool>>? QueueMobilePlaylistFunc { get; set; }
+    /// <summary>Gets or sets ordered playlist playback beginning with a source-validated selected row.</summary>
+    public Func<long, int, string, Task<bool>>? PlayMobilePlaylistFromTrackFunc { get; set; }
 
     /// <summary>Gets or sets a function that resolves a safe mobile track identity and applies a queue action.</summary>
     public Func<string, string, Task<bool>>? QueueMobileTrackFunc { get; set; }
+
+    /// <summary>Gets or sets ordered library/search queue replacement using safe identities.</summary>
+    public Func<IReadOnlyList<string>, Task<bool>>? QueueMobileTracksFunc { get; set; }
+
+    /// <summary>Gets or sets the validated transient music encoding preference.</summary>
+    public Action<string>? SetBrowserMusicFormatFunc { get; set; }
+
+    /// <summary>Gets or sets the filtered all-album browser.</summary>
+    public Func<string?, CancellationToken, Task<IReadOnlyList<global::Orynivo.Remote.MobileRemoteAlbum>>>? BrowseMobileAllAlbumsFunc { get; set; }
+
+    /// <summary>Gets or sets bounded artwork loading for opaque artist and album keys.</summary>
+    public Func<string, CancellationToken, Task<RemoteArtwork?>>? GetMobileLibraryArtworkFunc { get; set; }
 
     /// <summary>Gets or sets a function returning the current track favorite state, or no value when unavailable.</summary>
     public Func<bool?>? GetCurrentFavoriteFunc { get; set; }

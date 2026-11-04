@@ -72,7 +72,7 @@ public partial class MainWindow : Window
         var previous = DetachEndpointVolumeSynchronization();
         if (previous is not null)
             _ = Task.Run(() => DisposeEndpointSynchronizer(previous));
-        if (_settings.OutputBackend != OutputBackend.Wasapi ||
+        if (_browserAudioClientId is not null || _settings.OutputBackend != OutputBackend.Wasapi ||
             string.IsNullOrWhiteSpace(_settings.SelectedWasapiDeviceId))
         {
             return;
@@ -84,7 +84,7 @@ public partial class MainWindow : Window
             var synchronizer = await Task.Run(() => new WindowsEndpointVolumeSynchronizer(deviceId));
             if (synchronizationVersion !=
                     Volatile.Read(ref _endpointVolumeSynchronizationVersion) ||
-                _settings.OutputBackend != OutputBackend.Wasapi ||
+                _browserAudioClientId is not null || _settings.OutputBackend != OutputBackend.Wasapi ||
                 !string.Equals(
                     _settings.SelectedWasapiDeviceId,
                     deviceId,
@@ -553,19 +553,7 @@ public partial class MainWindow : Window
     private void OutputPickerButton_OnClick(object? sender, RoutedEventArgs e)
     {
         EqPickerPopup.IsOpen = false;
-        _outputPickerUpdating = true;
-        try
-        {
-            OutputPickerComboBox.ItemsSource = _settings.OutputProfiles;
-            OutputPickerComboBox.SelectedItem = _settings.OutputProfiles
-                .FirstOrDefault(p => string.Equals(
-                    p.Name, _settings.SelectedOutputProfileName,
-                    StringComparison.OrdinalIgnoreCase));
-        }
-        finally
-        {
-            _outputPickerUpdating = false;
-        }
+        RefreshOutputPickerSelection();
         OutputPickerPopup.IsOpen = !OutputPickerPopup.IsOpen;
     }
 
@@ -573,6 +561,7 @@ public partial class MainWindow : Window
     {
         if (_outputPickerUpdating) return;
         if (OutputPickerComboBox.SelectedItem is not OutputProfile profile) return;
+        if (ReferenceEquals(profile, _browserOutputPickerProfile)) return;
         await SelectOutputProfileAsync(profile);
     }
 
@@ -602,25 +591,29 @@ public partial class MainWindow : Window
         if (_playbackShuttingDown)
             return;
         var selectionVersion = ++_outputProfileSelectionVersion;
-        if (string.Equals(profile.Name, _settings.SelectedOutputProfileName, StringComparison.Ordinal)) return;
+        var browserWasSelected = _browserAudioClientId is not null;
+        if (!browserWasSelected && string.Equals(profile.Name, _settings.SelectedOutputProfileName, StringComparison.Ordinal)) return;
 
         var outputChanged =
-            _settings.OutputBackend != profile.Backend ||
+            browserWasSelected || _settings.OutputBackend != profile.Backend ||
             !string.Equals(_settings.SelectedDriverName, profile.SelectedDriverName, StringComparison.Ordinal) ||
             !string.Equals(_settings.SelectedWasapiDeviceId, profile.SelectedWasapiDeviceId, StringComparison.Ordinal) ||
             !string.Equals(_settings.SelectedAirPlayDeviceId, profile.SelectedAirPlayDeviceId, StringComparison.Ordinal);
 
         // Snapshot playback state before StopPlaybackCore clears station/podcast fields.
-        var resumePath     = _currentFilePath;
-        var resumeStation  = _currentRadioStation;
-        var resumePodcast  = _currentPodcastPlayback;
-        var resumePosition = outputChanged && _player is not null ? _player.Position : TimeSpan.Zero;
-        var wasPaused      = outputChanged && _player?.IsPaused == true;
-        var shouldResume   = outputChanged && _player is not null && !string.IsNullOrEmpty(resumePath);
+        var resume = GetOutputResumeForSelection(browserWasSelected, outputChanged);
+        var resumePath     = resume?.Path ?? _currentFilePath;
+        var resumeStation  = resume?.Radio;
+        var resumePodcast  = resume?.Podcast;
+        var resumePosition = resume?.Position ?? TimeSpan.Zero;
+        var wasPaused      = resume?.WasPaused == true;
+        var shouldResume   = resume is not null && !string.IsNullOrEmpty(resumePath);
 
         if (outputChanged)
         {
-            var stopped = StopPlaybackAsync();
+            _browserAudioClientId = null;
+            _browserOutputResume = null;
+            var stopped = StopPlaybackAsync(waitForCompleteDisposal: browserWasSelected);
             var stoppedIntent = _playbackStarts.Current;
             await stopped;
             if (_playbackShuttingDown || selectionVersion != _outputProfileSelectionVersion ||
@@ -638,6 +631,8 @@ public partial class MainWindow : Window
         _settings.SelectedAirPlayHost        = profile.SelectedAirPlayHost;
         _settings.SelectedAirPlayPort        = profile.SelectedAirPlayPort;
         _ = Task.Run(() => _settingsStore.Save(_settings));
+
+        RefreshOutputPickerSelection();
 
         if (!shouldResume)
             return;
@@ -751,11 +746,11 @@ public partial class MainWindow : Window
     {
         if (OutputDeviceLockButton is null || OutputDeviceLockIconPath is null)
             return;
-        var isHeld = _player is not null;
+        var isHeld = _player is not null && _player is not BrowserAudioPlayer;
         OutputDeviceLockIconPath.Data = FindResource<StreamGeometry>(
             isHeld ? "IconLockClosed" : "IconLockOpen");
-        OutputDeviceLockButton.IsEnabled = isHeld ||
-            (_audioDeviceExplicitlyReleased && !string.IsNullOrWhiteSpace(_releasedOutputPath));
+        OutputDeviceLockButton.IsEnabled = _browserAudioClientId is null && (isHeld ||
+            (_audioDeviceExplicitlyReleased && !string.IsNullOrWhiteSpace(_releasedOutputPath)));
         ToolTip.SetTip(
             OutputDeviceLockButton,
             isHeld

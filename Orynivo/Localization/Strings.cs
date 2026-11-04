@@ -1292,6 +1292,8 @@ public sealed record LocalizedStrings(
     public string MobileRemote { get; init; } = "";
     /// <summary>Gets the mobile web remote security and usage hint.</summary>
     public string MobileRemoteHint { get; init; } = "";
+    /// <summary>Gets the transient browser audio output display name.</summary>
+    public string BrowserAudioOutput { get; init; } = "";
     /// <summary>Gets the label for enabling the mobile web remote.</summary>
     public string MobileRemoteEnabled { get; init; } = "";
     /// <summary>Gets the mobile web remote port label.</summary>
@@ -1668,4 +1670,14 @@ public sealed record LocalizedStrings(
     public string DuplicateResolutionNoneFound { get; init; } = "";
     /// <summary>Gets the removal result format.</summary>
     public string DuplicateResolutionRemoved { get; init; } = "";
+    /// <summary>Gets the localized browser music More label.</summary>
+    public string BrowserMusicMore { get; init; } = "";
+    /// <summary>Gets the localized browser music Format label.</summary>
+    public string BrowserMusicFormat { get; init; } = "";
+    /// <summary>Gets the localized browser music Original label.</summary>
+    public string BrowserMusicOriginal { get; init; } = "";
+    /// <summary>Gets the localized browser music DsdPcm label.</summary>
+    public string BrowserMusicDsdPcm { get; init; } = "";
+    /// <summary>Gets the localized browser music FormatHint label.</summary>
+    public string BrowserMusicFormatHint { get; init; } = "";
 }

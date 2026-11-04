@@ -127,6 +127,12 @@ public partial class MainWindow : Window
 
     private void RefreshTransport()
     {
+        if (_player is BrowserAudioPlayer browserOutput)
+        {
+            FileInfoTextBlock.Text = browserOutput.OutputFormat;
+            PositionSlider.IsEnabled = browserOutput.CanSeek;
+            _currentPlaybackDuration = browserOutput.Duration;
+        }
         if (_player is null) return;
         if (_isSeekingWithSlider &&
             DateTimeOffset.UtcNow - _positionSliderSeekStartedAt > TimeSpan.FromSeconds(5))

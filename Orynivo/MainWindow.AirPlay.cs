@@ -2,8 +2,6 @@ using Orynivo.Audio;
 using Orynivo.Library;
 using Orynivo.Localization;
 using Avalonia.Threading;
-using SkiaSharp;
-using System.Security.Cryptography;
 
 namespace Orynivo;
 
@@ -180,34 +178,4 @@ public partial class MainWindow
             artworkBytes?.MimeType);
     }
 
-    /// <summary>Creates a bounded JPEG thumbnail for the currently playing track.</summary>
-    /// <returns>Remote-safe artwork, or <see langword="null"/> when no current image exists.</returns>
-    private async Task<Mcp.RemoteArtwork?> ResolveMobileRemoteArtworkAsync()
-    {
-        var path = _currentFilePath;
-        if (string.IsNullOrWhiteSpace(path))
-            return null;
-        var metadata = await ResolveAirPlayTrackMetadataAsync(path, CancellationToken.None);
-        if (metadata.Artwork is not { Length: > 0 } bytes)
-            return null;
-        return await Task.Run(() =>
-        {
-            using var source = SKBitmap.Decode(bytes);
-            if (source is null)
-                return null;
-            const int maximumEdge = 640;
-            var scale = Math.Min(1d, maximumEdge / (double)Math.Max(source.Width, source.Height));
-            var info = new SKImageInfo(
-                Math.Max(1, (int)Math.Round(source.Width * scale)),
-                Math.Max(1, (int)Math.Round(source.Height * scale)));
-            using var resized = scale < 1d
-                ? source.Resize(info, new SKSamplingOptions(SKFilterMode.Linear, SKMipmapMode.Linear))
-                : source.Copy();
-            using var encoded = resized?.Encode(SKEncodedImageFormat.Jpeg, 85);
-            var data = encoded?.ToArray();
-            return data is { Length: > 0 }
-                ? new Mcp.RemoteArtwork(data, "image/jpeg", Convert.ToHexString(SHA256.HashData(data)))
-                : null;
-        });
-    }
 }

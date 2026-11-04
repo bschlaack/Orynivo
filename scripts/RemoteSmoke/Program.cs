@@ -27,6 +27,7 @@ var run = Task.Run(async () =>
     reserve.Start(); var port = ((IPEndPoint)reserve.LocalEndpoint).Port; reserve.Stop();
     var token = Convert.ToHexString(System.Security.Cryptography.RandomNumberGenerator.GetBytes(32));
     var lastAction = "";
+    IReadOnlyList<string>? lastIdentities = null;
     var commandEntered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
     var commandReady = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
     var bridge = new McpPlayerBridge
@@ -38,6 +39,11 @@ var run = Task.Run(async () =>
         BrowseMobilePlaylistsFunc = _ => Task.FromResult<IReadOnlyList<MobileRemotePlaylist>>([new(1, "Fixture playlist", 1, false)]),
         BrowseMobilePlaylistTracksFunc = (_, _) => Task.FromResult<IReadOnlyList<MobileRemoteTrack>>([new("local:1", "Fixture track", null, null, 1998, "Local")]),
         QueueMobilePlaylistFunc = (id, action) => { lastAction = action; return Task.FromResult(id == 1); },
+        QueueMobileTracksFunc = ids => { lastIdentities = ids; return Task.FromResult(true); },
+        GetMobileLibraryArtworkFunc = (key, _) => Task.FromResult<RemoteArtwork?>(key == new string('a', 32)
+            ? new RemoteArtwork([1, 2, 3], "image/jpeg", "library-fixture") : null),
+        PlayMobilePlaylistFromTrackFunc = (id, index, identity) =>
+            Task.FromResult(id == 1 && index == 2 && identity == "local:1"),
         BrowseMobileRadioFunc = async (q, ct) =>
         {
             Check(dispatcher.CheckAccess(), "radio browsing dispatcher");
@@ -60,6 +66,7 @@ var run = Task.Run(async () =>
         Check(html.Headers.CacheControl?.NoStore == true, "HTML must not be cached");
         Check(html.Headers.GetValues("Content-Security-Policy").Single().Contains("blob:"), "authenticated artwork blobs");
         foreach (var route in new[] { "/remote/api/state", "/remote/api/playlists", "/remote/api/playlists/1/tracks", "/remote/api/events",
+            "/remote/api/library/artwork?key=" + new string('a', 32),
             "/remote/api/media/radio", "/remote/api/media/podcasts", "/remote/api/media/podcasts/podcast-id/episodes" })
         {
             using var denied = await client.GetAsync(route);
@@ -191,10 +198,50 @@ var run = Task.Run(async () =>
         var snapshot = await client.GetStringAsync("/remote/api/state");
         Check(!snapshot.Contains("private-path") && !snapshot.Contains("secret-path") && !snapshot.Contains(token), "safe state DTO");
         Check(snapshot.Contains("\"title\":\"Fixture track\""), "camelCase state");
+        var artworkEntered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var artworkReady = new TaskCompletionSource<RemoteArtwork?>();
+        var revision = "radio-revision";
+        await bridge.OnUiAsync(() =>
+        {
+            bridge.GetMobilePlaybackInfoFunc = () => new("radio", null, "Fixture station", "Jazz", "MP3 · 128 kbps", null, false, revision);
+            bridge.GetCurrentArtworkFunc = () => { artworkEntered.TrySetResult(); return artworkReady.Task; };
+        });
+        var radioState = await client.GetFromJsonAsync<JsonElement>("/remote/api/state");
+        Check(radioState.GetProperty("album").ValueKind == JsonValueKind.Null &&
+            radioState.GetProperty("playback").GetProperty("sourceName").GetString() == "Fixture station" &&
+            !radioState.GetProperty("playback").GetProperty("canSeek").GetBoolean(), "active radio details exclude stale queue album");
+        var oldArtwork = client.GetAsync("/remote/api/artwork?key=radio-revision");
+        await artworkEntered.Task.WaitAsync(TimeSpan.FromSeconds(10));
+        await bridge.OnUiAsync(() => revision = "podcast-revision");
+        artworkReady.SetResult(new RemoteArtwork([1, 2, 3], "image/jpeg", "thumbnail"));
+        using (var rejected = await oldArtwork)
+            Check(rejected.StatusCode == HttpStatusCode.NotFound, "late source artwork rejected");
+        using (var artwork = await client.GetAsync("/remote/api/artwork?key=podcast-revision"))
+        {
+            Check(artwork.StatusCode == HttpStatusCode.OK &&
+                (await artwork.Content.ReadAsByteArrayAsync()).SequenceEqual(new byte[] { 1, 2, 3 }), "authenticated current artwork bytes");
+            Check(artwork.Headers.CacheControl?.Private == true && artwork.Headers.ETag?.Tag == "\"thumbnail\"", "private artwork validator");
+        }
+        await bridge.OnUiAsync(() => bridge.GetMobilePlaybackInfoFunc = () =>
+            new("podcasts", null, "Fixture publisher", "Culture", "AAC", DateTimeOffset.UnixEpoch, true, revision));
+        var podcastState = await client.GetFromJsonAsync<JsonElement>("/remote/api/state");
+        Check(podcastState.GetProperty("playback").GetProperty("publishedAt").ValueKind == JsonValueKind.String &&
+            podcastState.GetProperty("playback").GetProperty("canSeek").GetBoolean(), "podcast publication and seeking details");
         var playlists = await client.GetStringAsync("/remote/api/playlists");
         Check(playlists.Contains("Fixture playlist"), "playlist enumeration");
         var tracks = await client.GetStringAsync("/remote/api/playlists/1/tracks");
         Check(tracks.Contains("local:1") && !tracks.Contains("path"), "safe playlist tracks");
+        using var libraryImage = await client.GetAsync("/remote/api/library/artwork?key=" + new string('a', 32));
+        Check(libraryImage.IsSuccessStatusCode && libraryImage.Headers.CacheControl?.Private == true &&
+            libraryImage.Headers.ETag?.Tag == "\"library-fixture\"" && (await libraryImage.Content.ReadAsByteArrayAsync()).SequenceEqual(new byte[] { 1, 2, 3 }), "private catalog artwork bytes and validator");
+        using var missingLibraryImage = await client.GetAsync("/remote/api/library/artwork?key=" + new string('b', 32));
+        Check(missingLibraryImage.StatusCode == HttpStatusCode.NotFound, "missing catalog artwork");
+        using var invalidLibraryImage = await client.GetAsync("/remote/api/library/artwork?key=unregistered-source");
+        Check(invalidLibraryImage.StatusCode == HttpStatusCode.NotFound, "catalog artwork rejects source locations");
+        using var cachedLibraryRequest = new HttpRequestMessage(HttpMethod.Get, "/remote/api/library/artwork?key=" + new string('a', 32));
+        cachedLibraryRequest.Headers.IfNoneMatch.Add(new EntityTagHeaderValue("\"library-fixture\""));
+        using var cachedLibraryImage = await client.SendAsync(cachedLibraryRequest);
+        Check(cachedLibraryImage.StatusCode == HttpStatusCode.NotModified, "catalog artwork cache validation");
         foreach (var action in new[] { "play", "append" })
         {
             using var result = await client.PostAsJsonAsync("/remote/api/playlists/1/queue", new { action });
@@ -202,6 +249,104 @@ var run = Task.Run(async () =>
         }
         using var invalid = await client.PostAsJsonAsync("/remote/api/playlists/1/queue", new { action = "delete" });
         Check(invalid.StatusCode == HttpStatusCode.BadRequest, "reject invalid action");
+        using var suffix = await client.PostAsJsonAsync("/remote/api/playlists/1/queue",
+            new { action = "play", startIndex = 2, trackId = "local:1" });
+        Check(suffix.StatusCode == HttpStatusCode.NoContent, "playlist occurrence continuation");
+        using var staleSuffix = await client.PostAsJsonAsync("/remote/api/playlists/1/queue",
+            new { action = "play", startIndex = 2, trackId = "remote:1" });
+        Check(staleSuffix.StatusCode == HttpStatusCode.BadRequest, "reject stale playlist identity");
+        using var invalidSuffix = await client.PostAsJsonAsync("/remote/api/playlists/1/queue",
+            new { action = "append", startIndex = 2, trackId = "local:1" });
+        Check(invalidSuffix.StatusCode == HttpStatusCode.BadRequest, "reject invalid suffix action");
+        using var librarySuffix = await client.PostAsJsonAsync("/remote/api/tracks/queue",
+            new { action = "play", ids = new[] { "local:2", "server:one:1", "local:2" } });
+        Check(librarySuffix.StatusCode == HttpStatusCode.NoContent && lastIdentities!.SequenceEqual(new[] { "local:2", "server:one:1", "local:2" }), "ordered library suffix and duplicate identity");
+        using var oversizedSuffix = await client.PostAsJsonAsync("/remote/api/tracks/queue",
+            new { action = "play", ids = Enumerable.Repeat("local:1", 501).ToArray() });
+        Check(oversizedSuffix.StatusCode == HttpStatusCode.BadRequest, "bounded library suffix");
+        BrowserAudioState? browserOutput = null;
+        var browserEntered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var browserReady = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        await bridge.OnUiAsync(() =>
+        {
+            bridge.SelectBrowserOutputFunc = async id =>
+            {
+                Check(dispatcher.CheckAccess(), "browser output selection dispatcher");
+                browserEntered.TrySetResult(); await browserReady.Task;
+                browserOutput = new(id, "browser-stream", 12, false, .4, 1); return true;
+            };
+            bridge.GetBrowserAudioStateFunc = () => browserOutput;
+            bridge.ReleaseBrowserOutputFunc = id => { if (browserOutput?.ClientId == id) browserOutput = null; return Task.CompletedTask; };
+            bridge.OpenBrowserAudioStreamFunc = id => id == browserOutput?.StreamId
+                ? async (output, ct) => { await output.WriteAsync(new byte[] { 1, 2, 3, 4 }, ct); } : null;
+            bridge.ReportBrowserAudioFunc = report => report.ClientId == browserOutput?.ClientId && report.StreamId == browserOutput?.StreamId;
+        });
+        var browserClient = Guid.NewGuid().ToString("N");
+        var claim = client.PostAsJsonAsync("/remote/api/browser-audio/select", new { clientId = browserClient });
+        if (await Task.WhenAny(claim, browserEntered.Task) == claim)
+            throw new InvalidOperationException("Browser output claim finished before adapter admission: " + (int)(await claim).StatusCode);
+        await browserEntered.Task.WaitAsync(TimeSpan.FromSeconds(10));
+        Check(!claim.IsCompleted, "browser output waits for full old-output release");
+        browserReady.SetResult();
+        using var claimed = await claim;
+        Check(claimed.StatusCode == HttpStatusCode.NoContent, "browser output accepted");
+        var originalCookie = claimed.Headers.GetValues("Set-Cookie").Single();
+        Check(originalCookie.Contains("httponly", StringComparison.OrdinalIgnoreCase) &&
+            originalCookie.Contains("samesite=strict", StringComparison.OrdinalIgnoreCase) && !originalCookie.Contains("expires=", StringComparison.OrdinalIgnoreCase),
+            "session-only HttpOnly media cookie");
+        var browserOutputs = await client.GetFromJsonAsync<JsonElement>("/remote/api/outputs?clientId=" + browserClient);
+        Check(browserOutputs.EnumerateArray().Any(x => x.GetProperty("isBrowser").GetBoolean() && x.GetProperty("selected").GetBoolean()), "own browser output listed");
+        using (var unclaimed = new HttpClient { BaseAddress = client.BaseAddress })
+        {
+            unclaimed.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+            using var deniedStream = await unclaimed.GetAsync("/remote/api/browser-audio/stream/browser-stream");
+            Check(deniedStream.StatusCode == HttpStatusCode.Unauthorized, "bearer alone cannot consume another page's media");
+        }
+        client.DefaultRequestHeaders.Authorization = null;
+        using (var audio = await client.GetAsync("/remote/api/browser-audio/stream/browser-stream"))
+            Check(audio.StatusCode == HttpStatusCode.OK && audio.Content.Headers.ContentType?.MediaType == "audio/mpeg" &&
+                (await audio.Content.ReadAsByteArrayAsync()).Length == 4 && audio.Headers.CacheControl?.NoStore == true, "cookie-authenticated no-store media bytes");
+        using (var cookieOnly = await client.GetAsync("/remote/api/state"))
+            Check(cookieOnly.StatusCode == HttpStatusCode.Unauthorized, "media cookie grants no control API access");
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        using (var feedback = await client.PostAsJsonAsync("/remote/api/browser-audio/report", new BrowserAudioReport(browserClient, "browser-stream", 1, 15, true)))
+            Check(feedback.StatusCode == HttpStatusCode.NoContent, "owned browser feedback");
+        var secondBrowser = Guid.NewGuid().ToString("N");
+        using (var transferred = await client.PostAsJsonAsync("/remote/api/browser-audio/select", new { clientId = secondBrowser }))
+            Check(transferred.StatusCode == HttpStatusCode.NoContent, "second browser takeover");
+        using (var oldClient = new HttpClient(new HttpClientHandler { UseCookies = false }) { BaseAddress = client.BaseAddress })
+        {
+            oldClient.DefaultRequestHeaders.Add("Cookie", originalCookie.Split(';')[0]);
+            using var staleMedia = await oldClient.GetAsync("/remote/api/browser-audio/stream/browser-stream");
+            Check(staleMedia.StatusCode == HttpStatusCode.Unauthorized, "previous browser cookie revoked");
+        }
+        using (var staleRelease = await client.PostAsJsonAsync("/remote/api/browser-audio/release", new { clientId = browserClient }))
+            Check(staleRelease.StatusCode == HttpStatusCode.NoContent && browserOutput?.ClientId == secondBrowser, "old page cannot release new output");
+        var releaseEntered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseReady = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        await bridge.OnUiAsync(() => bridge.ReleaseBrowserOutputFunc = async id =>
+        {
+            if (id == secondBrowser) { releaseEntered.SetResult(); await releaseReady.Task; }
+            if (browserOutput?.ClientId == id) browserOutput = null;
+        });
+        var delayedRelease = client.PostAsJsonAsync("/remote/api/browser-audio/release", new { clientId = secondBrowser });
+        await releaseEntered.Task.WaitAsync(TimeSpan.FromSeconds(10));
+        var thirdBrowser = Guid.NewGuid().ToString("N");
+        try
+        {
+            using var reclaimed = await client.PostAsJsonAsync("/remote/api/browser-audio/select", new { clientId = thirdBrowser });
+            Check(reclaimed.StatusCode == HttpStatusCode.NoContent, "takeover during old release cleanup");
+        }
+        finally { releaseReady.TrySetResult(); }
+        using (var oldReleaseResult = await delayedRelease)
+            Check(oldReleaseResult.StatusCode == HttpStatusCode.NoContent, "old output cleanup completes independently");
+        using (var newMedia = await client.GetAsync("/remote/api/browser-audio/stream/browser-stream"))
+            Check(newMedia.StatusCode == HttpStatusCode.OK && browserOutput?.ClientId == thirdBrowser,
+                "late release must not erase the new media cookie");
+        using (var released = await client.PostAsJsonAsync("/remote/api/browser-audio/release", new { clientId = thirdBrowser }))
+            Check(released.StatusCode == HttpStatusCode.NoContent && browserOutput is null, "browser release without native fallback");
+        using (var revoked = await client.GetAsync("/remote/api/browser-audio/stream/browser-stream"))
+            Check(revoked.StatusCode == HttpStatusCode.Unauthorized, "released media cookie rejected");
         using var oversized = await client.PostAsync("/remote/api/playlists/1/queue", new StringContent(new string('x', 70_000), Encoding.UTF8, "application/json"));
         Check(oversized.StatusCode == HttpStatusCode.RequestEntityTooLarge, "reject oversized request");
         var qrPayload = "http://192.0.2.1:49201/remote#token=synthetic-test-only";
@@ -218,7 +363,7 @@ var run = Task.Run(async () =>
         settings.MobileRemoteAccessToken = "synthetic-rotated-token";
         store.Save(settings);
         Check(store.Load().MobileRemoteAccessToken == "synthetic-rotated-token", "encrypted token round trip");
-        Console.WriteLine("PASS: production host authentication, embedded assets, safe DTOs, media browsing/search/failure/bounds, radio/podcast playback readiness, playlists, command failure, body limit, PNG QR and encrypted token migration/rotation.");
+        Console.WriteLine("PASS: production host authentication, safe DTOs, media/library readiness, browser output admission, scoped media cookies, streaming, takeover/release, controls, limits, QR and encrypted credential migration.");
     }
     finally { await host.StopAsync(); stop.Cancel(); }
 });

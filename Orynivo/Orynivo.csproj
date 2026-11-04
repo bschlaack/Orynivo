@@ -36,6 +36,7 @@
   <ItemGroup>
     <InternalsVisibleTo Include="Orynivo.Tests" />
     <InternalsVisibleTo Include="Orynivo.Ui.Smoke" />
+    <InternalsVisibleTo Include="BrowserAudioSmoke" />
   </ItemGroup>
 
   <PropertyGroup>

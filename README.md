@@ -364,12 +364,87 @@ Expired media selections require refreshing the list. The browser receives only
 display metadata and bounded, process-local opaque identities, never feed or
 audio URLs. All seven interface languages are available in the remote.
 
+Starting a track, station, episode, playlist or queue entry opens **Now
+playing** after playback preparation succeeds. **Play next** and **Append**
+retain the browsing view. The playback page shows the available album cover,
+station logo or podcast cover and the active source's title, artist/show, album
+or station/publisher, genre/station details, episode publication date and audio
+format. Images arriving later refresh automatically; missing images use the
+default illustration. Seeking is available only when the active player supports
+it. Playback controls, position, duration, volume and output selection remain on
+the same page.
+
+Choose **This device** under **Output device** to listen on the phone, tablet or
+browser running the remote. Orynivo fully releases the previous computer output
+(including exclusive WASAPI/ASIO) before handing over the current source. While
+browser output is selected, new music, radio and podcast actions also play only
+there. Switching between the browser and a configured computer output preserves
+the current position and paused state when playback is active. This selection is
+temporary and is not saved as a desktop output profile.
+
+The single bottom navigation row contains **Now playing**, **Artists**,
+**Albums**, and **More**. Open **More** for search, playlists, radio, podcasts
+or **Up Next**. Music search combines local/server matches by relevance; playing
+from search or an album queues the displayed tracks from the chosen row onward.
+The playback cover prefers original artwork, bounded to 1280 pixels. Artist and
+album rows show a small image at the left. Thumbnails load as rows approach the
+viewport; unavailable images retain a placeholder.
+
+While **This device** is selected, **Music format** offers:
+
+- **Original format**: unchanged single-file media, requiring browser support.
+- **DSD → PCM**: DSD becomes FLAC at 24-bit/88.2 kHz; other single files retain
+  their original format.
+- FLAC: 16-bit at 44.1/48 kHz, or 24-bit at 88.2/96/176.4/192 kHz.
+- MP3: 128, 192, 256 or 320 kbps at 48 kHz.
+
+Format changes retain position and pause state. Radio/podcast output ignores
+this music preference. Original DSD generally cannot play in browsers; select
+**DSD → PCM** or an explicit FLAC/MP3 choice instead. Virtual segments and
+multipart tracks require an encoded choice. The preference lasts for the current
+remote session and does not change source files or desktop output settings.
+
+Radio and podcasts are relayed progressively in their original format, with
+byte-range seeking for supported podcast sources. Unsupported browser formats
+fall back to progressive FFmpeg encoding. Music, including DSF/DFF DSD, streams
+in the selected format (MP3 at 48 kHz/192 kbps by default) without waiting for a
+complete conversion. Indexed metadata avoids redundant probing, and encoding
+uses response backpressure rather than artificial realtime input pacing. **Now
+playing** shows the delivered format. Audio files are not rewritten. Browser
+output is PCM; native DSD, desktop EQ/crossfeed and native gapless output are
+not used. Queue advancement follows the browser's actual end event. Playing a
+playlist row queues that occurrence and all following playable entries.
+ReplayGain is applied to encoded music; volume uses a browser gain node where
+available, otherwise the media element's volume support. Hardware volume remains
+controlled by the device. Some mobile browsers require **Play here** once to
+allow sound. Keep the page open; background playback depends on the browser and
+operating system.
+
+Only the selecting page owns playback. Another page can take over by selecting
+**This device** itself. Closing/signing out stops its output; a disconnected
+stream without page feedback pauses after 30 seconds. Neither case resumes the
+computer automatically. Reloading or a failed stream requires selecting the
+browser output again and starting playback if stopped. Select a configured
+computer output to return to local listening. The desktop output picker shows
+**Remote device** while browser output is selected. Selecting a physical output
+also restores the retained source and position after the page has closed or its
+connection has timed out; an explicit Stop discards this resume state. Control
+tokens remain in page memory; the audio element uses a separate, scoped,
+session-only HttpOnly cookie that grants no control-API access. Media URLs
+contain only an opaque revision, never library paths, source URLs or access
+tokens. Continue using HTTPS or a VPN outside a trusted LAN.
+
 Remote verification:
 
 `dotnet run --project scripts/RemoteSmoke/RemoteSmoke.csproj` checks the
 production host with synthetic data. With Node.js and Playwright available,
 `node scripts/verify-mobile-remote.cjs` checks the embedded UI using a mock
 server and headless Edge; it never controls the actual player.
+
+`dotnet run --project scripts/BrowserAudioSmoke/BrowserAudioSmoke.csproj`
+additionally requires FFmpeg/FFprobe and checks real browser-output encoding of
+synthetic PCM, DSF, virtual segments and multipart sources, including response
+failure/cancellation cleanup. It opens no audio device or personal library.
 
 ### MCP Server
 

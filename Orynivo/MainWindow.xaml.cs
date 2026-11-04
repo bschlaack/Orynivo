@@ -663,6 +663,19 @@ public partial class MainWindow : Window
             _queue.Select((item, i) => new Mcp.QueueEntry(
                 i, i == _queueIndex, item.FilePath, item.DisplayTitle)).ToList();
         _mcpBridge.GetCurrentArtworkFunc = ResolveMobileRemoteArtworkAsync;
+        _mcpBridge.GetMobilePlaybackInfoFunc = GetMobilePlaybackInfo;
+        _mcpBridge.SelectBrowserOutputFunc = SelectBrowserOutputAsync;
+        _mcpBridge.ReleaseBrowserOutputFunc = ReleaseBrowserOutputAsync;
+        _mcpBridge.GetBrowserAudioStateFunc = GetBrowserAudioState;
+        _mcpBridge.OpenBrowserAudioStreamFunc = id =>
+            _player is Audio.BrowserAudioPlayer browser && browser.Snapshot().StreamId == id &&
+            browser.Snapshot().ClientId == _browserAudioClientId
+                ? (stream, ct) => browser.WriteAsync(id, stream, ct) : null;
+        _mcpBridge.ReportBrowserAudioFunc = report => report.ClientId == _browserAudioClientId &&
+            _player is Audio.BrowserAudioPlayer browser && browser.Report(report);
+        _mcpBridge.OpenBrowserAudioResponseFunc = id => _player is Audio.BrowserAudioPlayer browser &&
+            browser.Snapshot().StreamId == id && browser.Snapshot().ClientId == _browserAudioClientId
+                ? (context, ct) => browser.WriteResponseAsync(id, context, ct) : null;
         _mcpBridge.PlayQueueIndexFunc = async index =>
         {
             if (index < 0 || index >= _queue.Count)
@@ -672,6 +685,10 @@ public partial class MainWindow : Window
             return player is not null && ReferenceEquals(_player, player);
         };
         _mcpBridge.SearchMobileTracksFunc = SearchMobileRemoteTracksAsync;
+        _mcpBridge.SetBrowserMusicFormatFunc = id => _browserMusicEncoding = Audio.BrowserAudioEncoding.Find(id)!;
+        _mcpBridge.QueueMobileTracksFunc = QueueMobileRemoteTracksAsync;
+        _mcpBridge.BrowseMobileAllAlbumsFunc = BrowseMobileRemoteAllAlbumsAsync;
+        _mcpBridge.GetMobileLibraryArtworkFunc = ResolveMobileLibraryArtworkAsync;
         _mcpBridge.BrowseMobileRadioFunc = BrowseMobileRadioAsync;
         _mcpBridge.BrowseMobilePodcastsFunc = BrowseMobilePodcastsAsync;
         _mcpBridge.BrowseMobileEpisodesFunc = BrowseMobileEpisodesAsync;
@@ -681,7 +698,8 @@ public partial class MainWindow : Window
         _mcpBridge.BrowseMobileAlbumTracksFunc = BrowseMobileRemoteAlbumTracksAsync;
         _mcpBridge.BrowseMobilePlaylistsFunc = BrowseMobileRemotePlaylistsAsync;
         _mcpBridge.BrowseMobilePlaylistTracksFunc = BrowseMobileRemotePlaylistTracksAsync;
-        _mcpBridge.QueueMobilePlaylistFunc = QueueMobileRemotePlaylistAsync;
+        _mcpBridge.QueueMobilePlaylistFunc = (id, action) => QueueMobileRemotePlaylistAsync(id, action);
+        _mcpBridge.PlayMobilePlaylistFromTrackFunc = (id, index, identity) => QueueMobileRemotePlaylistAsync(id, "play", index, identity);
         _mcpBridge.QueueMobileTrackFunc = QueueMobileRemoteTrackAsync;
         _mcpBridge.GetCurrentFavoriteFunc = () =>
             _currentTrackId.HasValue || CurrentOrynivoFavoriteTarget is not null
