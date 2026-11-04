@@ -15,7 +15,9 @@ const token = 'synthetic-test-key&plus+equals=';
 const commands = [], errors = [], requests = [];
 const track = {id:'server:synthetic:42',title:'A song with a longer title',artist:'Example Artist',album:'Example Album',year:1998,source:'Music server'};
 const state = {status:'playing',title:track.title,artist:track.artist,album:track.album,positionSeconds:65,durationSeconds:240,volume:.35,isFavorite:true,artworkKey:'fixture',queue:[{index:0,isCurrent:true,title:track.title}]};
-let deny = false;
+let deny = false, releaseRadio;
+let signalRadioHeld;
+const radioHeld = new Promise(resolve=>{signalRadioHeld=resolve;});
 const server = http.createServer(async(req,res)=>{
     requests.push(req.url);
     if(!req.url.startsWith('/remote/api/')) {
@@ -24,6 +26,12 @@ const server = http.createServer(async(req,res)=>{
         res.end(html); return;
     }
     if(deny || req.headers.authorization !== 'Bearer '+token){res.writeHead(401);res.end();return;}
+    if(req.url.includes('/media/radio?q=failure')) {res.writeHead(502);res.end();return;}
+    if(req.url.includes('/media/radio?q=slow')) {
+        releaseRadio = () => {res.setHeader('Content-Type','application/json');res.end(JSON.stringify([{id:'old',title:'Obsolete radio'}]));};
+        signalRadioHeld();
+        return;
+    }
     if(req.method==='POST'){
         let body='';for await(const chunk of req) body+=chunk;
         commands.push({url:req.url,body:JSON.parse(body)});res.writeHead(204);res.end();return;
@@ -39,6 +47,9 @@ const server = http.createServer(async(req,res)=>{
         res.end('<svg xmlns="http://www.w3.org/2000/svg" width="320" height="320"><rect width="320" height="320" fill="#235972"/><circle cx="160" cy="160" r="90" fill="#62437b"/><circle cx="160" cy="160" r="25" fill="#20364b"/></svg>');return;
     }
     else if(req.url.endsWith('/outputs')) data=[{name:'Living room',selected:true}];
+    else if(req.url.includes('/media/radio')) data=[{id:'station-id',title:'Synthetic radio',subtitle:'MP3'}];
+    else if(req.url.includes('/media/podcasts/podcast-id/episodes')) data=[{id:'episode-id',title:'Synthetic episode',subtitle:'Synthetic podcast',durationSeconds:1800,publishedAt:'2026-01-02T00:00:00Z'}];
+    else if(req.url.includes('/media/podcasts')) data=[{id:'podcast-id',title:'Synthetic podcast',subtitle:'Publisher'}];
     else if(req.url.endsWith('/playlists')) data=[{id:1,name:'Evening favorites',trackCount:2,isSmart:false},{id:2,name:'Smart discovery',trackCount:null,isSmart:true}];
     else if(req.url.includes('/library/artists')) data=[{id:'local:1',name:'Example Artist',source:'Local'}];
     else if(req.url.includes('/library/albums')) data=[{id:'local:2',title:'Example Album',year:1998,source:'Local'}];
@@ -67,6 +78,42 @@ const server = http.createServer(async(req,res)=>{
         assert.equal(await page.locator('#status').textContent(),words.de.playing);
         assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true,'Phone width must not overflow');
         await page.screenshot({path:path.join(root,'out/mobile-remote-phone.png'),fullPage:true});
+        await page.locator('[data-view=radio]').click();
+        await page.waitForSelector('#radioList .result-actions button');
+        await page.locator('#radioList .result-actions button').click();
+        await page.waitForFunction(()=>!document.querySelector('#radioList .result-actions button').disabled);
+        assert(commands.some(x=>x.url==='/remote/api/media/radio/play'&&x.body.id==='station-id'));
+        await page.locator('#radioSearch').fill('jazz');
+        await Promise.all([page.waitForRequest(r=>r.url().includes('/media/radio?q=jazz')),
+            page.locator('#radioSearch').press('Enter')]);
+        await page.waitForSelector('#radioList .result-actions button');
+        await page.locator('#radioRefresh').click();
+        await page.waitForSelector('#radioList .result-actions button');
+        assert.equal(await page.locator('#radioSearch').inputValue(),'');
+        await page.locator('#radioSearch').fill('failure');
+        await page.locator('#radioSearch').press('Enter');
+        await page.waitForFunction(text=>document.getElementById('radioList').textContent===text,words.de.failed);
+        await page.locator('#radioSearch').fill('slow');
+        await Promise.all([page.waitForRequest(r=>r.url().includes('/media/radio?q=slow')),
+            page.locator('#radioSearch').press('Enter')]);
+        await page.locator('[data-view=podcasts]').click();
+        await radioHeld;
+        releaseRadio();
+        await page.getByRole('button',{name:'Synthetic podcast',exact:true}).click();
+        await page.waitForSelector('#podcastsList .result-actions button');
+        assert((await page.locator('#podcastsList').textContent()).includes('30:00'));
+        await page.locator('#podcastsList .result-actions button').click();
+        await page.waitForFunction(()=>!document.querySelector('#podcastsList .result-actions button').disabled);
+        assert(commands.some(x=>x.url==='/remote/api/media/podcasts/play'&&x.body.id==='episode-id'));
+        await page.screenshot({path:path.join(root,'out/mobile-remote-podcasts.png'),fullPage:true});
+        await page.locator('#podcastsBack').click();
+        await page.getByRole('button',{name:'Synthetic podcast',exact:true}).waitFor();
+        await page.locator('#podcastsSearch').fill('science');
+        await Promise.all([page.waitForRequest(r=>r.url().includes('/media/podcasts?q=science')),
+            page.locator('#podcastsSearch').press('Enter')]);
+        await page.getByRole('button',{name:'Synthetic podcast',exact:true}).waitFor();
+        assert(!(await page.locator('#radioList').textContent()).includes('Obsolete radio'),'Abandoned media responses must not publish');
+        assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true,'Media tabs must not overflow phone');
         await page.locator('[data-view=playlists]').click();
         await page.waitForSelector('#playlistList .row-name');
         await page.screenshot({path:path.join(root,'out/mobile-remote-playlists.png'),fullPage:true});
@@ -107,11 +154,17 @@ const server = http.createServer(async(req,res)=>{
             await p.waitForSelector('#app',{state:'visible'});
             assert.equal(await p.locator('html').getAttribute('lang'),lang);
             assert.equal(await p.locator('#logout').textContent(),words[lang].logout);
+            await p.locator('[data-view=radio]').click();
+            assert.equal(await p.locator('#radioTitle').textContent(),words[lang].radio);
+            await p.locator('#radioList .result-actions button').waitFor();
+            await p.locator('[data-view=podcasts]').click();
+            await p.getByRole('button',{name:'Synthetic podcast',exact:true}).click();
+            await p.locator('#podcastsList .result-actions button').waitFor();
             assert.equal(await p.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true,lang+' 320px overflow');
             await c.close();
         }
         assert.deepEqual(errors,[]);
         assert(requests.every(x=>!x.includes(token)&&!x.includes('token=')),'No token may occur in request URLs');
-        console.log('PASS: QR login, manual/invalid/expired login, in-memory credentials, playlist actions, navigation, artwork CSP, all '+Object.keys(words).length+' mobile languages, 320/390/1024px layout.');
+        console.log('PASS: QR/manual/invalid/expired login, memory-only credentials, playlists, radio search/play/failure/stale response, podcast search/episode/play, navigation, artwork CSP, all '+Object.keys(words).length+' mobile languages, 320/390/1024px layout.');
     } finally {await browser.close();server.closeAllConnections();server.close();}
 })().catch(e=>{console.error(e);process.exitCode=1;server.closeAllConnections();server.close();});

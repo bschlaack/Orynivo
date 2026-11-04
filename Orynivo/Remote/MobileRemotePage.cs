@@ -3,7 +3,7 @@ namespace Orynivo.Remote;
 /// <summary>Provides the self-contained responsive mobile remote from embedded resources.</summary>
 internal static class MobileRemotePage
 {
-    /// <summary>Gets the remote document with offline script and four-language resources.</summary>
+    /// <summary>Gets the remote document with offline script and seven-language resources.</summary>
     internal static string Html { get; } = Read("Remote.MobileRemote.html")
         .Replace("/*REMOTE_WORDS*/", "const words = " + Read("Localization.MobileRemote.json") + ";", StringComparison.Ordinal)
         .Replace("/*REMOTE_SCRIPT*/", Read("Remote.MobileRemote.js"), StringComparison.Ordinal);

@@ -1,5 +1,16 @@
 # Workflow verification scopes
 
+Mobile radio/podcast coverage (2026-11-04): `MobileRemoteMediaCatalogTests`
+checks source-kind isolation, retained podcast identity and bounded eviction
+without identity reuse. `scripts/RemoteSmoke` checks authenticated production
+media routes, search bounds, sanitized provider failures, expired podcasts and
+asynchronous playback acknowledgements through fake dispatcher-bound adapters.
+`scripts/verify-mobile-remote.cjs` checks radio search/play, podcast episode
+browsing/play, navigation and seven languages at phone/tablet sizes using
+synthetic HTTP. These checks never contact directories, read personal catalogs
+or start an audio device. They do not prove real receiver playback or provider
+availability.
+
 Updated: 2026-10-14. Counts identify the added workflow cases, not the total
 number of unit tests in the repository.
 

@@ -329,6 +329,18 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
   filter internals. Unresolved entries and standalone imported streams are
   intentionally omitted; do not expose raw playlist paths or authenticated URLs
   as an alternative.
+- Mobile radio/podcast browsing runs through dispatcher-owned adapters in
+  MainWindow.MobileRemote.Media.cs. Empty queries select saved stations/pinned
+  podcasts; searches use existing directory clients. MobileRemoteMediaCatalog
+  retains at most 2,048 process-local opaque source identities. Never accept
+  browser-provided stream/feed URLs or serialize the registry. Episode
+  identities retain their original podcast; search results matching a pinned
+  feed reuse its database identity for progress/downloads. Play must use
+  StartReadyPlaybackAsync and acknowledge only the still-current prepared
+  player. Limit lists to 100 stations/shows and 500 newest episodes, sanitize
+  provider errors, and reject stale browser responses after search, navigation
+  or sign-out. Keep all six navigation destinations visible on phones and all
+  seven remote locales complete.
 - AI endpoint discovery and testing use `AiEndpointService` and the unsaved
   values currently visible in Settings. Query only the credential-free
   OpenAI-compatible `/models` URL, accept standard and Ollama model-list shapes,

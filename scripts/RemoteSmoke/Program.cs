@@ -37,7 +37,17 @@ var run = Task.Run(async () =>
         GetQueueFunc = () => [new QueueEntry(0, true, "secret-path", "Fixture track")],
         BrowseMobilePlaylistsFunc = _ => Task.FromResult<IReadOnlyList<MobileRemotePlaylist>>([new(1, "Fixture playlist", 1, false)]),
         BrowseMobilePlaylistTracksFunc = (_, _) => Task.FromResult<IReadOnlyList<MobileRemoteTrack>>([new("local:1", "Fixture track", null, null, 1998, "Local")]),
-        QueueMobilePlaylistFunc = (id, action) => { lastAction = action; return Task.FromResult(id == 1); }
+        QueueMobilePlaylistFunc = (id, action) => { lastAction = action; return Task.FromResult(id == 1); },
+        BrowseMobileRadioFunc = async (q, ct) =>
+        {
+            Check(dispatcher.CheckAccess(), "radio browsing dispatcher");
+            await Task.Yield(); ct.ThrowIfCancellationRequested();
+            if (q == "failure") throw new InvalidOperationException("private-feed-must-not-escape");
+            return [new("station-id", string.IsNullOrEmpty(q) ? "Saved station" : "Search station", "MP3")];
+        },
+        BrowseMobilePodcastsFunc = (_, _) => Task.FromResult<IReadOnlyList<MobileRemoteMedia>>([new("podcast-id", "Pinned podcast", "Publisher")]),
+        BrowseMobileEpisodesFunc = (id, _) => Task.FromResult<IReadOnlyList<MobileRemoteMedia>?>(id == "podcast-id"
+            ? [new("episode-id", "Episode", "Pinned podcast", 120, DateTimeOffset.UnixEpoch)] : null)
     };
     try
     {
@@ -49,12 +59,53 @@ var run = Task.Run(async () =>
         Check(document.Contains("playlistActions") && !document.Contains("/*REMOTE_SCRIPT*/") && !document.Contains("/*REMOTE_WORDS*/"), "embedded assets");
         Check(html.Headers.CacheControl?.NoStore == true, "HTML must not be cached");
         Check(html.Headers.GetValues("Content-Security-Policy").Single().Contains("blob:"), "authenticated artwork blobs");
-        foreach (var route in new[] { "/remote/api/state", "/remote/api/playlists", "/remote/api/playlists/1/tracks", "/remote/api/events" })
+        foreach (var route in new[] { "/remote/api/state", "/remote/api/playlists", "/remote/api/playlists/1/tracks", "/remote/api/events",
+            "/remote/api/media/radio", "/remote/api/media/podcasts", "/remote/api/media/podcasts/podcast-id/episodes" })
         {
             using var denied = await client.GetAsync(route);
             Check(denied.StatusCode == HttpStatusCode.Unauthorized, "unauthenticated request");
         }
+        foreach (var kind in new[] { "radio", "podcasts" })
+        {
+            using var deniedPlay = await client.PostAsJsonAsync($"/remote/api/media/{kind}/play", new { id = "known" });
+            Check(deniedPlay.StatusCode == HttpStatusCode.Unauthorized, "media playback authentication");
+        }
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        using (var savedRadio = await client.GetAsync("/remote/api/media/radio"))
+            Check((await savedRadio.Content.ReadAsStringAsync()).Contains("Saved station") && savedRadio.Headers.CacheControl?.NoStore == true,
+                "saved radio and private response caching");
+        Check((await client.GetStringAsync("/remote/api/media/radio?q=test")).Contains("Search station"), "radio search");
+        Check((await client.GetStringAsync("/remote/api/media/podcasts")).Contains("Pinned podcast"), "pinned podcasts");
+        var episodes = await client.GetStringAsync("/remote/api/media/podcasts/podcast-id/episodes");
+        Check(episodes.Contains("episode-id") && !episodes.Contains("audioUrl") && !episodes.Contains("feedUrl"), "safe episode DTO");
+        using (var missingEpisode = await client.GetAsync("/remote/api/media/podcasts/missing/episodes"))
+            Check(missingEpisode.StatusCode == HttpStatusCode.NotFound, "expired podcast identity");
+        using (var failedMedia = await client.GetAsync("/remote/api/media/radio?q=failure"))
+            Check(failedMedia.StatusCode == HttpStatusCode.BadGateway &&
+                !(await failedMedia.Content.ReadAsStringAsync()).Contains("private-feed"), "sanitized media failure");
+        using (var longQuery = await client.GetAsync("/remote/api/media/radio?q=" + new string('x', 251)))
+            Check(longQuery.StatusCode == HttpStatusCode.BadRequest, "bounded media search");
+        foreach (var kind in new[] { "radio", "podcasts" })
+        {
+            var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            var ready = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            await bridge.OnUiAsync(() => bridge.PlayMobileMediaFunc = async (source, id) =>
+            {
+                Check(dispatcher.CheckAccess() && source == kind, "media playback dispatcher and kind");
+                if (id != "known") return false;
+                entered.SetResult(); await ready.Task; return true;
+            });
+            var play = client.PostAsJsonAsync($"/remote/api/media/{kind}/play", new { id = "known" });
+            await entered.Task.WaitAsync(TimeSpan.FromSeconds(10));
+            Check(!play.IsCompleted, "media play awaits preparation");
+            ready.SetResult();
+            using var result = await play;
+            Check(result.StatusCode == HttpStatusCode.NoContent, "media playback accepted");
+            using var unknown = await client.PostAsJsonAsync($"/remote/api/media/{kind}/play", new { id = "missing" });
+            Check(unknown.StatusCode == HttpStatusCode.BadRequest, "unknown media rejected");
+        }
+        using (var invalidKind = await client.PostAsJsonAsync("/remote/api/media/unsupported/play", new { id = "known" }))
+            Check(invalidKind.StatusCode == HttpStatusCode.BadRequest, "invalid media kind");
         var command = client.PostAsJsonAsync("/remote/api/command", new { command = "pause-resume" });
         await commandEntered.Task.WaitAsync(TimeSpan.FromSeconds(10));
         Check(!command.IsCompleted, "command waits for asynchronous preparation");
@@ -167,7 +218,7 @@ var run = Task.Run(async () =>
         settings.MobileRemoteAccessToken = "synthetic-rotated-token";
         store.Save(settings);
         Check(store.Load().MobileRemoteAccessToken == "synthetic-rotated-token", "encrypted token round trip");
-        Console.WriteLine("PASS: production host authentication, embedded resources, safe DTOs, playlist routes/actions, asynchronous command completion/failure, body limit, PNG QR generation, encrypted token migration and rotation.");
+        Console.WriteLine("PASS: production host authentication, embedded assets, safe DTOs, media browsing/search/failure/bounds, radio/podcast playback readiness, playlists, command failure, body limit, PNG QR and encrypted token migration/rotation.");
     }
     finally { await host.StopAsync(); stop.Cancel(); }
 });

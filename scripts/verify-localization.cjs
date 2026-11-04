@@ -24,6 +24,7 @@ for (const [language, values] of Object.entries(mobile)) {
   assert.ok(Object.values(values).every(value => value.trim()), language + ': mobile empty value');
 }
 assert.ok(mobile.hi, 'Hindi mobile resources must exist');
+assert.deepEqual(Object.keys(mobile).sort(), Object.keys(web.languageUrls).sort(), 'All desktop locales must have mobile resources');
 const script = fs.readFileSync(path.join(root, 'html/i18n.js'), 'utf8');
 for (const language of Object.keys(web.languageUrls)) {
   const buttons = Object.keys(web.languageUrls).map(l => ({

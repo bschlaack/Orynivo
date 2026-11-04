@@ -672,6 +672,10 @@ public partial class MainWindow : Window
             return player is not null && ReferenceEquals(_player, player);
         };
         _mcpBridge.SearchMobileTracksFunc = SearchMobileRemoteTracksAsync;
+        _mcpBridge.BrowseMobileRadioFunc = BrowseMobileRadioAsync;
+        _mcpBridge.BrowseMobilePodcastsFunc = BrowseMobilePodcastsAsync;
+        _mcpBridge.BrowseMobileEpisodesFunc = BrowseMobileEpisodesAsync;
+        _mcpBridge.PlayMobileMediaFunc = PlayMobileMediaAsync;
         _mcpBridge.BrowseMobileArtistsFunc = BrowseMobileRemoteArtistsAsync;
         _mcpBridge.BrowseMobileAlbumsFunc = BrowseMobileRemoteAlbumsAsync;
         _mcpBridge.BrowseMobileAlbumTracksFunc = BrowseMobileRemoteAlbumTracksAsync;
