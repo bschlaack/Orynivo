@@ -2,6 +2,7 @@ using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
 using Orynivo.Audio;
+using Orynivo.Audio.CoreAudio;
 using Orynivo.Localization;
 
 namespace Orynivo;
@@ -9,6 +10,7 @@ namespace Orynivo;
 /// <summary>Dialog for creating or editing a named audio output profile.</summary>
 internal partial class OutputProfileDialog : Window
 {
+    /// <summary>Separates legacy non-Windows PCM routes sharing the WASAPI compatibility value.</summary>
     private enum LinuxDeviceKind
     {
         Any,
@@ -16,15 +18,22 @@ internal partial class OutputProfileDialog : Window
         DirectAlsa
     }
 
+    /// <summary>One platform-appropriate output type in the shared profile dialog.</summary>
+    /// <param name="Value">Persisted backend value.</param>
+    /// <param name="Label">Localized output type label.</param>
+    /// <param name="LinuxDeviceKind">Optional compatibility-route filter.</param>
     private sealed record BackendChoice(
         OutputBackend Value,
         string Label,
         LinuxDeviceKind LinuxDeviceKind = LinuxDeviceKind.Any)
     {
+        /// <inheritdoc/>
         public override string ToString() => Label;
     }
 
     private readonly HashSet<string> _existingNames;
+    private readonly bool _isMacOS;
+    private readonly Func<OutputBackend, IReadOnlyList<WasapiDeviceInfo>>? _enumeratePcmDevices;
     private readonly SemaphoreSlim _deviceLoadGate = new(1, 1);
     private int _deviceLoadVersion;
 
@@ -43,9 +52,27 @@ internal partial class OutputProfileDialog : Window
     /// <param name="existingNames">Profile names already in use (must exclude the profile being edited).</param>
     /// <param name="profile">Existing profile to edit, or <see langword="null"/> for a new profile.</param>
     internal OutputProfileDialog(IEnumerable<string> existingNames, OutputProfile? profile)
+        : this(existingNames, profile, OperatingSystem.IsMacOS(), null)
     {
+    }
+
+    /// <summary>Constructs the shared dialog with injectable platform/device boundaries for isolated layout checks.</summary>
+    /// <param name="existingNames">Names already in use.</param>
+    /// <param name="profile">The existing output, if any.</param>
+    /// <param name="isMacOS">Whether the CoreAudio platform choice is available.</param>
+    /// <param name="enumeratePcmDevices">Optional synthetic PCM device source; production leaves it unset.</param>
+    internal OutputProfileDialog(IEnumerable<string> existingNames, OutputProfile? profile, bool isMacOS,
+        Func<OutputBackend, IReadOnlyList<WasapiDeviceInfo>>? enumeratePcmDevices)
+    {
+        _isMacOS = isMacOS;
+        _enumeratePcmDevices = enumeratePcmDevices;
+        _initialProfile = profile;
         InitializeComponent();
         _existingNames = new HashSet<string>(existingNames, StringComparer.OrdinalIgnoreCase);
+        CoreAudioMatchRateCheckBox.IsChecked = profile?.CoreAudioMatchRate ?? true;
+        CoreAudioExclusiveCheckBox.IsChecked = profile?.CoreAudioExclusive ?? false;
+        CoreAudioRestoreRateCheckBox.IsChecked = profile?.CoreAudioRestoreRate ?? true;
+        CoreAudioBypassCheckBox.IsChecked = profile?.CoreAudioBypass ?? false;
 
         var isEditing = profile is not null;
         Title = isEditing
@@ -58,8 +85,10 @@ internal partial class OutputProfileDialog : Window
             new(OutputBackend.CwAsio, LocalizationManager.Current.CwAsio),
             new(OutputBackend.AirPlay, LocalizationManager.Current.AirPlay)
         };
-        if (!OperatingSystem.IsWindows())
+        if (!OperatingSystem.IsWindows() || _isMacOS)
         {
+            if (_isMacOS)
+                availableBackends.Add(new(OutputBackend.CoreAudio, LocalizationManager.Current.CoreAudio));
             availableBackends.Add(
                 new(OutputBackend.Wasapi, LocalizationManager.Current.OpenAl, LinuxDeviceKind.OpenAl));
             if (OperatingSystem.IsLinux())
@@ -90,7 +119,6 @@ internal partial class OutputProfileDialog : Window
                      c.LinuxDeviceKind == ResolveLinuxDeviceKind(profile.SelectedWasapiDeviceId)))
                 ?? filteredBackends.FirstOrDefault(c => c.Value == OutputBackend.Wasapi)
                 ?? filteredBackends.FirstOrDefault();
-            _initialProfile = profile;
         }
         else
         {
@@ -143,7 +171,21 @@ internal partial class OutputProfileDialog : Window
 
     private void BackendComboBox_OnSelectionChanged(object? sender, SelectionChangedEventArgs e)
     {
+        CoreAudioOptionsPanel.IsVisible = SelectedBackend == OutputBackend.CoreAudio;
         _ = LoadDevicesAsync();
+    }
+
+    private void CoreAudioBypassCheckBox_OnIsCheckedChanged(object? sender, RoutedEventArgs e)
+    {
+        if (CoreAudioMatchRateCheckBox is null || CoreAudioExclusiveCheckBox is null) return;
+        var bypass = CoreAudioBypassCheckBox.IsChecked == true;
+        if (bypass)
+        {
+            CoreAudioMatchRateCheckBox.IsChecked = true;
+            CoreAudioExclusiveCheckBox.IsChecked = true;
+        }
+        CoreAudioMatchRateCheckBox.IsEnabled = !bypass;
+        CoreAudioExclusiveCheckBox.IsEnabled = !bypass;
     }
 
     private void DeviceComboBox_OnSelectionChanged(object? sender, SelectionChangedEventArgs e)
@@ -163,13 +205,18 @@ internal partial class OutputProfileDialog : Window
             }
             else if (DeviceComboBox.SelectedItem is WasapiDeviceInfo wasapiDevice)
             {
-                var info = WasapiDeviceProvider.GetCapabilities(wasapiDevice.Id);
+                var backend = SelectedBackend;
+                var info = await Task.Run(() => backend == OutputBackend.CoreAudio
+                    ? CoreAudioNativeDevice.Resolve(wasapiDevice.Id).GetCapabilities()
+                    : WasapiDeviceProvider.GetCapabilities(wasapiDevice.Id));
                 await new DeviceInfoWindow(info).ShowDialog(this);
             }
         }
         catch (Exception ex)
         {
-            StatusTextBlock.Text = string.Format(LocalizationManager.Current.DeviceInfoFailed, ex.Message);
+            StatusTextBlock.Text = SelectedBackend == OutputBackend.CoreAudio
+                ? LocalizationManager.Current.CoreAudioFailed
+                : string.Format(LocalizationManager.Current.DeviceInfoFailed, ex.Message);
         }
     }
 
@@ -181,6 +228,7 @@ internal partial class OutputProfileDialog : Window
     {
         var loadVersion = Interlocked.Increment(ref _deviceLoadVersion);
         var backend = SelectedBackend;
+        CoreAudioOptionsPanel.IsVisible = backend == OutputBackend.CoreAudio;
         DeviceComboBox.IsEnabled = false;
         DeviceInfoButton.IsEnabled = false;
         DeviceInfoButton.IsVisible = false;
@@ -192,9 +240,20 @@ internal partial class OutputProfileDialog : Window
             if (loadVersion != Volatile.Read(ref _deviceLoadVersion))
                 return;
 
-            if (backend == OutputBackend.Wasapi)
+            if (backend == OutputBackend.CoreAudio)
             {
-                var devices = (await Task.Run(WasapiDeviceProvider.GetRenderDevices))
+                var devices = (await EnumeratePcmDevicesAsync(backend)).ToArray();
+                if (loadVersion != Volatile.Read(ref _deviceLoadVersion)) return;
+                DeviceComboBox.ItemsSource = devices;
+                DeviceComboBox.DisplayMemberBinding = new Avalonia.Data.Binding(nameof(WasapiDeviceInfo.Name));
+                DeviceComboBox.SelectedItem = devices.FirstOrDefault(device =>
+                    device.Id == _initialProfile?.SelectedWasapiDeviceId) ?? devices.FirstOrDefault();
+                DeviceLabelTextBlock.Text = LocalizationManager.Current.CoreAudioOutputDevice;
+                StatusTextBlock.Text = devices.Length == 0 ? LocalizationManager.Current.CoreAudioNoDevices : string.Empty;
+            }
+            else if (backend == OutputBackend.Wasapi)
+            {
+                var devices = (await EnumeratePcmDevicesAsync(backend))
                     .Where(device =>
                         SelectedLinuxDeviceKind == LinuxDeviceKind.Any ||
                         ResolveLinuxDeviceKind(device.Id) == SelectedLinuxDeviceKind)
@@ -206,7 +265,7 @@ internal partial class OutputProfileDialog : Window
                 DeviceComboBox.SelectedItem = devices.FirstOrDefault(d =>
                     string.Equals(d.Id, _initialProfile?.SelectedWasapiDeviceId, StringComparison.Ordinal))
                     ?? devices.FirstOrDefault();
-                DeviceLabelTextBlock.Text = !OperatingSystem.IsWindows()
+                DeviceLabelTextBlock.Text = !OperatingSystem.IsWindows() || _isMacOS
                     ? SelectedLinuxDeviceKind == LinuxDeviceKind.DirectAlsa
                         ? LocalizationManager.Current.AlsaOutputDevice
                         : LocalizationManager.Current.OpenAlOutputDevice
@@ -272,7 +331,8 @@ internal partial class OutputProfileDialog : Window
         catch (DllNotFoundException)
         {
             if (loadVersion == Volatile.Read(ref _deviceLoadVersion))
-                StatusTextBlock.Text = LocalizationManager.Current.AsioBridgeMissing;
+                StatusTextBlock.Text = backend == OutputBackend.CoreAudio
+                    ? LocalizationManager.Current.CoreAudioFailed : LocalizationManager.Current.AsioBridgeMissing;
         }
         catch
         {
@@ -281,6 +341,7 @@ internal partial class OutputProfileDialog : Window
                 {
                     OutputBackend.Wasapi => LocalizationManager.Current.NoWasapiDevices,
                     OutputBackend.AirPlay => LocalizationManager.Current.NoAirPlayDevices,
+                    OutputBackend.CoreAudio => LocalizationManager.Current.CoreAudioFailed,
                     _ => LocalizationManager.Current.NoAsioDrivers
                 };
         }
@@ -311,6 +372,12 @@ internal partial class OutputProfileDialog : Window
         return true;
     }
 
+    private Task<IReadOnlyList<WasapiDeviceInfo>> EnumeratePcmDevicesAsync(OutputBackend backend) => Task.Run(() =>
+        _enumeratePcmDevices is not null ? _enumeratePcmDevices(backend) : backend == OutputBackend.CoreAudio
+            ? (IReadOnlyList<WasapiDeviceInfo>)CoreAudioNativeDevice.GetOutputDevices()
+                .Select(device => new WasapiDeviceInfo(device.Uid, device.Name)).ToArray()
+            : WasapiDeviceProvider.GetRenderDevices());
+
     private void UpdateSaveButton()
     {
         var name = NameTextBox.Text?.Trim();
@@ -332,6 +399,10 @@ internal partial class OutputProfileDialog : Window
             SelectedDriverName = DeviceComboBox.SelectedItem as string,
             SelectedWasapiDeviceId = DeviceComboBox.SelectedItem is WasapiDeviceInfo w ? w.Id : null,
             SelectedWasapiDeviceName = DeviceComboBox.SelectedItem is WasapiDeviceInfo wd ? wd.Name : null,
+            CoreAudioMatchRate = CoreAudioMatchRateCheckBox.IsChecked == true,
+            CoreAudioExclusive = CoreAudioExclusiveCheckBox.IsChecked == true,
+            CoreAudioRestoreRate = CoreAudioRestoreRateCheckBox.IsChecked == true,
+            CoreAudioBypass = CoreAudioBypassCheckBox.IsChecked == true,
             SelectedAirPlayDeviceId = airPlayDevice?.Id,
             SelectedAirPlayDeviceName = airPlayDevice?.Name,
             SelectedAirPlayHost = airPlayDevice?.Host,

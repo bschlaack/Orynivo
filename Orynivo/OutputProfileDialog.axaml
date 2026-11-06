@@ -5,7 +5,9 @@
         Icon="avares://Orynivo/Assets/Orynivo.ico"
         Width="480"
         SizeToContent="Height"
-        CanResize="False"
+        CanResize="True"
+        MinWidth="420"
+        MaxHeight="760"
         WindowStartupLocation="CenterOwner"
         Background="{DynamicResource AppSurfaceBrush}"
         Foreground="{DynamicResource AppPrimaryTextBrush}">
@@ -54,8 +56,10 @@
         </ControlTheme>
     </Window.Resources>
 
+    <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
     <Grid Margin="24,20,24,24">
         <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
@@ -135,7 +139,25 @@
                        Foreground="{DynamicResource AppMutedTextBrush}"/>
         </Grid>
 
-        <StackPanel Grid.Row="8"
+        <StackPanel x:Name="CoreAudioOptionsPanel" Grid.Row="8" IsVisible="False" Margin="0,0,0,16" Spacing="8">
+            <CheckBox x:Name="CoreAudioMatchRateCheckBox" AutomationProperties.Name="{DynamicResource L_CoreAudioMatchRate}">
+                <TextBlock Text="{DynamicResource L_CoreAudioMatchRate}" TextWrapping="Wrap"/>
+            </CheckBox>
+            <CheckBox x:Name="CoreAudioExclusiveCheckBox" AutomationProperties.Name="{DynamicResource L_CoreAudioExclusive}">
+                <TextBlock Text="{DynamicResource L_CoreAudioExclusive}" TextWrapping="Wrap"/>
+            </CheckBox>
+            <CheckBox x:Name="CoreAudioRestoreRateCheckBox" AutomationProperties.Name="{DynamicResource L_CoreAudioRestoreRate}">
+                <TextBlock Text="{DynamicResource L_CoreAudioRestoreRate}" TextWrapping="Wrap"/>
+            </CheckBox>
+            <CheckBox x:Name="CoreAudioBypassCheckBox" AutomationProperties.Name="{DynamicResource L_CoreAudioBypass}"
+                      IsCheckedChanged="CoreAudioBypassCheckBox_OnIsCheckedChanged">
+                <TextBlock Text="{DynamicResource L_CoreAudioBypass}" TextWrapping="Wrap"/>
+            </CheckBox>
+            <TextBlock Text="{DynamicResource L_CoreAudioOptionsHint}" TextWrapping="Wrap"
+                       FontSize="{DynamicResource FontSizeMeta}" Foreground="{DynamicResource AppSecondaryTextBrush}"/>
+        </StackPanel>
+
+        <StackPanel Grid.Row="9"
                     Orientation="Horizontal"
                     HorizontalAlignment="Right">
             <Button Width="96"
@@ -153,4 +175,5 @@
                     Click="SaveButton_OnClick"/>
         </StackPanel>
     </Grid>
+    </ScrollViewer>
 </Window>

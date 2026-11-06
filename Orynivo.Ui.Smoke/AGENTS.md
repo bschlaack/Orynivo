@@ -23,6 +23,10 @@ affect the pure desktop unit tests.
   paths, catalog metadata or environment values.
 - The initial runtime contract is Windows-only. Add evidence and CI execution
   before claiming other-platform support. Pure unit tests remain cross-platform.
+- Native output-profile checks may simulate Mac choice policy and inject PCM
+  device lists into OutputProfileDialog. Never invoke real device enumeration or
+  playback. This proves shared control layout/Save behavior only, not native
+  macOS windowing, HAL capabilities or audible output.
 - Run the project in Debug and Release through `scripts/verify-all.ps1` after
   changes. Windows CI must continue invoking it in both configurations.
 - Match the desktop Avalonia version for Headless dependencies. Document all

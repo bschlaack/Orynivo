@@ -17,11 +17,20 @@ public sealed class OutputProfile
     /// <summary>Gets or sets the selected ASIO or cwASIO driver name.</summary>
     public string? SelectedDriverName { get; set; }
 
-    /// <summary>Gets or sets the MMDevice ID of the selected WASAPI render device.</summary>
+    /// <summary>Gets or sets the Windows endpoint, non-Windows route, or CoreAudio device UID.</summary>
     public string? SelectedWasapiDeviceId { get; set; }
 
-    /// <summary>Gets or sets the display name of the selected WASAPI render device.</summary>
+    /// <summary>Gets or sets the display name of the selected platform PCM output device.</summary>
     public string? SelectedWasapiDeviceName { get; set; }
+
+    /// <summary>Gets or sets whether CoreAudio matches the file's PCM sample rate.</summary>
+    public bool CoreAudioMatchRate { get; set; } = true;
+    /// <summary>Gets or sets whether CoreAudio requires exclusive hog ownership.</summary>
+    public bool CoreAudioExclusive { get; set; }
+    /// <summary>Gets or sets whether CoreAudio restores the prior rate on release.</summary>
+    public bool CoreAudioRestoreRate { get; set; } = true;
+    /// <summary>Gets or sets whether CoreAudio ignores software volume and PCM processing.</summary>
+    public bool CoreAudioBypass { get; set; }
 
     /// <summary>Gets or sets the stable DNS-SD service name of the selected AirPlay receiver.</summary>
     public string? SelectedAirPlayDeviceId { get; set; }

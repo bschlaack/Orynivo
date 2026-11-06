@@ -39,12 +39,18 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
 
 ## Client Invariants
 
-- `Audio/CoreAudio` currently provides an unconnected macOS HAL control plane,
-  not a playback backend. Keep stable UID admission through complete
-  asynchronous restoration, never release another session's hog ownership, and
-  stop native rendering before lease disposal when integrating it. Do not
-  advertise CoreAudio selection or bit-perfect macOS output until the renderer
-  and profile routing exist. Implementation and acceptance steps live in
+- `Audio/CoreAudio` implements experimental macOS AUHAL stereo PCM as the
+  appended `OutputBackend.CoreAudio` value. Persist stable UIDs and preserve
+  existing OpenAL profiles. Snapshot profile options before awaits. Keep UID
+  admission through complete asynchronous restoration, never release another
+  session's hog ownership, and stop native callbacks before lease disposal.
+  Callback code only copies the bounded S32 ring or writes silence; no waits,
+  decoding, device-property work or UI calls. Seek epochs discard obsolete PCM;
+  native health checks stay on a worker. Keep a non-quiescent failed output's
+  lease rather than releasing an outstanding renderer's device. Bypass requires
+  matched-rate exclusive stereo PCM and ignores all software gain/DSP. Do not
+  claim hardware bit-perfect verification, native DSD/DoP or gapless sessions
+  for this initial single-track path. Plan and hardware acceptance live in
   `../docs/COREAUDIO-PLAN.md`.
 
 - Shuffle changes must refresh prepared gapless output through the existing
@@ -1745,21 +1751,23 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
   Linux and macOS targets in `Orynivo.csproj`. The compatibility types currently
   live under `Compatibility/Linux`; shared non-Windows PCM playback uses OpenAL,
   loading `libopenal.so.1` on Linux and the system OpenAL framework on macOS.
-  Linux additionally enumerates direct ALSA `hw:` devices through
-  `libasound.so.2` and selectable OpenAL devices through `libopenal.so.1`. The
-  output-profile dialog presents these as separate output types and classifies
-  persisted profiles by their device ID (`alsa:` means direct ALSA); never mix
-  direct ALSA hardware into the OpenAL device list. Direct ALSA uses stereo
-  signed 32-bit PCM, the source rate, and `soft_resample=0`; failure to open
-  that exact format/rate must be reported rather than silently falling back to
-  resampling. An `EBUSY` open failure must identify PipeWire/other-process
-  ownership and explain that changing the desktop default does not release the
-  card. The shared device-information window must use ALSA/OpenAL terminology on
-  Linux and must not expose its historical WASAPI labels there. OpenAL requests
-  the source rate when creating the context, then queries the negotiated OpenAL
-  mixer rate and uses that value for FFmpeg decoding and transport output-rate
-  reporting. Compatibility types must not persist credentials in plaintext or
-  claim unavailable WASAPI, ASIO, endpoint-volume, or SMTC capabilities.
+  macOS can instead select the dedicated CoreAudio backend described above; it
+  does not route through these OpenAL compatibility players. Linux additionally
+  enumerates direct ALSA `hw:` devices through `libasound.so.2` and selectable
+  OpenAL devices through `libopenal.so.1`. The output-profile dialog presents
+  these as separate output types and classifies persisted profiles by their
+  device ID (`alsa:` means direct ALSA); never mix direct ALSA hardware into the
+  OpenAL device list. Direct ALSA uses stereo signed 32-bit PCM, the source
+  rate, and `soft_resample=0`; failure to open that exact format/rate must be
+  reported rather than silently falling back to resampling. An `EBUSY` open
+  failure must identify PipeWire/other-process ownership and explain that
+  changing the desktop default does not release the card. The shared
+  device-information window must use ALSA/OpenAL terminology on Linux and must
+  not expose its historical WASAPI labels there. OpenAL requests the source rate
+  when creating the context, then queries the negotiated OpenAL mixer rate and
+  uses that value for FFmpeg decoding and transport output-rate reporting.
+  Compatibility types must not persist credentials in plaintext or claim
+  unavailable WASAPI, ASIO, endpoint-volume, or SMTC capabilities.
   Cross-platform behavior shared with the server belongs in `Orynivo.Core`.
 - The Linux target exposes system-media control through MPRIS 2 instead of SMTC.
   `Orynivo/Compatibility/Linux/MprisMediaTransport.cs` registers

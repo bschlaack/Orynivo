@@ -494,6 +494,7 @@ public partial class MainWindow : Window
             OutputBackend.AirPlay when !string.IsNullOrWhiteSpace(_settings.SelectedAirPlayDeviceName) =>
                 $"{_settings.SelectedAirPlayDeviceName}  ·  {LocalizationManager.Current.AirPlay}",
             OutputBackend.KernelStreaming => "KernelStreaming",
+            OutputBackend.CoreAudio => $"{_settings.SelectedWasapiDeviceName}  ·  {LocalizationManager.Current.CoreAudio}",
             _ => LocalizationManager.Current.NoDeviceSelected
         };
     }

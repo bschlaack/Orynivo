@@ -14,5 +14,7 @@ public enum OutputBackend
     /// <summary>cwASIO via <c>CwAsioBridge.dll</c>.</summary>
     CwAsio = 3,
     /// <summary>AirPlay 2 output through the native sender, with classic RAOP fallback.</summary>
-    AirPlay = 4
+    AirPlay = 4,
+    /// <summary>Native macOS Core Audio HAL PCM output.</summary>
+    CoreAudio = 5
 }

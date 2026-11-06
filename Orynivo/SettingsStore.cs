@@ -431,7 +431,7 @@ public sealed class SettingsStore
     private static bool IsUsableOutputProfile(OutputProfile profile) =>
         profile.Backend switch
         {
-            OutputBackend.Wasapi => !string.IsNullOrWhiteSpace(profile.SelectedWasapiDeviceId),
+            OutputBackend.Wasapi or OutputBackend.CoreAudio => !string.IsNullOrWhiteSpace(profile.SelectedWasapiDeviceId),
             OutputBackend.Asio or OutputBackend.CwAsio => !string.IsNullOrWhiteSpace(profile.SelectedDriverName),
             OutputBackend.AirPlay =>
                 !string.IsNullOrWhiteSpace(profile.SelectedAirPlayDeviceId) &&

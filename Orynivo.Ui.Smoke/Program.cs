@@ -59,6 +59,7 @@ internal static class Program
             ViewRefreshWorkflows.Run();
             ShuffleWorkflows.Run();
             BrowserOutputReclaimWorkflows.Run();
+            CoreAudioProfileWorkflows.Run();
             if (DenyExternalRequests.Requests != 0)
                 throw new InvalidOperationException("Cached workflows attempted external provider requests.");
             Console.WriteLine("All Windows UI smoke workflows passed.");

@@ -237,6 +237,26 @@ public sealed record LocalizedStrings(
     public string AirPlaySenderMissing { get; init; } = "";
     /// <summary>Gets the message shown when an AirPlay profile has no receiver selected.</summary>
     public string SelectAirPlayDevice { get; init; } = "";
+    /// <summary>Gets the localized CoreAudio text.</summary>
+    public string CoreAudio { get; init; } = "";
+    /// <summary>Gets the localized CoreAudioOutputDevice text.</summary>
+    public string CoreAudioOutputDevice { get; init; } = "";
+    /// <summary>Gets the localized CoreAudioMatchRate text.</summary>
+    public string CoreAudioMatchRate { get; init; } = "";
+    /// <summary>Gets the localized CoreAudioExclusive text.</summary>
+    public string CoreAudioExclusive { get; init; } = "";
+    /// <summary>Gets the localized CoreAudioRestoreRate text.</summary>
+    public string CoreAudioRestoreRate { get; init; } = "";
+    /// <summary>Gets the localized CoreAudioBypass text.</summary>
+    public string CoreAudioBypass { get; init; } = "";
+    /// <summary>Gets the localized CoreAudioOptionsHint text.</summary>
+    public string CoreAudioOptionsHint { get; init; } = "";
+    /// <summary>Gets the localized CoreAudioFailed text.</summary>
+    public string CoreAudioFailed { get; init; } = "";
+    /// <summary>Gets the localized CoreAudioNoDevices text.</summary>
+    public string CoreAudioNoDevices { get; init; } = "";
+    /// <summary>Gets the localized CoreAudioEndpointSummary text.</summary>
+    public string CoreAudioEndpointSummary { get; init; } = "";
     /// <summary>Gets the OpenAL backend label.</summary>
     public string OpenAl { get; init; } = "";
     /// <summary>Gets the OpenAL output-device field label.</summary>

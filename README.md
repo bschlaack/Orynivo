@@ -1410,15 +1410,35 @@ the Steinberg ASIO SDK nor a platform-specific Orynivo bridge is required.
 - FFmpeg and FFprobe from `PATH`, common package-manager locations, or Orynivo's
   automatic per-user download
 - The system OpenAL framework used for PCM output
+- Optional native CoreAudio HAL stereo PCM output, currently experimental
 - Avalonia OpenGL rendering with a software fallback for Macs whose Metal shader
   compiler exceeds Skia's compilation timeout
 - No ASIO, cwASIO, ALSA, or native DSD support
 
-A native CoreAudio output with automatic device-rate matching is in development.
-The initial device-control foundation is not connected to playback yet; macOS
-currently uses OpenAL and does not guarantee bit-perfect output. The
-[CoreAudio implementation plan](docs/COREAUDIO-PLAN.md) tracks the planned
-OpenAL/CoreAudio profile choice and Mac/USB-DAC testing still required.
+**Create output** and **Configure output** offer **OpenAL** and **CoreAudio** on
+macOS. Existing OpenAL profiles retain their behavior. CoreAudio selects a
+native device by stable UID and supplies stereo signed 32-bit PCM to Apple's HAL
+output unit. Its client format does not establish the DAC's physical stream
+precision.
+
+| CoreAudio option or feature                   | Current behavior                                                                                                                                                                    |
+| --------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Match sample rate to the file                 | Enabled by default; confirms the nominal device rate before rendering. Disabling it converts to the current device rate.                                                            |
+| Exclusive device access                       | Optional hog mode; failure to acquire it stops startup rather than downgrading silently.                                                                                            |
+| Restore previous sample rate on release       | Enabled by default. Stop, release, switching outputs and normal shutdown await native cleanup before restoring owned changes. Pause retains the device.                             |
+| Unprocessed PCM                               | Requires matched-rate exclusive stereo PCM. Ignores Orynivo software volume, ReplayGain, boost, EQ and fades; control volume on the device. It is not a verified bit-perfect claim. |
+| Ordinary PCM processing                       | Software volume, ReplayGain, PCM boost and EQ are supported.                                                                                                                        |
+| Maximum PCM output sample rate                | A positive value is a strict ceiling; an incompatible current-device rate fails when automatic matching is disabled.                                                                |
+| DSD                                           | Converts to PCM; native DSD and DoP are unavailable through CoreAudio.                                                                                                              |
+| Queue and seeking                             | Uses normal queue advancement, Pause/Resume and segment-aware seeking. Each title gets a new session, including a rate change where needed.                                         |
+| Gapless, crossfeed and loudness normalization | Not implemented for this initial CoreAudio path.                                                                                                                                    |
+
+CoreAudio is experimental and has not yet been verified on physical Mac/DAC
+hardware. Output stops when a monitored device/rate/ownership change is
+detected. Restoration preserves observable external changes and cannot be
+guaranteed after a crash, an unresponsive driver or device removal. The
+[CoreAudio implementation plan](docs/COREAUDIO-PLAN.md) records the software
+evidence, native test matrix and remaining gapless work.
 
 Tagged releases provide self-contained PKG installers and portable app bundles,
 so the .NET runtime is not required. Development builds require the .NET 10 SDK.

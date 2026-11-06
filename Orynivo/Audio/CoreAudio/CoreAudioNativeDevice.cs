@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Text;
+using Orynivo.Localization;
 
 namespace Orynivo.Audio.CoreAudio;
 
@@ -55,6 +56,35 @@ internal sealed class CoreAudioNativeDevice : ICoreAudioDeviceControl
 
     /// <inheritdoc/>
     public double SampleRate => Read<double>(_objectId, NominalRate);
+
+    /// <summary>Gets this live HAL object for renderer creation only; never persist it.</summary>
+    internal uint ObjectId => _objectId;
+
+    /// <summary>Gets a conservative output latency plus hardware-buffer tail.</summary>
+    internal TimeSpan DrainTail => TimeSpan.FromSeconds((
+        (double)Read<uint>(_objectId, 0x6673697a) + // fsiz, buffer frame size
+        ReadOutputUInt(0x6c746e63) + // ltnc, output latency
+        ReadOutputUInt(0x73616674) + // saft, safety offset
+        ReadArray<uint>(_objectId, Streams, OutputScope)
+            .Select(stream => (double)Read<uint>(stream, 0x6c746e63)).DefaultIfEmpty(0).Max()) / SampleRate);
+
+    /// <summary>Returns current nominal-rate capabilities without claiming native stream precision.</summary>
+    /// <returns>Display information for the CoreAudio output path.</returns>
+    internal WasapiDeviceCapabilities GetCapabilities() => new(
+        ReadString(_objectId, ObjectName), "coreaudio:" + Uid, checked((int)SampleRate), 2, 32,
+        new[] { 8000, 11025, 22050, 44100, 48000, 88200, 96000, 176400, 192000, 352800, 384000, 705600, 768000 }
+            .Where(rate => SupportsRate(rate)).ToArray(),
+        [string.Format(LocalizationManager.Current.PcmIntegerFormat, 32, "S32_LE")]);
+
+    private unsafe uint ReadOutputUInt(uint selector)
+    {
+        var address = new PropertyAddress(selector, OutputScope);
+        uint value = 0;
+        uint size = sizeof(uint);
+        Check(AudioObjectGetPropertyData(_objectId, ref address, 0, 0, ref size, (nint)(&value)));
+        if (size != sizeof(uint)) throw new IOException();
+        return value;
+    }
 
     /// <inheritdoc/>
     public int HogOwner => Read<int>(_objectId, HogMode);

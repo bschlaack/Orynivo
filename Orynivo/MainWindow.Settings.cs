@@ -187,6 +187,7 @@ public partial class MainWindow : Window
     private void UpdateReplayGainBadge(bool nativeDsdOutput)
     {
         ReplayGainBadgeBorder.IsVisible =
+            _player is not Audio.CoreAudio.CoreAudioAudioPlayer { BypassesProcessing: true } &&
             !nativeDsdOutput &&
             _settings.ReplayGainMode != ReplayGainMode.Off &&
             TryGetCurrentReplayGainValues(_currentFilePath, out var trackGain, out var albumGain) &&
@@ -613,7 +614,8 @@ public partial class MainWindow : Window
         {
             _browserAudioClientId = null;
             _browserOutputResume = null;
-            var stopped = StopPlaybackAsync(waitForCompleteDisposal: browserWasSelected);
+            var stopped = StopPlaybackAsync(waitForCompleteDisposal: browserWasSelected ||
+                _settings.OutputBackend == OutputBackend.CoreAudio || profile.Backend == OutputBackend.CoreAudio);
             var stoppedIntent = _playbackStarts.Current;
             await stopped;
             if (_playbackShuttingDown || selectionVersion != _outputProfileSelectionVersion ||
@@ -822,7 +824,14 @@ public partial class MainWindow : Window
                 window.SelectedOrynivoServers);
             var libraryPathsChanged = !(_settings.LibraryPaths ?? []).SequenceEqual(window.SelectedLibraryPaths);
             var hadOrynivoServers = _settings.OrynivoServers.Count > 0;
+            var nativeOptionsChanged = Audio.CoreAudio.CoreAudioOutputOptions.FromProfile(
+                _settings.OutputProfiles.FirstOrDefault(p => string.Equals(p.Name,
+                    _settings.SelectedOutputProfileName, StringComparison.OrdinalIgnoreCase))) !=
+                Audio.CoreAudio.CoreAudioOutputOptions.FromProfile(window.SelectedOutputProfiles.FirstOrDefault(
+                    p => string.Equals(p.Name, window.SelectedOutputProfileName, StringComparison.OrdinalIgnoreCase)));
             var outputChanged =
+                (_settings.OutputBackend == OutputBackend.CoreAudio && (nativeOptionsChanged ||
+                    _settings.MaxOutputSampleRateHz != window.MaxOutputSampleRateHz)) ||
                 _settings.OutputBackend != window.SelectedOutputBackend ||
                 _settings.DsdOverPcmEnabled != window.DsdOverPcmEnabled ||
                 !string.Equals(
@@ -838,7 +847,8 @@ public partial class MainWindow : Window
                 window.SelectedAirPlayDeviceId,
                 StringComparison.Ordinal);
             if (outputChanged && _player is not null)
-                await StopPlaybackAsync();
+                await StopPlaybackAsync(waitForCompleteDisposal: _settings.OutputBackend == OutputBackend.CoreAudio ||
+                    window.SelectedOutputBackend == OutputBackend.CoreAudio);
 
             _settings.OutputProfiles             = window.SelectedOutputProfiles.ToList();
             _settings.SelectedOutputProfileName  = window.SelectedOutputProfileName;

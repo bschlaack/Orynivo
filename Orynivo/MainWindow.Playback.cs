@@ -789,6 +789,16 @@ public partial class MainWindow : Window
             }
             (player, info) = await CreateAirPlayPlayerAsync(playbackTrack, cancellationToken);
         }
+        else if (_settings.OutputBackend == OutputBackend.CoreAudio)
+        {
+            var profile = _settings.OutputProfiles.FirstOrDefault(p =>
+                string.Equals(p.Name, _settings.SelectedOutputProfileName, StringComparison.OrdinalIgnoreCase));
+            var options = Audio.CoreAudio.CoreAudioOutputOptions.FromProfile(profile);
+            (player, info) = await Audio.CoreAudio.CoreAudioAudioPlayer.CreateAsync(
+                playbackTrack, _settings.SelectedWasapiDeviceId ?? string.Empty, options,
+                _settings.EqualizerEnabled, _settings.EqualizerProfile?.Clone(),
+                (float)VolumeSlider.Value, _settings.MaxOutputSampleRateHz, cancellationToken);
+        }
         else if (_settings.OutputBackend == OutputBackend.Wasapi)
         {
             if (string.IsNullOrWhiteSpace(_settings.SelectedWasapiDeviceId))

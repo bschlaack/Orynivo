@@ -870,6 +870,10 @@ internal partial class SettingsView : UserControl
         SelectedDriverName = profile.SelectedDriverName,
         SelectedWasapiDeviceId = profile.SelectedWasapiDeviceId,
         SelectedWasapiDeviceName = profile.SelectedWasapiDeviceName,
+        CoreAudioMatchRate = profile.CoreAudioMatchRate,
+        CoreAudioExclusive = profile.CoreAudioExclusive,
+        CoreAudioRestoreRate = profile.CoreAudioRestoreRate,
+        CoreAudioBypass = profile.CoreAudioBypass,
         SelectedAirPlayDeviceId = profile.SelectedAirPlayDeviceId,
         SelectedAirPlayDeviceName = profile.SelectedAirPlayDeviceName,
         SelectedAirPlayHost = profile.SelectedAirPlayHost,
@@ -2230,6 +2234,7 @@ internal partial class SettingsView : UserControl
             OutputBackend.Asio   => LocalizationManager.Current.SteinbergAsio,
             OutputBackend.CwAsio => LocalizationManager.Current.CwAsio,
             OutputBackend.AirPlay => LocalizationManager.Current.AirPlay,
+            OutputBackend.CoreAudio => LocalizationManager.Current.CoreAudio,
             _                    => !OperatingSystem.IsWindows()
                 ? profile.SelectedWasapiDeviceId?.StartsWith("alsa:", StringComparison.Ordinal) == true
                     ? LocalizationManager.Current.DirectAlsa

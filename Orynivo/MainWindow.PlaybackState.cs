@@ -529,6 +529,7 @@ public partial class MainWindow : Window
     private void MaybeStartNonGaplessFadeTransition(TimeSpan visiblePosition)
     {
         if (_nonGaplessFadeTransitionInProgress ||
+            _player is Audio.CoreAudio.CoreAudioAudioPlayer { BypassesProcessing: true } ||
             _settings.NonGaplessCrossfadeSeconds <= 0 ||
             _currentRadioStation is not null ||
             _currentPodcastPlayback is not null ||

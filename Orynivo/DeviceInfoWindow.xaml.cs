@@ -6,6 +6,7 @@ using AvaloniaApp = Avalonia.Application;
 
 namespace Orynivo;
 
+/// <summary>Displays platform-specific audio-device and client-format capabilities.</summary>
 public partial class DeviceInfoWindow : Window
 {
     /// <summary>
@@ -96,13 +97,15 @@ public partial class DeviceInfoWindow : Window
         DsdFormatsTextBlock.Text = LocalizationManager.Current.NativeDsdUsesAsio;
     }
 
-    /// <summary>Populates PCM device information for OpenAL and Linux direct ALSA outputs.</summary>
+    /// <summary>Populates PCM information for OpenAL, CoreAudio and direct ALSA outputs.</summary>
     /// <param name="info">PCM device capabilities to display.</param>
     private void PopulateNonWindowsPcmDeviceInfo(WasapiDeviceCapabilities info)
     {
         var isDirectAlsa = info.Id.StartsWith("alsa:", StringComparison.Ordinal);
         SummaryTextBlock.Text = string.Format(
-            isDirectAlsa
+            info.Id.StartsWith("coreaudio:", StringComparison.Ordinal)
+                ? LocalizationManager.Current.CoreAudioEndpointSummary
+                : isDirectAlsa
                 ? LocalizationManager.Current.LinuxAlsaEndpointSummary
                 : LocalizationManager.Current.LinuxOpenAlEndpointSummary,
             info.MixFormatChannels,

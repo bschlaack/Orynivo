@@ -8,11 +8,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
-- Initial macOS CoreAudio device-control foundation: stable output-device UIDs,
-  nominal-rate capability queries, confirmed rate changes, optional hog-mode
-  ownership, and asynchronous restoration with device-free lifecycle tests. This
-  is not yet connected to playback or output-profile selection; macOS continues
-  to use OpenAL. See `docs/COREAUDIO-PLAN.md` for the remaining work.
+- Experimental macOS **CoreAudio** output alongside **OpenAL** in **Create
+  output** and **Configure output**. Native profiles select a stable device UID
+  and offer automatic sample-rate matching, optional exclusive hog mode,
+  restore-on-release and an unprocessed stereo PCM mode that bypasses software
+  volume and DSP. Ordinary mode supports volume, ReplayGain, PCM boost and EQ;
+  the maximum PCM rate remains a strict ceiling. Device/rate loss stops output,
+  and native cleanup precedes restoration. DSD converts to PCM. Gapless native
+  sessions and physical Mac/DAC/bit-perfect validation remain pending; see
+  `docs/COREAUDIO-PLAN.md`.
 
 ### Fixed
 

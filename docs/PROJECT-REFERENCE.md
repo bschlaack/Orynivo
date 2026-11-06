@@ -56,29 +56,55 @@ routing discriminator: `alsa:` identifies direct ALSA; every other Linux device
 ID uses OpenAL. Existing profiles must be classified from that ID.
 
 macOS desktop builds target `net10.0` for `osx-arm64` and `osx-x64`. PCM
-playback uses Apple's system OpenAL framework. FFmpeg/FFprobe discovery checks
-the application and per-user cache, inherited `PATH`, and conventional Homebrew,
-MacPorts, pkgsrc, Fink, and per-user binary directories because Finder-launched
-apps receive a minimal `PATH`; missing tools are downloaded for the current
-architecture into the per-user cache. ALSA and native DSD output remain
-Linux-only. Tagged releases package self-contained `Orynivo.app` bundles for
-both Mac architectures as installable PKGs, portable ZIPs, and tar archives.
-Each bundle generates `Orynivo.icns` from `Logo/icon.png`, stores it under
-`Contents/Resources`, and declares it through `CFBundleIconFile`; every package
-is included in the signed release manifest. The desktop updater selects the
-current process architecture's signed `pkg`, verifies its digest, and opens it
-through `/usr/bin/open`; Orynivo must never invoke a privileged installer
-command directly.
+playback uses Apple's system OpenAL framework or the experimental native
+CoreAudio output. FFmpeg/FFprobe discovery checks the application and per-user
+cache, inherited `PATH`, and conventional Homebrew, MacPorts, pkgsrc, Fink, and
+per-user binary directories because Finder-launched apps receive a minimal
+`PATH`; missing tools are downloaded for the current architecture into the
+per-user cache. ALSA and native DSD output remain Linux-only. Tagged releases
+package self-contained `Orynivo.app` bundles for both Mac architectures as
+installable PKGs, portable ZIPs, and tar archives. Each bundle generates
+`Orynivo.icns` from `Logo/icon.png`, stores it under `Contents/Resources`, and
+declares it through `CFBundleIconFile`; every package is included in the signed
+release manifest. The desktop updater selects the current process architecture's
+signed `pkg`, verifies its digest, and opens it through `/usr/bin/open`; Orynivo
+must never invoke a privileged installer command directly.
 
-`Orynivo/Audio/CoreAudio/` contains the initial, unconnected native HAL device
-control plane. `CoreAudioNativeDevice` resolves stable output UIDs, reads rate
-ranges and accesses nominal rate/hog properties. `CoreAudioDeviceLease` owns
-process-local UID admission, confirmed exact-rate startup and asynchronous
-restoration, including failed/cancelled startup. It preserves intervening
-external rate/ownership changes where observable and never adopts an existing
-hog owner. No renderer, profile choice or bit-perfect claim is supplied by this
-foundation. See [the staged CoreAudio plan](COREAUDIO-PLAN.md) for integration
-and hardware acceptance.
+`Orynivo/Audio/CoreAudio/` implements experimental `OutputBackend.CoreAudio`
+(appended value 5; previous enum values are unchanged). Profiles persist the
+stable native UID/name in their existing device fields and four CoreAudio-only
+options. Settings cloning/normalization retain these fields; factory preparation
+captures immutable `CoreAudioOutputOptions` before awaiting. OpenAL remains a
+separate choice with its existing compatibility value and device IDs.
+
+`CoreAudioNativeDevice` resolves live UIDs and nominal rate/hog properties.
+`CoreAudioDeviceLease` retains UID admission through confirmed restoration,
+including failed startup. Successful sessions may explicitly keep their rate;
+failed startup always restores. It never adopts another hog owner or blindly
+overwrites observable external rate/ownership changes.
+
+`CoreAudioHalOutput` creates an output-only AUHAL unit at the confirmed nominal
+rate with a read-back-validated stereo S32 client format. Its callback uses
+`CoreAudioPcmRing` for bounded single-producer/single-consumer byte copies and
+underflow/paused silence. Property access, decoding, waits and UI work stay off
+the callback. Managed lifetime remains rooted until native disposal succeeds.
+After failed native stop/disposal, a non-quiescent output must retain its lease
+rather than reopen an outstanding callback's device. Native device/stream
+latency, safety offset and buffer frames bound the normal final-buffer tail.
+
+`CoreAudioAudioPlayer` reuses the segment-aware FFmpeg decoder through injected
+source/output boundaries. It serializes seek epochs and discards obsolete PCM,
+counts only consumed media frames, monitors device/rate/hog/output health every
+200 ms, and awaits output retirement before restoring the lease. It exposes
+sanitized localized failures, never decoder arguments or source locations.
+Ordinary PCM applies volume/ReplayGain/boost/EQ before the ring, preserving
+bytes at unity with EQ disabled. Profile bypass ignores all Orynivo DSP/gain and
+requires exclusive matched-rate stereo PCM; it does not establish physical
+bit-perfect output. The initial player is single-track, using existing queue
+advancement rather than claiming gapless sessions. Mixed-rate tracks open their
+own rate; crossfeed, loudness normalization, DoP and native DSD remain
+unsupported. See [the CoreAudio plan](COREAUDIO-PLAN.md) for remaining native
+acceptance.
 
 ## Orynivo.Core
 

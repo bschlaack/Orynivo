@@ -17,6 +17,7 @@ internal sealed class CoreAudioDeviceLease : IAsyncDisposable
     private double _originalRate;
     private bool _rateRequested;
     private bool _hogRequested;
+    private bool _restoreRate = true;
     private Task? _disposeTask;
 
     private CoreAudioDeviceLease(ICoreAudioDeviceControl device, double rate)
@@ -32,12 +33,14 @@ internal sealed class CoreAudioDeviceLease : IAsyncDisposable
     /// <param name="rate">Positive finite PCM rate in hertz.</param>
     /// <param name="exclusive">Whether hog mode is mandatory rather than best effort.</param>
     /// <param name="cancellationToken">Cancellation of startup, including rate confirmation.</param>
+    /// <param name="restoreSampleRate">Whether successful playback restores the original rate on release.</param>
     /// <returns>A confirmed lease which must be asynchronously disposed.</returns>
     internal static async Task<CoreAudioDeviceLease> OpenAsync(
         ICoreAudioDeviceControl device,
         double rate,
         bool exclusive,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        bool restoreSampleRate = true)
     {
         ArgumentNullException.ThrowIfNull(device);
         if (!double.IsFinite(rate) || rate <= 0)
@@ -81,6 +84,7 @@ internal sealed class CoreAudioDeviceLease : IAsyncDisposable
             if (!device.IsAvailable || device.SampleRate != rate ||
                 (exclusive && device.HogOwner != lease._processId))
                 throw new IOException();
+            lease._restoreRate = restoreSampleRate;
             return lease;
         }
         catch (Exception startupFailure)
@@ -109,7 +113,7 @@ internal sealed class CoreAudioDeviceLease : IAsyncDisposable
         {
             try
             {
-                if (_rateRequested && _device.IsAvailable &&
+                if (_restoreRate && _rateRequested && _device.IsAvailable &&
                     (_device.HogOwner == -1 || _device.HogOwner == _processId) &&
                     (_device.SampleRate == _requestedRate || _device.SampleRate == _originalRate))
                 {

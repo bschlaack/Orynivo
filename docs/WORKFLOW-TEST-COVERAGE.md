@@ -1,5 +1,17 @@
 # Workflow verification scopes
 
+CoreAudio (2026-11-06): 50 device-free cases cover exact-rate/hog leases,
+restoration/cancellation, bounded concurrent PCM transport, byte preservation,
+rate ceilings, ordinary gain, pause/seek and overlapping seek epochs, late
+decoder cleanup, monitored rate loss and profile normalization/cloning/JSON. The
+production player composes injected device, output and decoder boundaries; these
+tests do not execute native HAL entry points or FFmpeg decoding. One additional
+Windows UI group simulates Mac choice policy with injected PCM device lists,
+then exercises the actual CoreAudio/OpenAL profile dialog and Save across seven
+languages, two themes and two widths. Synthetic captures verify the shared
+layout, not macOS windowing or audio devices. Native Mac/DAC acceptance and
+same-rate gapless output remain open in [COREAUDIO-PLAN.md](COREAUDIO-PLAN.md).
+
 Mobile catalog row artwork (2026-11-04): unit checks cover opaque source keys,
 deduplication and bounded eviction. API smoke checks private image bytes/ETags
 and missing/invalid key rejection. Muted Edge verifies artist and album images
@@ -58,13 +70,13 @@ synthetic HTTP. These checks never contact directories, read personal catalogs
 or start an audio device. They do not prove real receiver playback or provider
 availability.
 
-Updated: 2026-10-14. Counts identify the added workflow cases, not the total
+Updated: 2026-11-06. Counts identify the added workflow cases, not the total
 number of unit tests in the repository.
 
 | Scope                      | Tracked evidence                                                                                                                                                   | Execution                                                   | Limits                                                                                                                |
 | -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
 | Playback lifecycle         | 14 PlaybackSessionLifecycleTests cases, including four output-switch cases and one composed gapless queue-edit case; separate ownership/drain/refresh tests remain | Desktop unit tests                                          | Fake factories, seek, positions, pause, completion and disposal; no hardware or physical audio                        |
-| Desktop setup and recovery | 66 Orynivo.Ui.Smoke groups using production adapters, original history and source collisions                                                                       | Windows Debug/Release CI configuration and local verify-all | MainWindow unshown; synthetic SQLite/HTTP and bounded headless layout; no pointer-dispatch or other-platform UI claim |
+| Desktop setup and recovery | 68 Orynivo.Ui.Smoke groups using production adapters, original history and source collisions                                                                       | Windows Debug/Release CI configuration and local verify-all | MainWindow unshown; synthetic SQLite/HTTP and bounded headless layout; no pointer-dispatch or other-platform UI claim |
 | Track HTTP routes          | Eight paging/detail/ID/auth/profile cases                                                                                                                          | Server TestServer unit-test project                         | Real route/middleware subset with temporary SQLite; no startup services or TCP listener                               |
 | Playlist HTTP routes       | Seven order/duplicate/mutation/profile/smart-resolution cases                                                                                                      | Server TestServer unit-test project                         | Shared definitions and per-request track state; synthetic catalog                                                     |
 | Original-file streaming    | Thirteen full/range/error/access/file-write cancellation cases                                                                                                     | Server TestServer unit-test project                         | Synthetic opaque files; no audio decoding, FFmpeg codec or physical network disconnect                                |
