@@ -39,6 +39,14 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
 
 ## Client Invariants
 
+- `Audio/CoreAudio` currently provides an unconnected macOS HAL control plane,
+  not a playback backend. Keep stable UID admission through complete
+  asynchronous restoration, never release another session's hog ownership, and
+  stop native rendering before lease disposal when integrating it. Do not
+  advertise CoreAudio selection or bit-perfect macOS output until the renderer
+  and profile routing exist. Implementation and acceptance steps live in
+  `../docs/COREAUDIO-PLAN.md`.
+
 - Shuffle changes must refresh prepared gapless output through the existing
   coordinator, preserving position, pause and start ownership. Automatic queue
   advancement must include forward shuffle history after Previous.

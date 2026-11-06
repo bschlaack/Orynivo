@@ -4,6 +4,18 @@ All notable changes to Orynivo are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased]
+
+### Added
+
+- Initial macOS CoreAudio device-control foundation: stable output-device UIDs,
+  nominal-rate capability queries, confirmed rate changes, optional hog-mode
+  ownership, and asynchronous restoration with device-free lifecycle tests. This
+  is not yet connected to playback or output-profile selection; macOS continues
+  to use OpenAL. See `docs/COREAUDIO-PLAN.md` for the remaining work.
+
+### Fixed
+
 ## [0.49.0] - 2026-11-04
 
 ### Added

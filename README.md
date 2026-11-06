@@ -1414,6 +1414,12 @@ the Steinberg ASIO SDK nor a platform-specific Orynivo bridge is required.
   compiler exceeds Skia's compilation timeout
 - No ASIO, cwASIO, ALSA, or native DSD support
 
+A native CoreAudio output with automatic device-rate matching is in development.
+The initial device-control foundation is not connected to playback yet; macOS
+currently uses OpenAL and does not guarantee bit-perfect output. The
+[CoreAudio implementation plan](docs/COREAUDIO-PLAN.md) tracks the planned
+OpenAL/CoreAudio profile choice and Mac/USB-DAC testing still required.
+
 Tagged releases provide self-contained PKG installers and portable app bundles,
 so the .NET runtime is not required. Development builds require the .NET 10 SDK.
 The signed update mechanism selects and verifies the PKG matching the running

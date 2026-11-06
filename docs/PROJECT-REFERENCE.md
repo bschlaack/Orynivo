@@ -70,6 +70,16 @@ current process architecture's signed `pkg`, verifies its digest, and opens it
 through `/usr/bin/open`; Orynivo must never invoke a privileged installer
 command directly.
 
+`Orynivo/Audio/CoreAudio/` contains the initial, unconnected native HAL device
+control plane. `CoreAudioNativeDevice` resolves stable output UIDs, reads rate
+ranges and accesses nominal rate/hog properties. `CoreAudioDeviceLease` owns
+process-local UID admission, confirmed exact-rate startup and asynchronous
+restoration, including failed/cancelled startup. It preserves intervening
+external rate/ownership changes where observable and never adopts an existing
+hog owner. No renderer, profile choice or bit-perfect claim is supplied by this
+foundation. See [the staged CoreAudio plan](COREAUDIO-PLAN.md) for integration
+and hardware acceptance.
+
 ## Orynivo.Core
 
 `Orynivo.Core` is a `net10.0` class library with no platform-specific
